@@ -1,0 +1,20 @@
+{
+  "capturedAtUtc": "2026-09-20T16:46:17.6148085+00:00",
+  "contracts": [
+    {
+      "sha256": "A4E624BE02A01479B98C2269BE5B0931008CD3862107F9CBF40400628AA200DF",
+      "version": "3.0.0",
+      "source": "https://vamsys.io/api-docs/operations.json",
+      "name": "operations",
+      "openapi": "3.1.0"
+    },
+    {
+      "sha256": "765864DA9B0ABCDD0ECE546EE1B6AE41EE23134CB32EF2285959CD5FDFA30C30",
+      "version": "3.0.0",
+      "source": "https://vamsys.io/api-docs/pilot.json",
+      "name": "pilot",
+      "openapi": "3.1.0"
+    }
+  ],
+  "instanceValidation": "not_performed"
+}

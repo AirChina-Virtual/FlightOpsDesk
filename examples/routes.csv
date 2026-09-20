@@ -1,0 +1,2 @@
+ID,Departure Airport (ICAO/IATA),Arrival Airport (ICAO/IATA),Type,Callsign,Flight Number,Fleet IDs,Departure Time (HH:MM),Arrival Time (HH:MM),Tags,_delete
+100,ZBAA,ZSPD,scheduled,DEM100,DM100,1,23:30,01:45,演示,FALSE

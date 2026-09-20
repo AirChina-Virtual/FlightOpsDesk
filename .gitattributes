@@ -1,0 +1,3 @@
+* text=auto
+# Contract hashes identify the exact downloaded bytes on every platform.
+docs/contracts/*.json -text whitespace=cr-at-eol

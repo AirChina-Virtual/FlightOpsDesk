@@ -1,0 +1,901 @@
+<root>
+  <data name="Text_1AB133520F" xml:space="preserve">
+    <value>Select the records to assign fleets to first</value>
+  </data>
+  <data name="Text_A1896E4C88" xml:space="preserve">
+    <value>Records marked for deletion are read-only. Restore them first.</value>
+  </data>
+  <data name="Text_D18ED1A023" xml:space="preserve">
+    <value>Selected: </value>
+  </data>
+  <data name="Text_368B16B1B0" xml:space="preserve">
+    <value>Search name, ICAO type code or ID</value>
+  </data>
+  <data name="Text_ED31FBB483" xml:space="preserve">
+    <value>Operation</value>
+  </data>
+  <data name="Text_DD9F9DBA0C" xml:space="preserve">
+    <value>Replace with selected fleets</value>
+  </data>
+  <data name="Text_7A387A9608" xml:space="preserve">
+    <value>Add selected fleets</value>
+  </data>
+  <data name="Text_58A816EF01" xml:space="preserve">
+    <value>Remove selected fleets</value>
+  </data>
+  <data name="Text_F1439C5A73" xml:space="preserve">
+    <value>Select assigned fleet</value>
+  </data>
+  <data name="Text_F042305012" xml:space="preserve">
+    <value>Select available fleets (multiple)</value>
+  </data>
+  <data name="Text_182B2BEF88" xml:space="preserve">
+    <value>Applies to {arg0:N0} selected records using this workspace's fleets. Unresolved references are retained and flagged.</value>
+  </data>
+  <data name="Text_5C250CFB41" xml:space="preserve">
+    <value>Preview changes</value>
+  </data>
+  <data name="Text_7B23705C3B" xml:space="preserve">
+    <value>Fleet assignment validation failed</value>
+  </data>
+  <data name="Text_3FD47EDCE4" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="Text_AB90F9524E" xml:space="preserve">
+    <value>No fleet associations changed</value>
+  </data>
+  <data name="Text_D1482F496E" xml:space="preserve">
+    <value>Review fleet assignment</value>
+  </data>
+  <data name="Text_CCFF94DA2A" xml:space="preserve">
+    <value>{arg0:N0} drafts will change. You can undo this operation.</value>
+  </data>
+  <data name="Text_2354C137CE" xml:space="preserve">
+    <value>Apply to drafts</value>
+  </data>
+  <data name="Text_46F566CD0E" xml:space="preserve">
+    <value>Updated fleet associations on {arg0:N0} records; not submitted</value>
+  </data>
+  <data name="Text_C124B32C00" xml:space="preserve">
+    <value>Select routes that are not marked for deletion</value>
+  </data>
+  <data name="Text_B80DA74EC5" xml:space="preserve">
+    <value>Expire routes (CSV)</value>
+  </data>
+  <data name="Text_A5124DA2BA" xml:space="preserve">
+    <value>Set End Date to {arg1} on {arg0} routes. Export and import into Orwell to apply. This does not delete routes.</value>
+  </data>
+  <data name="Text_52D4945C25" xml:space="preserve">
+    <value>Set end date</value>
+  </data>
+  <data name="Text_B4F14FDEB3" xml:space="preserve">
+    <value>Route end dates set. Review and export the CSV.</value>
+  </data>
+  <data name="Text_E531BA46BD" xml:space="preserve">
+    <value>vaMSYS Batch Manager</value>
+  </data>
+  <data name="Text_9750099F9F" xml:space="preserve">
+    <value>API batch management</value>
+  </data>
+  <data name="Text_11584EAAA5" xml:space="preserve">
+    <value>Drafts autosaved · Not submitted</value>
+  </data>
+  <data name="Text_571629E172" xml:space="preserve">
+    <value>A task is running. Cancel it or wait for completion first.</value>
+  </data>
+  <data name="Text_7AF24B0E8E" xml:space="preserve">
+    <value>Save failed. The window remains open; check disk space and directory permissions.</value>
+  </data>
+  <data name="Text_AEB8A69DBE" xml:space="preserve">
+    <value>Operation did not complete: </value>
+  </data>
+  <data name="Text_2CD0F3BE87" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="Text_692F811146" xml:space="preserve">
+    <value>Demo · No live connection</value>
+  </data>
+  <data name="Text_C4C1F8C6F4" xml:space="preserve">
+    <value>Online · Adapter pending</value>
+  </data>
+  <data name="Text_6C352EE0B0" xml:space="preserve">
+    <value>Offline mode</value>
+  </data>
+  <data name="Text_C4CF69F358" xml:space="preserve">
+    <value>Not loaded</value>
+  </data>
+  <data name="Text_B5B62EA34A" xml:space="preserve">
+    <value>{arg0:N0} records · Snapshot: {arg1}</value>
+  </data>
+  <data name="Text_9BB882C622" xml:space="preserve">
+    <value>Data management</value>
+  </data>
+  <data name="Text_D52C17622D" xml:space="preserve">
+    <value>Import wizard</value>
+  </data>
+  <data name="Text_10CCC8AAA2" xml:space="preserve">
+    <value>Change review</value>
+  </data>
+  <data name="Text_00B514C36A" xml:space="preserve">
+    <value>Task center</value>
+  </data>
+  <data name="Text_C2B958136D" xml:space="preserve">
+    <value>Connection &amp; settings</value>
+  </data>
+  <data name="Text_3797982942" xml:space="preserve">
+    <value>Workspaces</value>
+  </data>
+  <data name="Text_B9B43D4DAA" xml:space="preserve">
+    <value>{arg0:N0} records · {arg1:N0} pending changes</value>
+  </data>
+  <data name="Text_C771248E51" xml:space="preserve">
+    <value>Open</value>
+  </data>
+  <data name="Text_2C33D5F7DE" xml:space="preserve">
+    <value>Connect VA → Load from API → Edit in bulk → Review and submit → Verify by read-back</value>
+  </data>
+  <data name="Text_946897D107" xml:space="preserve">
+    <value>New workspace</value>
+  </data>
+  <data name="Text_8DCC576817" xml:space="preserve">
+    <value>Airline name</value>
+  </data>
+  <data name="Text_A818AFCD80" xml:space="preserve">
+    <value>New airline</value>
+  </data>
+  <data name="Text_CDD0362664" xml:space="preserve">
+    <value>Create separate workspace</value>
+  </data>
+  <data name="Text_57D4E0340D" xml:space="preserve">
+    <value>Create demo workspace</value>
+  </data>
+  <data name="Text_8B0B7AD880" xml:space="preserve">
+    <value>CSV supports candidate imports and exports; SQLite stores caches, drafts and jobs.</value>
+  </data>
+  <data name="Text_762B9F2664" xml:space="preserve">
+    <value>Search all fields</value>
+  </data>
+  <data name="Text_5C55A67935" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="Text_682D211B71" xml:space="preserve">
+    <value>Modified</value>
+  </data>
+  <data name="Text_549986E82C" xml:space="preserve">
+    <value>Marked for deletion</value>
+  </data>
+  <data name="Text_0DE280B4DF" xml:space="preserve">
+    <value>Filter / sort</value>
+  </data>
+  <data name="Text_0006D696D8" xml:space="preserve">
+    <value>New</value>
+  </data>
+  <data name="Text_95DD1FDDFE" xml:space="preserve">
+    <value>Assign fleets</value>
+  </data>
+  <data name="Text_435BF8A234" xml:space="preserve">
+    <value>Delete selected</value>
+  </data>
+  <data name="Text_A6926595CE" xml:space="preserve">
+    <value>Restore deleted</value>
+  </data>
+  <data name="Text_48A195CA7E" xml:space="preserve">
+    <value>Review and submit</value>
+  </data>
+  <data name="Text_E306752B35" xml:space="preserve">
+    <value>Batch rules</value>
+  </data>
+  <data name="Text_7AA882D2FE" xml:space="preserve">
+    <value>Expire routes</value>
+  </data>
+  <data name="Text_926A50B98E" xml:space="preserve">
+    <value>Undo</value>
+  </data>
+  <data name="Text_E5CE954248" xml:space="preserve">
+    <value>Last draft edit undone</value>
+  </data>
+  <data name="Text_03717B6F10" xml:space="preserve">
+    <value>Redo</value>
+  </data>
+  <data name="Text_1F00D27BEE" xml:space="preserve">
+    <value>Draft edit redone</value>
+  </data>
+  <data name="Text_41B0AF8C5C" xml:space="preserve">
+    <value>Validate</value>
+  </data>
+  <data name="Text_6320B4A872" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="Text_72FDFB5848" xml:space="preserve">
+    <value>Fleet (click to choose)</value>
+  </data>
+  <data name="Text_75141EDE81" xml:space="preserve">
+    <value>Draft modified · Autosaving</value>
+  </data>
+  <data name="Text_EE96DC1EBE" xml:space="preserve">
+    <value>Pending deletion</value>
+  </data>
+  <data name="Text_20D2382F10" xml:space="preserve">
+    <value>Existing</value>
+  </data>
+  <data name="Text_4EF7F62706" xml:space="preserve">
+    <value>New draft</value>
+  </data>
+  <data name="Text_C221144914" xml:space="preserve">
+    <value>Unresolved fleet · </value>
+  </data>
+  <data name="Text_F274578907" xml:space="preserve">
+    <value>Choose fleet…</value>
+  </data>
+  <data name="Text_BAB47FB928" xml:space="preserve">
+    <value>Select records to delete first</value>
+  </data>
+  <data name="Text_FD6D0919A9" xml:space="preserve">
+    <value>Dependencies prevent deletion</value>
+  </data>
+  <data name="Text_EEAAAF2F48" xml:space="preserve">
+    <value>These records are already marked for deletion. Use Restore deleted.</value>
+  </data>
+  <data name="Text_948725D00E" xml:space="preserve">
+    <value>Delete selected records</value>
+  </data>
+  <data name="Text_0360D81E1F" xml:space="preserve">
+    <value>Remove {arg0} new drafts and mark {arg1} existing records for deletion. Only local drafts change; this can be undone.</value>
+  </data>
+  <data name="Text_0E38068B45" xml:space="preserve">
+    <value>Reference checks cover this workspace only and cannot rule out other remote dependencies.</value>
+  </data>
+  <data name="Text_A3EA3C17B4" xml:space="preserve">
+    <value>Confirm deletion</value>
+  </data>
+  <data name="Text_2C040F22AA" xml:space="preserve">
+    <value>Removed {arg0} new drafts; marked {arg1} existing records for deletion</value>
+  </data>
+  <data name="Text_785FDE2811" xml:space="preserve">
+    <value>Select records marked for deletion</value>
+  </data>
+  <data name="Text_FABC892562" xml:space="preserve">
+    <value>Deletion canceled; previous edits retained</value>
+  </data>
+  <data name="Text_4BB22EC98B" xml:space="preserve">
+    <value>No records to process</value>
+  </data>
+  <data name="Text_86F623E5CC" xml:space="preserve">
+    <value>Field (use Assign fleets for fleet changes)</value>
+  </data>
+  <data name="Text_A30D395090" xml:space="preserve">
+    <value>Set / clear value</value>
+  </data>
+  <data name="Text_5B7341C2D6" xml:space="preserve">
+    <value>Find and replace text</value>
+  </data>
+  <data name="Text_795CBFF909" xml:space="preserve">
+    <value>Add tags</value>
+  </data>
+  <data name="Text_6FE8FC1819" xml:space="preserve">
+    <value>Remove tags</value>
+  </data>
+  <data name="Text_FAC7E021A1" xml:space="preserve">
+    <value>Shift time (minutes, wrap at midnight)</value>
+  </data>
+  <data name="Text_E79453E164" xml:space="preserve">
+    <value>Shift date (days)</value>
+  </data>
+  <data name="Text_6797F1B017" xml:space="preserve">
+    <value>Expire routes</value>
+  </data>
+  <data name="Text_DD5ABC95B1" xml:space="preserve">
+    <value>New value / offset</value>
+  </data>
+  <data name="Text_8FAB339859" xml:space="preserve">
+    <value>Search text (for replacement only)</value>
+  </data>
+  <data name="Text_A737FD72B0" xml:space="preserve">
+    <value>Selected</value>
+  </data>
+  <data name="Text_CD02A81FB5" xml:space="preserve">
+    <value>All filtered results</value>
+  </data>
+  <data name="Text_3733B88A89" xml:space="preserve">
+    <value>Scope: {arg0}, {arg1} records</value>
+  </data>
+  <data name="Text_13D61FEA9F" xml:space="preserve">
+    <value>Preview</value>
+  </data>
+  <data name="Text_CA75B5F2F0" xml:space="preserve">
+    <value>Expiration applies to routes only</value>
+  </data>
+  <data name="Text_AD86791376" xml:space="preserve">
+    <value>Review rule impact</value>
+  </data>
+  <data name="Text_42F23885A7" xml:space="preserve">
+    <value>Processing {arg0} records; the first 8 are shown. Time shifts do not automatically change service days or effective dates.</value>
+  </data>
+  <data name="Text_13292B3343" xml:space="preserve">
+    <value>Processed {arg0} records; not submitted</value>
+  </data>
+  <data name="Text_AA9F647A82" xml:space="preserve">
+    <value>Local validation passed. Remote rules still require import or live verification.</value>
+  </data>
+  <data name="Text_8EEF5FE8E6" xml:space="preserve">
+    <value>Found {arg0} issues</value>
+  </data>
+  <data name="Text_38833A8579" xml:space="preserve">
+    <value>Row validation results</value>
+  </data>
+  <data name="Text_7560F012B2" xml:space="preserve">
+    <value>Row {arg0} · {arg1}: {arg2}</value>
+  </data>
+  <data name="Text_D030C51D78" xml:space="preserve">
+    <value>Read standard vaMSYS CSV or map custom columns. The first import can establish a snapshot; later files can merge into drafts.</value>
+  </data>
+  <data name="Text_3618171B0A" xml:space="preserve">
+    <value>Missing rows do not cause deletion. Leave ID empty for new records; load existing records with IDs before updating them.</value>
+  </data>
+  <data name="Text_5A2BBDEA04" xml:space="preserve">
+    <value>Choose CSV and map columns</value>
+  </data>
+  <data name="Text_130FDB3E71" xml:space="preserve">
+    <value>Read from API (adapter pending)</value>
+  </data>
+  <data name="Text_B91DE02936" xml:space="preserve">
+    <value>Use as original snapshot (replace this resource's snapshot and drafts)</value>
+  </data>
+  <data name="Text_42F0F930C9" xml:space="preserve">
+    <value>{arg0:N0} records. Edit destination column names; keep original names to preserve unknown columns.</value>
+  </data>
+  <data name="Text_793A76BFEA" xml:space="preserve">
+    <value>First 3 rows:
+</value>
+  </data>
+  <data name="Text_E0FDE3C5CB" xml:space="preserve">
+    <value>Column mapping and preview</value>
+  </data>
+  <data name="Text_C9B2630A18" xml:space="preserve">
+    <value>Import into workspace</value>
+  </data>
+  <data name="Text_885B15B2F5" xml:space="preserve">
+    <value>Replace workspace snapshot</value>
+  </data>
+  <data name="Text_5B5C523423" xml:space="preserve">
+    <value>This resource's drafts and undo history will be replaced. The source CSV is unaffected.</value>
+  </data>
+  <data name="Text_131B13AA26" xml:space="preserve">
+    <value>Replace</value>
+  </data>
+  <data name="Text_3BCC8B750F" xml:space="preserve">
+    <value>The file contains duplicate identifiers. Correct them before importing.</value>
+  </data>
+  <data name="Text_D84A9B1171" xml:space="preserve">
+    <value>Imported {arg0:N0} records; {arg1} validation issues are available in Data management</value>
+  </data>
+  <data name="Text_5ABD08A949" xml:space="preserve">
+    <value>Explicit deletion</value>
+  </data>
+  <data name="Text_4478B3A156" xml:space="preserve">
+    <value>{arg0} changes · Create {arg1} · Update {arg2} · Delete {arg3}</value>
+  </data>
+  <data name="Text_ABED06FAA0" xml:space="preserve">
+    <value>Export changes as CSV</value>
+  </data>
+  <data name="Text_498F64E2E2" xml:space="preserve">
+    <value>Run demo task (all resources)</value>
+  </data>
+  <data name="Text_49EA85BB1C" xml:space="preserve">
+    <value>Submit to API</value>
+  </data>
+  <data name="Text_75843F167F" xml:space="preserve">
+    <value>Resolve validation issues first</value>
+  </data>
+  <data name="Text_90484F47B3" xml:space="preserve">
+    <value>No changes to export</value>
+  </data>
+  <data name="Text_5D6042B30E" xml:space="preserve">
+    <value>Export includes deletions</value>
+  </data>
+  <data name="Text_B83678AC3A" xml:space="preserve">
+    <value>The files will contain {arg0} deletion instructions. Importing them into Orwell may be irreversible.</value>
+  </data>
+  <data name="Text_6B20B383BC" xml:space="preserve">
+    <value>Export deletion instructions</value>
+  </data>
+  <data name="Text_D964132351" xml:space="preserve">
+    <value>Awaiting Orwell import · Exported {arg0} CSV files · {arg1}</value>
+  </data>
+  <data name="Text_B680DD9FD1" xml:space="preserve">
+    <value>Exported {arg0} files · Awaiting Orwell import; remote data unchanged</value>
+  </data>
+  <data name="Text_78E06D4B43" xml:space="preserve">
+    <value>Resolve validation issues across all resources first</value>
+  </data>
+  <data name="Text_008D68D9F9" xml:space="preserve">
+    <value>Demo task: review all resources</value>
+  </data>
+  <data name="Text_5581164B03" xml:space="preserve">
+    <value>The simulator will execute {arg0} changes without connecting to vaMSYS. Review every resource below; Delete means explicit deletion.</value>
+  </data>
+  <data name="Text_48B3938B8C" xml:space="preserve">
+    <value>Run demo</value>
+  </data>
+  <data name="Text_B64A075682" xml:space="preserve">
+    <value>Demo: </value>
+  </data>
+  <data name="Text_59164F39E2" xml:space="preserve">
+    <value>Cancellation stops subsequent requests only. Unknown results are checked first; successful items are not repeated.</value>
+  </data>
+  <data name="Text_14F7E13979" xml:space="preserve">
+    <value>Cancel subsequent requests</value>
+  </data>
+  <data name="Text_9A397E63C4" xml:space="preserve">
+    <value>Succeeded {arg0} / {arg1} · Unknown {arg2}</value>
+  </data>
+  <data name="Text_979A332955" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="Text_4DCE8EF2E4" xml:space="preserve">
+    <value>Per-record execution results</value>
+  </data>
+  <data name="Text_9C4801C86B" xml:space="preserve">
+    <value>Resume demo task</value>
+  </data>
+  <data name="Text_6A1C23202F" xml:space="preserve">
+    <value>Retry confirmed failures</value>
+  </data>
+  <data name="Text_0251B89662" xml:space="preserve">
+    <value>Instance address (HTTPS)</value>
+  </data>
+  <data name="Text_86032C09C5" xml:space="preserve">
+    <value>Client Secret (leave empty to keep stored credentials)</value>
+  </data>
+  <data name="Text_92BD49D337" xml:space="preserve">
+    <value>Use airport local times (preserve offline values; do not infer time zones)</value>
+  </data>
+  <data name="Text_A741E95F8D" xml:space="preserve">
+    <value>Operations API · Adapter pending</value>
+  </data>
+  <data name="Text_7E95E384B5" xml:space="preserve">
+    <value>Instance OpenAPI, authentication URL and resource contracts are missing. Live reads and writes remain disabled. Saving settings sends no requests.</value>
+  </data>
+  <data name="Text_760143E568" xml:space="preserve">
+    <value>Save connection settings</value>
+  </data>
+  <data name="Text_D6934554B8" xml:space="preserve">
+    <value>Enter an HTTPS instance address without embedded credentials</value>
+  </data>
+  <data name="Text_DEADA9F3CC" xml:space="preserve">
+    <value>Settings saved; credentials protected for the current Windows user. No requests sent.</value>
+  </data>
+  <data name="Text_0FBBFA69D4" xml:space="preserve">
+    <value>Test connection (contract required)</value>
+  </data>
+  <data name="Text_1CCB303756" xml:space="preserve">
+    <value>Imported times are preserved offline. Time offsets wrap at 24 hours without changing service days. Time zone conversion requires verified airport time zone data.</value>
+  </data>
+  <data name="Text_8BEFA80716" xml:space="preserve">
+    <value>Task state could not be persisted; subsequent requests stopped</value>
+  </data>
+  <data name="Text_5026A63B58" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="Text_6F312AE253" xml:space="preserve">
+    <value>Subsequent requests canceled</value>
+  </data>
+  <data name="Text_3E85DDB213" xml:space="preserve">
+    <value>Dependency did not succeed</value>
+  </data>
+  <data name="Text_3BFE500D9C" xml:space="preserve">
+    <value>Create result unknown; manual verification required. Not retried.</value>
+  </data>
+  <data name="Text_A65DECDE8F" xml:space="preserve">
+    <value>Remote result verified during recovery</value>
+  </data>
+  <data name="Text_E0B2732184" xml:space="preserve">
+    <value>Interrupted result could not be confirmed; verify manually</value>
+  </data>
+  <data name="Text_D876D1E7AF" xml:space="preserve">
+    <value>Remote data differs from the snapshot; review again</value>
+  </data>
+  <data name="Text_4B53041E43" xml:space="preserve">
+    <value>Local reference is not resolved yet</value>
+  </data>
+  <data name="Text_DCC1A22D9E" xml:space="preserve">
+    <value>Submitting</value>
+  </data>
+  <data name="Text_631F4DBEC2" xml:space="preserve">
+    <value>Verified by read-back</value>
+  </data>
+  <data name="Text_477A5F591D" xml:space="preserve">
+    <value>Request returned, but read-back did not confirm the target values</value>
+  </data>
+  <data name="Text_CB72CB3DAC" xml:space="preserve">
+    <value>Authentication or permission error; sent requests require verification</value>
+  </data>
+  <data name="Text_5B0F395E13" xml:space="preserve">
+    <value>Paused: authentication / permission error</value>
+  </data>
+  <data name="Text_395B73E720" xml:space="preserve">
+    <value>Request interrupted; result unknown. Verify before resuming.</value>
+  </data>
+  <data name="Text_08E3371510" xml:space="preserve">
+    <value>Read interrupted; resumable</value>
+  </data>
+  <data name="Text_EFDA7294FF" xml:space="preserve">
+    <value>Field validation failed</value>
+  </data>
+  <data name="Text_A60B4675CF" xml:space="preserve">
+    <value>Operation failed; check the contract and data</value>
+  </data>
+  <data name="Text_140197D868" xml:space="preserve">
+    <value>Completed and verified</value>
+  </data>
+  <data name="Text_E9008C53CF" xml:space="preserve">
+    <value>Completed with items requiring attention</value>
+  </data>
+  <data name="Text_6216D1C3A0" xml:space="preserve">
+    <value>Search text cannot be empty</value>
+  </data>
+  <data name="Text_5CBDBA3063" xml:space="preserve">
+    <value>Unsupported rule</value>
+  </data>
+  <data name="Text_269E09BE6D" xml:space="preserve">
+    <value>Invalid CSV quoting</value>
+  </data>
+  <data name="Text_FDC11D46D9" xml:space="preserve">
+    <value>CSV has an unclosed quote</value>
+  </data>
+  <data name="Text_EB79E7A05C" xml:space="preserve">
+    <value>CSV is empty</value>
+  </data>
+  <data name="Text_147B7E591C" xml:space="preserve">
+    <value>CSV column names are empty or duplicated</value>
+  </data>
+  <data name="Text_7D9C54257B" xml:space="preserve">
+    <value>CSV row column count differs from the header</value>
+  </data>
+  <data name="Text_E93E44505B" xml:space="preserve">
+    <value>Mapped fields are empty or duplicated</value>
+  </data>
+  <data name="Text_FF27EDEC0D" xml:space="preserve">
+    <value>Snapshot records require identifiers. Clear Use as original snapshot for new records.</value>
+  </data>
+  <data name="Text_FC5C1BF085" xml:space="preserve">
+    <value>Import file contains duplicate identifiers</value>
+  </data>
+  <data name="Text_DFA07F45EA" xml:space="preserve">
+    <value>Workspace contains duplicate identifiers; cannot merge</value>
+  </data>
+  <data name="Text_C73CE653CA" xml:space="preserve">
+    <value>Identifier {arg0} is duplicated; automatic merge is not possible</value>
+  </data>
+  <data name="Text_6597D6DF98" xml:space="preserve">
+    <value>Local references require remote IDs before CSV export. Import the base resources into Orwell, then reload their IDs.</value>
+  </data>
+  <data name="Text_924C111685" xml:space="preserve">
+    <value>A single row exceeds the file size limit</value>
+  </data>
+  <data name="Text_CCEF575C0D" xml:space="preserve">
+    <value>Still referenced by {arg0} {arg1} ({arg2}{arg3}, local row {arg4}) in {arg5}</value>
+  </data>
+  <data name="Text_0829856E83" xml:space="preserve">
+    <value>Active dependent records exist; deletion was not performed</value>
+  </data>
+  <data name="Text_77F9BBEB62" xml:space="preserve">
+    <value>Only aircraft and routes support fleet assignment</value>
+  </data>
+  <data name="Text_95BA634DEA" xml:space="preserve">
+    <value>Duplicate ID</value>
+  </data>
+  <data name="Text_0772B8422B" xml:space="preserve">
+    <value>Pending creation {arg0}</value>
+  </data>
+  <data name="Text_63524EC09F" xml:space="preserve">
+    <value>Unresolved fleet</value>
+  </data>
+  <data name="Text_F6036A3E65" xml:space="preserve">
+    <value>Reference needs verification</value>
+  </data>
+  <data name="Text_18371681C3" xml:space="preserve">
+    <value>Local reference</value>
+  </data>
+  <data name="Text_1C6416508F" xml:space="preserve">
+    <value>Aircraft support replacing a single assigned fleet only</value>
+  </data>
+  <data name="Text_92C7B26624" xml:space="preserve">
+    <value>Records marked for deletion cannot be edited</value>
+  </data>
+  <data name="Text_0CEB89655F" xml:space="preserve">
+    <value>Aircraft must have exactly one fleet</value>
+  </data>
+  <data name="Text_2335DBC57B" xml:space="preserve">
+    <value>Non-jumpseat routes must retain at least one fleet</value>
+  </data>
+  <data name="Text_F7B2F3BC0C" xml:space="preserve">
+    <value>Cannot add association {arg0}: {arg1}</value>
+  </data>
+  <data name="Text_919362E2F8" xml:space="preserve">
+    <value>Resolve fleet assignment issues first</value>
+  </data>
+  <data name="Text_707DBE0213" xml:space="preserve">
+    <value>My airline</value>
+  </data>
+  <data name="Text_637DA56123" xml:space="preserve">
+    <value>Pending</value>
+  </data>
+  <data name="Text_6A5347AC5F" xml:space="preserve">
+    <value>Airports</value>
+  </data>
+  <data name="Text_D082D02D37" xml:space="preserve">
+    <value>Fleets</value>
+  </data>
+  <data name="Text_C05F7CD6ED" xml:space="preserve">
+    <value>Aircraft</value>
+  </data>
+  <data name="Text_ABF79C546F" xml:space="preserve">
+    <value>Routings</value>
+  </data>
+  <data name="Text_486B1DF063" xml:space="preserve">
+    <value>Routes</value>
+  </data>
+  <data name="Text_DA77CC5B62" xml:space="preserve">
+    <value>Duplicate identifier; resolve before submitting</value>
+  </data>
+  <data name="Text_73DF5EC597" xml:space="preserve">
+    <value>Cannot delete a record whose existence is unconfirmed</value>
+  </data>
+  <data name="Text_F9F0B63720" xml:space="preserve">
+    <value>Deletion identifier differs from the snapshot</value>
+  </data>
+  <data name="Text_B283E8E5F2" xml:space="preserve">
+    <value>Required field is empty</value>
+  </data>
+  <data name="Text_783B7A2935" xml:space="preserve">
+    <value>Record identifiers cannot be edited; create a new record</value>
+  </data>
+  <data name="Text_0D4C574F60" xml:space="preserve">
+    <value>This ID is absent from the snapshot. Load existing data first or clear ID to explicitly create a record.</value>
+  </data>
+  <data name="Text_1B7AB7E0F1" xml:space="preserve">
+    <value>Boolean value must be TRUE or FALSE</value>
+  </data>
+  <data name="Text_F59EB79050" xml:space="preserve">
+    <value>Date format must be yyyy-MM-dd HH:mm:ss</value>
+  </data>
+  <data name="Text_C8CF0D677E" xml:space="preserve">
+    <value>Time format must be HH:mm</value>
+  </data>
+  <data name="Text_C4946548B5" xml:space="preserve">
+    <value>Service days must be lowercase English weekday names, separated by commas</value>
+  </data>
+  <data name="Text_50DDC19E1F" xml:space="preserve">
+    <value>Invalid fleet category</value>
+  </data>
+  <data name="Text_675251FAAF" xml:space="preserve">
+    <value>A nonnegative capacity is required</value>
+  </data>
+  <data name="Text_EFB86BD704" xml:space="preserve">
+    <value>Invalid route type</value>
+  </data>
+  <data name="Text_134FD96D33" xml:space="preserve">
+    <value>Required for non-jumpseat routes</value>
+  </data>
+  <data name="Text_39CD1EC048" xml:space="preserve">
+    <value>Callsign must contain 4–7 characters</value>
+  </data>
+  <data name="Text_D60FFE3B83" xml:space="preserve">
+    <value>Flight number must contain 3–6 characters</value>
+  </data>
+  <data name="Text_31E5AEFD06" xml:space="preserve">
+    <value>Existing routing departure and arrival airports cannot be changed</value>
+  </data>
+  <data name="Text_5CDAFFB468" xml:space="preserve">
+    <value>Reference {arg0} is missing from this workspace; load {arg1} first</value>
+  </data>
+  <data name="Text_06FE405F2A" xml:space="preserve">
+    <value>Aircraft can have only one assigned fleet</value>
+  </data>
+  <data name="Text_CDDA93CCD1" xml:space="preserve">
+    <value>Possible duplicate creation; verify the identifier or business fields</value>
+  </data>
+  <data name="Text_A69A8C3CDE" xml:space="preserve">
+    <value>Pagination URLs must use HTTPS and the configured instance origin</value>
+  </data>
+  <data name="Text_33FE138E2B" xml:space="preserve">
+    <value>Authentication or permission error</value>
+  </data>
+  <data name="Text_122031269F" xml:space="preserve">
+    <value>Server returned a repeated pagination cursor</value>
+  </data>
+  <data name="Text_61CA285291" xml:space="preserve">
+    <value>Pagination response does not match the known contract</value>
+  </data>
+  <data name="Text_9F2DE78FA0" xml:space="preserve">
+    <value>Adapter pending: instance OpenAPI, authentication URL and resource contracts are missing; no live verification performed</value>
+  </data>
+  <data name="OfflineReady" xml:space="preserve">
+    <value>Connect to the Operations API or open a cached workspace.</value>
+  </data>
+  <data name="Enum_ChangeKind_Create" xml:space="preserve">
+    <value>Create</value>
+  </data>
+  <data name="Enum_ChangeKind_Update" xml:space="preserve">
+    <value>Update</value>
+  </data>
+  <data name="Enum_ItemState_Unknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="ChooseFleet" xml:space="preserve">
+    <value>Choose fleet</value>
+  </data>
+  <data name="CurrentWorkspace" xml:space="preserve">
+    <value>Current workspace</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Interface language (applies immediately)</value>
+  </data>
+  <data name="Enum_ItemState_Failed" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="Enum_ItemState_Conflict" xml:space="preserve">
+    <value>Conflict</value>
+  </data>
+  <data name="Enum_ChangeKind_Delete" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="Enum_RunMode_Online" xml:space="preserve">
+    <value>Online</value>
+  </data>
+  <data name="Enum_RunMode_Demo" xml:space="preserve">
+    <value>Demo</value>
+  </data>
+  <data name="ResourceType" xml:space="preserve">
+    <value>Resource type</value>
+  </data>
+  <data name="Enum_ItemState_Pending" xml:space="preserve">
+    <value>Pending</value>
+  </data>
+  <data name="Enum_ItemState_Skipped" xml:space="preserve">
+    <value>Skipped</value>
+  </data>
+  <data name="Enum_RunMode_Offline" xml:space="preserve">
+    <value>Offline</value>
+  </data>
+  <data name="Enum_ItemState_Running" xml:space="preserve">
+    <value>Running</value>
+  </data>
+  <data name="Enum_ItemState_Succeeded" xml:space="preserve">
+    <value>Succeeded</value>
+  </data>
+  <data name="Confirm" xml:space="preserve">
+    <value>Confirm</value>
+  </data>
+  <data name="DemoWorkspace" xml:space="preserve">
+    <value>Demo airline {time}</value>
+  </data>
+  <data name="ApiMoveFleet" xml:space="preserve">
+    <value>Moving aircraft between fleets is disabled: MoveAircraftFleetData has no documented request fields.</value>
+  </data>
+  <data name="ApiSubmitScope" xml:space="preserve">
+    <value>Target: {va} (airline {id}), {count} records. Unverified operations run as small samples; successful read-back records operation verification.</value>
+  </data>
+  <data name="ApiCapability" xml:space="preserve">
+    <value>Official contracts implemented. Connect to verify reads; unverified writes are limited to 3 samples per operation. Fleet moves, route fleet updates and unconfirmed clearing remain disabled.</value>
+  </data>
+  <data name="ApiSettingsHelp" xml:space="preserve">
+    <value>Use the Operations Client ID and Secret configured in Orwell. Refresh manually after connecting; drafts are never submitted automatically. API weights use kg; dates and times use UTC.</value>
+  </data>
+  <data name="ApiFleetSet" xml:space="preserve">
+    <value>Route fleet replacement and clearing semantics have not been verified against an instance.</value>
+  </data>
+  <data name="ApiRefresh" xml:space="preserve">
+    <value>Refresh from API</value>
+  </data>
+  <data name="ApiRefreshed" xml:space="preserve">
+    <value>API data refreshed. Conflicts to review: {count}.</value>
+  </data>
+  <data name="ApiHttp" xml:space="preserve">
+    <value>The API returned HTTP {status}. See the diagnostic details.</value>
+  </data>
+  <data name="ApiAuth" xml:space="preserve">
+    <value>Authentication or permission denied. Check Operations credentials and access.</value>
+  </data>
+  <data name="ApiConnected" xml:space="preserve">
+    <value>Operations connected. Airline ID: {id}.</value>
+  </data>
+  <data name="ApiInvalid" xml:space="preserve">
+    <value>Field does not meet the API contract: {field}</value>
+  </data>
+  <data name="ApiKeepLocal" xml:space="preserve">
+    <value>Keep local changes</value>
+  </data>
+  <data name="ApiSettings" xml:space="preserve">
+    <value>Operations API connection</value>
+  </data>
+  <data name="ApiConnect" xml:space="preserve">
+    <value>Test Operations connection</value>
+  </data>
+  <data name="ApiConflictValues" xml:space="preserve">
+    <value>Original: {old}
+Local: {local}
+Remote: {remote}</value>
+  </data>
+  <data name="ApiUnsupported" xml:space="preserve">
+    <value>API mapping has not been verified for this field: {field}</value>
+  </data>
+  <data name="ApiConflict" xml:space="preserve">
+    <value>Remote and local changes conflict. Review them before submitting.</value>
+  </data>
+  <data name="ApiDependencies" xml:space="preserve">
+    <value>Referenced records or unfinished dependencies must be handled first.</value>
+  </data>
+  <data name="ApiLoading" xml:space="preserve">
+    <value>Loading {resource}: {count} records</value>
+  </data>
+  <data name="ApiTarget" xml:space="preserve">
+    <value>Target workspace: {va} · Airline ID: {id}</value>
+  </data>
+  <data name="ApiConnectFirst" xml:space="preserve">
+    <value>Save credentials and test the connection in Settings first.</value>
+  </data>
+  <data name="ApiJumpseat" xml:space="preserve">
+    <value>Online changes to or from Jumpseat are disabled because they clear associations.</value>
+  </data>
+  <data name="ApiSoftDelete" xml:space="preserve">
+    <value>Deletion was accepted. Verify the final soft-delete state in Orwell; the request will not be repeated automatically.</value>
+  </data>
+  <data name="ApiBlocked" xml:space="preserve">
+    <value>These changes cannot be submitted online</value>
+  </data>
+  <data name="ApiRefreshFirst" xml:space="preserve">
+    <value>Refresh from the API to establish remote identities first.</value>
+  </data>
+  <data name="ApiUnknown" xml:space="preserve">
+    <value>The result is unconfirmed. Resume checks the remote state without repeating writes. Inspect the original record in Orwell.</value>
+  </data>
+  <data name="ApiUseRemote" xml:space="preserve">
+    <value>Use remote value</value>
+  </data>
+  <data name="ApiSubmit" xml:space="preserve">
+    <value>Submit to API</value>
+  </data>
+  <data name="ApiDependent" xml:space="preserve">
+    <value>Create {count} dependencies first; requests will use their returned IDs.</value>
+  </data>
+  <data name="ApiPendingJob" xml:space="preserve">
+    <value>Resolve pending or unknown online tasks before refreshing or submitting again.</value>
+  </data>
+  <data name="ApiNoChanges" xml:space="preserve">
+    <value>There are no API field changes to submit.</value>
+  </data>
+  <data name="ApiImmutable" xml:space="preserve">
+    <value>The API does not allow this field to change: {field}</value>
+  </data>
+  <data name="ApiClear" xml:space="preserve">
+    <value>Online clearing semantics are not confirmed for this field: {field}</value>
+  </data>
+  <data name="ApiDeleteConfirm" xml:space="preserve">
+    <value>Confirm {count} deletions. Airports and routes are soft-deleted; fleets, aircraft and routings are permanently deleted. Remote undo is unavailable.</value>
+  </data>
+  <data name="ApiWrongVa" xml:space="preserve">
+    <value>The returned airline does not match this workspace. Create a separate workspace for another VA.</value>
+  </data>
+  <data name="ApiVerified" xml:space="preserve">
+    <value>Operations verified by read-back in this workspace: {operations}</value>
+  </data>
+  <data name="ApiUtc" xml:space="preserve">
+    <value>API times and dates must use UTC. Disable local times and check the format.</value>
+  </data>
+  <data name="ApiConflicts" xml:space="preserve">
+    <value>Review conflicts ({count})</value>
+  </data>
+  <data name="ApiRowConflict" xml:space="preserve"><value>Conflict to review</value></data>
+  <data name="ApiRowDraft" xml:space="preserve"><value>Unsubmitted draft</value></data>
+  <data name="ApiDuplicate" xml:space="preserve"><value>A possible duplicate exists remotely. Refresh and review before creating another record.</value></data>
+  <data name="ApiCredentials" xml:space="preserve"><value>Enter the matching Secret when changing Client ID.</value></data>
+  <data name="ApiRecoverId" xml:space="preserve"><value>Find this created record in Orwell and enter its remote ID. The app only reads it back; it will not create it again.</value></data>
+  <data name="ApiManualDelete" xml:space="preserve"><value>First verify in Orwell that record {id} is deleted or disabled as intended. Confirmation archives the local deletion draft. This is manual confirmation, not API verification, and does not enable bulk deletion.</value></data>
+  <data name="ApiManualConfirm" xml:space="preserve"><value>Verified in Orwell</value></data>
+  <data name="Enum_ItemState_ManuallyConfirmed" xml:space="preserve"><value>Manually confirmed</value></data>
+  <data name="ApiManualResult" xml:space="preserve"><value>Manually confirmed; not automatically verified by API</value></data>
+  <data name="ApiUnknownReview" xml:space="preserve"><value>Review unknown results</value></data>
+  <data name="ApiCheckRemote" xml:space="preserve"><value>Verify by read-back</value></data>
+</root>
