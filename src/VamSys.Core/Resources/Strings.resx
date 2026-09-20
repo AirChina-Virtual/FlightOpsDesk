@@ -1,0 +1,901 @@
+<root>
+  <data name="Text_1AB133520F" xml:space="preserve">
+    <value>请先选择要分配机型的记录</value>
+  </data>
+  <data name="Text_A1896E4C88" xml:space="preserve">
+    <value>待删除记录不可编辑，请先取消删除</value>
+  </data>
+  <data name="Text_D18ED1A023" xml:space="preserve">
+    <value>已选：</value>
+  </data>
+  <data name="Text_368B16B1B0" xml:space="preserve">
+    <value>搜索名称、ICAO 类型代码或 ID</value>
+  </data>
+  <data name="Text_ED31FBB483" xml:space="preserve">
+    <value>操作</value>
+  </data>
+  <data name="Text_DD9F9DBA0C" xml:space="preserve">
+    <value>替换为所选机型</value>
+  </data>
+  <data name="Text_7A387A9608" xml:space="preserve">
+    <value>追加所选机型</value>
+  </data>
+  <data name="Text_58A816EF01" xml:space="preserve">
+    <value>移除所选机型</value>
+  </data>
+  <data name="Text_F1439C5A73" xml:space="preserve">
+    <value>选择所属机型</value>
+  </data>
+  <data name="Text_F042305012" xml:space="preserve">
+    <value>选择可用机型（多选）</value>
+  </data>
+  <data name="Text_182B2BEF88" xml:space="preserve">
+    <value>作用于所选 {arg0:N0} 条记录，仅使用当前工作区机型。未解析关联会保留并提示。</value>
+  </data>
+  <data name="Text_5C250CFB41" xml:space="preserve">
+    <value>预览变更</value>
+  </data>
+  <data name="Text_7B23705C3B" xml:space="preserve">
+    <value>机型分配未通过校验</value>
+  </data>
+  <data name="Text_3FD47EDCE4" xml:space="preserve">
+    <value>关闭</value>
+  </data>
+  <data name="Text_AB90F9524E" xml:space="preserve">
+    <value>机型关联没有变化</value>
+  </data>
+  <data name="Text_D1482F496E" xml:space="preserve">
+    <value>审阅机型分配</value>
+  </data>
+  <data name="Text_CCFF94DA2A" xml:space="preserve">
+    <value>将修改 {arg0:N0} 条草稿，可撤销。</value>
+  </data>
+  <data name="Text_2354C137CE" xml:space="preserve">
+    <value>应用到草稿</value>
+  </data>
+  <data name="Text_46F566CD0E" xml:space="preserve">
+    <value>已更新 {arg0:N0} 条机型关联，尚未提交</value>
+  </data>
+  <data name="Text_C124B32C00" xml:space="preserve">
+    <value>请选择未标记删除的航线</value>
+  </data>
+  <data name="Text_B80DA74EC5" xml:space="preserve">
+    <value>航线到期停用（CSV）</value>
+  </data>
+  <data name="Text_A5124DA2BA" xml:space="preserve">
+    <value>将 {arg0} 条航线的 End Date 设置为 {arg1}。导出后需到 Orwell 导入；此操作不删除航线。</value>
+  </data>
+  <data name="Text_52D4945C25" xml:space="preserve">
+    <value>设置到期日期</value>
+  </data>
+  <data name="Text_B4F14FDEB3" xml:space="preserve">
+    <value>已设置航线到期日期，请审阅并导出 CSV</value>
+  </data>
+  <data name="Text_E531BA46BD" xml:space="preserve">
+    <value>vaMSYS 批量管理工作台</value>
+  </data>
+  <data name="Text_9750099F9F" xml:space="preserve">
+    <value>API 批量管理</value>
+  </data>
+  <data name="Text_11584EAAA5" xml:space="preserve">
+    <value>草稿已自动保存 · 尚未提交</value>
+  </data>
+  <data name="Text_571629E172" xml:space="preserve">
+    <value>任务进行中，请先取消或等待完成</value>
+  </data>
+  <data name="Text_7AF24B0E8E" xml:space="preserve">
+    <value>保存失败，窗口保持打开；请检查磁盘空间或目录权限</value>
+  </data>
+  <data name="Text_AEB8A69DBE" xml:space="preserve">
+    <value>操作未完成：</value>
+  </data>
+  <data name="Text_2CD0F3BE87" xml:space="preserve">
+    <value>取消</value>
+  </data>
+  <data name="Text_692F811146" xml:space="preserve">
+    <value>演示 · 不连接真实数据</value>
+  </data>
+  <data name="Text_C4C1F8C6F4" xml:space="preserve">
+    <value>在线 · 待适配</value>
+  </data>
+  <data name="Text_6C352EE0B0" xml:space="preserve">
+    <value>离线模式</value>
+  </data>
+  <data name="Text_C4CF69F358" xml:space="preserve">
+    <value>尚未读取</value>
+  </data>
+  <data name="Text_B5B62EA34A" xml:space="preserve">
+    <value>{arg0:N0} 条记录 · 快照：{arg1}</value>
+  </data>
+  <data name="Text_9BB882C622" xml:space="preserve">
+    <value>数据管理</value>
+  </data>
+  <data name="Text_D52C17622D" xml:space="preserve">
+    <value>导入向导</value>
+  </data>
+  <data name="Text_10CCC8AAA2" xml:space="preserve">
+    <value>变更审阅</value>
+  </data>
+  <data name="Text_00B514C36A" xml:space="preserve">
+    <value>任务中心</value>
+  </data>
+  <data name="Text_C2B958136D" xml:space="preserve">
+    <value>连接与设置</value>
+  </data>
+  <data name="Text_3797982942" xml:space="preserve">
+    <value>工作区</value>
+  </data>
+  <data name="Text_B9B43D4DAA" xml:space="preserve">
+    <value>{arg0:N0} 条 · {arg1:N0} 项待处理</value>
+  </data>
+  <data name="Text_C771248E51" xml:space="preserve">
+    <value>打开</value>
+  </data>
+  <data name="Text_2C33D5F7DE" xml:space="preserve">
+    <value>连接 VA → 从 API 加载 → 批量编辑 → 审阅提交 → 回读核对</value>
+  </data>
+  <data name="Text_946897D107" xml:space="preserve">
+    <value>新建工作区</value>
+  </data>
+  <data name="Text_8DCC576817" xml:space="preserve">
+    <value>航空公司名称</value>
+  </data>
+  <data name="Text_A818AFCD80" xml:space="preserve">
+    <value>新的航空公司</value>
+  </data>
+  <data name="Text_CDD0362664" xml:space="preserve">
+    <value>新建独立工作区</value>
+  </data>
+  <data name="Text_57D4E0340D" xml:space="preserve">
+    <value>创建演示工作区</value>
+  </data>
+  <data name="Text_8B0B7AD880" xml:space="preserve">
+    <value>CSV 用于导入候选变更及导出；SQLite 保存缓存、草稿和任务。</value>
+  </data>
+  <data name="Text_762B9F2664" xml:space="preserve">
+    <value>搜索全部字段</value>
+  </data>
+  <data name="Text_5C55A67935" xml:space="preserve">
+    <value>全部</value>
+  </data>
+  <data name="Text_682D211B71" xml:space="preserve">
+    <value>已修改</value>
+  </data>
+  <data name="Text_549986E82C" xml:space="preserve">
+    <value>标记删除</value>
+  </data>
+  <data name="Text_0DE280B4DF" xml:space="preserve">
+    <value>筛选／排序</value>
+  </data>
+  <data name="Text_0006D696D8" xml:space="preserve">
+    <value>新增</value>
+  </data>
+  <data name="Text_95DD1FDDFE" xml:space="preserve">
+    <value>分配机型</value>
+  </data>
+  <data name="Text_435BF8A234" xml:space="preserve">
+    <value>删除所选</value>
+  </data>
+  <data name="Text_A6926595CE" xml:space="preserve">
+    <value>取消删除</value>
+  </data>
+  <data name="Text_48A195CA7E" xml:space="preserve">
+    <value>审阅并提交</value>
+  </data>
+  <data name="Text_E306752B35" xml:space="preserve">
+    <value>批量规则</value>
+  </data>
+  <data name="Text_7AA882D2FE" xml:space="preserve">
+    <value>到期停用</value>
+  </data>
+  <data name="Text_926A50B98E" xml:space="preserve">
+    <value>撤销</value>
+  </data>
+  <data name="Text_E5CE954248" xml:space="preserve">
+    <value>已撤销上一步草稿编辑</value>
+  </data>
+  <data name="Text_03717B6F10" xml:space="preserve">
+    <value>重做</value>
+  </data>
+  <data name="Text_1F00D27BEE" xml:space="preserve">
+    <value>已重做草稿编辑</value>
+  </data>
+  <data name="Text_41B0AF8C5C" xml:space="preserve">
+    <value>校验</value>
+  </data>
+  <data name="Text_6320B4A872" xml:space="preserve">
+    <value>状态</value>
+  </data>
+  <data name="Text_72FDFB5848" xml:space="preserve">
+    <value>机型（点击选择）</value>
+  </data>
+  <data name="Text_75141EDE81" xml:space="preserve">
+    <value>草稿已修改 · 自动保存中</value>
+  </data>
+  <data name="Text_EE96DC1EBE" xml:space="preserve">
+    <value>待删除</value>
+  </data>
+  <data name="Text_20D2382F10" xml:space="preserve">
+    <value>已有</value>
+  </data>
+  <data name="Text_4EF7F62706" xml:space="preserve">
+    <value>新增草稿</value>
+  </data>
+  <data name="Text_C221144914" xml:space="preserve">
+    <value>未找到机型 · </value>
+  </data>
+  <data name="Text_F274578907" xml:space="preserve">
+    <value>选择机型…</value>
+  </data>
+  <data name="Text_BAB47FB928" xml:space="preserve">
+    <value>先选择要删除的记录</value>
+  </data>
+  <data name="Text_FD6D0919A9" xml:space="preserve">
+    <value>存在依赖，不能删除</value>
+  </data>
+  <data name="Text_EEAAAF2F48" xml:space="preserve">
+    <value>选中记录已标记删除，可使用“取消删除”</value>
+  </data>
+  <data name="Text_948725D00E" xml:space="preserve">
+    <value>删除所选记录</value>
+  </data>
+  <data name="Text_0360D81E1F" xml:space="preserve">
+    <value>移除新增草稿 {arg0} 条；标记删除已有记录 {arg1} 条。此次只修改本地草稿，可撤销。</value>
+  </data>
+  <data name="Text_0E38068B45" xml:space="preserve">
+    <value>引用检查仅覆盖当前工作区，不能证明远端无其他依赖。</value>
+  </data>
+  <data name="Text_A3EA3C17B4" xml:space="preserve">
+    <value>确认删除</value>
+  </data>
+  <data name="Text_2C040F22AA" xml:space="preserve">
+    <value>已移除 {arg0} 条新增草稿，标记 {arg1} 条已有记录</value>
+  </data>
+  <data name="Text_785FDE2811" xml:space="preserve">
+    <value>请选择待删除记录</value>
+  </data>
+  <data name="Text_FABC892562" xml:space="preserve">
+    <value>已取消删除，原编辑内容保留</value>
+  </data>
+  <data name="Text_4BB22EC98B" xml:space="preserve">
+    <value>没有可处理的记录</value>
+  </data>
+  <data name="Text_86F623E5CC" xml:space="preserve">
+    <value>字段（机型请使用专用分配操作）</value>
+  </data>
+  <data name="Text_A30D395090" xml:space="preserve">
+    <value>统一赋值／清空</value>
+  </data>
+  <data name="Text_5B7341C2D6" xml:space="preserve">
+    <value>文本查找替换</value>
+  </data>
+  <data name="Text_795CBFF909" xml:space="preserve">
+    <value>添加标签</value>
+  </data>
+  <data name="Text_6FE8FC1819" xml:space="preserve">
+    <value>移除标签</value>
+  </data>
+  <data name="Text_FAC7E021A1" xml:space="preserve">
+    <value>时刻偏移（分钟，跨午夜取模）</value>
+  </data>
+  <data name="Text_E79453E164" xml:space="preserve">
+    <value>日期偏移（天）</value>
+  </data>
+  <data name="Text_6797F1B017" xml:space="preserve">
+    <value>航线到期停用</value>
+  </data>
+  <data name="Text_DD5ABC95B1" xml:space="preserve">
+    <value>新值／偏移量</value>
+  </data>
+  <data name="Text_8FAB339859" xml:space="preserve">
+    <value>查找文本（仅替换使用）</value>
+  </data>
+  <data name="Text_A737FD72B0" xml:space="preserve">
+    <value>已选中</value>
+  </data>
+  <data name="Text_CD02A81FB5" xml:space="preserve">
+    <value>全部筛选结果</value>
+  </data>
+  <data name="Text_3733B88A89" xml:space="preserve">
+    <value>范围：{arg0} {arg1} 条</value>
+  </data>
+  <data name="Text_13D61FEA9F" xml:space="preserve">
+    <value>预览</value>
+  </data>
+  <data name="Text_CA75B5F2F0" xml:space="preserve">
+    <value>到期停用仅适用于航线</value>
+  </data>
+  <data name="Text_AD86791376" xml:space="preserve">
+    <value>审阅规则影响</value>
+  </data>
+  <data name="Text_42F23885A7" xml:space="preserve">
+    <value>将处理 {arg0} 条记录，以下展示前 8 条。时刻偏移不会自动调整服务日或有效日期。</value>
+  </data>
+  <data name="Text_13292B3343" xml:space="preserve">
+    <value>已处理 {arg0} 条，尚未提交</value>
+  </data>
+  <data name="Text_AA9F647A82" xml:space="preserve">
+    <value>本地校验通过；远端规则仍需实际导入／联调验证</value>
+  </data>
+  <data name="Text_8EEF5FE8E6" xml:space="preserve">
+    <value>发现 {arg0} 项问题</value>
+  </data>
+  <data name="Text_38833A8579" xml:space="preserve">
+    <value>逐行校验结果</value>
+  </data>
+  <data name="Text_7560F012B2" xml:space="preserve">
+    <value>行 {arg0} · {arg1}：{arg2}</value>
+  </data>
+  <data name="Text_D030C51D78" xml:space="preserve">
+    <value>读取 vaMSYS 标准 CSV，或映射自定义列。首次导入可作为原始快照；后续文件可合并为待提交草稿。</value>
+  </data>
+  <data name="Text_3618171B0A" xml:space="preserve">
+    <value>不会删除源文件中缺失的记录。用于新增的记录请留空 ID；需要更新的记录请先读取含 ID 的现有数据。</value>
+  </data>
+  <data name="Text_5A2BBDEA04" xml:space="preserve">
+    <value>选择 CSV 并映射</value>
+  </data>
+  <data name="Text_130FDB3E71" xml:space="preserve">
+    <value>从 API 读取（待适配）</value>
+  </data>
+  <data name="Text_B91DE02936" xml:space="preserve">
+    <value>作为原始快照（替换此资源的快照和草稿）</value>
+  </data>
+  <data name="Text_42F0F930C9" xml:space="preserve">
+    <value>{arg0:N0} 条记录。编辑目标列名；保留原名即可保留未知列。</value>
+  </data>
+  <data name="Text_793A76BFEA" xml:space="preserve">
+    <value>前 3 行：
+</value>
+  </data>
+  <data name="Text_E0FDE3C5CB" xml:space="preserve">
+    <value>列映射与数据预览</value>
+  </data>
+  <data name="Text_C9B2630A18" xml:space="preserve">
+    <value>导入工作区</value>
+  </data>
+  <data name="Text_885B15B2F5" xml:space="preserve">
+    <value>替换工作区快照</value>
+  </data>
+  <data name="Text_5B5C523423" xml:space="preserve">
+    <value>此资源现有草稿和撤销历史将被替换，原 CSV 文件不受影响。</value>
+  </data>
+  <data name="Text_131B13AA26" xml:space="preserve">
+    <value>替换</value>
+  </data>
+  <data name="Text_3BCC8B750F" xml:space="preserve">
+    <value>文件含重复标识，先修正后再导入</value>
+  </data>
+  <data name="Text_D84A9B1171" xml:space="preserve">
+    <value>已导入 {arg0:N0} 条；{arg1} 项校验问题可在数据管理查看</value>
+  </data>
+  <data name="Text_5ABD08A949" xml:space="preserve">
+    <value>显式删除</value>
+  </data>
+  <data name="Text_4478B3A156" xml:space="preserve">
+    <value>{arg0} 项变更 · 新增 {arg1} · 修改 {arg2} · 删除 {arg3}</value>
+  </data>
+  <data name="Text_ABED06FAA0" xml:space="preserve">
+    <value>导出变化 CSV</value>
+  </data>
+  <data name="Text_498F64E2E2" xml:space="preserve">
+    <value>执行演示任务（全部资源）</value>
+  </data>
+  <data name="Text_49EA85BB1C" xml:space="preserve">
+    <value>提交 API</value>
+  </data>
+  <data name="Text_75843F167F" xml:space="preserve">
+    <value>请先解决校验问题</value>
+  </data>
+  <data name="Text_90484F47B3" xml:space="preserve">
+    <value>没有变化可导出</value>
+  </data>
+  <data name="Text_5D6042B30E" xml:space="preserve">
+    <value>导出包含删除</value>
+  </data>
+  <data name="Text_B83678AC3A" xml:space="preserve">
+    <value>文件将包含 {arg0} 条删除指令。上传到 Orwell 后可能无法恢复。</value>
+  </data>
+  <data name="Text_6B20B383BC" xml:space="preserve">
+    <value>导出删除指令</value>
+  </data>
+  <data name="Text_D964132351" xml:space="preserve">
+    <value>待到 Orwell 导入 · 已导出 {arg0} 个 CSV · {arg1}</value>
+  </data>
+  <data name="Text_B680DD9FD1" xml:space="preserve">
+    <value>已导出 {arg0} 个文件 · 待到 Orwell 导入，尚未修改远端</value>
+  </data>
+  <data name="Text_78E06D4B43" xml:space="preserve">
+    <value>请先解决各资源的校验问题</value>
+  </data>
+  <data name="Text_008D68D9F9" xml:space="preserve">
+    <value>演示任务：审阅全部资源</value>
+  </data>
+  <data name="Text_5581164B03" xml:space="preserve">
+    <value>将在模拟服务执行 {arg0} 项变更，不连接 vaMSYS。请审阅下列所有资源，Delete 表示显式删除。</value>
+  </data>
+  <data name="Text_48B3938B8C" xml:space="preserve">
+    <value>执行演示</value>
+  </data>
+  <data name="Text_B64A075682" xml:space="preserve">
+    <value>演示：</value>
+  </data>
+  <data name="Text_59164F39E2" xml:space="preserve">
+    <value>取消只停止后续请求；未知结果会先核对，成功项不会重复执行。</value>
+  </data>
+  <data name="Text_14F7E13979" xml:space="preserve">
+    <value>取消后续请求</value>
+  </data>
+  <data name="Text_9A397E63C4" xml:space="preserve">
+    <value>成功 {arg0} / {arg1} · 未知 {arg2}</value>
+  </data>
+  <data name="Text_979A332955" xml:space="preserve">
+    <value>详情</value>
+  </data>
+  <data name="Text_4DCE8EF2E4" xml:space="preserve">
+    <value>逐条执行结果</value>
+  </data>
+  <data name="Text_9C4801C86B" xml:space="preserve">
+    <value>恢复演示任务</value>
+  </data>
+  <data name="Text_6A1C23202F" xml:space="preserve">
+    <value>重试明确失败项</value>
+  </data>
+  <data name="Text_0251B89662" xml:space="preserve">
+    <value>实例地址（HTTPS）</value>
+  </data>
+  <data name="Text_86032C09C5" xml:space="preserve">
+    <value>Client Secret（留空保留已有凭据）</value>
+  </data>
+  <data name="Text_92BD49D337" xml:space="preserve">
+    <value>航线使用机场本地时间（离线保持原值，不推测机场时区）</value>
+  </data>
+  <data name="Text_A741E95F8D" xml:space="preserve">
+    <value>Operations API · 待适配</value>
+  </data>
+  <data name="Text_7E95E384B5" xml:space="preserve">
+    <value>缺少实例 OpenAPI、认证地址和资源字段契约，真实读取与写入保持禁用。保存连接配置不会发送请求。</value>
+  </data>
+  <data name="Text_760143E568" xml:space="preserve">
+    <value>保存连接设置</value>
+  </data>
+  <data name="Text_D6934554B8" xml:space="preserve">
+    <value>请输入不含凭据的 HTTPS 实例地址</value>
+  </data>
+  <data name="Text_DEADA9F3CC" xml:space="preserve">
+    <value>设置已保存；凭据经当前 Windows 用户加密，未发送网络请求</value>
+  </data>
+  <data name="Text_0FBBFA69D4" xml:space="preserve">
+    <value>连接测试（等待完整契约）</value>
+  </data>
+  <data name="Text_1CCB303756" xml:space="preserve">
+    <value>离线导入文件中的时刻原样保留；时刻偏移按 24 小时取模，不自动改动服务日。完整的机场时区转换需取得明确时区数据后接入。</value>
+  </data>
+  <data name="Text_8BEFA80716" xml:space="preserve">
+    <value>任务状态未能持久化，停止发送后续请求</value>
+  </data>
+  <data name="Text_5026A63B58" xml:space="preserve">
+    <value>执行中</value>
+  </data>
+  <data name="Text_6F312AE253" xml:space="preserve">
+    <value>已取消后续请求</value>
+  </data>
+  <data name="Text_3E85DDB213" xml:space="preserve">
+    <value>依赖未成功</value>
+  </data>
+  <data name="Text_3BFE500D9C" xml:space="preserve">
+    <value>新增结果未知，需要人工核对，未重试</value>
+  </data>
+  <data name="Text_A65DECDE8F" xml:space="preserve">
+    <value>恢复时已核实远端结果</value>
+  </data>
+  <data name="Text_E0B2732184" xml:space="preserve">
+    <value>中断结果无法确认，请人工核对</value>
+  </data>
+  <data name="Text_D876D1E7AF" xml:space="preserve">
+    <value>远端与原始快照不一致，请重新审阅</value>
+  </data>
+  <data name="Text_4B53041E43" xml:space="preserve">
+    <value>本地引用尚未解析</value>
+  </data>
+  <data name="Text_DCC1A22D9E" xml:space="preserve">
+    <value>提交中</value>
+  </data>
+  <data name="Text_631F4DBEC2" xml:space="preserve">
+    <value>已回读核对</value>
+  </data>
+  <data name="Text_477A5F591D" xml:space="preserve">
+    <value>请求已返回，但回读未确认目标值</value>
+  </data>
+  <data name="Text_CB72CB3DAC" xml:space="preserve">
+    <value>认证或权限错误；已发送请求需核对</value>
+  </data>
+  <data name="Text_5B0F395E13" xml:space="preserve">
+    <value>认证／权限错误，已暂停</value>
+  </data>
+  <data name="Text_395B73E720" xml:space="preserve">
+    <value>请求中断，结果未知；恢复时先核对</value>
+  </data>
+  <data name="Text_08E3371510" xml:space="preserve">
+    <value>读取中断，可恢复</value>
+  </data>
+  <data name="Text_EFDA7294FF" xml:space="preserve">
+    <value>字段验证失败</value>
+  </data>
+  <data name="Text_A60B4675CF" xml:space="preserve">
+    <value>操作失败，请查看契约与数据</value>
+  </data>
+  <data name="Text_140197D868" xml:space="preserve">
+    <value>已完成并核对</value>
+  </data>
+  <data name="Text_E9008C53CF" xml:space="preserve">
+    <value>完成，存在待处理项</value>
+  </data>
+  <data name="Text_6216D1C3A0" xml:space="preserve">
+    <value>查找文本不能为空</value>
+  </data>
+  <data name="Text_5CBDBA3063" xml:space="preserve">
+    <value>不支持的规则</value>
+  </data>
+  <data name="Text_269E09BE6D" xml:space="preserve">
+    <value>CSV 引号格式错误</value>
+  </data>
+  <data name="Text_FDC11D46D9" xml:space="preserve">
+    <value>CSV 存在未闭合引号</value>
+  </data>
+  <data name="Text_EB79E7A05C" xml:space="preserve">
+    <value>CSV 为空</value>
+  </data>
+  <data name="Text_147B7E591C" xml:space="preserve">
+    <value>CSV 列名为空或重复</value>
+  </data>
+  <data name="Text_7D9C54257B" xml:space="preserve">
+    <value>CSV 数据列数与表头不一致</value>
+  </data>
+  <data name="Text_E93E44505B" xml:space="preserve">
+    <value>映射后的字段为空或重复</value>
+  </data>
+  <data name="Text_FF27EDEC0D" xml:space="preserve">
+    <value>原始快照中的记录必须有标识；新增记录请取消“作为原始快照”</value>
+  </data>
+  <data name="Text_FC5C1BF085" xml:space="preserve">
+    <value>导入文件含重复标识</value>
+  </data>
+  <data name="Text_DFA07F45EA" xml:space="preserve">
+    <value>工作区含重复标识，不能合并</value>
+  </data>
+  <data name="Text_C73CE653CA" xml:space="preserve">
+    <value>标识 {arg0} 重复，不能自动合并</value>
+  </data>
+  <data name="Text_6597D6DF98" xml:space="preserve">
+    <value>本地引用必须先取得远端 ID 才能导出 CSV；请先导入基础资源并重新读取其 ID</value>
+  </data>
+  <data name="Text_924C111685" xml:space="preserve">
+    <value>单行超过文件大小限制</value>
+  </data>
+  <data name="Text_CCEF575C0D" xml:space="preserve">
+    <value>仍被{arg0} {arg1}（{arg2}{arg3}，本地行 {arg4}）的 {arg5} 引用</value>
+  </data>
+  <data name="Text_0829856E83" xml:space="preserve">
+    <value>存在未删除的依赖记录，未执行删除</value>
+  </data>
+  <data name="Text_77F9BBEB62" xml:space="preserve">
+    <value>仅飞机和航线支持机型分配</value>
+  </data>
+  <data name="Text_95BA634DEA" xml:space="preserve">
+    <value>ID 重复</value>
+  </data>
+  <data name="Text_0772B8422B" xml:space="preserve">
+    <value>待创建 {arg0}</value>
+  </data>
+  <data name="Text_63524EC09F" xml:space="preserve">
+    <value>未找到机型</value>
+  </data>
+  <data name="Text_F6036A3E65" xml:space="preserve">
+    <value>引用待核对</value>
+  </data>
+  <data name="Text_18371681C3" xml:space="preserve">
+    <value>本地引用</value>
+  </data>
+  <data name="Text_1C6416508F" xml:space="preserve">
+    <value>飞机只能统一替换一个所属机型</value>
+  </data>
+  <data name="Text_92C7B26624" xml:space="preserve">
+    <value>待删除记录不可编辑</value>
+  </data>
+  <data name="Text_0CEB89655F" xml:space="preserve">
+    <value>飞机必须选择且只能选择一个机型</value>
+  </data>
+  <data name="Text_2335DBC57B" xml:space="preserve">
+    <value>非 jumpseat 航线必须保留至少一个机型</value>
+  </data>
+  <data name="Text_F7B2F3BC0C" xml:space="preserve">
+    <value>不能新增关联 {arg0}：{arg1}</value>
+  </data>
+  <data name="Text_919362E2F8" xml:space="preserve">
+    <value>请先解决机型分配问题</value>
+  </data>
+  <data name="Text_707DBE0213" xml:space="preserve">
+    <value>我的航空公司</value>
+  </data>
+  <data name="Text_637DA56123" xml:space="preserve">
+    <value>待执行</value>
+  </data>
+  <data name="Text_6A5347AC5F" xml:space="preserve">
+    <value>机场</value>
+  </data>
+  <data name="Text_D082D02D37" xml:space="preserve">
+    <value>机型</value>
+  </data>
+  <data name="Text_C05F7CD6ED" xml:space="preserve">
+    <value>飞机</value>
+  </data>
+  <data name="Text_ABF79C546F" xml:space="preserve">
+    <value>航路</value>
+  </data>
+  <data name="Text_486B1DF063" xml:space="preserve">
+    <value>航线</value>
+  </data>
+  <data name="Text_DA77CC5B62" xml:space="preserve">
+    <value>标识重复，请解决后再提交</value>
+  </data>
+  <data name="Text_73DF5EC597" xml:space="preserve">
+    <value>不能删除未确认存在的记录</value>
+  </data>
+  <data name="Text_F9F0B63720" xml:space="preserve">
+    <value>删除记录的标识与快照不一致</value>
+  </data>
+  <data name="Text_B283E8E5F2" xml:space="preserve">
+    <value>必填字段为空</value>
+  </data>
+  <data name="Text_783B7A2935" xml:space="preserve">
+    <value>记录标识不可修改，请新增记录</value>
+  </data>
+  <data name="Text_0D4C574F60" xml:space="preserve">
+    <value>此 ID 不在原始快照中；请先读取现有数据，或清空 ID 明确新增</value>
+  </data>
+  <data name="Text_1B7AB7E0F1" xml:space="preserve">
+    <value>布尔值须为 TRUE 或 FALSE</value>
+  </data>
+  <data name="Text_F59EB79050" xml:space="preserve">
+    <value>日期格式须为 yyyy-MM-dd HH:mm:ss</value>
+  </data>
+  <data name="Text_C8CF0D677E" xml:space="preserve">
+    <value>时刻格式须为 HH:mm</value>
+  </data>
+  <data name="Text_C4946548B5" xml:space="preserve">
+    <value>服务日须为英文小写星期，逗号分隔</value>
+  </data>
+  <data name="Text_50DDC19E1F" xml:space="preserve">
+    <value>机型类别无效</value>
+  </data>
+  <data name="Text_675251FAAF" xml:space="preserve">
+    <value>需要非负容量</value>
+  </data>
+  <data name="Text_EFB86BD704" xml:space="preserve">
+    <value>航线类型无效</value>
+  </data>
+  <data name="Text_134FD96D33" xml:space="preserve">
+    <value>非 jumpseat 航线必填</value>
+  </data>
+  <data name="Text_39CD1EC048" xml:space="preserve">
+    <value>呼号须为 4–7 字符</value>
+  </data>
+  <data name="Text_D60FFE3B83" xml:space="preserve">
+    <value>班号须为 3–6 字符</value>
+  </data>
+  <data name="Text_31E5AEFD06" xml:space="preserve">
+    <value>已有航路不可修改起降机场</value>
+  </data>
+  <data name="Text_5CDAFFB468" xml:space="preserve">
+    <value>未在工作区找到引用 {arg0}；请先读取{arg1}</value>
+  </data>
+  <data name="Text_06FE405F2A" xml:space="preserve">
+    <value>飞机只能有一个所属机型</value>
+  </data>
+  <data name="Text_CDDA93CCD1" xml:space="preserve">
+    <value>疑似重复新增，请核对标识或业务字段</value>
+  </data>
+  <data name="Text_A69A8C3CDE" xml:space="preserve">
+    <value>分页地址必须与配置实例同源且使用 HTTPS</value>
+  </data>
+  <data name="Text_33FE138E2B" xml:space="preserve">
+    <value>认证或权限错误</value>
+  </data>
+  <data name="Text_122031269F" xml:space="preserve">
+    <value>服务返回重复分页游标</value>
+  </data>
+  <data name="Text_61CA285291" xml:space="preserve">
+    <value>分页响应不符合已知契约</value>
+  </data>
+  <data name="Text_9F2DE78FA0" xml:space="preserve">
+    <value>待适配：缺少实例 OpenAPI、认证地址及资源字段契约；尚未真实联调</value>
+  </data>
+  <data name="OfflineReady" xml:space="preserve">
+    <value>请连接 Operations API，或打开已缓存的工作区。</value>
+  </data>
+  <data name="Enum_ChangeKind_Create" xml:space="preserve">
+    <value>新增</value>
+  </data>
+  <data name="Enum_ChangeKind_Update" xml:space="preserve">
+    <value>修改</value>
+  </data>
+  <data name="Enum_ItemState_Unknown" xml:space="preserve">
+    <value>结果未知</value>
+  </data>
+  <data name="ChooseFleet" xml:space="preserve">
+    <value>选择机型</value>
+  </data>
+  <data name="CurrentWorkspace" xml:space="preserve">
+    <value>当前工作区</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>界面语言（立即生效）</value>
+  </data>
+  <data name="Enum_ItemState_Failed" xml:space="preserve">
+    <value>失败</value>
+  </data>
+  <data name="Enum_ItemState_Conflict" xml:space="preserve">
+    <value>冲突</value>
+  </data>
+  <data name="Enum_ChangeKind_Delete" xml:space="preserve">
+    <value>删除</value>
+  </data>
+  <data name="Enum_RunMode_Online" xml:space="preserve">
+    <value>在线</value>
+  </data>
+  <data name="Enum_RunMode_Demo" xml:space="preserve">
+    <value>演示</value>
+  </data>
+  <data name="ResourceType" xml:space="preserve">
+    <value>资源类型</value>
+  </data>
+  <data name="Enum_ItemState_Pending" xml:space="preserve">
+    <value>待执行</value>
+  </data>
+  <data name="Enum_ItemState_Skipped" xml:space="preserve">
+    <value>已跳过</value>
+  </data>
+  <data name="Enum_RunMode_Offline" xml:space="preserve">
+    <value>离线</value>
+  </data>
+  <data name="Enum_ItemState_Running" xml:space="preserve">
+    <value>执行中</value>
+  </data>
+  <data name="Enum_ItemState_Succeeded" xml:space="preserve">
+    <value>成功</value>
+  </data>
+  <data name="Confirm" xml:space="preserve">
+    <value>确认</value>
+  </data>
+  <data name="DemoWorkspace" xml:space="preserve">
+    <value>演示航空公司 {time}</value>
+  </data>
+  <data name="ApiMoveFleet" xml:space="preserve">
+    <value>飞机更换机型已禁用：官方 MoveAircraftFleetData 未定义请求字段。</value>
+  </data>
+  <data name="ApiSubmitScope" xml:space="preserve">
+    <value>目标：{va}（VA {id}），共 {count} 条。未验证操作按小样本执行；成功回读后记录该操作验证结果。</value>
+  </data>
+  <data name="ApiCapability" xml:space="preserve">
+    <value>官方契约已接入；只读需连接验证，未验证写入每类每次最多 3 条。机型迁移、航线机型关联修改及未确认清空保持禁用。</value>
+  </data>
+  <data name="ApiSettingsHelp" xml:space="preserve">
+    <value>使用 Orwell 中配置的 Operations Client ID 与 Secret。连接后手动刷新；草稿不会自动提交。API 重量按 kg，日期与时刻按 UTC。</value>
+  </data>
+  <data name="ApiFleetSet" xml:space="preserve">
+    <value>航线机型集合更新与清空语义尚未完成实例核实。</value>
+  </data>
+  <data name="ApiRefresh" xml:space="preserve">
+    <value>从 API 刷新</value>
+  </data>
+  <data name="ApiRefreshed" xml:space="preserve">
+    <value>API 数据已刷新。待审阅冲突：{count}。</value>
+  </data>
+  <data name="ApiHttp" xml:space="preserve">
+    <value>API 返回 HTTP {status}，详情见诊断记录。</value>
+  </data>
+  <data name="ApiAuth" xml:space="preserve">
+    <value>认证或权限不足，请检查 Operations 凭据与授权。</value>
+  </data>
+  <data name="ApiConnected" xml:space="preserve">
+    <value>Operations 连接成功，VA 标识：{id}。</value>
+  </data>
+  <data name="ApiInvalid" xml:space="preserve">
+    <value>字段不符合 API 契约：{field}</value>
+  </data>
+  <data name="ApiKeepLocal" xml:space="preserve">
+    <value>保留本地修改</value>
+  </data>
+  <data name="ApiSettings" xml:space="preserve">
+    <value>Operations API 连接</value>
+  </data>
+  <data name="ApiConnect" xml:space="preserve">
+    <value>测试 Operations 连接</value>
+  </data>
+  <data name="ApiConflictValues" xml:space="preserve">
+    <value>原始值：{old}
+本地值：{local}
+远端值：{remote}</value>
+  </data>
+  <data name="ApiUnsupported" xml:space="preserve">
+    <value>此字段的 API 转换尚未核实：{field}</value>
+  </data>
+  <data name="ApiConflict" xml:space="preserve">
+    <value>远端与本地存在冲突，请审阅后再提交。</value>
+  </data>
+  <data name="ApiDependencies" xml:space="preserve">
+    <value>有关联记录或依赖未完成，请先处理依赖。</value>
+  </data>
+  <data name="ApiLoading" xml:space="preserve">
+    <value>正在读取 {resource}：{count} 条</value>
+  </data>
+  <data name="ApiTarget" xml:space="preserve">
+    <value>目标工作区：{va} · VA 标识：{id}</value>
+  </data>
+  <data name="ApiConnectFirst" xml:space="preserve">
+    <value>请先在连接与设置中保存凭据并测试连接。</value>
+  </data>
+  <data name="ApiJumpseat" xml:space="preserve">
+    <value>暂不支持在线转换到或离开 Jumpseat 类型，此操作会清除关联。</value>
+  </data>
+  <data name="ApiSoftDelete" xml:space="preserve">
+    <value>删除请求已接收；软删除的最终状态仍需在 Orwell 核对，不会自动重发。</value>
+  </data>
+  <data name="ApiBlocked" xml:space="preserve">
+    <value>以下变更暂不能在线提交</value>
+  </data>
+  <data name="ApiRefreshFirst" xml:space="preserve">
+    <value>请先从 API 刷新数据并确认远端标识。</value>
+  </data>
+  <data name="ApiUnknown" xml:space="preserve">
+    <value>结果尚未确认。恢复时仅核对远端，不自动重复写入；请在 Orwell 检查原记录。</value>
+  </data>
+  <data name="ApiUseRemote" xml:space="preserve">
+    <value>采用远端值</value>
+  </data>
+  <data name="ApiSubmit" xml:space="preserve">
+    <value>提交 API</value>
+  </data>
+  <data name="ApiDependent" xml:space="preserve">
+    <value>先创建依赖记录：{count} 项；取得真实 ID 后生成请求。</value>
+  </data>
+  <data name="ApiPendingJob" xml:space="preserve">
+    <value>请先处理任务中心中未完成或结果未知的在线任务，避免重复提交。</value>
+  </data>
+  <data name="ApiNoChanges" xml:space="preserve">
+    <value>没有可提交的 API 字段变更。</value>
+  </data>
+  <data name="ApiImmutable" xml:space="preserve">
+    <value>API 不允许修改此字段：{field}</value>
+  </data>
+  <data name="ApiClear" xml:space="preserve">
+    <value>此字段的在线清空语义尚未确认：{field}</value>
+  </data>
+  <data name="ApiDeleteConfirm" xml:space="preserve">
+    <value>确认提交 {count} 条删除。机场与航线为软删除；机型、飞机与航路永久删除，不支持远端撤销。</value>
+  </data>
+  <data name="ApiWrongVa" xml:space="preserve">
+    <value>返回的航空公司标识与当前工作区不符。请为其他 VA 创建独立工作区。</value>
+  </data>
+  <data name="ApiVerified" xml:space="preserve">
+    <value>此工作区已回读验证的操作：{operations}</value>
+  </data>
+  <data name="ApiUtc" xml:space="preserve">
+    <value>API 时刻与日期必须明确使用 UTC；请关闭本地时刻设置并检查格式。</value>
+  </data>
+  <data name="ApiConflicts" xml:space="preserve">
+    <value>审阅冲突（{count}）</value>
+  </data>
+  <data name="ApiRowConflict" xml:space="preserve"><value>冲突待审阅</value></data>
+  <data name="ApiRowDraft" xml:space="preserve"><value>未提交草稿</value></data>
+  <data name="ApiDuplicate" xml:space="preserve"><value>远端存在疑似重复记录。请刷新并审阅，不能重复创建。</value></data>
+  <data name="ApiCredentials" xml:space="preserve"><value>更换 Client ID 时必须同时填写对应的 Secret。</value></data>
+  <data name="ApiRecoverId" xml:space="preserve"><value>请在 Orwell 找到本次创建的记录，输入真实 ID。程序仅回读核对，不会重新创建。</value></data>
+  <data name="ApiManualDelete" xml:space="preserve"><value>请先在 Orwell 确认记录 {id} 已按预期停用／删除。确认后归档本地删除草稿；这只是人工确认，不代表 API 自动验证成功，也不会启用批量删除。</value></data>
+  <data name="ApiManualConfirm" xml:space="preserve"><value>已在 Orwell 核对</value></data>
+  <data name="Enum_ItemState_ManuallyConfirmed" xml:space="preserve"><value>人工确认</value></data>
+  <data name="ApiManualResult" xml:space="preserve"><value>人工确认，未通过 API 自动核对</value></data>
+  <data name="ApiUnknownReview" xml:space="preserve"><value>核对未知结果</value></data>
+  <data name="ApiCheckRemote" xml:space="preserve"><value>回读核对</value></data>
+</root>

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VamSys.App/VamSys.App.csproj" />
+    <Project Path="src/VamSys.Core/VamSys.Core.csproj" />
+    <Project Path="src/VamSys.Infrastructure/VamSys.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VamSys.Tests/VamSys.Tests.csproj" />
+  </Folder>
+</Solution>
