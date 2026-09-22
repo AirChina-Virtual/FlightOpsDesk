@@ -1,62 +1,62 @@
-# VamSys.Tests — 行为、契约、恢复与性能验证
+# VamSys.Tests — 检查功能、恢复和运行速度
 
-这是一个 net10.0 控制台场景测试程序，而非使用 dotnet test 发现用例的测试框架项目。Program.cs 组织场景，逐项输出 PASS；断言失败会抛出异常并结束执行。
+这个项目会按顺序执行一组自动检查，例如导入 CSV、修改记录或模拟请求超时。每项通过后输出 PASS；发现结果不符合预期时会报错并停止。它是 net10.0 控制台程序，使用下面的 dotnet run 命令运行，不使用 dotnet test。
 
-项目直接引用 Infrastructure，间接使用 Core；同时链接 App/TaskViewModels.cs，使用真实任务视图模型验证已提交状态展示，避免维护另一份测试专用实现。
+测试直接调用 Infrastructure 和 Core 中的实际代码。任务页面的数据处理也使用 App/TaskViewModels.cs 原文件，确保检查的是程序真正使用的逻辑，而不是另一份只供测试的版本。
 
 ## 运行入口
 
 以下命令均从仓库根目录执行：
 
 ~~~powershell
-# 完整行为回归
+# 运行全部自动检查
 dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
 
-# v3 存储与任务视图模型专项
+# 只检查 v3 保存方式和任务页面的数据更新
 dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -- --v3
 
-# 存储专项
+# 只检查数据保存
 dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -- --storage
 
-# v3 重基线性能结果写入指定文件
+# 测量确认修改成功后保存一条记录的开销，并写入文件
 dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -- --benchmark-v3 artifacts/v3-rebase.json
 ~~~
 
-完整场景包含 Windows 凭据保护与子进程行为，应在 Windows 环境执行。测试输出文件与数据库应使用隔离目录，不能指向用户的真实工作区。
+部分检查会调用 Windows 的密钥保护功能或启动额外进程，因此完整测试应在 Windows 上运行。测试文件和数据库要放在单独的目录，不能使用用户真正工作的数据。
 
 ## 测试文件分工
 
 | 文件 | 验证重点 |
 |---|---|
-| Program.cs | 场景注册、基础业务断言、专项参数和 UI 数据准备入口 |
-| ApiScenarios.cs | 资源请求方法、字段转换、响应处理和 API 执行行为 |
-| AuditScenarios.cs、ReauditScenarios.cs | 历次审核缺陷的固定复现和回归保护 |
-| CandidateIndexScenarios.cs | 同签名多实体、索引更新、未知身份及随机对照 |
-| LifecycleScenarios.cs | 创建、修改、删除和恢复之间的生命周期交互 |
-| CredentialSaveScenarios.cs | 凭据保存失败与事务一致性 |
-| StorageScenarios.cs | 任务拆分保存、迁移、版本和兼容行为 |
-| StorageV3Scenarios.cs | v3 资源增量、原子重基线、关闭保护及序号语义 |
-| StorageProcessScenarios.cs | 父进程保留模拟远端，终止并重启子进程检查未知写入 |
-| TaskViewModelScenarios.cs | 未提交状态不提前呈现、局部更新计数和集合稳定性 |
-| PerformanceScenarios.cs | 请求量、索引构建与大数据量处理基准 |
-| TestTime.cs | 可控测试时间辅助，减少真实等待对场景的影响 |
+| Program.cs | 决定运行哪些检查，处理命令参数，并为窗口测试准备数据 |
+| ApiScenarios.cs | 检查发送给 API 的请求及服务器返回数据的处理 |
+| AuditScenarios.cs、ReauditScenarios.cs | 重现以前发现的问题，防止修改代码后再次出现 |
+| CandidateIndexScenarios.cs | 检查同名记录是否都被保留、查重结果是否更新，以及随机数据下结果是否正确 |
+| LifecycleScenarios.cs | 连续新增、修改、删除或恢复时，检查各步骤是否互相影响 |
+| CredentialSaveScenarios.cs | 模拟保存密钥失败，检查是否留下只保存一半的数据 |
+| StorageScenarios.cs | 检查任务单独保存、旧数据库升级和版本识别 |
+| StorageV3Scenarios.cs | 检查单条保存是否完整、关闭时是否丢草稿，以及记录顺序是否保持 |
+| StorageProcessScenarios.cs | 强制结束正在执行的测试程序，再启动它，检查是否重复提交 |
+| TaskViewModelScenarios.cs | 检查页面是否只显示已保存结果，以及更新时计数和列表是否正确 |
+| PerformanceScenarios.cs | 统计请求次数，并测量大量记录下的查重和处理速度 |
+| TestTime.cs | 让测试可以控制时间，减少不必要的真实等待 |
 
-## 子进程恢复测试
+## 怎样检查程序突然退出后的恢复
 
-父测试进程维护模拟远端状态，子进程使用独立 SQLite。测试在写请求、返回 ID、补充 PUT 与重基线事务等明确屏障处终止子进程，重启后检查写请求数量和持久化状态。
+一个测试进程扮演服务器并记住已完成的操作，另一个进程执行任务。测试会在发送请求、收到 ID、补充修改或保存结果等指定时刻，强制结束执行任务的进程。重新启动后，检查进度有没有丢失，以及已经完成的操作有没有被重复提交。
 
-这是实际进程中断测试，但远端为模拟服务；不会访问真实 vaMSYS 写接口。内部 --storage-child 参数由父测试驱动，不是正常用户启动入口。
+这里确实会结束并重启进程，但服务器是模拟的，不会修改真实 vaMSYS 数据。--storage-child 参数由测试程序内部使用，正常运行不需要手动填写。
 
-## 窗口测试与种子数据
+## 怎样检查实际窗口
 
---seed-task-ui、--seed-storage-ui、--seed-recovery-ui 等参数用于构造隔离窗口测试数据，不能对正常数据目录执行。实际窗口验证脚本位于 ../../scripts，要求 Windows 交互桌面；部分受控故障验证要求独立 UI_VERIFICATION 构建。
+--seed-task-ui、--seed-storage-ui、--seed-recovery-ui 等参数会生成专门用于检查窗口的测试数据，不要对正常数据目录运行。../../scripts 中的脚本会实际操作窗口，需要可用的 Windows 桌面。模拟保存失败等检查还需要专用的 UI_VERIFICATION 测试版本。
 
-行为测试通过不能替代 DPI、图标、滚动和双语布局的实际窗口检查，也不能替代真实实例联调。
+自动测试通过后，仍要查看不同显示缩放比例下的布局、图标、滚动和双语显示，也仍然需要使用真实账号检查 API 操作。
 
 ## 如何读取报告
 
-第八轮记录为 151 项完整回归通过。品牌更新随后运行了针对性构建和实际窗口检查；各次执行日期与范围分开记录。性能数据包括同机配置、测量方法和适用边界，不应只比较一个耗时数字。
+第八轮共有 151 项自动测试通过。之后更换名称和图标时，又检查了打包和实际窗口操作。报告会分别说明每次测试的时间与范围。比较处理速度时，也要看数据量、机器配置和测量方法，不能只看一个耗时数字。
 
-新增缺陷回归应复现可观察的错误结果，例如错误写请求数量、未知记录被重发或事务前后状态不一致，避免仅重复实现步骤。
+为新问题补测试时，应检查真正可能出错的结果，例如多发了一次请求、重复创建了记录，或保存失败后数据只更新了一半。
 
 [测试报告](../../docs/TEST-REPORT.md) · [性能报告](../../docs/PERFORMANCE.md) · [项目首页](../../README.md)
