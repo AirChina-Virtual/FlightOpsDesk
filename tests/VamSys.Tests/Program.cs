@@ -4,6 +4,26 @@ using System.Text;
 using VamSys.Core;
 using VamSys.Infrastructure;
 
+if(args.Length==4 && args[0]=="--storage-child"){await StorageProcessScenarios.Child(args);return;}
+if(args.Length==3 && args[0]=="--seed-storage-ui")
+{
+    Directory.CreateDirectory(args[1]);var w=StorageScenarios.Fixture();using var db=StorageScenarios.Legacy(args[1],w);
+    if(args[2]=="future")StorageScenarios.Sql(db,"PRAGMA user_version=4");
+    Console.WriteLine("Seeded isolated storage UI");return;
+}
+if(args.Length==2 && args[0]=="--seed-task-ui")
+{
+    var w=StorageScenarios.Fixture();w.Jobs.Clear();w.Mode=RunMode.Offline;
+    for(var n=0;n<1000;n++)w.Jobs.Add(new(){Created=DateTimeOffset.UnixEpoch.AddMinutes(n),Mode=RunMode.Online,Items=Enumerable.Range(0,20).Select(k=>new ChangeItem{State=ItemState.Succeeded}).ToList()});
+    w.Jobs.Add(new(){Created=DateTimeOffset.UtcNow,Mode=RunMode.Online,Items=Enumerable.Range(0,20000).Select(k=>new ChangeItem{State=ItemState.Pending}).ToList()});
+    var taskStore=new WorkspaceStore(args[1]);taskStore.Save(w);taskStore.SaveLanguage("en-US");Console.WriteLine("Seeded 1000 histories / 20000 history items + 20000 active items");return;
+}
+if(args.Length==2 && args[0]=="--assert-close-ui")
+{
+    var store=new WorkspaceStore(args[1]);var w=store.Load(store.List()[0].Id);
+    if(w.Resources[ResourceKind.Fleets].Draft[0].Get("Name")!="accepted after failure")throw new Exception("Closing retry did not persist draft");
+    Console.WriteLine("PASS restart reads the last accepted draft after failed close and retry");return;
+}
 int passed = 0;
 async Task Test(string name, Func<Task> test)
 {
@@ -12,7 +32,23 @@ async Task Test(string name, Func<Task> test)
 Task Sync(Action a) { a(); return Task.CompletedTask; }
 void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
 DataRow Row(params (string, string)[] fields) => new() { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
+if(args.Length==1 && args[0]=="--v3"){await StorageV3Scenarios.Run(Test);await TaskViewModelScenarios.Run(Test);Console.WriteLine($"{passed} v3 scenarios passed.");return;}
+if(args.Length==2 && args[0]=="--benchmark-v3"){await StorageV3Scenarios.Benchmark(args[1]);return;}
+if(args.Length==1 && args[0]=="--storage"){await StorageScenarios.Run(Test);Console.WriteLine($"{passed} storage scenarios passed.");return;}
+if(args.Length==2 && args[0]=="--benchmark-storage"){await StorageScenarios.Benchmark(args[1]);return;}
 var csv = new CsvAdapter(); var planner = new ChangePlanner();
+if (args.Length == 2 && args[0] == "--seed-recovery-ui")
+{
+    var w=new Workspace { Name="QA recovery candidates",Mode=RunMode.Online,AirlineId="7" };
+    var item=new ChangeItem { Resource=ResourceKind.Airports,Kind=ChangeKind.Create,State=ItemState.Unknown,RemoteId="102",
+        After=Row(("ICAO/IATA","EGLL"),("Name","Hub")),Fields=new(){["ICAO/IATA"]=new(FieldIntent.Set,"EGLL"),["Name"]=new(FieldIntent.Set,"Hub")} };
+    var pendingAirport=new ChangeItem { Resource=ResourceKind.Airports,Kind=ChangeKind.Create,State=ItemState.Pending,After=Row(("ICAO/IATA","EGLL")) };
+    pendingAirport.SetMessage(Messages.Define("ApiAirportCreatePending"));
+    var pendingFleet=new ChangeItem { Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,State=ItemState.Pending,After=Row(("Name","Pending fleet")) };
+    pendingFleet.SetMessage(Messages.Define("ApiIdentityPending"));
+    w.Resources[ResourceKind.Airports].Draft.Add(item.After.Copy());w.Jobs.Add(new(){Mode=RunMode.Online,Items=[item,pendingAirport,pendingFleet]});
+    new WorkspaceStore(args[1]).Save(w);Console.WriteLine("Seeded recovery UI without credentials");return;
+}
 if (args.Length == 2 && args[0] == "--seed-ui")
 {
     var w = new Workspace { Name = "QA 20000 航线", Mode = RunMode.Demo };
@@ -20,6 +56,10 @@ if (args.Length == 2 && args[0] == "--seed-ui")
     CsvAdapter.Import(ResourceKind.Routes,w.Resources[ResourceKind.Routes],Enumerable.Range(0,20000).Select(i=>Row(("ID",i.ToString()),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Type","jumpseat"),("Tags","性能测试"))).ToList(),true);
     new WorkspaceStore(args[1]).Save(w); Console.WriteLine("Seeded isolated UI workspace"); return;
 }
+
+if(args.Length==1 && args[0]=="--performance") {await PerformanceScenarios.Run(Test); await CandidateIndexScenarios.Run(Test);Console.WriteLine($"{passed} performance scenarios passed.");return;}
+if(args.Length==1 && args[0]=="--indexes") {await CandidateIndexScenarios.Run(Test);Console.WriteLine($"{passed} index scenarios passed.");return;}
+if(args.Length==2 && args[0]=="--benchmark-performance") {await PerformanceScenarios.Benchmark(args[1]);return;}
 
 await Test("CSV quoting, Unicode, embedded newline and leading zeros", () => Sync(() =>
 {
@@ -327,6 +367,13 @@ await Test("Fleet labels translate generated annotations without translating nam
     Check(options[1].Describe(loc).Contains("Unresolved fleet") && options[1].Describe(loc).Contains("Reference needs verification"));
 }));
 await ApiScenarios.Run(Test);
+await AuditScenarios.Run(Test);
+await ReauditScenarios.Run(Test);
+await LifecycleScenarios.Run(Test);
+await CredentialSaveScenarios.Run(Test);
+await PerformanceScenarios.Run(Test); await CandidateIndexScenarios.Run(Test);
+await StorageScenarios.Run(Test);
+await StorageV3Scenarios.Run(Test);await TaskViewModelScenarios.Run(Test);
 Console.WriteLine($"{passed} scenarios passed.");
 
 sealed class CountingService(DemoService inner) : IResourceReader,IResourceWriter

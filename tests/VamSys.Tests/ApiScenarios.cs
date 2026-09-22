@@ -129,6 +129,8 @@ static class ApiScenarios
                 r=>Task.FromResult(ScriptedHttp.Json("{\"data\":{\"id\":101,\"airline_id\":7,\"icao\":\"EGLL\",\"iata\":\"LHR\",\"name\":\"London\"}}")),
                 r=>Task.FromResult(ScriptedHttp.Json("{\"data\":[],\"meta\":{\"next_cursor_url\":null}}")),
                 r=>Task.FromResult(ScriptedHttp.Json("{\"data\":[],\"meta\":{\"next_cursor_url\":null}}")),
+                r=>Task.FromResult(ScriptedHttp.Json("{\"data\":[],\"meta\":{\"next_cursor_url\":null}}")),
+                r=>Task.FromResult(ScriptedHttp.Json("{\"data\":[],\"meta\":{\"next_cursor_url\":null}}")),
                 r=>{Check(r.Method==HttpMethod.Delete);return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));},
                 r=>Task.FromResult(ScriptedHttp.Json("{}",HttpStatusCode.NotFound))]);
             var api=Adapter(w,h);var row=Parse(api,ResourceKind.Airports,"{\"id\":101,\"airline_id\":7,\"icao\":\"EGLL\",\"iata\":\"LHR\",\"name\":\"London\"}");

@@ -12,11 +12,11 @@ public interface IApiResourceAdapter
     DataRow FromJson(ResourceKind kind, JsonElement value);
     List<ApiStep> Plan(ChangeItem change);
 }
-public sealed class OperationsAdapter(OperationsTransport transport, Workspace workspace) : IResourceReader, IResourceWriter, IApiResourceAdapter
+public sealed partial class OperationsAdapter(OperationsTransport transport, Workspace workspace) : IResourceReader, IResourceWriter, IApiResourceAdapter
 {
     public static readonly Uri BaseUri = new("https://vamsys.io/api/v3/operations/");
     static readonly JsonElement SchemasJson = JsonDocument.Parse(typeof(OperationsAdapter).Assembly.GetManifestResourceStream("Operations.OpenApi.json")!).RootElement.GetProperty("components").GetProperty("schemas");
-    readonly Dictionary<(ResourceKind,string),DataRow> known = new();
+    Dictionary<(ResourceKind,string),DataRow> known = new();
     public string? SessionAirlineId { get; private set; }
     public string ConnectionId => workspace.AirlineId ?? throw Block("ApiConnectFirst");
     public static InvalidOperationException Block(string key, string? field = null) => MessageErrors.Attach(new InvalidOperationException(Messages.Define(key, ("field",field))), Messages.Define(key, ("field",field)));
@@ -72,6 +72,37 @@ public sealed class OperationsAdapter(OperationsTransport transport, Workspace w
         }
         else await foreach (var element in transport.ReadPagesAsync(new(BaseUri,Collection(kind)),ct)) yield return FromJson(kind,element);
     }
+    public async Task RefreshSnapshotsAsync(Func<Workspace,Task> persist,CancellationToken ct,Action<ResourceKind,int>? progress=null)
+    {
+        // Reads must not mutate the live identity index, even if a later page or save fails.
+        var readWorkspace=new Workspace { AirlineId=workspace.AirlineId };
+        var reader=new OperationsAdapter(transport,readWorkspace);
+        var incoming=new Dictionary<ResourceKind,List<DataRow>>();
+        foreach(var kind in Enum.GetValues<ResourceKind>())
+        {
+            var rows=new List<DataRow>();
+            await foreach(var row in reader.ReadAllAsync(kind,ct))
+            { rows.Add(row); if(rows.Count%100==0) progress?.Invoke(kind,rows.Count); }
+            incoming[kind]=rows;
+        }
+        ct.ThrowIfCancellationRequested();
+        var staged=Workspace.Deserialize(workspace.Serialize());
+        staged.AirlineId ??= readWorkspace.AirlineId;
+        foreach(var (kind,rows) in incoming)
+        {
+            SnapshotMerger.Merge(kind,staged.Resources[kind],rows);
+            if(!staged.VerifiedOperations.Contains(kind+":Read")) staged.VerifiedOperations.Add(kind+":Read");
+        }
+        await persist(staged);
+        workspace.StorageRevision=staged.StorageRevision;
+        // No await between the durable snapshot and its in-memory index replacement.
+        workspace.Resources=staged.Resources;
+        workspace.VerifiedOperations=staged.VerifiedOperations;
+        workspace.AirlineId=staged.AirlineId;
+        known=reader.known;
+        SessionAirlineId=reader.SessionAirlineId ?? SessionAirlineId;
+    }
+    public void Forget(ResourceKind kind,string id) => known.Remove((kind,id));
     string Path(ResourceKind kind, DataRow row, string? remoteId = null, bool preview = false)
     {
         var identity = row.Identity;
@@ -120,9 +151,43 @@ public sealed class OperationsAdapter(OperationsTransport transport, Workspace w
     }
     static bool HasAirportAlias(DataRow r,string code)
     {
-        if(r.RawApiJson == null) return false;
+        if(r.RawApiJson == null || string.IsNullOrWhiteSpace(code)) return false;
         using var doc=JsonDocument.Parse(r.RawApiJson);
         return new[]{"icao","iata"}.Any(k=>doc.RootElement.TryGetProperty(k,out var v) && v.ValueKind==JsonValueKind.String && v.GetString()!.Equals(code,StringComparison.OrdinalIgnoreCase));
+    }
+    void CheckConnection(DataRow row)
+    {
+        if(row.Identity != null && row.Identity.ConnectionId != ConnectionId) throw Block("ApiWrongVa");
+    }
+    long EndpointId(ResourceKind kind,DataRow row,string field,bool remote)
+    {
+        CheckConnection(row);
+        if(remote)
+        {
+            if(row.RawApiJson == null) throw Block("ApiRefreshFirst");
+            using var doc=JsonDocument.Parse(row.RawApiJson);
+            var wire=(field.StartsWith("Departure") ? "departure" : "arrival") + (kind==ResourceKind.Routes ? "_id" : "_airport_id");
+            if(!doc.RootElement.TryGetProperty(wire,out var value)) throw Block("ApiRefreshFirst");
+            return PositiveId(value.ToString());
+        }
+        return AirportId(row.Get(field));
+    }
+    bool SameEndpoint(ResourceKind kind,DataRow current,DataRow expected,string field,bool before=false)
+        => EndpointId(kind,current,field,true)==EndpointId(kind,expected,field,before && expected.RawApiJson!=null);
+
+    internal bool IsDuplicate(ChangeItem item,DataRow current)
+    {
+        CheckConnection(current); CheckConnection(item.After);
+        if(item.Resource==ResourceKind.Airports) return HasAirportAlias(current,item.After.Get("ICAO/IATA"));
+        if(item.Resource is ResourceKind.Routes or ResourceKind.Routings)
+        {
+            var signature=item.Resource==ResourceKind.Routes ? "Flight Number" : "Route String";
+            return SameEndpoint(item.Resource,current,item.After,"Departure Airport (ICAO/IATA)")
+                && SameEndpoint(item.Resource,current,item.After,"Arrival Airport (ICAO/IATA)")
+                && current.Get(signature).Equals(item.After.Get(signature),StringComparison.OrdinalIgnoreCase);
+        }
+        var field=item.Resource==ResourceKind.Aircraft ? "Registration" : "Name";
+        return current.Get(field).Equals(item.After.Get(field),StringComparison.OrdinalIgnoreCase);
     }
     static string SchemaName(ResourceKind kind,bool create) => (kind,create) switch
     {
@@ -242,30 +307,58 @@ public sealed class OperationsAdapter(OperationsTransport transport, Workspace w
         }
     }
     public async Task<string?> WriteAsync(ChangeItem change,CancellationToken ct) => await WriteStepsAsync(change,()=>Task.CompletedTask,ct);
-    public async Task<string?> WriteStepsAsync(ChangeItem change,Func<Task> persist,CancellationToken ct)
+    internal static Dictionary<string,JsonElement> ExpectedValues(IEnumerable<ApiStep> steps)
+        => steps.SelectMany(s=>s.Body).GroupBy(p=>p.Key).ToDictionary(g=>g.Key,g=>JsonSerializer.SerializeToElement(g.Last().Value));
+    public Task<string?> WriteStepsAsync(ChangeItem change,Func<Task> persist,CancellationToken ct)
+        => WriteStepsAsync(change,Plan(change),persist,ct);
+    internal static void PrepareSteps(ChangeItem change,List<ApiStep> steps)
+        => change.ApiSteps=steps.Select(s=>new BatchStep{Method=s.Method.Method,Path=s.Path,Body=s.Body.ToDictionary(p=>p.Key,p=>JsonSerializer.SerializeToElement(p.Value))}).ToList();
+    internal async Task<string?> WriteStepsAsync(ChangeItem change,List<ApiStep> steps,Func<Task> persist,CancellationToken ct)
     {
-        var steps=Plan(change);
+        change.ApiExpectedValues=ExpectedValues(steps);
+        if(change.ApiSteps.Count!=steps.Count) PrepareSteps(change,steps);
         for(int index=0;index<steps.Count;index++)
         {
             var step=steps[index];
             if(step.Method==HttpMethod.Post && change.CreateCompleted) continue;
             var path=step.Path=="{created}" ? Path(change.Resource,change.After,change.RemoteId) : step.Path;
+            var record=change.ApiSteps[index];record.Path=path;record.State=BatchStepState.InFlight;await persist();
             using var response=await transport.SendAsync(step.Method,new(BaseUri,path),step.Method==HttpMethod.Delete?null:step.Body,ct);
             if(step.Method==HttpMethod.Post)
             {
                 var created=FromJson(change.Resource,response.RootElement);
                 change.RemoteId=created.Identity!.RemoteId; change.After.Identity=created.Identity;
-                change.CreateCompleted=true; await persist();
+                change.CreateCompleted=true;record.RemoteId=change.RemoteId;
             }
-            change.WriteAccepted=index==steps.Count-1; await persist();
+            record.State=BatchStepState.ResponseReceived;change.WriteAccepted=index==steps.Count-1; await persist();
         }
         return change.RemoteId ?? change.After.Identity?.RemoteId;
     }
     public bool Matches(ChangeItem item,DataRow current,DataRow expected,bool before)
     {
+        CheckConnection(current); CheckConnection(expected);
+        if(item.Resource==ResourceKind.Airports && item.Kind==ChangeKind.Create
+            && !HasAirportAlias(current,expected.Get("ICAO/IATA"))) return false;
+        if(!before)
+        {
+            if(current.RawApiJson==null) return false;
+            var values=item.ApiExpectedValues ?? ExpectedValues(Plan(item));
+            if(item.Resource==ResourceKind.Aircraft && item.Kind==ChangeKind.Create
+                && current.Identity?.ParentFleetId!=expected.Get("Fleet ID")) return false;
+            using var raw=JsonDocument.Parse(current.RawApiJson);
+            foreach(var (wire,wanted) in values)
+            {
+                if(wire=="icao_iata")
+                { if(!HasAirportAlias(current,wanted.GetString()!)) return false; continue; }
+                if(!raw.RootElement.TryGetProperty(wire,out var actual) || !WireEquivalent(wire,actual,wanted)) return false;
+            }
+            return true;
+        }
         IEnumerable<string> fields = before && item.Kind==ChangeKind.Delete ? Maps[item.Resource].Keys : item.Fields.Keys;
         var relevant=fields.Where(f=>Maps[item.Resource].ContainsKey(f)||Schemas.ReferenceFields(item.Resource).Contains(f)).ToList();
-        if(!relevant.All(f=>Equivalent(f,current.Get(f),expected.Get(f)))) return false;
+        if(!relevant.All(f=>f is "Departure Airport (ICAO/IATA)" or "Arrival Airport (ICAO/IATA)"
+            ? SameEndpoint(item.Resource,current,expected,f,before)
+            : Equivalent(f,current.Get(f),expected.Get(f)))) return false;
         if(current.RawApiJson != null)
         {
             using var actual=JsonDocument.Parse(current.RawApiJson);
@@ -276,18 +369,26 @@ public sealed class OperationsAdapter(OperationsTransport transport, Workspace w
                     if(Maps[item.Resource].TryGetValue(f,out var wire) && wire is "departure_time" or "arrival_time" or "start_date" or "end_date")
                         if(original.RootElement.TryGetProperty(wire,out var a) && actual.RootElement.TryGetProperty(wire,out var b) && a.ToString()!=b.ToString()) return false;
             }
-            else if(!before)
-            {
-                foreach(var pair in Plan(item).SelectMany(s=>s.Body).Where(p=>p.Key is "departure_time" or "arrival_time" or "start_date" or "end_date"))
-                {
-                    if(!actual.RootElement.TryGetProperty(pair.Key,out var value)) return false;
-                    if(pair.Key is "start_date" or "end_date")
-                    { if(!DateTimeOffset.TryParse(value.ToString(),CultureInfo.InvariantCulture,DateTimeStyles.None,out var date) || date!=DateTimeOffset.Parse((string)pair.Value!,CultureInfo.InvariantCulture)) return false; }
-                    else if(value.ToString()!=pair.Value?.ToString()) return false;
-                }
-            }
+
         }
         return true;
+    }
+    static bool WireEquivalent(string wire,JsonElement actual,JsonElement wanted)
+    {
+        if(wire is "start_date" or "end_date")
+            return actual.ValueKind==JsonValueKind.String && wanted.ValueKind==JsonValueKind.String
+                && DateTimeOffset.TryParse(actual.GetString(),CultureInfo.InvariantCulture,DateTimeStyles.None,out var a)
+                && DateTimeOffset.TryParse(wanted.GetString(),CultureInfo.InvariantCulture,DateTimeStyles.None,out var b) && a==b;
+        if(wanted.ValueKind==JsonValueKind.Array)
+        {
+            if(actual.ValueKind!=JsonValueKind.Array) return false;
+            // The documented response allows string IDs, while requests require integer IDs.
+            string Key(JsonElement value) => wire is "fleet_ids" or "container_ids"
+                && long.TryParse(value.ToString(),NumberStyles.None,CultureInfo.InvariantCulture,out var id)
+                ? "id:"+id.ToString(CultureInfo.InvariantCulture) : value.ValueKind==JsonValueKind.String ? "string:"+value.GetString() : value.GetRawText();
+            return wanted.EnumerateArray().Select(Key).ToHashSet().SetEquals(actual.EnumerateArray().Select(Key));
+        }
+        return JsonElement.DeepEquals(actual,wanted);
     }
     static bool Equivalent(string field,string a,string b) => field is "Fleet IDs" or "Tags" or "Service Days" or "Days of Operation" or "Container IDs"
         ? a.Split(',',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries).ToHashSet().SetEquals(b.Split(',',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries)) : a==b;

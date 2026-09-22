@@ -55,6 +55,7 @@ public sealed class ResourceData
 public sealed class Workspace
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public long StorageRevision { get; set; }
     public string Name { get; set; } = Messages.Define("Text_707DBE0213");
     public RunMode Mode { get; set; }
     public bool LocalRouteTimes { get; set; }
@@ -66,9 +67,19 @@ public sealed class Workspace
     public List<string> VerifiedOperations { get; set; } = [];
     public Dictionary<ResourceKind, ResourceData> Resources { get; set; } = Enum.GetValues<ResourceKind>().ToDictionary(k => k, _ => new ResourceData());
     public List<BatchJob> Jobs { get; set; } = [];
+    // Used to stage an atomic rebase. The caller replaces the changed ResourceData;
+    // unchanged resources and jobs are shared for read-only serialization.
+    public Workspace StageResource(ResourceKind kind,ResourceData data)
+    {
+        var copy=(Workspace)MemberwiseClone();
+        copy.Resources=new(Resources){[kind]=data};copy.VerifiedOperations=[..VerifiedOperations];
+        return copy;
+    }
     public string Serialize() => JsonSerializer.Serialize(this);
     public static Workspace Deserialize(string json) => JsonSerializer.Deserialize<Workspace>(json)!;
 }
+
+public sealed record RecoveryCandidateAttempt(string RemoteId, DateTimeOffset ProposedAt);
 
 public sealed class ChangeItem
 {
@@ -81,6 +92,24 @@ public sealed class ChangeItem
     public List<Guid> Dependencies { get; set; } = [];
     public ItemState State { get; set; }
     public string? RemoteId { get; set; }
+    public Dictionary<string, JsonElement>? ApiExpectedValues { get; set; }
+    public List<BatchStep> ApiSteps { get; set; } = [];
+    public string? RecoveryCandidateId { get; set; }
+    public List<RecoveryCandidateAttempt> RecoveryCandidates { get; set; } = [];
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool CanProposeRecoveryId => State==ItemState.Unknown && Kind==ChangeKind.Create && !CreateCompleted && After.Identity==null;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? EditableRecoveryId => RecoveryCandidateId ?? (CanProposeRecoveryId ? RemoteId : null);
+    public void ProposeRecoveryId(string value)
+    {
+        if(!CanProposeRecoveryId) throw new InvalidOperationException(Messages.Define("ApiUnknown"));
+        if(!long.TryParse(value,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out var id) || id<=0)
+            throw new FormatException(Messages.Define("ApiInvalid",("field","Remote ID")));
+        // Earlier versions stored unverified user input in RemoteId.
+        if(RemoteId!=null && !RecoveryCandidates.Any(a=>a.RemoteId==RemoteId)) RecoveryCandidates.Add(new(RemoteId,DateTimeOffset.UtcNow));
+        RemoteId=null; RecoveryCandidateId=id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        RecoveryCandidates.Add(new(RecoveryCandidateId,DateTimeOffset.UtcNow));
+    }
     public bool Rebased { get; set; }
     public bool CreateCompleted { get; set; }
     public bool WriteAccepted { get; set; }

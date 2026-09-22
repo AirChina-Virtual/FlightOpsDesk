@@ -3,7 +3,13 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 $scope=[System.Windows.Automation.TreeScope]::Descendants
 function Root { $p=Get-Process VamSys.App -ErrorAction SilentlyContinue | Select-Object -First 1; if($p -and $p.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)} }
-function Elements { $r=Root; if($r){$r.FindAll($scope,[System.Windows.Automation.Condition]::TrueCondition)} }
+function Elements {
+    for($attempt=0;$attempt -lt 3;$attempt++) {
+        try { $r=Root; if($r){return $r.FindAll($scope,[System.Windows.Automation.Condition]::TrueCondition)}; return }
+        catch { if($_.Exception.InnerException -isnot [Runtime.InteropServices.COMException]){throw}; Start-Sleep -Milliseconds 100 }
+    }
+    # The provider may be unavailable briefly during window startup; WaitFor is still bounded.
+}
 function Named($name,$type) { Elements | Where-Object { $_.Current.Name -eq $name -and (!$type -or $_.Current.ControlType.ProgrammaticName -eq "ControlType.$type") } | Select-Object -First 1 }
 function WaitFor([scriptblock]$condition) { $limit=[DateTime]::UtcNow.AddSeconds(15); do { $result=& $condition; if($result){return $result}; Start-Sleep -Milliseconds 100 } while([DateTime]::UtcNow -lt $limit); throw "UI timeout: $condition" }
 function Click($name) { $c=Named $name 'Button'; if(!$c){$more=Elements | Where-Object {$_.Current.AutomationId -eq 'MoreButton'} | Select-Object -First 1; if($more){([System.Windows.Automation.InvokePattern]$more.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke()}}; $c=WaitFor {Named $name 'Button'}; ([System.Windows.Automation.InvokePattern]$c.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke() }

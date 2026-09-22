@@ -5,13 +5,15 @@ public sealed class PersistenceException(Exception inner) : Exception(Messages.D
 public sealed class BatchExecutor(IResourceReader reader, IResourceWriter writer) : IBatchExecutor
 {
     static bool EqualFields(DataRow current, DataRow expected) => expected.Fields.Where(p => p.Key != "_delete").All(p => current.Get(p.Key) == p.Value);
-    public async Task ExecuteAsync(BatchJob job, Func<Task> persist, CancellationToken ct)
+    public Task ExecuteAsync(BatchJob job,Func<Task> persist,CancellationToken ct)=>ExecuteAsync(job,persist,ct,null);
+    public async Task ExecuteAsync(BatchJob job, Func<Task> persist, CancellationToken ct,Action<ChangeItem?>? progress)
     {
-        var save = persist;
-        persist = async () => { try { await save(); } catch (Exception e) { throw new PersistenceException(e); } };
+        ChangeItem? active=null;var save = persist;
+        persist = async () => { try { await save();progress?.Invoke(active); } catch (Exception e) { throw new PersistenceException(e); } };
         job.SetStatus(JobStatus.Running, Messages.Define("Text_5026A63B58"));
         foreach (var item in job.Items.OrderBy(i => i.Kind == ChangeKind.Delete ? 10 - (int)i.Resource : (int)i.Resource))
         {
+            active=item;
             if (ct.IsCancellationRequested) { job.SetStatus(JobStatus.Canceled, Messages.Define("Text_6F312AE253")); break; }
             if (item.State is ItemState.Succeeded or ItemState.Conflict or ItemState.Failed) continue;
             if (item.State == ItemState.Skipped && item.Dependencies.Count == 0) continue;
@@ -68,11 +70,13 @@ public sealed class BatchExecutor(IResourceReader reader, IResourceWriter writer
                 bool sent = item.State == ItemState.Running;
                 item.State = sent ? ItemState.Unknown : ItemState.Pending;
                 item.SetMessage(sent ? Messages.Define("Text_395B73E720") : Messages.Define("Text_08E3371510"));
-                if (ct.IsCancellationRequested) { job.SetStatus(JobStatus.Canceled, Messages.Define("Text_6F312AE253")); await persist(); break; }
+                active=item;
+            if (ct.IsCancellationRequested) { job.SetStatus(JobStatus.Canceled, Messages.Define("Text_6F312AE253")); await persist(); break; }
             }
             catch (Exception e) when (e is not PersistenceException) { item.State = ItemState.Failed; item.SetMessage(e is FormatException or ArgumentException ? Messages.Define("Text_EFDA7294FF") : Messages.Define("Text_A60B4675CF")); }
             await persist();
         }
+        active=null;
         if (job.StatusCode == JobStatus.Running) { var complete = job.Items.All(i => i.State == ItemState.Succeeded); job.SetStatus(complete ? JobStatus.Completed : JobStatus.NeedsAttention, Messages.Define(complete ? "Text_140197D868" : "Text_E9008C53CF")); }
         await persist();
     }

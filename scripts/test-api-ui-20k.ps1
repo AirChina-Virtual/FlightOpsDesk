@@ -27,7 +27,12 @@ $picker=WaitFor {All|Where-Object{$_.Current.AutomationId -eq 'LanguagePicker'}|
 $timer=[System.Diagnostics.Stopwatch]::StartNew();SelectItem 'English';WaitFor {Named 'Connection & settings' 'ListItem'}|Out-Null;$timer.Stop()
 SelectItem 'Data management';WaitFor {Named 'ID' 'Edit'}|Out-Null
 Start-Sleep -Milliseconds 250
-$idsAfter=@(All|Where-Object{$_.Current.Name -eq 'ID' -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Edit'}|ForEach-Object{([System.Windows.Automation.ValuePattern]$_.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)).Current.Value})
+# Wait for the virtualized provider to finish restoring the last page. A single
+# FindAll can return no controls during a transient provider refresh.
+$idsAfter=@(WaitFor {
+    $values=@(All|Where-Object{$_.Current.Name -eq 'ID' -and $_.Current.ControlType.ProgrammaticName -eq 'ControlType.Edit'}|ForEach-Object{([System.Windows.Automation.ValuePattern]$_.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)).Current.Value})
+    if($values.Count -gt 0 -and $values[-1] -eq '19999'){return $values}
+})
 $positionAfter=Position
 if([math]::Abs($positionBefore-$positionAfter) -gt 0.05 -or $positionAfter -lt 99.9 -or $idsAfter[-1] -ne '19999'){throw ('Scroll position lost: '+$positionBefore+' -> '+$positionAfter)}
 if($idsAfter.Count -gt 100){throw 'Rows not virtualized'}

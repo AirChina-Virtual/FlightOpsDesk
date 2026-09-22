@@ -15,7 +15,7 @@ public sealed partial class MainWindow : Window
     readonly CsvAdapter csv = new(); readonly ChangePlanner planner = new();
     readonly FleetAssignmentService fleets = new(); readonly DeletionService deletions = new();
     Workspace workspace = new(); ResourceKind resource = ResourceKind.Routes;
-    string page = "workspace"; bool ready, busy; string? lastEditedCell;
+    string page = "workspace"; bool ready, busy, storageBlocked; string? lastEditedCell;
     ListView? table; List<RowViewModel> visible = [];
     CancellationTokenSource? running;
     readonly SemaphoreSlim saveGate = new(1);
@@ -43,16 +43,23 @@ public sealed partial class MainWindow : Window
         ResourcePicker.SelectedIndex = (int)resource;
         ReloadWorkspaces();
         autosave.Tick += async (_, _) => { autosave.Stop(); await Guard(async () => { await Save(); if (!busy) Status(() => L("Text_11584EAAA5")); }); };
-        AppWindow.Closing += (_, e) =>
+        AppWindow.Closing += async (_, e) =>
         {
-            if (busy) { e.Cancel = true; Status(() => L("Text_571629E172")); }
-            else
-            {
-                try { autosave.Stop(); store.Save(workspace); }
-                catch { e.Cancel = true; Status(() => L("Text_7AF24B0E8E")); }
-            }
+            if(closeState.State==WindowCloseState.Closed)return;
+            e.Cancel=true;
+            if(!closeState.IsOpen)return;
+            if(busy||interactiveOperations>0||dialogs>0){Status(()=>L("CloseBlocked"));return;}
+            try {
+                var closed=await closeState.RequestAsync(false,async()=>{
+                    if(!storageBlocked)await Save();
+                },FreezeClosing);
+                if(closed)Close();
+            } catch {Status(()=>L("Text_7AF24B0E8E"));}
         };
         ready = true; Navigation.SelectedItem = Navigation.MenuItems[0]; Render();
+#if UI_VERIFICATION
+        InitializeVerification();
+#endif
     }
     void Status(Func<string> message) { statusText = message; StatusLabel.Text = message(); }
     void ToggleNavigation(TitleBar sender, object args) => Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
@@ -75,10 +82,10 @@ public sealed partial class MainWindow : Window
     async Task Save()
     {
         await saveGate.WaitAsync();
-        try { var id = workspace.Id; var name = workspace.Name; var json = workspace.Serialize(); await Task.Run(() => store.SaveJson(id, name, json)); }
+        try { if(storageBlocked) throw OperationsAdapter.Block("StorageReload"); await store.SaveAsync(workspace); }
         finally { saveGate.Release(); }
     }
-    void SaveSoon() { autosave.Stop(); autosave.Start(); }
+    void SaveSoon() { if(!closeState.IsOpen)return; autosave.Stop(); autosave.Start(); }
     async Task Guard(Func<Task> operation)
     {
         try { await operation(); }
@@ -86,19 +93,21 @@ public sealed partial class MainWindow : Window
     }
     async Task Work(Func<Task> operation)
     {
-        if (busy) return;
+        if (!closeState.IsOpen || busy || !closeState.IsOpen) return;
+        if(storageBlocked) throw OperationsAdapter.Block("StorageReload");
+        var pendingSave=autosave.IsEnabled;autosave.Stop();
         busy = true; BusyRing.IsActive = true; WorkspacePicker.IsEnabled = false; ResourcePicker.IsEnabled = false;
-        try { await operation(); }
+        try { if(pendingSave) await Save(); await operation(); }
         finally { busy = false; BusyRing.IsActive = false; WorkspacePicker.IsEnabled = true; ResourcePicker.IsEnabled = true; Render(); }
     }
     Button Button(Func<string> label, Func<Task> action, bool enabled = true)
     {
-        var b = new Button { IsEnabled = enabled }.Localize(localization, "Content", () => label()); b.Click += async (_, _) => await Guard(action); return b;
+        var b = new Button { IsEnabled = enabled }.Localize(localization, "Content", () => label()); b.Click += async (_, _) => await UserAction(action); return b;
     }
     AppBarButton Command(Func<string> label, Symbol icon, Func<Task> action, bool enabled = true)
     {
         var button = new AppBarButton { Icon = new SymbolIcon(icon), IsEnabled = enabled }.Localize(localization, "Label", () => label());
-        button.Click += async (_, _) => await Guard(action); return button;
+        button.Click += async (_, _) => await UserAction(action); return button;
     }
     static StackPanel Stack(params UIElement[] children) { var s = new StackPanel { Spacing = 12 }; foreach (var c in children) s.Children.Add(c); return s; }
     static StackPanel Row(params UIElement[] children) { var s = Stack(children); s.Orientation = Orientation.Horizontal; return s; }
@@ -108,23 +117,23 @@ public sealed partial class MainWindow : Window
     async Task<bool> Confirm(string title, UIElement content, string? primary = null)
     {
         var d = new ContentDialog { XamlRoot = Content.XamlRoot, Title = title, Content = content, PrimaryButtonText = primary ?? L("Confirm"), CloseButtonText = L("Text_2CD0F3BE87"), DefaultButton = ContentDialogButton.Close };
-        return await d.ShowAsync() == ContentDialogResult.Primary;
+        dialogs++; try { return await d.ShowAsync() == ContentDialogResult.Primary; } finally { dialogs--; }
     }
     void Navigate(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        if (!ready) return; page = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString() ?? "workspace"; Render();
+        if (!ready || !closeState.IsOpen) return; page = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString() ?? "workspace"; Render();
     }
     async void WorkspaceChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!ready || busy || WorkspacePicker.SelectedItem is not WorkspaceChoice choice || choice.Id == workspace.Id) return;
-        await Guard(async () => { autosave.Stop(); await Save(); workspace = store.Load(choice.Id); if (apiSessions.Remove(choice.Id, out var previous)) previous.Client.Dispose(); if (workspace.Mode == RunMode.Online) workspace.Mode = RunMode.Offline; Render(); });
+        if (!ready || !closeState.IsOpen || busy || WorkspacePicker.SelectedItem is not WorkspaceChoice choice || choice.Id == workspace.Id) return;
+        await UserAction(async () => { autosave.Stop(); await Save(); workspace = store.Load(choice.Id); if (apiSessions.Remove(choice.Id, out var previous)) previous.Client.Dispose(); if (workspace.Mode == RunMode.Online) workspace.Mode = RunMode.Offline; Render(); });
     }
     void ResourceChanged(object sender, SelectionChangedEventArgs e)
-    { if (!ready || busy) return; resource = (ResourceKind)ResourcePicker.SelectedIndex; Render(); }
+    { if (!ready || !closeState.IsOpen || busy) return; resource = (ResourceKind)ResourcePicker.SelectedIndex; Render(); }
     void Render()
     {
         if (!ready) return;
-        CapturePageState();
+        CapturePageState();CaptureTaskState();
         lastEditedCell = null;
         ModeBadge.Text = workspace.Mode switch { RunMode.Demo => L("Text_692F811146"), RunMode.Online => L("Text_C4C1F8C6F4"), _ => L("Text_6C352EE0B0") };
         ResourceBar.Visibility = page is "data" or "import" or "review" ? Visibility.Visible : Visibility.Collapsed;
@@ -144,12 +153,12 @@ public sealed partial class MainWindow : Window
         return Scroll(Stack(Text(() => L("Text_2C33D5F7DE")),
             Row(Button(() => L("Text_946897D107"), async () =>
             {
-                if (busy) return; var name = new TextBox { Text = L("Text_A818AFCD80"), MaxLength = 80 }.Localize(localization, "Header", () => L("Text_8DCC576817"));
+                if (!closeState.IsOpen || busy || !closeState.IsOpen) return; var name = new TextBox { Text = L("Text_A818AFCD80"), MaxLength = 80 }.Localize(localization, "Header", () => L("Text_8DCC576817"));
                 if (await Confirm(L("Text_CDD0362664"), name) && !string.IsNullOrWhiteSpace(name.Text))
                 { await Save(); workspace = new Workspace { Name = name.Text.Trim() }; await Save(); ReloadWorkspaces(); Render(); }
             }), Button(() => L("Text_57D4E0340D"), async () =>
             {
-                if (busy) return; await Save(); workspace = DemoWorkspace(); await Save(); ReloadWorkspaces(); Render();
+                if (!closeState.IsOpen || busy || !closeState.IsOpen) return; await Save(); workspace = DemoWorkspace(); await Save(); ReloadWorkspaces(); Render();
             })), cards,
             Text(() => L("Text_8B0B7AD880"))));
     }
@@ -171,13 +180,13 @@ public sealed partial class MainWindow : Window
         actions.PrimaryCommands.Add(Command(() => L("Text_E306752B35"), Symbol.Edit, EditRules));
         actions.PrimaryCommands.Add(Command(() => L("Text_48A195CA7E"), Symbol.View, () => { Navigation.SelectedItem = Navigation.MenuItems[3]; return Task.CompletedTask; }));
         actions.PrimaryCommands.Add(Command(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts, !busy && Data.Conflicts.Count > 0));
-        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (busy) return; Data.Checkpoint(); var r = new DataRow(); foreach (var f in Schemas.All[resource].Columns) r.Fields[f] = f == "_delete" ? "FALSE" : ""; Data.Draft.Add(r); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
+        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!closeState.IsOpen || busy || !closeState.IsOpen) return; Data.Checkpoint(); var r = new DataRow(); foreach (var f in Schemas.All[resource].Columns) r.Fields[f] = f == "_delete" ? "FALSE" : ""; Data.Draft.Add(r); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
         if (resource is ResourceKind.Aircraft or ResourceKind.Routes) actions.PrimaryCommands.Add(Command(() => L("Text_95DD1FDDFE"), Symbol.Edit, () => ChooseFleets(null)));
         actions.PrimaryCommands.Add(Command(() => L("Text_435BF8A234"), Symbol.Delete, DeleteSelected));
         actions.PrimaryCommands.Add(Command(() => L("Text_A6926595CE"), Symbol.Undo, RestoreSelected));
         if (resource == ResourceKind.Routes) actions.SecondaryCommands.Add(Command(() => L("Text_7AA882D2FE"), Symbol.Clock, RetireSelected));
-        actions.SecondaryCommands.Add(Command(() => L("Text_926A50B98E"), Symbol.Undo, async () => { if (busy) return; Data.UndoEdit(); await Save(); Render(); Status(() => L("Text_E5CE954248")); }));
-        actions.SecondaryCommands.Add(Command(() => L("Text_03717B6F10"), Symbol.Redo, async () => { if (busy) return; Data.RedoEdit(); await Save(); Render(); Status(() => L("Text_1F00D27BEE")); }));
+        actions.SecondaryCommands.Add(Command(() => L("Text_926A50B98E"), Symbol.Undo, async () => { if (!closeState.IsOpen || busy || !closeState.IsOpen) return; Data.UndoEdit(); await Save(); Render(); Status(() => L("Text_E5CE954248")); }));
+        actions.SecondaryCommands.Add(Command(() => L("Text_03717B6F10"), Symbol.Redo, async () => { if (!closeState.IsOpen || busy || !closeState.IsOpen) return; Data.RedoEdit(); await Save(); Render(); Status(() => L("Text_1F00D27BEE")); }));
         actions.SecondaryCommands.Add(Command(() => L("Text_41B0AF8C5C"), Symbol.Accept, Validate));
         Grid.SetRow(actions, 1); grid.Children.Add(actions);
         table = new ListView { SelectionMode = ListViewSelectionMode.Multiple, HorizontalContentAlignment = HorizontalAlignment.Stretch, IsEnabled = !busy };
@@ -223,13 +232,13 @@ public sealed partial class MainWindow : Window
         var fleetLabels = fleets.Options(workspace).ToDictionary(o => o.Token, StringComparer.OrdinalIgnoreCase);
         visible = rows.Select(r => new RowViewModel(r, columns.Select(f => new CellViewModel(f, r.Get(f), value =>
         {
-            if (busy || Schemas.Deleted(r) || f == "_delete") return;
+            if (!closeState.IsOpen || busy || Schemas.Deleted(r) || f == "_delete") return;
             var cellKey = r.LocalId + ":" + f;
             if (lastEditedCell != cellKey) { Data.Checkpoint(); lastEditedCell = cellKey; }
             r.Fields[f] = value; SaveSoon(); Status(() => L("Text_75141EDE81"));
         })
         {
-            IsReadOnly = Schemas.Deleted(r), FleetName = () => L("ChooseFleet"),
+            CanEdit=()=>closeState.IsOpen&&!busy, IsReadOnly = Schemas.Deleted(r), FleetName = () => L("ChooseFleet"),
             DisplayText = () => f == "_delete" ? (Schemas.Deleted(r) ? L("Text_EE96DC1EBE") : conflictIds.Contains(r.LocalId) ? L("ApiRowConflict") : modifiedIds.Contains(r.LocalId) && existingIds.Contains(r.LocalId) ? L("ApiRowDraft") : existingIds.Contains(r.LocalId) ? L("Text_20D2382F10") : L("Text_4EF7F62706"))
                 : f is "Fleet ID" or "Fleet IDs" ? (string.Join("; ", FleetAssignmentService.Tokens(r.Get(f)).Select(t => fleetLabels.TryGetValue(t, out var option) ? option.Describe(localization) : L("Text_C221144914") + t)) is var label && label.Length > 0 ? label : L("Text_F274578907")) : "",
             ChooseFleet = f is "Fleet ID" or "Fleet IDs" ? new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Guard(() => ChooseFleets(r))) : null
@@ -238,7 +247,7 @@ public sealed partial class MainWindow : Window
     List<DataRow> SelectedRows() => table?.SelectedItems.Cast<RowViewModel>().Select(v => v.Row).ToList() ?? [];
     async Task DeleteSelected()
     {
-        if (busy) return; var selected = SelectedRows(); if (selected.Count == 0) { Status(() => L("Text_BAB47FB928")); return; }
+        if (!closeState.IsOpen || busy || !closeState.IsOpen) return; var selected = SelectedRows(); if (selected.Count == 0) { Status(() => L("Text_BAB47FB928")); return; }
         var plan = deletions.Preview(workspace, resource, selected.Select(r => r.LocalId));
         if (plan.Issues.Count > 0) { await Confirm(L("Text_FD6D0919A9"), new ScrollViewer { MaxHeight = 350, Content = Text(() => string.Join("\n", plan.Issues.Take(100).Select(i => L(i.Description)))) }, L("Text_3FD47EDCE4")); return; }
         if (plan.RemoveDrafts.Count + plan.MarkExisting.Count == 0) { Status(() => L("Text_EEAAAF2F48")); return; }
@@ -247,13 +256,13 @@ public sealed partial class MainWindow : Window
     }
     async Task RestoreSelected()
     {
-        if (busy) return; var selected = SelectedRows();
+        if (!closeState.IsOpen || busy || !closeState.IsOpen) return; var selected = SelectedRows();
         if (selected.Count == 0) { Status(() => L("Text_785FDE2811")); return; }
         deletions.Restore(Data, selected.Select(r => r.LocalId)); await Save(); Render(); Status(() => L("Text_FABC892562"));
     }
     async Task EditRules()
     {
-        if (busy) return; var selected = SelectedRows(); var rows = (selected.Count > 0 ? selected : visible.Select(v => v.Row).ToList()).Where(r => !Schemas.Deleted(r)).ToList();
+        if (!closeState.IsOpen || busy || !closeState.IsOpen) return; var selected = SelectedRows(); var rows = (selected.Count > 0 ? selected : visible.Select(v => v.Row).ToList()).Where(r => !Schemas.Deleted(r)).ToList();
         if (rows.Count == 0) { Status(() => L("Text_4BB22EC98B")); return; }
         var field = new ComboBox { ItemsSource = DisplayColumns().Where(f => f is not "_delete" and not "Fleet ID" and not "Fleet IDs").ToList(), SelectedIndex = 0, MinWidth = 330 }.Localize(localization, "Header", () => L("Text_86F623E5CC"));
         var kind = new ComboBox { ItemsSource = new[] { L("Text_A30D395090"), L("Text_5B7341C2D6"), L("Text_795CBFF909"), L("Text_6FE8FC1819"), L("Text_FAC7E021A1"), L("Text_E79453E164"), L("Text_6797F1B017") }, SelectedIndex = 0 }.Localize(localization, "Header", () => L("Text_ED31FBB483")).Localize(localization, "ItemsSource", () => new[] { L("Text_A30D395090"), L("Text_5B7341C2D6"), L("Text_795CBFF909"), L("Text_6FE8FC1819"), L("Text_FAC7E021A1"), L("Text_E79453E164"), L("Text_6797F1B017") });
@@ -294,7 +303,7 @@ public sealed partial class MainWindow : Window
         Button(() => L("Text_5A2BBDEA04"), ImportCsv), Button(() => L("ApiRefresh"), RefreshApi));
     async Task ImportCsv()
     {
-        if (busy) return;
+        if (!closeState.IsOpen || busy || !closeState.IsOpen) return;
         var picker = new FileOpenPicker(); picker.FileTypeFilter.Add(".csv"); WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
         var file = await picker.PickSingleFileAsync(); if (file is null) return;
         await Work(async () =>
@@ -333,7 +342,7 @@ public sealed partial class MainWindow : Window
     }
     async Task ExportCsv()
     {
-        if (busy) return; if (!await ValidateForSubmit()) return;
+        if (!closeState.IsOpen || busy || !closeState.IsOpen) return; if (!await ValidateForSubmit()) return;
         var changes = planner.Plan(resource, Data); if (changes.Count == 0) { Status(() => L("Text_90484F47B3")); return; }
         if (changes.Any(i => i.Kind == ChangeKind.Delete) && !await Confirm(L("Text_5D6042B30E"), Text(() => L("Text_B83678AC3A", ("arg0", changes.Count(i => i.Kind == ChangeKind.Delete)))), L("Text_6B20B383BC"))) return;
         var picker = new FolderPicker(); picker.FileTypeFilter.Add("*"); WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
@@ -349,7 +358,7 @@ public sealed partial class MainWindow : Window
     }
     async Task StartDemo()
     {
-        if (busy || workspace.Mode != RunMode.Demo) return;
+        if (!closeState.IsOpen || busy || workspace.Mode != RunMode.Demo) return;
         var issues = await Task.Run(() => workspace.Resources.Where(p => p.Value.Draft.Count > 0).SelectMany(p => Schemas.Validate(workspace, p.Key)).ToList());
         if (issues.Count > 0) { await Confirm(L("Text_78E06D4B43"), Scroll(Text(() => string.Join("\n", issues.Take(60).Select(i => $"{i.Field}：{ItemText(i)}")))), L("Text_3FD47EDCE4")); return; }
         var changes = planner.PlanWorkspace(workspace); if (changes.Count == 0) return;
@@ -358,13 +367,13 @@ public sealed partial class MainWindow : Window
     }
     async Task ExecuteDemo(BatchJob job)
     {
-        if (busy || workspace.Mode != RunMode.Demo || job.Mode != RunMode.Demo) return;
+        if (!closeState.IsOpen || busy || workspace.Mode != RunMode.Demo || job.Mode != RunMode.Demo) return;
         await Work(async () =>
         {
             running = new CancellationTokenSource(); var demo = new DemoService(workspace);
             foreach (var history in workspace.Jobs.Where(j => j.Mode == RunMode.Demo)) demo.RestoreSuccessful(history);
             Navigation.SelectedItem = Navigation.MenuItems[4]; Render();
-            await new BatchExecutor(demo, demo).ExecuteAsync(job, async () => { await Save(); if (page == "tasks") Render(); }, running.Token);
+            await new BatchExecutor(demo, demo).ExecuteAsync(job, async () => { await Save(); }, running.Token, item=>NotifyTask(new(workspace.Id,job.Id,item?.Id,job.StatusCode!=JobStatus.Running)));
             // Rebase only verified successful rows, keeping failures and unrelated drafts intact.
             foreach (var item in job.Items.Where(i => i.State == ItemState.Succeeded && !i.Rebased))
             {
@@ -386,22 +395,8 @@ public sealed partial class MainWindow : Window
                 }
                 item.Rebased = true; data.SnapshotAt = DateTimeOffset.UtcNow; data.Undo.Clear(); data.Redo.Clear();
             }
-            await Save(); running.Dispose(); running = null; Render(); Status(() => L("Text_B64A075682") + JobText(job));
+            await Save(); foreach(var item in job.Items)NotifyTask(new(workspace.Id,job.Id,item.Id));FlushTasks(); running.Dispose(); running = null; Render(); Status(() => L("Text_B64A075682") + JobText(job));
         });
-    }
-    UIElement TasksPage()
-    {
-        var stack = Stack(Text(() => L("Text_59164F39E2")), Button(() => L("Text_14F7E13979"), () => { running?.Cancel(); return Task.CompletedTask; }, running != null));
-        foreach (var job in workspace.Jobs.OrderByDescending(j => j.Created))
-        {
-            var card = Stack(Text(() => $"{job.Created.ToLocalTime().ToString("g", localization.DisplayCulture)} · {EnumText(job.Mode)} · {JobText(job)}", 17), Text(() => L("Text_9A397E63C4", ("arg0", job.Items.Count(i => i.State == ItemState.Succeeded)), ("arg1", job.Items.Count), ("arg2", job.Items.Count(i => i.State == ItemState.Unknown)))));
-            card.Children.Add(Actions(Button(() => L("Text_979A332955"), async () => { await Confirm(L("Text_4DCE8EF2E4"), new ListView { MaxHeight = 450, ItemsSource = job.Items.Select(i => $"{L(Schemas.All[i.Resource].Name)} {Schemas.Key(i.Resource, i.After)} · {EnumText(i.State)} · {ItemText(i)}\n{i.Diagnostic}").ToList() }, L("Text_3FD47EDCE4")); }),
-                Button(() => L("ApiUnknownReview"), () => ReviewUnknown(job), !busy && job.Mode == RunMode.Online && workspace.Mode == RunMode.Online && job.Items.Any(i => i.State == ItemState.Unknown)),
-                Button(() => L("Text_9C4801C86B"), () => job.Mode == RunMode.Online ? ExecuteApi(job) : ExecuteDemo(job), job.Mode == workspace.Mode && job.Mode != RunMode.Offline && !busy && job.Items.Any(i => i.State is ItemState.Pending or ItemState.Running or ItemState.Unknown || i.State == ItemState.Succeeded && !i.Rebased)),
-                Button(() => L("Text_6A1C23202F"), async () => { if (busy) return; foreach (var i in job.Items.Where(i => i.State == ItemState.Failed)) i.State = ItemState.Pending; await ExecuteDemo(job); }, job.Mode == RunMode.Demo && !busy && job.Items.Any(i => i.State == ItemState.Failed))));
-            stack.Children.Add(new Border { Child = card, Padding = new Thickness(16), Margin = new Thickness(0, 6, 0, 6), CornerRadius = new CornerRadius(8), Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"] });
-        }
-        return Scroll(stack);
     }
     UIElement SettingsPage()
     {
@@ -412,17 +407,23 @@ public sealed partial class MainWindow : Window
         return Scroll(Stack(LanguagePicker(), Text(() => L("ApiSettings"), 20), Text(() => L("ApiSettingsHelp")), url, clientId, secret, local,
             Button(() => L("Text_760143E568"), async () =>
             {
-                if (busy) return;
-                if (url.Text != "" && (!Uri.TryCreate(url.Text, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo != "")) throw new ArgumentException(L("Text_D6934554B8"));
-                if (workspace.Jobs.Any(j => j.Mode == RunMode.Online && j.Items.Any(i => i.State is ItemState.Pending or ItemState.Running or ItemState.Unknown))) throw OperationsAdapter.Block("ApiPendingJob");
-                workspace.InstanceUrl = url.Text.Trim(); workspace.LocalRouteTimes = local.IsChecked == true;
-                if (secret.Password == "" && store.LoadSecret(workspace.Id) is string saved && System.Text.Json.JsonSerializer.Deserialize<OperationsCredentials>(saved)?.ClientId != clientId.Text.Trim()) throw OperationsAdapter.Block("ApiCredentials");
-                workspace.ClientId = clientId.Text.Trim();
-                if (secret.Password != "") { store.SaveSecret(workspace.Id, System.Text.Json.JsonSerializer.Serialize(new { ClientId = clientId.Text, Secret = secret.Password })); secret.Password = ""; }
-                if (apiSessions.Remove(workspace.Id, out var previous)) previous.Client.Dispose();
-                workspace.Mode = RunMode.Offline; workspace.ConnectedAt = null;
-                await Save(); Status(() => L("Text_DEADA9F3CC"));
-            }), Button(() => L("ApiConnect"), ConnectApi), Button(() => L("ApiRefresh"), RefreshApi),
+                if (!closeState.IsOpen || busy || !closeState.IsOpen) return;
+                await saveGate.WaitAsync();
+                try { store.SaveConnectionSettings(workspace,clientId.Text,secret.Password,url.Text,local.IsChecked==true); }
+                finally { saveGate.Release(); }
+                clientId.Text=workspace.ClientId ?? ""; secret.Password="";
+                if(apiSessions.Remove(workspace.Id,out var previous)) previous.Client.Dispose();
+                Status(()=>L("Text_DEADA9F3CC"));
+            }), Button(() => L("ApiUpdateCredentials"), async () =>
+            {
+                if(!closeState.IsOpen || busy) return;
+                await saveGate.WaitAsync();
+                try { store.UpdateOperationsCredentials(workspace,clientId.Text,secret.Password); }
+                finally { saveGate.Release(); }
+                clientId.Text=workspace.ClientId ?? ""; secret.Password="";
+                if(apiSessions.Remove(workspace.Id,out var previous)) previous.Client.Dispose();
+                Status(()=>L("ApiCredentialsUpdated"));
+            }, !busy), Text(()=>L("ApiCredentialsHelp")), Button(() => L("ApiConnect"), ConnectApi), Button(() => L("ApiRefresh"), RefreshApi),
             Text(() => L("ApiCapability")), Text(() => L("ApiVerified", ("operations", string.Join(", ", workspace.VerifiedOperations)))),
             Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?")))));
     }
