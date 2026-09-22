@@ -2,7 +2,7 @@ param([string]$DataDirectory = ('F:\vamsys\artifacts\recovery-ui-' + [Guid]::New
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 $scope=[System.Windows.Automation.TreeScope]::Descendants
-function Root { $p=Get-Process VamSys.App -ErrorAction SilentlyContinue | Select-Object -First 1; if($p -and $p.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)} }
+function Root { $p=Get-Process FlightOpsDesk -ErrorAction SilentlyContinue | Select-Object -First 1; if($p -and $p.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)} }
 function Elements {
     for($attempt=0;$attempt -lt 3;$attempt++) {
         try { $r=Root; if($r){return $r.FindAll($scope,[System.Windows.Automation.Condition]::TrueCondition)}; return }
@@ -27,13 +27,13 @@ function Language($name) {
 }
 function DataRow { Elements | Where-Object {$_.Current.ControlType -eq [System.Windows.Automation.ControlType]::ListItem -and $_.Current.Name.StartsWith('RowViewModel')} | Select-Object -First 1 }
 function Assert($condition,$message) { if(!$condition){throw $message} }
-if(Get-Process VamSys.App -ErrorAction SilentlyContinue){throw 'Close the existing app before running isolated UI tests'}
+if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close the existing app before running isolated UI tests'}
 & "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build -c Release --project "$PSScriptRoot/../tests/VamSys.Tests" -- --seed-recovery-ui $DataDirectory
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $env:VAMSYS_DATA_DIR=$DataDirectory
-function Launch { Start-Process "$PSScriptRoot/../artifacts/app/VamSys.App.exe" -WindowStyle Hidden }
+function Launch { Start-Process "$PSScriptRoot/../artifacts/flightops-app/FlightOpsDesk.exe" -WindowStyle Hidden }
 function CloseTest {
-    $p=Get-Process VamSys.App -ErrorAction SilentlyContinue
+    $p=Get-Process FlightOpsDesk -ErrorAction SilentlyContinue
     if($p){
         # ShowAsync can complete after the Cancel button's Invoke returns.
         # The app correctly rejects close while that interaction is finishing.

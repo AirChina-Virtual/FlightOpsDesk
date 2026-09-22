@@ -1,8 +1,8 @@
-param([string]$DataDirectory = 'F:\vamsys\artifacts\ui-language-smoke')
+param([string]$DataDirectory = 'F:\vamsys\artifacts\ui-language-smoke', [string]$AppDirectory = "$PSScriptRoot/../artifacts/flightops-app")
 $ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
 $scope=[System.Windows.Automation.TreeScope]::Descendants
-function Root { $p=Get-Process VamSys.App -ErrorAction SilentlyContinue | Select-Object -First 1; if($p -and $p.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)} }
+function Root { $p=Get-Process FlightOpsDesk -ErrorAction SilentlyContinue | Select-Object -First 1; if($p -and $p.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)} }
 function Elements {
     for($attempt=0;$attempt -lt 3;$attempt++) {
         try { $r=Root; if($r){return $r.FindAll($scope,[System.Windows.Automation.Condition]::TrueCondition)}; return }
@@ -20,12 +20,13 @@ function Language($name) {
     $picker=Elements | Where-Object {$_.Current.AutomationId -eq 'LanguagePicker'} | Select-Object -First 1
     ([System.Windows.Automation.ExpandCollapsePattern]$picker.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)).Expand()
     SelectItem $name
+    Assert ((Root).Current.Name -eq "FlightOps Desk") "Brand name changed with UI language"
 }
 function DataRow { Elements | Where-Object {$_.Current.ControlType -eq [System.Windows.Automation.ControlType]::ListItem -and $_.Current.Name.StartsWith('RowViewModel')} | Select-Object -First 1 }
 function Assert($condition,$message) { if(!$condition){throw $message} }
-if(Get-Process VamSys.App -ErrorAction SilentlyContinue){throw 'Close the existing app before running isolated UI tests'}
+if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close the existing app before running isolated UI tests'}
 $env:VAMSYS_DATA_DIR=$DataDirectory
-Start-Process -FilePath (Join-Path (Split-Path $PSScriptRoot -Parent) 'artifacts\app\VamSys.App.exe') -WindowStyle Hidden
+Start-Process -FilePath (Join-Path $AppDirectory 'FlightOpsDesk.exe') -WindowStyle Hidden
 WaitFor {Named '连接与设置' 'ListItem'} | Out-Null
 SelectItem '连接与设置'
 WaitFor {Named 'Client ID' 'Edit'} | Out-Null

@@ -1,8 +1,8 @@
-﻿param([string]$DataDirectory = ('F:\vamsys\artifacts\credentials-ui-' + [Guid]::NewGuid().ToString('N')))
+param([string]$DataDirectory = ('F:\vamsys\artifacts\credentials-ui-' + [Guid]::NewGuid().ToString('N')))
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 $scope=[System.Windows.Automation.TreeScope]::Descendants
-function Root { $p=Get-Process VamSys.App -ErrorAction SilentlyContinue | Select-Object -First 1; if($p -and $p.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)} }
+function Root { $p=Get-Process FlightOpsDesk -ErrorAction SilentlyContinue | Select-Object -First 1; if($p -and $p.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)} }
 function Elements { $r=Root; if($r){$r.FindAll($scope,[System.Windows.Automation.Condition]::TrueCondition)} }
 function Named($name,$type) { Elements | Where-Object { $_.Current.Name -eq $name -and (!$type -or $_.Current.ControlType.ProgrammaticName -eq "ControlType.$type") } | Select-Object -First 1 }
 function WaitFor([scriptblock]$condition) { $limit=[DateTime]::UtcNow.AddSeconds(15); do { $result=& $condition; if($result){return $result}; Start-Sleep -Milliseconds 100 } while([DateTime]::UtcNow -lt $limit); throw "UI timeout: $condition" }
@@ -17,12 +17,12 @@ function Language($name) {
 }
 function DataRow { Elements | Where-Object {$_.Current.ControlType -eq [System.Windows.Automation.ControlType]::ListItem -and $_.Current.Name.StartsWith('RowViewModel')} | Select-Object -First 1 }
 function Assert($condition,$message) { if(!$condition){throw $message} }
-if(Get-Process VamSys.App -ErrorAction SilentlyContinue){throw 'Close the existing app before running isolated UI tests'}
+if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close the existing app before running isolated UI tests'}
 & "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build -c Release --project "$PSScriptRoot/../tests/VamSys.Tests" -- --seed-recovery-ui $DataDirectory
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $env:VAMSYS_DATA_DIR=$DataDirectory
-function Launch { Start-Process "$PSScriptRoot/../artifacts/app/VamSys.App.exe" -WindowStyle Hidden }
-function CloseTest { $p=Get-Process VamSys.App -ErrorAction SilentlyContinue;if($p){$null=$p.CloseMainWindow();if(!$p.WaitForExit(10000)){throw 'Test app did not close'}} }
+function Launch { Start-Process "$PSScriptRoot/../artifacts/flightops-app/FlightOpsDesk.exe" -WindowStyle Hidden }
+function CloseTest { $p=Get-Process FlightOpsDesk -ErrorAction SilentlyContinue;if($p){$null=$p.CloseMainWindow();if(!$p.WaitForExit(10000)){throw 'Test app did not close'}} }
 Launch
 try {
     SelectItem '连接与设置'

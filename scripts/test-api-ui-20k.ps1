@@ -1,17 +1,17 @@
 param([string]$DataDirectory='F:\vamsys\artifacts\api-ui-20k')
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
-function Window { $p=Get-Process VamSys.App -ErrorAction SilentlyContinue|Select-Object -First 1; if($p -and $p.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)} }
+function Window { $p=Get-Process FlightOpsDesk -ErrorAction SilentlyContinue|Select-Object -First 1; if($p -and $p.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)} }
 function All { try { $r=Window;if($r){$r.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)} } catch { return @() } }
 function Named($n,$type) { All|Where-Object{$_.Current.Name -eq $n -and (!$type -or $_.Current.ControlType.ProgrammaticName -eq "ControlType.$type")}|Select-Object -First 1 }
 function WaitFor([scriptblock]$f){$until=[DateTime]::UtcNow.AddSeconds(20);do{$r=& $f;if($r){return $r};Start-Sleep -Milliseconds 100}while([DateTime]::UtcNow -lt $until);throw "Timeout: $f"}
 function Position { foreach($list in (All|Where-Object{$_.Current.ControlType.ProgrammaticName -eq 'ControlType.List'})){$pattern=$null;if($list.TryGetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern,[ref]$pattern) -and $pattern.Current.VerticallyScrollable){return $pattern.Current.VerticalScrollPercent}};return -1 }
 function SelectItem($n){$e=WaitFor {Named $n 'ListItem'};([System.Windows.Automation.SelectionItemPattern]$e.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)).Select()}
-if(Get-Process VamSys.App -ErrorAction SilentlyContinue){throw 'Close test app first'}
+if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close test app first'}
 & "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build -c Release --project "$PSScriptRoot/../tests/VamSys.Tests" -- --seed-ui $DataDirectory
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $env:VAMSYS_DATA_DIR=$DataDirectory
-Start-Process "$PSScriptRoot/../artifacts/app/VamSys.App.exe" -WindowStyle Hidden
+Start-Process "$PSScriptRoot/../artifacts/flightops-app/FlightOpsDesk.exe" -WindowStyle Hidden
 SelectItem '数据管理'
 WaitFor {Named 'ID' 'Edit'}|Out-Null
 $materialized=@(All|Where-Object{$_.Current.ControlType.ProgrammaticName -eq 'ControlType.ListItem' -and $_.Current.Name.StartsWith('RowViewModel')}).Count
@@ -36,4 +36,4 @@ $idsAfter=@(WaitFor {
 $positionAfter=Position
 if([math]::Abs($positionBefore-$positionAfter) -gt 0.05 -or $positionAfter -lt 99.9 -or $idsAfter[-1] -ne '19999'){throw ('Scroll position lost: '+$positionBefore+' -> '+$positionAfter)}
 if($idsAfter.Count -gt 100){throw 'Rows not virtualized'}
-"PASS 20k UI: language switch $($timer.ElapsedMilliseconds) ms; materialized $materialized; restored rows $($idsAfter.Count); first ID $($idsAfter[0]); last ID $($idsAfter[-1]); scroll $positionBefore -> $positionAfter; working set $([math]::Round((Get-Process VamSys.App).WorkingSet64/1MB)) MiB"
+"PASS 20k UI: language switch $($timer.ElapsedMilliseconds) ms; materialized $materialized; restored rows $($idsAfter.Count); first ID $($idsAfter[0]); last ID $($idsAfter[-1]); scroll $positionBefore -> $positionAfter; working set $([math]::Round((Get-Process FlightOpsDesk).WorkingSet64/1MB)) MiB"

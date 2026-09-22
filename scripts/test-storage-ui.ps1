@@ -1,11 +1,11 @@
 param([string]$DataDirectory=('F:\vamsys\artifacts\storage-v3-20260922\startup-ui-'+[Guid]::NewGuid().ToString('N')))
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
-if(Get-Process VamSys.App -ErrorAction SilentlyContinue){throw 'Close existing app before isolated test'}
+if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close existing app before isolated test'}
 $owned=[Collections.Generic.List[Diagnostics.Process]]::new()
 function Launch([string]$dir) {
     $env:VAMSYS_DATA_DIR=$dir
-    $p=Start-Process "$PSScriptRoot/../artifacts/app/VamSys.App.exe" -WindowStyle Hidden -PassThru
+    $p=Start-Process "$PSScriptRoot/../artifacts/flightops-app/FlightOpsDesk.exe" -WindowStyle Hidden -PassThru
     $owned.Add($p);return $p
 }
 function Texts($process) {
