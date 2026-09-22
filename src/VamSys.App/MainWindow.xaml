@@ -2,8 +2,8 @@
   <Window.SystemBackdrop><MicaBackdrop/></Window.SystemBackdrop>
   <Grid x:Name="RootGrid" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <TitleBar x:Name="AppTitleBar" Title="vaMSYS" IsPaneToggleButtonVisible="True" PaneToggleRequested="ToggleNavigation">
-      <TitleBar.IconSource><FontIconSource Glyph="&#xE709;"/></TitleBar.IconSource>
+    <TitleBar x:Name="AppTitleBar" Title="FlightOps Desk" IsPaneToggleButtonVisible="True" PaneToggleRequested="ToggleNavigation">
+      <TitleBar.IconSource><BitmapIconSource UriSource="ms-appx:///Assets/FlightOpsDesk.png" ShowAsMonochrome="False"/></TitleBar.IconSource>
       <TitleBar.Content>
         <StackPanel Orientation="Horizontal" Spacing="8">
         <ComboBox x:Name="WorkspacePicker" Width="230" Margin="12,0" VerticalAlignment="Center" DisplayMemberPath="Name" SelectionChanged="WorkspaceChanged"/>

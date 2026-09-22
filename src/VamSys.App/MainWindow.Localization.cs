@@ -36,7 +36,7 @@ public sealed partial class MainWindow
         try
         {
             RootGrid.Language = localization.Language;
-            Title = L("Text_E531BA46BD");
+            Title = AppTitleBar.Title = L("Text_E531BA46BD");
             AppTitleBar.Subtitle = RootGrid.ActualWidth is > 0 and < 1100 ? "" : L("Text_9750099F9F");
             string[] keys = ["Text_3797982942", "Text_9BB882C622", "Text_D52C17622D", "Text_10CCC8AAA2", "Text_00B514C36A", "Text_C2B958136D"];
             for (int i = 0; i < keys.Length; i++) ((NavigationViewItem)Navigation.MenuItems[i]).Content = L(keys[i]);

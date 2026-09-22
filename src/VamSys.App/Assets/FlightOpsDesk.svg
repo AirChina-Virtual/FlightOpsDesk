@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>FlightOps Desk</title>
+  <desc>Converging dispatch routes and a heading arrow. Coral red and slate navy.</desc>
+  <path fill="#232637" d="M60 8 H196 A52 52 0 0 1 248 60 V196 A52 52 0 0 1 196 248 H60 A52 52 0 0 1 8 196 V60 A52 52 0 0 1 60 8 Z"/>
+  <path fill="#E7515A" d="M57 177 H95 Q108 177 113 164 L127 127 L140 132 L126 170 Q118 191 96 191 H57 Z"/>
+  <path fill="#E7515A" d="M57 124 H96 L124 108 L131 120 L100 138 H57 Z"/>
+  <path fill="#FFFFFF" d="M94 101 L197 57 L153 161 L138 118 Z"/>
+  <path fill="#E7515A" d="M46 131 A11 11 0 1 0 68 131 A11 11 0 1 0 46 131 Z"/>
+  <path fill="#E7515A" d="M46 184 A11 11 0 1 0 68 184 A11 11 0 1 0 46 184 Z"/>
+</svg>
