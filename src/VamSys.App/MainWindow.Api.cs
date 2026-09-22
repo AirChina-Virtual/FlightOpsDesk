@@ -29,6 +29,7 @@ public sealed partial class MainWindow
                 // A documented list call checks the token, permissions and airline identity.
                 await foreach(var row in Api().ReadAllAsync(ResourceKind.Fleets,running.Token)) break;
                 if(Api().SessionAirlineId==null) await foreach(var row in Api().ReadAllAsync(ResourceKind.Airports,running.Token)) break;
+                if(Api().SessionAirlineId==null) throw OperationsAdapter.Block("ApiConnectFirst");
                 workspace.ConnectedAt=DateTimeOffset.UtcNow; workspace.Mode=RunMode.Online;
                 if(workspace.ContractHash!=ApiContracts.Sha256) workspace.VerifiedOperations.Clear();
                 workspace.ContractHash=ApiContracts.Sha256;
@@ -48,23 +49,13 @@ public sealed partial class MainWindow
             try
             {
                 var api=Api();
-                // Stage a complete response before touching snapshots or drafts.
-                var incoming=new Dictionary<ResourceKind,List<DataRow>>();
-                foreach(var kind in Enum.GetValues<ResourceKind>())
+                await api.RefreshSnapshotsAsync(async staged=>
                 {
-                    var rows=new List<DataRow>();
-                    await foreach(var row in api.ReadAllAsync(kind,running.Token))
-                    {
-                        rows.Add(row);
-                        if(rows.Count%100==0) { var count=rows.Count; Status(()=>L("ApiLoading",("resource",L(Schemas.All[kind].Name)),("count",count))); }
-                    }
-                    incoming[kind]=rows;
-                }
-                var staged=Workspace.Deserialize(workspace.Serialize());
-                foreach(var (kind,rows) in incoming) SnapshotMerger.Merge(kind,staged.Resources[kind],rows);
-                workspace.Resources=staged.Resources;
-                foreach(var kind in incoming.Keys) if(!workspace.VerifiedOperations.Contains(kind+":Read")) workspace.VerifiedOperations.Add(kind+":Read");
-                await Save(); Status(()=>L("ApiRefreshed",("count",workspace.Resources.Sum(p=>p.Value.Conflicts.Count))));
+                    await saveGate.WaitAsync();
+                    try { await store.SaveAsync(staged); }
+                    finally { saveGate.Release(); }
+                },running.Token,(kind,count)=>Status(()=>L("ApiLoading",("resource",L(Schemas.All[kind].Name)),("count",count))));
+                Status(()=>L("ApiRefreshed",("count",workspace.Resources.Sum(p=>p.Value.Conflicts.Count))));
             }
             finally { running.Dispose(); running=null; }
         });
@@ -98,7 +89,7 @@ public sealed partial class MainWindow
     }
     async Task StartApi()
     {
-        if(busy || workspace.Mode!=RunMode.Online) return;
+        if(!closeState.IsOpen || busy || workspace.Mode!=RunMode.Online) return;
         if(workspace.Resources.Values.Any(d=>d.Conflicts.Count>0)) throw OperationsAdapter.Block("ApiConflict");
         if(workspace.Jobs.Any(j=>j.Mode==RunMode.Online && j.Items.Any(i=>i.State is ItemState.Pending or ItemState.Running or ItemState.Unknown))) throw OperationsAdapter.Block("ApiPendingJob");
         var changes=planner.PlanWorkspace(workspace); if(changes.Count==0) return;
@@ -124,38 +115,69 @@ public sealed partial class MainWindow
     }
     async Task ExecuteApi(BatchJob job)
     {
-        if(busy || workspace.Mode!=RunMode.Online || job.Mode!=RunMode.Online) return;
+        if(!closeState.IsOpen || busy || workspace.Mode!=RunMode.Online || job.Mode!=RunMode.Online) return;
         await Work(async()=>
         {
             running=new();
+            using var performance=PerformanceRun.Begin(workspace.Id,job.Id);
+            using var cancellation=running.Token.Register(performance.MarkCancellation);
+            var outcome="Failed";
             try
             {
                 Navigation.SelectedItem=Navigation.MenuItems[4]; Render();
-                await new OperationsBatchExecutor(Api(),workspace).ExecuteAsync(job,async()=>{ await Save(); if(page=="tasks") Render(); },running.Token);
+                await new OperationsBatchExecutor(Api(),workspace).ExecuteAsync(job,new AppCheckpointWriter(this,store.CheckpointWriter(workspace)),running.Token,progress:NotifyTask);
+                outcome=job.StatusCode.ToString();
                 Status(()=>JobText(job));
             }
-            finally { running.Dispose(); running=null; }
+            catch(PersistenceException)
+            {
+                autosave.Stop();
+                if(apiSessions.Remove(workspace.Id,out var failed)) failed.Client.Dispose();
+                try { workspace=store.Load(workspace.Id);workspace.Mode=RunMode.Offline; }
+                catch { storageBlocked=true; }
+                throw;
+            }
+            finally
+            {
+                performance.Finish(outcome);
+                var directory=Environment.GetEnvironmentVariable("VAMSYS_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"VamSysBatch");
+                performance.TryWrite(Path.Combine(directory,"performance"));
+                running.Dispose();running=null;
+            }
         });
+    }
+    sealed class AppCheckpointWriter(MainWindow owner,IBatchCheckpointWriter inner) : IBatchCheckpointWriter
+    {
+        public async Task WriteAsync(BatchCheckpoint checkpoint,CancellationToken ct)
+        {
+            await owner.saveGate.WaitAsync(ct);
+            try { if(owner.storageBlocked) throw OperationsAdapter.Block("StorageReload"); await inner.WriteAsync(checkpoint,ct); }
+            finally { owner.saveGate.Release(); }
+        }
     }
     async Task ReviewUnknown(BatchJob job)
     {
-        if(busy || workspace.Mode!=RunMode.Online) return;
+        if(!closeState.IsOpen || busy || job.Mode!=RunMode.Online || workspace.Mode==RunMode.Demo) return;
         foreach(var item in job.Items.Where(i=>i.State==ItemState.Unknown).ToList())
         {
-            if(item.Kind==ChangeKind.Create && item.RemoteId==null)
+            if(item.CanProposeRecoveryId)
             {
-                var id=new TextBox { Header="Remote ID" };
-                if(!await Confirm(L("ApiUnknownReview"),Stack(Text(()=>ApiReview(item)),Text(()=>L("ApiRecoverId")),id),L("ApiCheckRemote"))) continue;
-                if(!long.TryParse(id.Text,out var number)||number<=0) throw OperationsAdapter.Block("ApiInvalid","Remote ID");
-                item.RemoteId=number.ToString(System.Globalization.CultureInfo.InvariantCulture);
-                await Save(); await ExecuteApi(job);
+                var id=new TextBox { Header="Remote ID",Text=item.EditableRecoveryId ?? "" };
+                if(!await Confirm(L("ApiUnknownReview"),Stack(Text(()=>ApiReview(item)),Text(()=>L("ApiRecoverId")),id),L(workspace.Mode==RunMode.Online?"ApiCheckRemote":"ApiSaveCandidate"))) continue;
+                var candidate=JsonSerializer.Deserialize<ChangeItem>(JsonSerializer.Serialize(item))!;
+                candidate.ProposeRecoveryId(id.Text);
+                await new AppCheckpointWriter(this,store.CheckpointWriter(workspace)).WriteAsync(new(CheckpointKind.Task,job,candidate),CancellationToken.None);
+                job.Items[job.Items.IndexOf(item)]=candidate;NotifyTask(new(workspace.Id,job.Id,candidate.Id,true));
+                if(workspace.Mode==RunMode.Online) await ExecuteApi(job);
+                else Status(()=>L("ApiCandidateSaved"));
             }
-            else if(item.Kind==ChangeKind.Delete && item.WriteAccepted && item.Resource is ResourceKind.Airports or ResourceKind.Routes)
+            else if(workspace.Mode==RunMode.Online && item.Kind==ChangeKind.Delete && item.WriteAccepted && item.Resource is ResourceKind.Airports or ResourceKind.Routes)
             {
                 if(!await Confirm(L("ApiUnknownReview"),Text(()=>L("ApiManualDelete",("id",item.RemoteId ?? item.After.Identity?.RemoteId))),L("ApiManualConfirm"))) continue;
                 item.State=ItemState.ManuallyConfirmed; item.SetMessage(Messages.Define("ApiManualResult")); item.Rebased=true;
                 var data=workspace.Resources[item.Resource];data.Draft.RemoveAll(r=>r.LocalId==item.After.LocalId);data.Snapshot.RemoveAll(r=>r.LocalId==item.After.LocalId);data.Undo.Clear();data.Redo.Clear();
-                job.SetStatus(JobStatus.NeedsAttention,Messages.Define("ApiManualResult")); await Save();
+                if(apiSessions.TryGetValue(workspace.Id,out var session) && (item.RemoteId ?? item.After.Identity?.RemoteId) is string removedId) session.Api.Forget(item.Resource,removedId);
+                job.SetStatus(JobStatus.NeedsAttention,Messages.Define("ApiManualResult")); await Save();NotifyTask(new(workspace.Id,job.Id,item.Id,true));
             }
             else await Confirm(L("ApiUnknownReview"),Text(()=>L("ApiUnknown")+"\n"+ApiReview(item)),L("Text_3FD47EDCE4"));
         }

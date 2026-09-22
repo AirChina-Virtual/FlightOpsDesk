@@ -891,11 +891,25 @@ Remote: {remote}</value>
   <data name="ApiRowDraft" xml:space="preserve"><value>Unsubmitted draft</value></data>
   <data name="ApiDuplicate" xml:space="preserve"><value>A possible duplicate exists remotely. Refresh and review before creating another record.</value></data>
   <data name="ApiCredentials" xml:space="preserve"><value>Enter the matching Secret when changing Client ID.</value></data>
-  <data name="ApiRecoverId" xml:space="preserve"><value>Find this created record in Orwell and enter its remote ID. The app only reads it back; it will not create it again.</value></data>
+  <data name="ApiRecoverId" xml:space="preserve"><value>Find this created record in Orwell and enter a candidate ID. You can correct it if verification fails. The app only binds a verified record and never creates it again.</value></data>
   <data name="ApiManualDelete" xml:space="preserve"><value>First verify in Orwell that record {id} is deleted or disabled as intended. Confirmation archives the local deletion draft. This is manual confirmation, not API verification, and does not enable bulk deletion.</value></data>
   <data name="ApiManualConfirm" xml:space="preserve"><value>Verified in Orwell</value></data>
   <data name="Enum_ItemState_ManuallyConfirmed" xml:space="preserve"><value>Manually confirmed</value></data>
   <data name="ApiManualResult" xml:space="preserve"><value>Manually confirmed; not automatically verified by API</value></data>
   <data name="ApiUnknownReview" xml:space="preserve"><value>Review unknown results</value></data>
   <data name="ApiCheckRemote" xml:space="preserve"><value>Verify by read-back</value></data>
-</root>
+  <data name="ApiPreflight" xml:space="preserve"><value>Preflight did not complete. No write request was sent; resume to retry.</value></data>
+  <data name="ApiSaveCandidate" xml:space="preserve"><value>Save candidate ID</value></data>
+  <data name="ApiCandidateSaved" xml:space="preserve"><value>Candidate ID saved. Connect and resume the task to verify it by read-back only.</value></data>
+  <data name="ApiUpdateCredentials" xml:space="preserve"><value>Update API credentials only</value></data>
+  <data name="ApiCredentialsUpdated" xml:space="preserve"><value>Credentials updated. Reconnect to verify the same VA before resuming.</value></data>
+  <data name="ApiCredentialsHelp" xml:space="preserve"><value>While a task is paused, update only Client ID and Secret. The target VA, time settings and task contents stay unchanged.</value></data>
+  <data name="ApiAirportCreatePending" xml:space="preserve"><value>An airport creation is still unverified. This record has not been sent. Verify the unknown result before resuming.</value></data>
+  <data name="ApiIdentityPending" xml:space="preserve"><value>This identity may be affected by an unverified write. This record has not been sent. Verify the unknown result before resuming.</value></data>
+  <data name="StorageNewer" xml:space="preserve"><value>This database requires a newer application version.</value></data>
+  <data name="StorageBackupFailed" xml:space="preserve"><value>The pre-upgrade backup failed validation. The database was not migrated.</value></data>
+  <data name="StorageInvalid" xml:space="preserve"><value>Local database records are incomplete or inconsistent. The operation was stopped.</value></data>
+  <data name="StorageStale" xml:space="preserve"><value>A newer local state has been saved. Reload before continuing.</value></data>
+  <data name="StorageInUse" xml:space="preserve"><value>Another application instance is using this data directory. Close it first.</value></data>
+  <data name="StorageReload" xml:space="preserve"><value>Saved data could not be reloaded. Close and restart the application before continuing.</value></data>
+<data name="CloseBlocked" xml:space="preserve"><value>Finish the current operation or close its dialog before exiting.</value></data><data name="CloseSaving" xml:space="preserve"><value>Saving before closing… Editing is temporarily disabled.</value></data></root>

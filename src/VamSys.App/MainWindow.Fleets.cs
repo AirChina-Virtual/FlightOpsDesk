@@ -9,7 +9,7 @@ public sealed partial class MainWindow
 {
     async Task ChooseFleets(DataRow? single)
     {
-        if (busy) return;
+        if (!closeState.IsOpen || busy) return;
         var rows = single is null ? SelectedRows() : new List<DataRow> { single };
         if (rows.Count == 0) { Status(() => L("Text_1AB133520F")); return; }
         if (rows.Any(Schemas.Deleted)) { Status(() => L("Text_A1896E4C88")); return; }
@@ -50,7 +50,7 @@ public sealed partial class MainWindow
 
     async Task RetireSelected()
     {
-        if (busy || resource != ResourceKind.Routes) return;
+        if (!closeState.IsOpen || busy || resource != ResourceKind.Routes) return;
         var rows = SelectedRows();
         if (rows.Count == 0 || rows.Any(Schemas.Deleted)) { Status(() => L("Text_C124B32C00")); return; }
         // A past date remains past regardless of the VA's configured time zone.

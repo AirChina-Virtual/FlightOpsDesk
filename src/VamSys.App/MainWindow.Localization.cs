@@ -44,7 +44,7 @@ public sealed partial class MainWindow
             ResourcePicker.SelectedIndex = (int)resource;
             AutomationProperties.SetName(ResourcePicker, L("ResourceType"));
             AutomationProperties.SetName(WorkspacePicker, L("CurrentWorkspace"));
-            RefreshShell();
+            RefreshShell();FlushTasks();foreach(var task in taskModels)task.RefreshLanguage();
             StatusLabel.Text = statusText();
             foreach (var row in visible) foreach (var cell in row.Cells) cell.RefreshLanguage();
         }

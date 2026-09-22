@@ -20,7 +20,8 @@ public sealed class CellViewModel : ObservableObject
     public string FleetAutomationName => FleetName();
     public void RefreshLanguage() { OnPropertyChanged(nameof(DisplayValue)); OnPropertyChanged(nameof(FleetAutomationName)); }
     public IAsyncRelayCommand? ChooseFleet { get; init; }
-    public string Value { get => value; set { if (this.value == value) return; commit(value); SetProperty(ref this.value, value); } }
+    public Func<bool> CanEdit {get;init;}=()=>true;
+    public string Value { get => value; set { if (!CanEdit() || this.value == value) return; commit(value); SetProperty(ref this.value, value); } }
     public CellViewModel(string field, string value, Action<string> commit) { Field = field; this.value = value; this.commit = commit; }
 }
 public sealed record RowViewModel(DataRow Row, List<CellViewModel> Cells);

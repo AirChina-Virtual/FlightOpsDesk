@@ -891,11 +891,25 @@
   <data name="ApiRowDraft" xml:space="preserve"><value>未提交草稿</value></data>
   <data name="ApiDuplicate" xml:space="preserve"><value>远端存在疑似重复记录。请刷新并审阅，不能重复创建。</value></data>
   <data name="ApiCredentials" xml:space="preserve"><value>更换 Client ID 时必须同时填写对应的 Secret。</value></data>
-  <data name="ApiRecoverId" xml:space="preserve"><value>请在 Orwell 找到本次创建的记录，输入真实 ID。程序仅回读核对，不会重新创建。</value></data>
+  <data name="ApiRecoverId" xml:space="preserve"><value>请在 Orwell 找到本次创建的记录，输入候选 ID。核对失败后可更正；确认前不会绑定记录，也不会重新创建。</value></data>
   <data name="ApiManualDelete" xml:space="preserve"><value>请先在 Orwell 确认记录 {id} 已按预期停用／删除。确认后归档本地删除草稿；这只是人工确认，不代表 API 自动验证成功，也不会启用批量删除。</value></data>
   <data name="ApiManualConfirm" xml:space="preserve"><value>已在 Orwell 核对</value></data>
   <data name="Enum_ItemState_ManuallyConfirmed" xml:space="preserve"><value>人工确认</value></data>
   <data name="ApiManualResult" xml:space="preserve"><value>人工确认，未通过 API 自动核对</value></data>
   <data name="ApiUnknownReview" xml:space="preserve"><value>核对未知结果</value></data>
   <data name="ApiCheckRemote" xml:space="preserve"><value>回读核对</value></data>
-</root>
+  <data name="ApiPreflight" xml:space="preserve"><value>预检未完成，尚未发送写入请求；可恢复重试。</value></data>
+  <data name="ApiSaveCandidate" xml:space="preserve"><value>保存候选 ID</value></data>
+  <data name="ApiCandidateSaved" xml:space="preserve"><value>候选 ID 已保存。连接后恢复任务，仅回读核对。</value></data>
+  <data name="ApiUpdateCredentials" xml:space="preserve"><value>仅更新 API 凭据</value></data>
+  <data name="ApiCredentialsUpdated" xml:space="preserve"><value>凭据已更新，请重新连接并核验同一 VA 后恢复任务。</value></data>
+  <data name="ApiCredentialsHelp" xml:space="preserve"><value>任务暂停时可仅更新 Client ID 和 Secret；目标 VA、时刻配置及任务内容保持不变。</value></data>
+  <data name="ApiAirportCreatePending" xml:space="preserve"><value>存在尚未核对成功的机场创建，本记录尚未发送。请先核对未知结果，再恢复任务。</value></data>
+  <data name="ApiIdentityPending" xml:space="preserve"><value>判重身份涉及尚未核对的写入，本记录尚未发送。请先核对未知结果，再恢复任务。</value></data>
+  <data name="StorageNewer" xml:space="preserve"><value>数据库由更新版本创建，请使用相应版本打开。</value></data>
+  <data name="StorageBackupFailed" xml:space="preserve"><value>升级前备份检查失败，数据库未迁移。</value></data>
+  <data name="StorageInvalid" xml:space="preserve"><value>本地数据库记录不完整或格式不一致，操作已停止。</value></data>
+  <data name="StorageStale" xml:space="preserve"><value>本地数据已被其他保存更新，请重新载入后再操作。</value></data>
+  <data name="StorageInUse" xml:space="preserve"><value>该数据目录已由另一个程序实例使用，请先关闭该实例。</value></data>
+  <data name="StorageReload" xml:space="preserve"><value>无法重新载入已保存数据，请关闭并重新启动程序后再操作。</value></data>
+<data name="CloseBlocked" xml:space="preserve"><value>请先完成当前操作或关闭对话框，再退出程序。</value></data><data name="CloseSaving" xml:space="preserve"><value>正在保存并关闭，暂时禁止编辑。</value></data></root>
