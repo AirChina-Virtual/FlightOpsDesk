@@ -1,28 +1,30 @@
-# FlightOps Desk 文档索引
+# 文档导航
 
-## 使用与升级
+## 想使用或升级程序
 
-| 文档 | 内容 |
+| 文档 | 可以找到什么 |
 |---|---|
-| [使用指南](USER-GUIDE.md) | 连接、编辑、提交、删除、恢复及本地数据 |
-| [存储迁移与恢复](STORAGE-MIGRATION.md) | v3 数据结构、迁移备份和任务恢复边界 |
-| [品牌说明](BRANDING.md) | 软件名称、图标源文件和旧版兼容 |
+| [使用指南](USER-GUIDE.md) | 怎样连接、修改、提交、删除和恢复任务，以及数据保存在什么地方 |
+| [升级与恢复说明](STORAGE-MIGRATION.md) | 旧数据怎样升级，备份怎样生成，以及为什么不能随意换回旧备份 |
+| [名称和图标说明](BRANDING.md) | 新名称、图标文件的位置，以及旧工作区是否还能使用 |
 
-## 开发与验证
+## 想了解实现和测试
 
-| 文档 | 内容 |
+| 文档 | 可以找到什么 |
 |---|---|
-| [API 契约](API-CONTRACTS.md) | 官方来源、资源转换、验证状态及禁用能力 |
-| [测试报告](TEST-REPORT.md) | 自动回归、实际窗口验证和历史审核记录 |
-| [性能报告](PERFORMANCE.md) | 索引、存储和任务界面的测量与复现 |
-| [多语言维护](LOCALIZATION.md) | 资源键、结构化消息及即时切换规则 |
-| [更新日志](../CHANGELOG.md) | 按日期归纳主要改动 |
+| [API 支持情况](API-CONTRACTS.md) | 程序依据哪些官方文档，支持哪些操作，还有哪些操作未开放 |
+| [测试报告](TEST-REPORT.md) | 每次检查了什么、发现或修复了什么，还有哪些没有验证 |
+| [速度与资源占用报告](PERFORMANCE.md) | 大量数据下的请求次数、处理时间、内存占用和测量方法 |
+| [中英文维护说明](LOCALIZATION.md) | 怎样添加提示文字，以及切换语言时需要注意什么 |
+| [更新日志](../CHANGELOG.md) | 各次更新的主要变化 |
 
-官方 OpenAPI 快照与获取信息保存在 contracts 目录。完整回归、模拟服务验证、实际窗口验证和真实 API 实例联调是不同验证层级，请结合各报告中的日期与边界阅读。
+contracts 目录保存了官方 API 文档副本。报告中的“本地测试通过”“窗口检查通过”和“真实账号测试通过”是不同的结果：模拟测试通过不表示已经在真实航空公司环境中验证。
 
-## 各项目说明
+## 想修改某个项目的代码
 
-- [App：桌面界面](../src/VamSys.App/README.md)：页面分工、任务局部更新、关闭保护、窗口构建。
-- [Core：业务核心](../src/VamSys.Core/README.md)：领域模型、变更规划、CSV、分配删除和消息边界。
-- [Infrastructure：外部适配](../src/VamSys.Infrastructure/README.md)：API、判重、未知恢复、SQLite 与迁移事务。
-- [Tests：验证项目](../tests/VamSys.Tests/README.md)：执行命令、场景分工、子进程恢复和窗口验证边界。
+每个项目都有单独的详细说明，包含文件分工、处理步骤和运行方法：
+
+- [App：程序界面](../src/VamSys.App/README.md)：窗口、表格、任务进度、关闭保存和图标。
+- [Core：数据处理规则](../src/VamSys.Core/README.md)：判断修改、导入 CSV、分配机型、检查删除和显示提示。
+- [Infrastructure：服务器与本地保存](../src/VamSys.Infrastructure/README.md)：发送 API 请求、查重、保存数据和中断后恢复。
+- [Tests：自动检查](../tests/VamSys.Tests/README.md)：运行命令、各类测试的用途和怎样模拟程序中断。
