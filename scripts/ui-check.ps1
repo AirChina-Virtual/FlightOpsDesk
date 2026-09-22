@@ -1,8 +1,8 @@
 param([string]$Name, [ValidateSet('Tree','Invoke','Select','Set','Screenshot')][string]$Action='Tree', [string]$Value, [string]$OutputPath)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
-$process = Get-Process VamSys.App | Select-Object -First 1
-if (!$process) { throw 'Start VamSys.App first' }
+$process = Get-Process FlightOpsDesk | Select-Object -First 1
+if (!$process) { throw 'Start FlightOpsDesk first' }
 $root=[System.Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
 $scope=[System.Windows.Automation.TreeScope]::Descendants
 if ($Action -eq 'Tree') {

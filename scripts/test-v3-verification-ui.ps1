@@ -4,12 +4,12 @@ Add-Type -AssemblyName UIAutomationClient
 $repo=Split-Path $PSScriptRoot -Parent
 $dir=Join-Path $repo ('artifacts/storage-v3-20260922/qa-'+[Guid]::NewGuid().ToString('N'))
 $pipeName='vamsys-ui-'+[Guid]::NewGuid().ToString('N')
-if(Get-Process VamSys.App -ErrorAction SilentlyContinue){throw 'Close existing app before isolated QA'}
+if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close existing app before isolated QA'}
 if($Tasks){& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --seed-task-ui $dir}
 else {& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --seed-storage-ui $dir legacy}
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $env:VAMSYS_DATA_DIR=$dir;$env:VAMSYS_QA_PIPE=$pipeName
-$p=Start-Process "$repo/artifacts/v3-qa/VamSys.App.exe" -WindowStyle Hidden -PassThru
+$p=Start-Process "$repo/artifacts/v3-qa/FlightOpsDesk.exe" -WindowStyle Hidden -PassThru
 $pipe=[IO.Pipes.NamedPipeClientStream]::new('.',$pipeName,[IO.Pipes.PipeDirection]::InOut)
 function Q([string]$command){
     $writer.WriteLine($command);$line=$reader.ReadLine()
