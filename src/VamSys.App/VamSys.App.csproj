@@ -17,7 +17,7 @@
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <DefineConstants Condition="'$(UiVerification)' == 'true'">$(DefineConstants);UI_VERIFICATION</DefineConstants>
+    <CopyOutputSymbolsToPublishDirectory Condition="'$(UiVerification)' != 'true'">false</CopyOutputSymbolsToPublishDirectory>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
@@ -25,11 +25,18 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <ProjectReference Include="../VamSys.Infrastructure/VamSys.Infrastructure.csproj" />
   </ItemGroup>
+  <ItemGroup Condition="'$(UiVerification)' == 'true'">
+    <Compile Include="../../tests/UiVerification/MainWindow.Verification.cs" Link="TestSupport/MainWindow.Verification.cs" />
+  </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\FlightOpsDesk.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\FlightOpsDesk.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <!-- CLI unpackaged publish omits generated XAML resources; include the compiled output explicitly. -->
+  <Target Name="ExcludeProductDebugSymbols" AfterTargets="ComputeFilesToPublish" Condition="'$(UiVerification)' != 'true'">
+    <!-- CopyOutputSymbolsToPublishDirectory covers this app; referenced projects have their own PDB items. -->
+    <ItemGroup><ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(ResolvedFileToPublish.Extension)' == '.pdb'" /></ItemGroup>
+  </Target>
   <Target Name="CopyCompiledXamlToPublish" AfterTargets="Publish">
     <ItemGroup><CompiledXaml Include="$(OutDir)*.xbf;$(OutDir)$(AssemblyName).pri" /></ItemGroup>
     <Copy SourceFiles="@(CompiledXaml)" DestinationFiles="@(CompiledXaml->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />

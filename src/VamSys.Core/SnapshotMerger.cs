@@ -45,10 +45,13 @@ public static class SnapshotMerger
         }
         merged.AddRange(remote.Values.Select(r => r.Copy()));
         // Retain unresolved conflicts over repeated refreshes; refreshing is not conflict resolution.
-        conflicts.AddRange(data.Conflicts.Where(c => merged.Any(r => r.LocalId == c.RowId) && !conflicts.Any(n => n.RowId == c.RowId && n.Field == c.Field)));
+        var mergedIds = merged.Select(r => r.LocalId).ToHashSet();
+        var recorded = conflicts.Select(c => (c.RowId, c.Field)).ToHashSet();
+        foreach (var c in data.Conflicts)
+            if (mergedIds.Contains(c.RowId) && recorded.Add((c.RowId, c.Field))) conflicts.Add(c);
         data.Snapshot = incoming.Select(r => r.Copy()).ToList(); data.Draft = merged;
         data.Conflicts = conflicts; data.SnapshotAt = DateTimeOffset.UtcNow;
         data.Columns = data.Columns.Concat(merged.SelectMany(r => r.Fields.Keys)).Distinct().ToList();
-        data.Undo.Clear(); data.Redo.Clear();
+        data.ClearHistory();
     }
 }

@@ -33,10 +33,17 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
     public DataRow FromJson(ResourceKind kind, JsonElement value)
     {
         var id = value.GetProperty("id").ToString();
-        var airline = value.GetProperty("airline_id").ToString();
-        if (workspace.AirlineId != null && workspace.AirlineId != airline) throw Block("ApiWrongVa");
-        workspace.AirlineId ??= airline;
-        SessionAirlineId = airline;
+        string airline;
+        if (value.TryGetProperty("airline_id", out var owner) && owner.ValueKind != JsonValueKind.Null)
+        {
+            airline = owner.ToString();
+            if (workspace.AirlineId != null && workspace.AirlineId != airline) throw Block("ApiWrongVa");
+            workspace.AirlineId ??= airline;
+            SessionAirlineId = airline;
+        }
+        // RouteData documents no airline_id; the credentials belong to exactly one VA.
+        else if (kind == ResourceKind.Routes) airline = workspace.AirlineId ?? SessionAirlineId ?? throw Block("ApiConnectFirst");
+        else throw Block("ApiInvalid","airline_id");
         string? parent = kind == ResourceKind.Aircraft ? value.GetProperty("fleet_id").ToString() : null;
         var row = new DataRow { Identity = new(id, airline, parent), RawApiJson = value.GetRawText() };
         row.Fields["_delete"] = "FALSE";
@@ -60,17 +67,23 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
                 row.Fields[side + " Airport (ICAO/IATA)"] = airport?.Get("ICAO/IATA") ?? "unresolved:" + airportId;
             }
         }
-        known[(kind,id)] = row; return row;
+        known[(kind,id)] = row; if (kind == ResourceKind.Airports) knownAirportsVersion++;
+        return row;
     }
     DataRow? Known(ResourceKind kind, string id) => known.GetValueOrDefault((kind,id)) ?? workspace.Resources[kind].Snapshot.FirstOrDefault(r => r.Identity?.RemoteId == id && r.Identity.ConnectionId == workspace.AirlineId);
     public async IAsyncEnumerable<DataRow> ReadAllAsync(ResourceKind kind, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
         if (kind == ResourceKind.Aircraft)
         {
-            await foreach (var fleet in ReadAllAsync(ResourceKind.Fleets,ct))
-                await foreach (var element in transport.ReadPagesAsync(new(BaseUri,$"fleet/{fleet.Identity!.RemoteId}/aircraft"),ct)) yield return FromJson(kind,element);
+            await foreach (var row in ReadAircraftAsync(ReadAllAsync(ResourceKind.Fleets,ct),ct)) yield return row;
         }
         else await foreach (var element in transport.ReadPagesAsync(new(BaseUri,Collection(kind)),ct)) yield return FromJson(kind,element);
+    }
+    // Aircraft have no collection endpoint; they are read fleet by fleet.
+    async IAsyncEnumerable<DataRow> ReadAircraftAsync(IAsyncEnumerable<DataRow> fleets, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        await foreach (var fleet in fleets.WithCancellation(ct))
+            await foreach (var element in transport.ReadPagesAsync(new(BaseUri,$"fleet/{fleet.Identity!.RemoteId}/aircraft"),ct)) yield return FromJson(ResourceKind.Aircraft,element);
     }
     public async Task RefreshSnapshotsAsync(Func<Workspace,Task> persist,CancellationToken ct,Action<ResourceKind,int>? progress=null)
     {
@@ -81,12 +94,15 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         foreach(var kind in Enum.GetValues<ResourceKind>())
         {
             var rows=new List<DataRow>();
-            await foreach(var row in reader.ReadAllAsync(kind,ct))
+            // Fleets precede aircraft in the enumeration, so their pages are not requested twice.
+            var source=kind==ResourceKind.Aircraft ? reader.ReadAircraftAsync(incoming[ResourceKind.Fleets].ToAsyncEnumerable(),ct) : reader.ReadAllAsync(kind,ct);
+            await foreach(var row in source)
             { rows.Add(row); if(rows.Count%100==0) progress?.Invoke(kind,rows.Count); }
             incoming[kind]=rows;
         }
         ct.ThrowIfCancellationRequested();
-        var staged=Workspace.Deserialize(workspace.Serialize());
+        // Merging replaces each staged resource's collections, so the live workspace stays untouched until persisted.
+        var staged=workspace.StageResources();
         staged.AirlineId ??= readWorkspace.AirlineId;
         foreach(var (kind,rows) in incoming)
         {
@@ -99,10 +115,10 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         workspace.Resources=staged.Resources;
         workspace.VerifiedOperations=staged.VerifiedOperations;
         workspace.AirlineId=staged.AirlineId;
-        known=reader.known;
+        known=reader.known; knownAirportsVersion++;
         SessionAirlineId=reader.SessionAirlineId ?? SessionAirlineId;
     }
-    public void Forget(ResourceKind kind,string id) => known.Remove((kind,id));
+    public void Forget(ResourceKind kind,string id) { if (known.Remove((kind,id)) && kind == ResourceKind.Airports) knownAirportsVersion++; }
     string Path(ResourceKind kind, DataRow row, string? remoteId = null, bool preview = false)
     {
         var identity = row.Identity;
@@ -143,18 +159,40 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
     long AirportId(string code,bool preview=false)
     {
         if(preview && code.StartsWith("local:")) return PreviewReference(code,ResourceKind.Airports);
-        var match = known.Where(p => p.Key.Item1 == ResourceKind.Airports).Select(p => p.Value).Concat(workspace.Resources[ResourceKind.Airports].Snapshot)
-            .Where(r => r.Identity?.ConnectionId == workspace.AirlineId && (r.Get("ICAO/IATA").Equals(code,StringComparison.OrdinalIgnoreCase) || r.Identity!.RemoteId == code || HasAirportAlias(r,code)))
-            .DistinctBy(r=>r.Identity!.RemoteId).ToList();
-        if (match.Count != 1) throw Block("ApiInvalid",code);
-        return PositiveId(match[0].Identity!.RemoteId);
+        // Exactly one remote airport may carry the code as its key, remote ID, ICAO or IATA; zero or several block.
+        if (!AirportIndex().TryGetValue(code,out var ids) || ids.Count != 1) throw Block("ApiInvalid",code);
+        return PositiveId(ids.First());
+    }
+    // Rebuilt whenever the known rows, the snapshot list or the connection change. Snapshot rows are never edited
+    // in place: refresh replaces the list, while rebase and deletion remove and append rows.
+    int knownAirportsVersion;
+    (List<DataRow>? List,int Count,DataRow? Last,int Known,string? Airline) airportIndexKey;
+    Dictionary<string,HashSet<string>>? airportIndex;
+    Dictionary<string,HashSet<string>> AirportIndex()
+    {
+        var snapshot=workspace.Resources[ResourceKind.Airports].Snapshot;
+        var key=(snapshot,snapshot.Count,snapshot.Count==0?null:snapshot[^1],knownAirportsVersion,workspace.AirlineId);
+        if(airportIndex!=null && airportIndexKey.Equals(key)) return airportIndex;
+        var index=new Dictionary<string,HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        void Add(string code,string id) { if(!index.TryGetValue(code,out var ids)) index[code]=ids=[]; ids.Add(id); }
+        foreach(var r in known.Where(p => p.Key.Item1 == ResourceKind.Airports).Select(p => p.Value).Concat(snapshot))
+        {
+            if(r.Identity == null || r.Identity.ConnectionId != workspace.AirlineId) continue;
+            var id=r.Identity.RemoteId;
+            Add(r.Get("ICAO/IATA"),id); Add(id,id);
+            foreach(var alias in AirportAliases(r)) Add(alias,id);
+        }
+        airportIndexKey=key; return airportIndex=index;
+    }
+    static IEnumerable<string> AirportAliases(DataRow r)
+    {
+        if(r.RawApiJson == null) return [];
+        using var doc=JsonDocument.Parse(r.RawApiJson);
+        return new[]{"icao","iata"}.Select(k=>doc.RootElement.TryGetProperty(k,out var v) && v.ValueKind==JsonValueKind.String ? v.GetString()! : "")
+            .Where(v=>!string.IsNullOrWhiteSpace(v)).ToArray();
     }
     static bool HasAirportAlias(DataRow r,string code)
-    {
-        if(r.RawApiJson == null || string.IsNullOrWhiteSpace(code)) return false;
-        using var doc=JsonDocument.Parse(r.RawApiJson);
-        return new[]{"icao","iata"}.Any(k=>doc.RootElement.TryGetProperty(k,out var v) && v.ValueKind==JsonValueKind.String && v.GetString()!.Equals(code,StringComparison.OrdinalIgnoreCase));
-    }
+        => !string.IsNullOrWhiteSpace(code) && AirportAliases(r).Any(a=>a.Equals(code,StringComparison.OrdinalIgnoreCase));
     void CheckConnection(DataRow row)
     {
         if(row.Identity != null && row.Identity.ConnectionId != ConnectionId) throw Block("ApiWrongVa");
@@ -251,7 +289,8 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
                 if(workspace.LocalRouteTimes || !DateTime.TryParseExact(text,"yyyy-MM-dd HH:mm:ss",CultureInfo.InvariantCulture,DateTimeStyles.None,out var date)) throw Block("ApiUtc");
                 if(c.Before?.RawApiJson is string raw)
                 { using var doc=JsonDocument.Parse(raw); if(doc.RootElement.TryGetProperty(wire,out var oldDate) && DateTimeOffset.TryParse(oldDate.ToString(),CultureInfo.InvariantCulture,DateTimeStyles.None,out var original)) date=date.AddTicks(original.Ticks%TimeSpan.TicksPerSecond); }
-                result = DateTime.SpecifyKind(date,DateTimeKind.Utc).ToString("O",CultureInfo.InvariantCulture);
+                // Match the documented ISO 8601 example; fractional seconds appear only when the original carried them.
+                result = new DateTimeOffset(DateTime.SpecifyKind(date,DateTimeKind.Unspecified),TimeSpan.Zero).ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz",CultureInfo.InvariantCulture);
             }
             body[wire] = result;
         }
@@ -261,6 +300,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             if(!new[]{"scheduled","cargo","charter","training","vfr","repositioning","jumpseat"}.Contains(c.After.Get("Type"))) throw Block("ApiInvalid","Type");
             foreach(var (field,min,max) in new[]{("Callsign",4,7),("Flight Number",3,6)})
                 if((create || c.Fields.ContainsKey(field)) && c.After.Get(field).Length is var length && (length<min || length>max)) throw Block("ApiInvalid",field);
+            if(body.TryGetValue("cost_index",out var costIndex) && !Schemas.ValidCostIndex((string)costIndex!)) throw Block("ApiInvalid","Cost Index");
             if(DateTime.TryParseExact(c.After.Get("Start Date"),"yyyy-MM-dd HH:mm:ss",CultureInfo.InvariantCulture,DateTimeStyles.None,out var start) && DateTime.TryParseExact(c.After.Get("End Date"),"yyyy-MM-dd HH:mm:ss",CultureInfo.InvariantCulture,DateTimeStyles.None,out var end) && end<=start) throw Block("ApiInvalid","End Date");
         }
         if(body.Count == 0) throw Block("ApiNoChanges");
@@ -326,6 +366,12 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             using var response=await transport.SendAsync(step.Method,new(BaseUri,path),step.Method==HttpMethod.Delete?null:step.Body,ct);
             if(step.Method==HttpMethod.Post)
             {
+                // Keep the created ID durable before a full parse can fail on an unexpected response shape.
+                if(response.RootElement.ValueKind==JsonValueKind.Object && response.RootElement.TryGetProperty("id",out var createdId) && long.TryParse(createdId.ToString(),NumberStyles.None,CultureInfo.InvariantCulture,out var parsedId) && parsedId>0)
+                {
+                    change.RemoteId=parsedId.ToString(CultureInfo.InvariantCulture);
+                    change.CreateCompleted=true;record.RemoteId=change.RemoteId;record.State=BatchStepState.ResponseReceived;await persist();
+                }
                 var created=FromJson(change.Resource,response.RootElement);
                 change.RemoteId=created.Identity!.RemoteId; change.After.Identity=created.Identity;
                 change.CreateCompleted=true;record.RemoteId=change.RemoteId;

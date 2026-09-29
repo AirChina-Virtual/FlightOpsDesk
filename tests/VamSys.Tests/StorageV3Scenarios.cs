@@ -12,7 +12,7 @@ static class StorageV3Scenarios
     {
         using var c=Legacy(dir,w);
         Sql(c,"ALTER TABLE workspaces ADD COLUMN format_version INTEGER DEFAULT 2; CREATE TABLE workspace_revisions(workspace_id TEXT PRIMARY KEY,revision INTEGER); CREATE TABLE batch_jobs(workspace_id TEXT,id TEXT,ordinal INTEGER,json TEXT,PRIMARY KEY(workspace_id,id)); CREATE TABLE batch_items(workspace_id TEXT,job_id TEXT,id TEXT,ordinal INTEGER,json TEXT,PRIMARY KEY(workspace_id,job_id,id)); PRAGMA user_version=2;");
-        var root=JsonNode.Parse(w.Serialize())!;root.AsObject().Remove("Jobs");
+        var root=JsonNode.Parse(HistoryScenarios.LegacyJson(w))!;root.AsObject().Remove("Jobs");
         Sql(c,"UPDATE workspaces SET json=$j",("$j",root.ToJsonString()));
         Sql(c,"INSERT INTO workspace_revisions VALUES($w,7)",("$w",w.Id.ToString()));
         foreach(var(j,n)in w.Jobs.Select((j,n)=>(j,n)))
@@ -47,11 +47,15 @@ static class StorageV3Scenarios
         foreach(var corrupt in new[]{false,true})
         await test("v2 to v3 keeps task revision and validates duplicate local IDs: "+corrupt,()=>{
             var dir=Temp();var w=Fixture();w.Jobs[0].Items[0].State=ItemState.Unknown;w.Jobs[0].Items[0].ProposeRecoveryId("10");
-            if(corrupt)w.Resources[ResourceKind.Fleets].Draft.Add(w.Resources[ResourceKind.Fleets].Draft[0].Copy());
             V2(dir,w);
             if(corrupt)
             {
-                try{new WorkspaceStore(dir);throw new Exception("duplicate accepted");}catch(Microsoft.Data.Sqlite.SqliteException){}
+                using(var broken=Open(dir))
+                {
+                    var node=JsonNode.Parse((string)Sql(broken,"SELECT json FROM workspaces")!)!;var rows=node["Resources"]!["Fleets"]!["Draft"]!.AsArray();rows.Add(rows[0]!.DeepClone());
+                    Sql(broken,"UPDATE workspaces SET json=$j",("$j",node.ToJsonString()));
+                }
+                try{new WorkspaceStore(dir);throw new Exception("duplicate accepted");}catch(Exception e) when(e is Microsoft.Data.Sqlite.SqliteException or ArgumentException or InvalidDataException){}
                 using var c=Open(dir);Assert(Convert.ToInt32(Sql(c,"PRAGMA user_version"))==2);Assert(Convert.ToInt32(Sql(c,"SELECT count(*) FROM sqlite_master WHERE name='resource_rows'"))==0);
             }
             else
@@ -97,7 +101,7 @@ static class StorageV3Scenarios
         {
             var w=Workspace.Deserialize(template);var kind=same?ResourceKind.Fleets:ResourceKind.Routes;var data=w.Resources[kind];
             for(var n=0;n<rows;n++){var row=new DataRow{Fields=new(){["Name"]="Row "+n,["ID"]=n.ToString()}};data.Draft.Add(row);data.Snapshot.Add(row.Copy());}
-            for(var n=0;n<undo;n++)data.Checkpoint();
+            for(var n=0;n<undo;n++){var row=data.Draft[n%data.Draft.Count];data.Edit([row.LocalId],()=>row.Fields["Name"]="history "+n);}
             var dir=Temp();var store=new WorkspaceStore(dir);store.Save(w);var item=w.Jobs[0].Items[0];item.State=ItemState.Succeeded;
             using var c=Open(dir);
             Sql(c,"CREATE TABLE touched(resource INTEGER,local_id TEXT); CREATE TRIGGER row_i AFTER INSERT ON resource_rows BEGIN INSERT INTO touched VALUES(NEW.resource,NEW.local_id); END; CREATE TRIGGER row_u AFTER UPDATE ON resource_rows BEGIN INSERT INTO touched VALUES(NEW.resource,NEW.local_id); END; CREATE TRIGGER row_d AFTER DELETE ON resource_rows BEGIN INSERT INTO touched VALUES(OLD.resource,OLD.local_id); END;");

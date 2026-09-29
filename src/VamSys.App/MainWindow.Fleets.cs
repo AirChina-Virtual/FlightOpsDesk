@@ -56,7 +56,7 @@ public sealed partial class MainWindow
         // A past date remains past regardless of the VA's configured time zone.
         var end = DateTime.UtcNow.AddDays(-2).ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
         if (!await Confirm(L("Text_B80DA74EC5"), new ListView { MaxHeight = 350, Header = Text(() => L("Text_A5124DA2BA", ("arg0", rows.Count), ("arg1", end))), ItemsSource = rows.Select(r => $"{r.Get("ID")} · {r.Get("Flight Number")} · {r.Get("End Date")} → {end}").ToList() }, L("Text_52D4945C25"))) return;
-        Data.Checkpoint(); foreach (var row in rows) row.Fields["End Date"] = end;
+        Data.Edit(rows.Select(r=>r.LocalId),()=>{foreach (var row in rows) row.Fields["End Date"] = end;});
         if (!Data.Columns.Contains("End Date")) Data.Columns.Add("End Date");
         await Save(); Render(); Status(() => L("Text_B4F14FDEB3"));
     }

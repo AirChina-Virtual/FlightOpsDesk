@@ -11,7 +11,7 @@ static class AuditScenarios
     static void Check(bool value,string why="Audit regression failed") { if(!value) throw new Exception(why); }
     static DataRow Row(params (string,string)[] fields)=>new(){Fields=fields.ToDictionary(p=>p.Item1,p=>p.Item2)};
     static ChangeItem Create(ResourceKind kind,DataRow row)=>new(){Resource=kind,Kind=ChangeKind.Create,After=row,Fields=row.Fields.ToDictionary(p=>p.Key,p=>new FieldChange(FieldIntent.Set,p.Value))};
-    static OperationsAdapter Api(Workspace w,AuditHttp h)=>new(new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("test",DateTimeOffset.UtcNow.AddHours(1))))),w);
+    static OperationsAdapter Api(Workspace w,AuditHttp h)=>new(new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("test",DateTimeOffset.UtcNow.AddHours(1)))),InstantTime.Requests()),w);
     static DataRow Parse(OperationsAdapter a,ResourceKind k,string raw) { using var d=JsonDocument.Parse(raw);return a.FromJson(k,d.RootElement); }
     static HttpResponseMessage Json(string raw,HttpStatusCode status=HttpStatusCode.OK)=>new(status){Content=new StringContent(raw)};
     static string Envelope(ResourceKind kind,string raw)=>kind==ResourceKind.Routings?raw:"{\"data\":"+raw+"}";
@@ -21,7 +21,7 @@ static class AuditScenarios
         : Row(("Departure Airport (ICAO/IATA)",dep),("Arrival Airport (ICAO/IATA)",arr),("Type","scheduled"),("Callsign","ACA123"),("Flight Number","AC123"),("Fleet IDs","4")));
     static string RouteJson(ResourceKind k)=>k==ResourceKind.Routings
         ? """{"id":9,"airline_id":7,"departure_airport_id":101,"arrival_airport_id":102,"route":"DCT"}"""
-        : """{"id":9,"airline_id":7,"departure_id":101,"arrival_id":102,"type":"scheduled","callsign":"ACA123","flight_number":"AC123","fleet_ids":[4]}""";
+        : """{"id":9,"departure_id":101,"arrival_id":102,"type":"scheduled","callsign":"ACA123","flight_number":"AC123","fleet_ids":[4]}""";
     static void Airports(Workspace w,OperationsAdapter a)
     { foreach(var json in new[]{London,Gatwick}) w.Resources[ResourceKind.Airports].Snapshot.Add(Parse(a,ResourceKind.Airports,json)); }
     public static async Task Run(Func<string,Func<Task>,Task> test)

@@ -52,13 +52,31 @@ static class StorageProcessScenarios
         await clock.Drive(new OperationsBatchExecutor(api,w).ExecuteAsync(w.Jobs[0],store.CheckpointWriter(w),default));
         await writer.WriteLineAsync(JsonSerializer.Serialize(new Wire("done")));
     }
-    static async Task Launch(string directory,Guid id,Remote remote,Func<Wire,bool>? killAt=null)
+    // Edits one draft cell (adding an undo step) and saves only that row, pausing at each commit barrier.
+    public static async Task DraftChild(string[] args)
+    {
+        using var pipe=new NamedPipeClientStream(".",args[2],PipeDirection.InOut,PipeOptions.Asynchronous);
+        await pipe.ConnectAsync(15000);
+        using var reader=new StreamReader(pipe);using var writer=new StreamWriter(pipe){AutoFlush=true};
+        void Barrier(string point)
+        {
+            writer.WriteLine(JsonSerializer.Serialize(new Wire("barrier",Point:point,Body:"{}")));
+            if(reader.ReadLine()==null)throw new IOException("Parent closed pipe");
+        }
+        using var lease=new DataDirectoryLease(args[1]);
+        var store=new WorkspaceStore(args[1],Barrier);var w=store.Load(Guid.Parse(args[3]));
+        var data=w.Resources[ResourceKind.Fleets];var row=data.Draft[0];data.Edit([row.LocalId],()=>row.Fields["Name"]="Edited in child");
+        var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId,true);
+        StorageScenarios.Check(await store.TrySaveDraftRowsAsync(w,edits.Changes),"Row save fell back");
+        await writer.WriteLineAsync(JsonSerializer.Serialize(new Wire("done")));
+    }
+    static async Task Launch(string directory,Guid id,Remote remote,Func<Wire,bool>? killAt=null,string mode="--storage-child")
     {
         var name="vamsys-test-"+Guid.NewGuid().ToString("N");
         using var pipe=new NamedPipeServerStream(name,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous);
         var psi=new ProcessStartInfo(Environment.ProcessPath!){UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};
         if(Path.GetFileNameWithoutExtension(Environment.ProcessPath!).Equals("dotnet",StringComparison.OrdinalIgnoreCase))psi.ArgumentList.Add(typeof(StorageProcessScenarios).Assembly.Location);
-        foreach(var arg in new[]{"--storage-child",directory,name,id.ToString()})psi.ArgumentList.Add(arg);
+        foreach(var arg in new[]{mode,directory,name,id.ToString()})psi.ArgumentList.Add(arg);
         using var process=Process.Start(psi)!;var stdout=process.StandardOutput.ReadToEndAsync();var stderr=process.StandardError.ReadToEndAsync();
         using var timeout=new CancellationTokenSource(TimeSpan.FromSeconds(30));
         bool killed=false,done=false;
@@ -85,7 +103,7 @@ static class StorageProcessScenarios
     {
         if(boundary=="PUT:Accepted")return wire.Type=="accepted"&&wire.Method=="PUT";
         if(wire.Type!="barrier")return false;
-        if(boundary.StartsWith("Migration")||boundary.StartsWith("Rebase"))return wire.Point==boundary;
+        if(boundary.StartsWith("Migration")||boundary.StartsWith("Rebase")||boundary.StartsWith("Draft"))return wire.Point==boundary;
         using var body=JsonDocument.Parse(wire.Body!);var root=body.RootElement;
         if(boundary.StartsWith("Task"))return wire.Point==boundary&&root.GetProperty("state").GetString()=="Running";
         if(wire.Point!=boundary.Split('|')[0])return false;
@@ -152,13 +170,36 @@ static class StorageProcessScenarios
                 StorageScenarios.Check(final.Resources[ResourceKind.Fleets].Undo.Count==0&&final.VerifiedOperations.Contains("Fleets:Create"));
             }
         });
+        foreach(var boundary in new[]{"Draft:BeforeCommit","Draft:AfterCommit",""})
+        await test("Real process termination during a draft row save: "+(boundary==""?"completed":boundary),async()=>{
+            var dir=Temp();var w=Fixture();var store=new WorkspaceStore(dir);store.Save(w);var original=store.Load(w.Id);
+            await Launch(dir,w.Id,new Remote(),boundary==""?null:m=>Match(m,boundary),"--draft-child");
+            var disk=store.Load(w.Id);var saved=boundary!="Draft:BeforeCommit";
+            var fleets=disk.Resources[ResourceKind.Fleets];
+            StorageScenarios.Check(fleets.Draft[0].Get("Name")==(saved?"Edited in child":original.Resources[ResourceKind.Fleets].Draft[0].Get("Name")),"Row value after termination");
+            StorageScenarios.Check(fleets.Undo.Count==original.Resources[ResourceKind.Fleets].Undo.Count+(saved?1:0),"Undo history after termination");
+            StorageScenarios.Check(disk.StorageRevision==original.StorageRevision+(saved?1:0));
+            // Everything else is exactly what was saved before, and the next full save still accepts the revision.
+            var expected=saved?original:disk;if(saved){var od=expected.Resources[ResourceKind.Fleets];od.History=fleets.History.Copy();od.Draft[0].Fields["Name"]="Edited in child";expected.StorageRevision=disk.StorageRevision;}
+            StorageScenarios.Check(disk.Serialize()==expected.Serialize(),"Unrelated data changed");
+            disk.Name="after restart";store.Save(disk);StorageScenarios.Check(store.Load(w.Id).Name=="after restart");
+        });
         foreach(var boundary in new[]{"Migration:BeforeCommit","Migration:AfterCommit"})
         await test("Real process termination during SQLite migration: "+boundary,async()=>{
             var dir=Temp();var w=Fixture();using(var legacy=Legacy(dir,w)){}
             var remote=new Remote();await Launch(dir,w.Id,remote,m=>Match(m,boundary));
-            using(var c=Open(dir))StorageScenarios.Check(Convert.ToInt32(Sql(c,"PRAGMA user_version"))==(boundary.EndsWith("AfterCommit")?3:0));
+            using(var c=Open(dir))StorageScenarios.Check(Convert.ToInt32(Sql(c,"PRAGMA user_version"))==(boundary.EndsWith("AfterCommit")?4:0));
             var store=new WorkspaceStore(dir);StorageScenarios.Check(store.Load(w.Id).Jobs[0].Items[0].State==ItemState.Pending&&remote.Posts==0);
-            StorageScenarios.Check(Directory.GetFiles(dir,"workspaces-before-v3-*.db").Length>=1);
+            StorageScenarios.Check(Directory.GetFiles(dir,"workspaces-before-v4-*.db").Length>=1);
+        });
+        foreach(var boundary in new[]{"Migration:BeforeCommit","Migration:AfterCommit"})
+        await test("Real process termination during v3 history migration: "+boundary,async()=>{
+            var dir=Temp();HistoryScenarios.FixedLegacy(dir,3);
+            await Launch(dir,HistoryScenarios.FixedId,new Remote(),m=>Match(m,boundary),"--draft-child");
+            using(var c=Open(dir))StorageScenarios.Check(Convert.ToInt32(Sql(c,"PRAGMA user_version"))==(boundary.EndsWith("AfterCommit")?4:3));
+            var store=new WorkspaceStore(dir);var d=store.Load(HistoryScenarios.FixedId).Resources[ResourceKind.Fleets];
+            StorageScenarios.Check(d.Undo.Count==2&&d.Redo.Count==2&&d.Draft[0].Get("Name")=="current");d.UndoEdit();StorageScenarios.Check(d.Draft[0].Get("Name")=="start");
+            d.RedoEdit();d.RedoEdit();StorageScenarios.Check(d.Draft[0].Get("Name")=="future1");
         });
     }
 }

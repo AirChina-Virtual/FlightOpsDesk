@@ -25,31 +25,26 @@ public sealed class DataRow
 public sealed record ResourceIdentity(string RemoteId, string ConnectionId, string? ParentFleetId = null);
 public sealed record MergeConflict(Guid RowId, string Field, string? Original, string? Local, string? Remote);
 
-public sealed class ResourceData
+[System.Text.Json.Serialization.JsonConverter(typeof(ResourceDataConverter))]
+public sealed partial class ResourceData
 {
     public List<DataRow> Snapshot { get; set; } = [];
-    public List<DataRow> Draft { get; set; } = [];
+    List<DataRow> draft = [];
+    Dictionary<Guid, DataRow>? draftIndex;
+    public List<DataRow> Draft { get => draft; set { draft = value; InvalidateDraftIndex(); } }
     public List<string> Columns { get; set; } = [];
     public DateTimeOffset? SnapshotAt { get; set; }
-    public List<List<DataRow>> Undo { get; set; } = [];
-    public List<List<DataRow>> Redo { get; set; } = [];
+    public EditHistory History { get; set; } = new();
+    public IReadOnlyList<HistoryStep> Undo => History.Undo;
+    public IReadOnlyList<HistoryStep> Redo => History.Redo;
     public List<MergeConflict> Conflicts { get; set; } = [];
-    public void Checkpoint()
-    {
-        Undo.Add(Draft.Select(r => r.Copy()).ToList());
-        if (Undo.Count > 20) Undo.RemoveAt(0);
-        Redo.Clear();
-    }
-    public void UndoEdit()
-    {
-        if (Undo.Count == 0) return;
-        Redo.Add(Draft); Draft = Undo[^1]; Undo.RemoveAt(Undo.Count - 1);
-    }
-    public void RedoEdit()
-    {
-        if (Redo.Count == 0) return;
-        Undo.Add(Draft); Draft = Redo[^1]; Redo.RemoveAt(Redo.Count - 1);
-    }
+    // New collections over the same row objects. Callers must replace rows, never edit them in place.
+    public ResourceData ShallowCopy() => new() { Snapshot = [..Snapshot], Draft = [..Draft], Columns = [..Columns], SnapshotAt = SnapshotAt, History = History.Copy(), Conflicts = [..Conflicts] };
+    public void InvalidateDraftIndex() => draftIndex = null;
+    public DataRow? FindDraftRow(Guid id) => (draftIndex ??= Draft.ToDictionary(r => r.LocalId)).GetValueOrDefault(id);
+    public void ClearHistory() { History.Clear(); InvalidateDraftIndex(); }
+    public void UndoEdit() => History.Move(this, undo: true);
+    public void RedoEdit() => History.Move(this, undo: false);
 }
 
 public sealed class Workspace
@@ -73,6 +68,13 @@ public sealed class Workspace
     {
         var copy=(Workspace)MemberwiseClone();
         copy.Resources=new(Resources){[kind]=data};copy.VerifiedOperations=[..VerifiedOperations];
+        return copy;
+    }
+    // Stages a change to every resource without deep-copying rows, jobs or undo history.
+    public Workspace StageResources()
+    {
+        var copy=(Workspace)MemberwiseClone();
+        copy.Resources=Resources.ToDictionary(p=>p.Key,p=>p.Value.ShallowCopy());copy.VerifiedOperations=[..VerifiedOperations];
         return copy;
     }
     public string Serialize() => JsonSerializer.Serialize(this);

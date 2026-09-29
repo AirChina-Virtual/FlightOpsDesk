@@ -99,13 +99,28 @@ public sealed class OperationsTransport(HttpClient client, Uri origin, string va
         }
     }
     static string Redact(string text) => System.Text.RegularExpressions.Regex.Replace(text.Length > 8000 ? text[..8000] : text, "(?i)(access_token|refresh_token|client_secret|authorization)([\\\"\\s:=]+)[^\\\"\\s,}]+", "$1$2[REDACTED]");
+    // The documented default of 15 rows costs one rate-limited request per 15 rows; 0 keeps the server default.
+    public int PageSize { get; init; } = 100;
+    const string PageSizeKey = "page%5Bsize%5D";
+    static bool HasPageSize(Uri uri) => uri.Query.Contains(PageSizeKey, StringComparison.OrdinalIgnoreCase) || Uri.UnescapeDataString(uri.Query).Contains("page[size]", StringComparison.OrdinalIgnoreCase);
+    static Uri WithPageSize(Uri uri, int size) => size <= 0 || HasPageSize(uri) ? uri
+        : new UriBuilder(uri) { Query = (uri.Query.Length > 1 ? uri.Query[1..] + "&" : "") + PageSizeKey + "=" + size.ToString(System.Globalization.CultureInfo.InvariantCulture) }.Uri;
     public async IAsyncEnumerable<JsonElement> ReadPagesAsync(Uri first, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        Uri? next = first; var visited = new HashSet<string>();
+        Uri? next = first; var visited = new HashSet<string>(); var size = PageSize; var firstPage = true;
         while (next != null)
         {
             if (!visited.Add(next.AbsoluteUri)) throw new FormatException(Messages.Define("Text_122031269F"));
-            using var json = await GetAsync(next, ct);
+            var target = WithPageSize(next, size);
+            JsonDocument json;
+            try { json = await GetAsync(target, ct); }
+            catch (ApiResponseException e) when (firstPage && target != next && e.Status is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity)
+            {
+                // An instance that rejects the page size still serves its documented default.
+                size = 0; json = await GetAsync(next, ct);
+            }
+            firstPage = false;
+            using var page = json;
             if (!json.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array) throw new FormatException(Messages.Define("Text_61CA285291"));
             PerformanceRun.Current?.Page();
             foreach (var row in data.EnumerateArray()) yield return row.Clone();

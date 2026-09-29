@@ -30,7 +30,7 @@ try {
     if($LASTEXITCODE -ne 0){throw 'Legacy seed failed'}
     $primary=Launch $DataDirectory
     WaitText $primary @('Task center','Connection & settings')
-    if(@(Get-ChildItem -LiteralPath $DataDirectory -Filter 'workspaces-before-v3-*.db').Count -ne 1){throw 'Migration backup not found'}
+    if(@(Get-ChildItem -LiteralPath $DataDirectory -Filter 'workspaces-before-v4-*.db').Count -ne 1){throw 'Migration backup not found'}
     Write-Output 'PASS legacy UI startup migrated with unique backup and English preference'
     $duplicate=Launch $DataDirectory
     WaitText $duplicate @('该数据目录已由另一个程序实例使用','Another application instance is using this data directory.')

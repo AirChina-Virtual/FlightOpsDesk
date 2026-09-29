@@ -11,7 +11,7 @@ static class LifecycleScenarios
     const string NewAirports="""{"data":[{"id":103,"airline_id":7,"icao":"EGLL","iata":"LHR"},{"id":102,"airline_id":7,"icao":"EGKK","iata":"LGW"}],"meta":{"next_cursor_url":null}}""";
     const string Empty="""{"data":[],"meta":{"next_cursor_url":null}}""";
     const string Fleet="""{"id":4,"airline_id":7,"name":"Old"}""";
-    static OperationsAdapter Api(Workspace w,AuditHttp h)=>new(new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("test",DateTimeOffset.UtcNow.AddHours(1))))),w);
+    static OperationsAdapter Api(Workspace w,AuditHttp h)=>new(new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("test",DateTimeOffset.UtcNow.AddHours(1)))),InstantTime.Requests()),w);
     static DataRow Parse(OperationsAdapter a,ResourceKind k,string raw){using var d=JsonDocument.Parse(raw);return a.FromJson(k,d.RootElement);}
     static ChangeItem Routing(string code)=>new(){Resource=ResourceKind.Routings,Kind=ChangeKind.Create,After=new(){Fields=new(){["Departure Airport (ICAO/IATA)"]=code,["Arrival Airport (ICAO/IATA)"]=code,["Route String"]="DCT"}},Fields=new(){["Departure Airport (ICAO/IATA)"]=new(FieldIntent.Set,code),["Arrival Airport (ICAO/IATA)"]=new(FieldIntent.Set,code),["Route String"]=new(FieldIntent.Set,"DCT")}};
     public static async Task Run(Func<string,Func<Task>,Task> test)
@@ -75,7 +75,7 @@ static class LifecycleScenarios
                     var raw=unknown||wrote?Fleet.Replace("Old","New"):Fleet;
                     return Json(r.RequestUri!.AbsolutePath.EndsWith("/fleet")?"{\"data\":["+raw+"],\"meta\":{\"next_cursor_url\":null}}":"{\"data\":"+raw+"}");
                 };
-                a=new(new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),tokens),restored);
+                a=new(new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),tokens,InstantTime.Requests()),restored);
                 await foreach(var row in a.ReadAllAsync(ResourceKind.Fleets,default))break;
                 Check(a.SessionAirlineId==restored.AirlineId);restored.Mode=RunMode.Online;
                 await new OperationsBatchExecutor(a,restored).ExecuteAsync(restored.Jobs[0],()=>Task.CompletedTask,default);

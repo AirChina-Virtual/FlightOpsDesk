@@ -1,4 +1,4 @@
-param([switch]$Tasks,[switch]$InteractionsOnly)
+param([switch]$Tasks,[switch]$InteractionsOnly,[switch]$Autosave,[switch]$History)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 $repo=Split-Path $PSScriptRoot -Parent
@@ -27,12 +27,46 @@ function Wait([scriptblock]$condition) {
     throw "Timeout: $condition"
 }
 function Click([string]$name){
-    $button=Wait {All|Where-Object{$_.Current.ControlType.ProgrammaticName -eq 'ControlType.Button' -and $_.Current.Name -eq $name}|Select-Object -First 1}
+    $button=Wait {All|Where-Object{($_.Current.Name -eq $name -or ($name -eq 'More' -and $_.Current.AutomationId -eq 'MoreButton')) -and $_.GetSupportedPatterns().Id.Contains([System.Windows.Automation.InvokePattern]::Pattern.Id)}|Select-Object -First 1}
     ([System.Windows.Automation.InvokePattern]$button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke()
 }
 try {
     $pipe.Connect(20000);$reader=[IO.StreamReader]::new($pipe);$writer=[IO.StreamWriter]::new($pipe);$writer.AutoFlush=$true
-    if(!$Tasks){
+    if($History){
+        Q prepare|Out-Null;$start=Q state
+        Q 'edit:history first'|Out-Null
+        Wait {(Q state).draftSaves -ge $start.draftSaves+1}|Out-Null
+        Q 'edit:history second'|Out-Null
+        Wait {(Q state).draftSaves -ge $start.draftSaves+2}|Out-Null
+        Assert ((Q state).undo -eq $start.undo+1) 'Same cell was not grouped across saves'
+        Click 'More';Click 'Undo'
+        Wait {(Q state).name -eq $start.name}|Out-Null
+        Click 'More';Click 'Redo'
+        Wait {(Q state).name -eq 'history second'}|Out-Null
+        Q workspace-away|Out-Null;Wait {(Q state).workspaceName -eq 'QA other'}|Out-Null
+        Q workspace-back|Out-Null;Wait {(Q state).workspaceName -eq $start.workspaceName}|Out-Null;Q prepare|Out-Null
+        Assert ((Q state).name -eq 'history second') 'Workspace switching lost history'
+        Click 'More';Click 'Undo'
+        Wait {(Q state).name -eq $start.name}|Out-Null
+        Click 'More';Click 'Redo'
+        Wait {(Q state).name -eq 'history second'}|Out-Null
+        Q close|Out-Null;Assert ($p.WaitForExit(10000)) 'Close did not persist history'
+        & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --assert-history-ui $dir 'history second' $start.name
+        if($LASTEXITCODE -ne 0){throw 'History restart verification failed'}
+        Write-Output 'PASS actual Undo/Redo buttons, same-cell continuation across autosaves, workspace switch and history after restart'
+    } elseif($Autosave){
+        # Autosave writes only the edited row; a forced kill afterwards must not lose it.
+        Q prepare|Out-Null;$start=Q state
+        Q 'edit:autosaved first'|Out-Null
+        $first=Wait {$s=Q state;if($s.draftSaves -ge $start.draftSaves+1){$s}}
+        Q 'edit:autosaved second'|Out-Null
+        $second=Wait {$s=Q state;if($s.draftSaves -ge $start.draftSaves+2){$s}}
+        Assert ($second.fullSaves -eq $start.fullSaves) 'Autosave used a full save'
+        $p.Kill();$p.WaitForExit()
+        & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --assert-autosave-ui $dir 'autosaved second'
+        if($LASTEXITCODE -ne 0){throw 'Restart verification failed'}
+        Write-Output "PASS actual window: two cell autosaves wrote rows only (draft saves $($second.draftSaves-$start.draftSaves), full saves 0); value survived a forced kill"
+    } elseif(!$Tasks){
         Q prepare|Out-Null;Q 'edit:accepted before close'|Out-Null;Q arm|Out-Null;Q close|Out-Null
         $state=Wait {$s=Q state;if($s.entered){$s}}
         Assert ($state.state -eq 'Saving' -and !$state.enabled) 'Window not frozen'

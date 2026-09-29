@@ -1,3 +1,34 @@
+using VamSys.Infrastructure;
+
+// Virtual time that advances by itself: each one-shot timer jumps the clock to its due time and fires at once.
+// Suited to sequential scenarios; rate-limit spacing and backoff are still computed, just not waited for in real time.
+// Concurrency and spacing assertions keep using TestTime, whose timers only fire when the test advances them.
+sealed class InstantTime : TimeProvider
+{
+    long ticks=DateTimeOffset.UtcNow.UtcTicks;
+    public static RequestCoordinator Requests()=>new(new InstantTime());
+    public override long TimestampFrequency=>TimeSpan.TicksPerSecond;
+    public override long GetTimestamp()=>Interlocked.Read(ref ticks);
+    public override DateTimeOffset GetUtcNow()=>new(GetTimestamp(),TimeSpan.Zero);
+    public override ITimer CreateTimer(TimerCallback callback,object? state,TimeSpan dueTime,TimeSpan period)
+    {var timer=new Timer(this,callback,state);timer.Change(dueTime,period);return timer;}
+    sealed class Timer(InstantTime clock,TimerCallback callback,object? state):ITimer
+    {
+        volatile bool disposed;
+        public bool Change(TimeSpan dueTime,TimeSpan period)
+        {
+            if(disposed)return false;
+            if(period!=Timeout.InfiniteTimeSpan && period!=TimeSpan.Zero)throw new NotSupportedException("InstantTime only supports one-shot timers");
+            if(dueTime==Timeout.InfiniteTimeSpan)return true;
+            if(dueTime>TimeSpan.Zero)Interlocked.Add(ref clock.ticks,dueTime.Ticks);
+            // Fire asynchronously so the awaiting Task.Delay is fully constructed first.
+            ThreadPool.QueueUserWorkItem(_=>{if(!disposed)callback(state);});
+            return true;
+        }
+        public void Dispose()=>disposed=true;
+        public ValueTask DisposeAsync(){Dispose();return ValueTask.CompletedTask;}
+    }
+}
 // A deterministic TimeProvider: callers explicitly advance timers; rate limiting remains enabled.
 sealed class TestTime : TimeProvider
 {

@@ -25,10 +25,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent(); InitializeLanguage();
-#if UI_VERIFICATION
-        // Isolated QA builds only; production publishing has no theme override.
-        RootGrid.RequestedTheme = Environment.GetEnvironmentVariable("VAMSYS_QA_THEME") == "light" ? ElementTheme.Light : ElementTheme.Dark;
-#endif
+        ConfigureVerificationTheme();
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "FlightOpsDesk.ico"));
@@ -43,7 +40,7 @@ public sealed partial class MainWindow : Window
         ResourcePicker.ItemsSource = Enum.GetValues<ResourceKind>().Select(k => L(Schemas.All[k].Name)).ToList();
         ResourcePicker.SelectedIndex = (int)resource;
         ReloadWorkspaces();
-        autosave.Tick += async (_, _) => { autosave.Stop(); await Guard(async () => { await Save(); if (!busy) Status(() => L("Text_11584EAAA5")); }); };
+        autosave.Tick += async (_, _) => { autosave.Stop(); await Guard(async () => { await SaveEdits(); if (!busy) Status(() => L("Text_11584EAAA5")); }); };
         AppWindow.Closing += async (_, e) =>
         {
             if(closeState.State==WindowCloseState.Closed)return;
@@ -58,10 +55,10 @@ public sealed partial class MainWindow : Window
             } catch {Status(()=>L("Text_7AF24B0E8E"));}
         };
         ready = true; Navigation.SelectedItem = Navigation.MenuItems[0]; Render();
-#if UI_VERIFICATION
         InitializeVerification();
-#endif
     }
+    partial void ConfigureVerificationTheme();
+    partial void InitializeVerification();
     void Status(Func<string> message) { statusText = message; StatusLabel.Text = message(); }
     void ToggleNavigation(TitleBar sender, object args) => Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
     void UpdateCaptionTheme()
@@ -80,10 +77,27 @@ public sealed partial class MainWindow : Window
         WorkspacePicker.SelectedItem = ((List<WorkspaceChoice>)WorkspacePicker.ItemsSource).First(x => x.Id == workspace.Id);
         ready = wasReady;
     }
+    // Cell edits not yet saved. Every other change is followed by a full save, which also covers these.
+    readonly DraftEdits edits = new();
     async Task Save()
     {
         await saveGate.WaitAsync();
+        var taken = edits.Take();
         try { if(storageBlocked) throw OperationsAdapter.Block("StorageReload"); await store.SaveAsync(workspace); }
+        catch { edits.Restore(taken); throw; }
+        finally { saveGate.Release(); }
+    }
+    // Autosave writes the edited rows and changed history steps, including same-cell continuations.
+    async Task SaveEdits()
+    {
+        await saveGate.WaitAsync();
+        var taken = edits.Take();
+        try
+        {
+            if(storageBlocked) throw OperationsAdapter.Block("StorageReload");
+            if(!taken.CanSaveRows(workspace) || !await store.TrySaveDraftRowsAsync(workspace, taken.Changes)) await store.SaveAsync(workspace);
+        }
+        catch { edits.Restore(taken); throw; }
         finally { saveGate.Release(); }
     }
     void SaveSoon() { if(!closeState.IsOpen)return; autosave.Stop(); autosave.Start(); }
@@ -98,7 +112,7 @@ public sealed partial class MainWindow : Window
         if(storageBlocked) throw OperationsAdapter.Block("StorageReload");
         var pendingSave=autosave.IsEnabled;autosave.Stop();
         busy = true; BusyRing.IsActive = true; WorkspacePicker.IsEnabled = false; ResourcePicker.IsEnabled = false;
-        try { if(pendingSave) await Save(); await operation(); }
+        try { if(pendingSave) await SaveEdits(); await operation(); }
         finally { busy = false; BusyRing.IsActive = false; WorkspacePicker.IsEnabled = true; ResourcePicker.IsEnabled = true; Render(); }
     }
     Button Button(Func<string> label, Func<Task> action, bool enabled = true)
@@ -181,7 +195,7 @@ public sealed partial class MainWindow : Window
         actions.PrimaryCommands.Add(Command(() => L("Text_E306752B35"), Symbol.Edit, EditRules));
         actions.PrimaryCommands.Add(Command(() => L("Text_48A195CA7E"), Symbol.View, () => { Navigation.SelectedItem = Navigation.MenuItems[3]; return Task.CompletedTask; }));
         actions.PrimaryCommands.Add(Command(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts, !busy && Data.Conflicts.Count > 0));
-        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!closeState.IsOpen || busy || !closeState.IsOpen) return; Data.Checkpoint(); var r = new DataRow(); foreach (var f in Schemas.All[resource].Columns) r.Fields[f] = f == "_delete" ? "FALSE" : ""; Data.Draft.Add(r); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
+        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!closeState.IsOpen || busy || !closeState.IsOpen) return; var r = new DataRow(); foreach (var f in Schemas.All[resource].Columns) r.Fields[f] = f == "_delete" ? "FALSE" : ""; Data.Edit([r.LocalId],()=>Data.Draft.Add(r),structural:true); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
         if (resource is ResourceKind.Aircraft or ResourceKind.Routes) actions.PrimaryCommands.Add(Command(() => L("Text_95DD1FDDFE"), Symbol.Edit, () => ChooseFleets(null)));
         actions.PrimaryCommands.Add(Command(() => L("Text_435BF8A234"), Symbol.Delete, DeleteSelected));
         actions.PrimaryCommands.Add(Command(() => L("Text_A6926595CE"), Symbol.Undo, RestoreSelected));
@@ -224,19 +238,19 @@ public sealed partial class MainWindow : Window
     {
         if (table is null) return;
         if (shownState != null) { shownState.AppliedSearch = search; shownState.AppliedFilter = filter; shownState.AppliedSort = sort; }
-        var columns = DisplayColumns(); var changed = filter == 1 ? planner.Plan(resource, Data).Select(i => i.After.LocalId).ToHashSet() : null;
-        IEnumerable<DataRow> rows = Data.Draft.Where(r => (search == "" || r.Fields.Values.Any(v => v.Contains(search, StringComparison.OrdinalIgnoreCase))) && (filter != 1 || changed!.Contains(r.LocalId)) && (filter != 2 || Schemas.Deleted(r)));
+        // One plan per load serves both the "changed" filter and the row status labels.
+        var columns = DisplayColumns(); var modifiedIds = planner.Plan(resource, Data).Select(i => i.After.LocalId).ToHashSet();
+        IEnumerable<DataRow> rows = Data.Draft.Where(r => (search == "" || r.Fields.Values.Any(v => v.Contains(search, StringComparison.OrdinalIgnoreCase))) && (filter != 1 || modifiedIds.Contains(r.LocalId)) && (filter != 2 || Schemas.Deleted(r)));
         if (sort != null) rows = rows.OrderBy(r => r.Get(sort), StringComparer.OrdinalIgnoreCase);
         var existingIds = Data.Snapshot.Select(r => r.LocalId).ToHashSet();
-        var modifiedIds = planner.Plan(resource, Data).Select(i => i.After.LocalId).ToHashSet();
         var conflictIds = Data.Conflicts.Select(c => c.RowId).ToHashSet();
         var fleetLabels = fleets.Options(workspace).ToDictionary(o => o.Token, StringComparer.OrdinalIgnoreCase);
         visible = rows.Select(r => new RowViewModel(r, columns.Select(f => new CellViewModel(f, r.Get(f), value =>
         {
             if (!closeState.IsOpen || busy || Schemas.Deleted(r) || f == "_delete") return;
-            var cellKey = r.LocalId + ":" + f;
-            if (lastEditedCell != cellKey) { Data.Checkpoint(); lastEditedCell = cellKey; }
-            r.Fields[f] = value; SaveSoon(); Status(() => L("Text_75141EDE81"));
+            var cellKey = r.LocalId + ":" + f; var checkpointed = lastEditedCell != cellKey;
+            Data.Edit([r.LocalId],()=>r.Fields[f] = value,newStep:checkpointed); lastEditedCell = cellKey;
+            edits.Cell(workspace, resource, r.LocalId, checkpointed); SaveSoon(); Status(() => L("Text_75141EDE81"));
         })
         {
             CanEdit=()=>closeState.IsOpen&&!busy, IsReadOnly = Schemas.Deleted(r), FleetName = () => L("ChooseFleet"),
@@ -276,8 +290,8 @@ public sealed partial class MainWindow : Window
         var targetField = ruleKind == RuleKind.Retire ? "End Date" : rule.Field;
         var samples = preview.Take(8).Select((r, i) => $"{rows[i].Get(Schemas.All[resource].Key)}：{rows[i].Get(targetField)} → {r.Get(targetField)}");
         if (!await Confirm(L("Text_AD86791376"), Stack(Text(() => L("Text_42F23885A7", ("arg0", rows.Count))), Text(() => string.Join("\n", samples))), L("Text_2354C137CE"))) return;
-        Data.Checkpoint(); var map = preview.ToDictionary(r => r.LocalId);
-        for (int i = 0; i < Data.Draft.Count; i++) if (map.TryGetValue(Data.Draft[i].LocalId, out var r)) Data.Draft[i] = r;
+        var map = preview.ToDictionary(r => r.LocalId);
+        Data.Edit(map.Keys,()=>{for (int i = 0; i < Data.Draft.Count; i++) if (map.TryGetValue(Data.Draft[i].LocalId, out var r)) Data.Draft[i] = r;},replaceRows:true);
         if (!Data.Columns.Contains(targetField)) Data.Columns.Add(targetField);
         await Save(); Render(); Status(() => L("Text_13292B3343", ("arg0", rows.Count)));
     }
@@ -394,7 +408,7 @@ public sealed partial class MainWindow : Window
                             if (current.Get(field).Contains("local:", StringComparison.OrdinalIgnoreCase)) current.Fields[field] = updated.Get(field);
                     }
                 }
-                item.Rebased = true; data.SnapshotAt = DateTimeOffset.UtcNow; data.Undo.Clear(); data.Redo.Clear();
+                item.Rebased = true; data.SnapshotAt = DateTimeOffset.UtcNow; data.ClearHistory();
             }
             await Save(); foreach(var item in job.Items)NotifyTask(new(workspace.Id,job.Id,item.Id));FlushTasks(); running.Dispose(); running = null; Render(); Status(() => L("Text_B64A075682") + JobText(job));
         });

@@ -59,7 +59,7 @@ public sealed class CsvAdapter : ICsvResourceAdapter
         {
             if (rows.Any(r => Schemas.Key(kind, r) == "")) throw MessageErrors.Attach(new FormatException(Messages.Define("Text_FF27EDEC0D")), Messages.Define("Text_FF27EDEC0D"));
             data.Snapshot = rows.Select(r => r.Copy()).ToList(); data.Draft = rows;
-            data.Undo.Clear(); data.Redo.Clear(); data.SnapshotAt = DateTimeOffset.UtcNow;
+            data.ClearHistory(); data.SnapshotAt = DateTimeOffset.UtcNow;
         }
         else
         {
@@ -71,7 +71,11 @@ public sealed class CsvAdapter : ICsvResourceAdapter
                 existing=data.Draft.SelectMany(r=>Schemas.MatchKeys(kind,r).Where(k=>k!="").Select(k=>(Key:k,Row:r))).GroupBy(p=>p.Key).ToDictionary(g=>g.Key,g=>g.Select(p=>p.Row).DistinctBy(r=>r.LocalId).ToList());
             var matchedIds=rows.Select(r=>existing.GetValueOrDefault(Schemas.Key(kind,r))).Where(m=>m?.Count==1).Select(m=>m![0].LocalId).ToList();
             if(matchedIds.Distinct().Count()!=matchedIds.Count) throw MessageErrors.Attach(new FormatException(Messages.Define("Text_FC5C1BF085")),Messages.Define("Text_FC5C1BF085"));
-            data.Checkpoint();
+            foreach(var incoming in rows)
+                if(existing.TryGetValue(Schemas.Key(kind,incoming),out var matches)&&matches.Count!=1)
+                    throw new InvalidOperationException(Messages.Define("Text_C73CE653CA",("arg0",Schemas.Key(kind,incoming))));
+            var added=rows.Where(r=>!existing.ContainsKey(Schemas.Key(kind,r))).ToArray();
+            data.Edit(matchedIds.Concat(added.Select(r=>r.LocalId)),()=>{
             foreach (var incoming in rows)
             {
                 var key = Schemas.Key(kind, incoming);
@@ -86,6 +90,7 @@ public sealed class CsvAdapter : ICsvResourceAdapter
                 }
                 else data.Draft.Add(incoming);
             }
+            },structural:added.Length>0);
         }
         data.Columns = data.Columns.Concat(rows.SelectMany(r => r.Fields.Keys)).Distinct().ToList();
     }

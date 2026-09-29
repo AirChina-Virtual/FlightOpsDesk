@@ -167,7 +167,7 @@ static class CandidateIndexScenarios
             }
             foreach(var kind in new[]{ResourceKind.Routes,ResourceKind.Routings}){
                 var field=kind==ResourceKind.Routes?"Flight Number":"Route String";var suffix=kind==ResourceKind.Routes?"_id":"_airport_id";
-                var raw="{\"id\":9,\"airline_id\":7,\"departure"+suffix+"\":101,\"arrival"+suffix+"\":101,\""+(kind==ResourceKind.Routes?"flight_number":"route")+"\":\"OLD\"}";
+                var raw="{\"id\":9,"+(kind==ResourceKind.Routes?"":"\"airline_id\":7,")+"\"departure"+suffix+"\":101,\"arrival"+suffix+"\":101,\""+(kind==ResourceKind.Routes?"flight_number":"route")+"\":\"OLD\"}";
                 var before=Parse(api,kind,raw);var after=before.Copy();after.Fields[field]="NEW";
                 var unknown=new ChangeItem{Resource=kind,Kind=ChangeKind.Update,Before=before,After=after};api.ReserveCandidate(unknown,session);
                 foreach(var code in new[]{"LHR","egll","101"})

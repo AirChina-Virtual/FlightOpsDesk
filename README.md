@@ -45,6 +45,16 @@ GitHub 的“Download ZIP”下载的是源代码，不能直接双击运行；�
 
 该命令先运行自动测试，通过后把可运行的程序放到 artifacts/flightops-app。运行该目录中的 FlightOpsDesk.exe。
 
+测试工具与正式程序分开构建。正式包只包含运行文件、使用及升级说明和 CSV 示例；不包含 QA 控制入口、故障注入、测试工具、开发文档或 PDB 调试符号。测试／QA 使用的业务程序集放在 artifacts/test-build，不覆盖正式构建；测试运行器保留自己的 tests/VamSys.Tests/bin 目录。运行时需要的 Operations 规范仍嵌入程序。
+
+生成支持窗口故障检查的专用版本：
+
+~~~powershell
+./scripts/build.ps1 -Publish -UiVerification
+~~~
+
+该版本输出到 artifacts/v3-qa，仅用于隔离测试。两种发布都会检查程序集中的测试入口和包内文件清单，验证通过后才替换各自输出目录。
+
 只运行自动测试，不生成程序包：
 
 ~~~powershell
@@ -69,4 +79,4 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:Restor
 
 ## 验证记录
 
-第八轮检查中，**151 项自动测试通过**。更换软件名称和图标后，又检查了程序打包以及中英文窗口操作，没有重新运行全部测试。每次具体检查了什么、还有哪些没有验证，见 [测试报告](docs/TEST-REPORT.md)。处理速度和测试方法见 [性能报告](docs/PERFORMANCE.md)。
+本次更新后，**192 项自动测试通过**，本机运行约 26–28 秒。也实际检查了旧数据升级、撤销与重做、自动保存，以及关闭时保存失败后的恢复。正式软件包已确认不含测试工具；目前只在本地生成，尚未上传可下载版本。具体检查范围见 [测试报告](docs/TEST-REPORT.md)，速度变化和测量方法见 [性能报告](docs/PERFORMANCE.md)。

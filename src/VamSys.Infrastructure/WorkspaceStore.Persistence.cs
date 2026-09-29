@@ -32,7 +32,7 @@ public sealed partial class WorkspaceStore
         var start=Stopwatch.GetTimestamp();
         var jobs=w.Jobs.Select((j,n)=>new StoredJob(j.Id,n,Encode(j,true),j.Items.Select((i,k)=>new StoredItem(i.Id,k,Encode(i))).ToList())).ToList();
         var resources=CaptureResources(w);var json=Encode(w,true);
-        if(measure) Measured(start,[json,..jobs.SelectMany(j=>new[]{j.Json}.Concat(j.Items.Select(i=>i.Json))),..resources.SelectMany(r=>new[]{r.Columns,r.Conflicts,r.Undo,r.Redo}.Concat(r.Rows.Select(row=>row.Json)))]);
+        if(measure) Measured(start,[json,..jobs.SelectMany(j=>new[]{j.Json}.Concat(j.Items.Select(i=>i.Json))),..resources.SelectMany(r=>new[]{r.Columns,r.Conflicts}.Concat(HistoryJson(r.History)).Concat(r.Rows.Select(row=>row.Json)))]);
         return new(w.Id,w.Name,w.StorageRevision,json,jobs,resources);
     }
     static void WriteJobs(SqliteConnection c,SqliteTransaction tx,FullPayload p)
@@ -58,9 +58,9 @@ public sealed partial class WorkspaceStore
                 write(c,tx);
                 var next=expected+1;
                 Execute(c,tx,"INSERT INTO workspace_revisions(workspace_id,revision) VALUES($w,$r) ON CONFLICT(workspace_id) DO UPDATE SET revision=$r",("$w",id.ToString()),("$r",next));
-                Barrier?.Invoke(kind+":BeforeCommit");tx.Commit();committed=true;
+                OnStorageBarrier(kind+":BeforeCommit");tx.Commit();committed=true;
                 metrics?.Saved(true,Stopwatch.GetElapsedTime(start));
-                Barrier?.Invoke(kind+":AfterCommit");
+                OnStorageBarrier(kind+":AfterCommit");
                 return next;
             }
             catch {if(!committed)metrics?.Saved(false,Stopwatch.GetElapsedTime(start));throw;}
@@ -68,14 +68,14 @@ public sealed partial class WorkspaceStore
     }
     internal long SavePayload(FullPayload p,byte[]? secret=null)
         => Commit(p.Id,p.Revision,"Full", (c,tx)=>{
-            Execute(c,tx,"INSERT INTO workspaces(id,name,json,format_version) VALUES($id,$name,$json,3) ON CONFLICT(id) DO UPDATE SET name=$name,json=$json,format_version=3",
+            Execute(c,tx,"INSERT INTO workspaces(id,name,json,format_version) VALUES($id,$name,$json,4) ON CONFLICT(id) DO UPDATE SET name=$name,json=$json,format_version=4",
                 ("$id",p.Id.ToString()),("$name",p.Name),("$json",p.Json));
             WriteJobs(c,tx,p);WriteResources(c,tx,p);
             if(secret!=null) Execute(c,tx,"INSERT INTO secrets(id,value) VALUES($id,$s) ON CONFLICT(id) DO UPDATE SET value=$s",("$id",p.Id.ToString()),("$s",secret));
         },true);
-    public void Save(Workspace w) { var p=Capture(w); w.StorageRevision=SavePayload(p); }
+    public void Save(Workspace w) { var p=Capture(w); w.StorageRevision=SavePayload(p);Acknowledge(p); }
     public async Task SaveAsync(Workspace w)
-    {var p=Capture(w);w.StorageRevision=await Task.Run(()=>SavePayload(p));}
+    {var p=Capture(w);w.StorageRevision=await Task.Run(()=>SavePayload(p));Acknowledge(p);}
     // Compatibility entry point for callers exchanging a complete workspace JSON.
     public void SaveJson(Guid id,string name,string json)
     {
@@ -84,6 +84,42 @@ public sealed partial class WorkspaceStore
         Save(w);
     }
     public static string SerializeForSave(Workspace w)=>w.Serialize();
+    // Saves edited draft cells without rewriting unrelated rows, resources or jobs. Only valid when the database
+    // holds the workspace at w.StorageRevision and the edits changed field values in place (no added, removed or
+    // reordered rows, and no column, conflict or snapshot changes). Returns false when a row is gone from memory;
+    // the caller then falls back to a full save.
+    public async Task<bool> TrySaveDraftRowsAsync(Workspace w,IReadOnlyCollection<DraftRowChanges> changes)
+    {
+        var start=Stopwatch.GetTimestamp();
+        var rows=new List<(int Kind,string Id,string Json)>();var history=new List<(ResourceKind Kind,StoredHistory Payload)>();
+        foreach(var change in changes)
+        {
+            var data=w.Resources[change.Resource];
+            if(change.Rows.Count>0)
+            {
+                foreach(var id in change.Rows)
+                {
+                    if(data.FindDraftRow(id) is not {} row) return false;
+                    rows.Add(((int)change.Resource,id.ToString(),Encode(row)));
+                }
+            }
+            history.Add((change.Resource,CaptureHistory(data.History,changes:change.History)));
+        }
+        Measured(start,[..rows.Select(r=>r.Json),..history.SelectMany(h=>HistoryJson(h.Payload))]);
+        var workspace=w.Id.ToString();var expected=w.StorageRevision;
+        w.StorageRevision=await Task.Run(()=>Commit(w.Id,expected,"Draft",(c,tx)=>{
+            using var update=Command(c,tx,"UPDATE resource_rows SET json=$json WHERE workspace_id=$w AND resource=$r AND collection=1 AND local_id=$id",("$w",workspace),("$r",0),("$id",""),("$json",""));
+            update.Prepare();
+            foreach(var row in rows)
+            {
+                update.Parameters["$r"].Value=row.Kind;update.Parameters["$id"].Value=row.Id;update.Parameters["$json"].Value=row.Json;
+                if(update.ExecuteNonQuery()!=1) throw OperationsAdapter.Block("StorageInvalid");
+            }
+            foreach(var h in history)WriteHistory(c,tx,w.Id,h.Kind,h.Payload);
+        }));
+        foreach(var h in history)h.Payload.Owner.Acknowledge(h.Payload.Captured);
+        return true;
+    }
     public IBatchCheckpointWriter CheckpointWriter(Workspace w)=>new Writer(this,w);
     sealed class Writer(WorkspaceStore store,Workspace workspace) : IBatchCheckpointWriter
     {
@@ -113,6 +149,7 @@ public sealed partial class WorkspaceStore
                 if(delta!=null){WriteDelta(c,tx,workspace.Id,delta,snapshot,draft);if(root!=null)Execute(c,tx,"UPDATE workspaces SET json=$json WHERE id=$w",("$json",root),("$w",w));}
             }));
             workspace.StorageRevision=next;
+            if(full!=null)Acknowledge(full);
         }
     }
 }

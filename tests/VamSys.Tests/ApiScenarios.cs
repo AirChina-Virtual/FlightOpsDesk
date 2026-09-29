@@ -7,7 +7,7 @@ static class ApiScenarios
 {
     static void Check(bool value,string message="API assertion failed") { if(!value) throw new Exception(message); }
     static DataRow Row(params (string,string)[] fields)=>new(){Fields=fields.ToDictionary(p=>p.Item1,p=>p.Item2)};
-    static OperationsAdapter Adapter(Workspace w, HttpMessageHandler? handler=null) => new(new OperationsTransport(new HttpClient(handler??new ScriptedHttp([])),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("test-token",DateTimeOffset.UtcNow.AddHours(1))))),w);
+    static OperationsAdapter Adapter(Workspace w, HttpMessageHandler? handler=null) => new(new OperationsTransport(new HttpClient(handler??new ScriptedHttp([])),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("test-token",DateTimeOffset.UtcNow.AddHours(1)))),InstantTime.Requests()),w);
     static DataRow Parse(OperationsAdapter api,ResourceKind kind,string json) { using var d=JsonDocument.Parse(json); return api.FromJson(kind,d.RootElement); }
     static ChangeItem Edit(ResourceKind kind,DataRow before,string field,string value)
     { var after=before.Copy(); after.Fields[field]=value; return new(){ Resource=kind,Kind=ChangeKind.Update,Before=before.Copy(),After=after,Fields=new(){[field]=new(value==""?FieldIntent.Clear:FieldIntent.Set,value)} }; }
@@ -73,7 +73,7 @@ static class ApiScenarios
             var steps=api.Plan(item);Check(steps.Count==2&&(long)steps[0].Body["departure_airport_id"]! ==101);
             var routing=Parse(api,ResourceKind.Routings,"{\"id\":9,\"airline_id\":7,\"departure_airport_id\":101,\"arrival_airport_id\":101,\"route\":\"DCT\"}");
             Blocked(()=>api.Plan(Edit(ResourceKind.Routings,routing,"Departure Airport (ICAO/IATA)","ZZZZ")),"ApiImmutable");
-            var route=Parse(api,ResourceKind.Routes,"{\"id\":5,\"airline_id\":7,\"departure_id\":101,\"arrival_id\":101,\"type\":\"scheduled\",\"departure_time\":\"23:59:37\",\"fleet_ids\":[1,2]}");
+            var route=Parse(api,ResourceKind.Routes,"{\"id\":5,\"departure_id\":101,\"arrival_id\":101,\"type\":\"scheduled\",\"departure_time\":\"23:59:37\",\"fleet_ids\":[1,2]}");
             var time=Edit(ResourceKind.Routes,route,"Departure Time (HH:MM)","00:10");Check(api.Plan(time).Single().Body["departure_time"]!.ToString()=="00:10:37");
             Blocked(()=>api.Plan(Edit(ResourceKind.Routes,route,"Fleet IDs","1")),"ApiFleetSet");
             Blocked(()=>api.Plan(Edit(ResourceKind.Routes,route,"Type","jumpseat")),"ApiJumpseat");
@@ -146,7 +146,7 @@ static class ApiScenarios
         await test("Write 500 is not retried and response diagnostics redact secrets",async()=>
         {
             var h=new ScriptedHttp([r=>Task.FromResult(ScriptedHttp.Json("{\"access_token\":\"secret-value\",\"error\":\"failed\"}",HttpStatusCode.InternalServerError))]);
-            var transport=new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("token",DateTimeOffset.UtcNow.AddHours(1)))));
+            var transport=new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("token",DateTimeOffset.UtcNow.AddHours(1)))),InstantTime.Requests());
             try{await transport.SendAsync(HttpMethod.Post,new(OperationsAdapter.BaseUri,"fleet"),new{name="x"},default);throw new Exception();}
             catch(ApiResponseException ex){Check(!ex.Diagnostic.Contains("secret-value")&&h.Calls==1);}
         });

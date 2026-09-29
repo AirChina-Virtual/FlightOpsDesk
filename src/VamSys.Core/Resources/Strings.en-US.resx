@@ -840,7 +840,13 @@ Remote: {remote}</value>
     <value>Online changes to or from Jumpseat are disabled because they clear associations.</value>
   </data>
   <data name="ApiSoftDelete" xml:space="preserve">
-    <value>Deletion was accepted. Verify the final soft-delete state in Orwell; the request will not be repeated automatically.</value>
+    <value>Deletion was accepted. The documentation defines airport and route deletion as a soft delete, so the record remains on the server and cannot be confirmed automatically. Verify it in Orwell; the request will not be repeated automatically.</value>
+  </data>
+  <data name="ApiRateLimited" xml:space="preserve">
+    <value>The API rate limit was reached (HTTP 429). The request was not processed and is pending again; resume the task later to retry.</value>
+  </data>
+  <data name="CostIndexInvalid" xml:space="preserve">
+    <value>Cost index must be empty, AUTO or an integer from 0 to 999</value>
   </data>
   <data name="ApiBlocked" xml:space="preserve">
     <value>These changes cannot be submitted online</value>

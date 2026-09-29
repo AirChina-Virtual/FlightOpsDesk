@@ -8,7 +8,7 @@ static class ReauditScenarios
     static void Check(bool v,string message="Reaudit assertion failed") {if(!v) throw new Exception(message);}
     static DataRow Row(params (string,string)[] f)=>new(){Fields=f.ToDictionary(x=>x.Item1,x=>x.Item2)};
     static ChangeItem Create(ResourceKind kind,DataRow r)=>new(){Resource=kind,Kind=ChangeKind.Create,After=r,Fields=r.Fields.ToDictionary(x=>x.Key,x=>new FieldChange(x.Value==""?FieldIntent.Clear:FieldIntent.Set,x.Value))};
-    static OperationsAdapter Api(Workspace w,AuditHttp h)=>new(new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("test",DateTimeOffset.UtcNow.AddHours(1))))),w);
+    static OperationsAdapter Api(Workspace w,AuditHttp h)=>new(new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("test",DateTimeOffset.UtcNow.AddHours(1)))),InstantTime.Requests()),w);
     static DataRow Parse(OperationsAdapter a,ResourceKind k,string raw){using var d=JsonDocument.Parse(raw);return a.FromJson(k,d.RootElement);}
     static HttpResponseMessage Json(string s,HttpStatusCode status=HttpStatusCode.OK)=>new(status){Content=new StringContent(s)};
     const string Fleet="""{"id":4,"airline_id":7,"name":"New","code":"B738","type":"pax","max_pax":189,"hide_in_phoenix":true}""";

@@ -10,14 +10,23 @@ public sealed partial class WorkspaceStore
     readonly string connectionString;
     readonly object writeLock;
     static readonly System.Collections.Concurrent.ConcurrentDictionary<string,object> locks=new(StringComparer.OrdinalIgnoreCase);
+#if VAMSYS_TEST_SUPPORT
     public WorkspaceStore(string directory) : this(directory,null) {}
     internal WorkspaceStore(string directory,Action<string>? barrier)
+#else
+    public WorkspaceStore(string directory)
+#endif
     {
         directory=Path.GetFullPath(directory);Directory.CreateDirectory(directory);
         connectionString=new SqliteConnectionStringBuilder{DataSource=Path.Combine(directory,"workspaces.db")}.ToString();
-        writeLock=locks.GetOrAdd(directory,_=>new());Barrier=barrier;
+        writeLock=locks.GetOrAdd(directory,_=>new());
+#if VAMSYS_TEST_SUPPORT
+        Barrier=barrier;
+#endif
         lock(writeLock) Initialize(directory);
     }
+    // With no implementation in product builds, the compiler removes these calls and their arguments.
+    partial void OnStorageBarrier(string point);
     SqliteConnection Open()
     {
         var c=new SqliteConnection(connectionString);c.Open();
@@ -92,6 +101,7 @@ public sealed partial class WorkspaceStore
         if(localRouteTimes.HasValue) staged.LocalRouteTimes=localRouteTimes.Value;
         var encrypted=credentials==null ? null : ProtectedData.Protect(Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(credentials)),workspace.Id.ToByteArray(),DataProtectionScope.CurrentUser);
         workspace.StorageRevision=SavePayload(Capture(staged),encrypted);
+        foreach(var data in workspace.Resources.Values)data.History.Acknowledge(data.History.Capture());
         workspace.ClientId=staged.ClientId;workspace.Mode=RunMode.Offline;workspace.ConnectedAt=null;
         workspace.InstanceUrl=staged.InstanceUrl;workspace.LocalRouteTimes=staged.LocalRouteTimes;
     }

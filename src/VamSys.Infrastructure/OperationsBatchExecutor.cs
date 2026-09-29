@@ -40,7 +40,7 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
             if(delta.Snapshot.Row!=null)original.Snapshot.Add(delta.Snapshot.Row);
             if(delta.Draft.Action==RowMutationKind.Delete)original.Draft.RemoveAll(r=>r.LocalId==delta.LocalId);
             else if(delta.Draft.Row!=null)original.Draft[original.Draft.FindIndex(r=>r.LocalId==delta.LocalId)]=delta.Draft.Row;
-            original.Undo.Clear();original.Redo.Clear();original.SnapshotAt=delta.SnapshotAt;
+            original.ClearHistory();original.SnapshotAt=delta.SnapshotAt;
             workspace.VerifiedOperations=staged.VerifiedOperations;
             item.RemoteId=stagedItem.RemoteId;item.After=stagedItem.After;item.CreateCompleted=stagedItem.CreateCompleted;
             item.RecoveryCandidateId=stagedItem.RecoveryCandidateId;item.Rebased=stagedItem.Rebased;
@@ -130,16 +130,20 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
             catch(ApiResponseException e)
             {
                 item.Diagnostic=e.Diagnostic;
+                // A 429 is rejected before processing, so an unaccepted write can safely return to Pending.
+                var throttled=e.Status==HttpStatusCode.TooManyRequests && phase is ExecutionPhase.Preflight or ExecutionPhase.Writing;
                 item.State=phase is ExecutionPhase.Recovering or ExecutionPhase.Verifying || item.CreateCompleted || item.WriteAccepted
                     || phase==ExecutionPhase.Writing && (int)e.Status>=500 ? ItemState.Unknown
-                    : phase==ExecutionPhase.Preflight && (e.Status==HttpStatusCode.TooManyRequests || (int)e.Status>=500) ? ItemState.Pending : ItemState.Failed;
-                item.SetMessage(Messages.Define("ApiHttp",("status",(int)e.Status)));
+                    : throttled || phase==ExecutionPhase.Preflight && (int)e.Status>=500 ? ItemState.Pending : ItemState.Failed;
+                if(item.State==ItemState.Pending && phase==ExecutionPhase.Writing)
+                    foreach(var step in item.ApiSteps.Where(s=>s.State==BatchStepState.InFlight)) step.State=BatchStepState.Prepared;
+                item.SetMessage(throttled && item.State==ItemState.Pending ? Messages.Define("ApiRateLimited") : Messages.Define("ApiHttp",("status",(int)e.Status)));
             }
             catch(Exception e) when(e is OperationCanceledException or HttpRequestException or TimeoutException or System.Text.Json.JsonException)
             { item.State=phase!=ExecutionPhase.Preflight?ItemState.Unknown:ItemState.Pending; item.SetMessage(Messages.Define(phase==ExecutionPhase.Preflight?"ApiPreflight":"ApiUnknown")); }
             catch(Exception e)
             { item.State=phase!=ExecutionPhase.Preflight?ItemState.Unknown:ItemState.Failed; item.SetMessage(MessageErrors.Describe(e)); }
-            if(item.State==ItemState.Failed && !item.CreateCompleted && !item.WriteAccepted) queries.Release(item);
+            if(item.State is ItemState.Failed or ItemState.Pending && !item.CreateCompleted && !item.WriteAccepted) queries.Release(item);
             await Save();
             if(ct.IsCancellationRequested)
             { job.SetStatus(JobStatus.Canceled,Messages.Define("Text_6F312AE253")); break; }
@@ -176,7 +180,7 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
             data.Snapshot.Add(verified.Copy());
         }
         item.Rebased=true; item.State=ItemState.Succeeded; item.SetMessage(Messages.Define("Text_631F4DBEC2"));
-        data.Undo.Clear(); data.Redo.Clear(); data.SnapshotAt=DateTimeOffset.UtcNow;
+        data.ClearHistory(); data.SnapshotAt=DateTimeOffset.UtcNow;
         var operation=$"{item.Resource}:{item.Kind}";
         if(!workspace.VerifiedOperations.Contains(operation)) workspace.VerifiedOperations.Add(operation);
     }

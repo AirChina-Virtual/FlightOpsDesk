@@ -6,8 +6,8 @@ namespace VamSys.Infrastructure;
 public sealed partial class WorkspaceStore
 {
     internal sealed record StoredRow(int Collection,Guid Id,int Ordinal,string Json);
-    internal sealed record StoredResource(ResourceKind Kind,string Columns,string Conflicts,string? SnapshotAt,string Undo,string Redo,List<StoredRow> Rows);
-    static List<StoredResource> CaptureResources(Workspace w)=>w.Resources.Select(p=>new StoredResource(p.Key,Encode(p.Value.Columns),Encode(p.Value.Conflicts),p.Value.SnapshotAt?.ToString("O"),Encode(p.Value.Undo),Encode(p.Value.Redo),
+    internal sealed record StoredResource(ResourceKind Kind,string Columns,string Conflicts,string? SnapshotAt,StoredHistory History,List<StoredRow> Rows);
+    static List<StoredResource> CaptureResources(Workspace w)=>w.Resources.Select(p=>new StoredResource(p.Key,Encode(p.Value.Columns),Encode(p.Value.Conflicts),p.Value.SnapshotAt?.ToString("O"),CaptureHistory(p.Value.History,full:true),
         p.Value.Snapshot.Select((r,n)=>new StoredRow(0,r.LocalId,n,Encode(r))).Concat(p.Value.Draft.Select((r,n)=>new StoredRow(1,r.LocalId,n,Encode(r)))).ToList())).ToList();
     static void WriteResources(SqliteConnection c,SqliteTransaction tx,FullPayload p)
     {
@@ -15,7 +15,7 @@ public sealed partial class WorkspaceStore
         foreach(var r in p.Resources)
         {
             Execute(c,tx,"INSERT INTO resource_metadata VALUES($w,$r,$cols,$conflicts,$at)",("$w",p.Id.ToString()),("$r",(int)r.Kind),("$cols",r.Columns),("$conflicts",r.Conflicts),("$at",r.SnapshotAt));
-            Execute(c,tx,"INSERT INTO resource_history VALUES($w,$r,$undo,$redo)",("$w",p.Id.ToString()),("$r",(int)r.Kind),("$undo",r.Undo),("$redo",r.Redo));
+            WriteHistory(c,tx,p.Id,r.Kind,r.History,full:true);
             using var cmd=Command(c,tx,"INSERT INTO resource_rows VALUES($w,$r,$collection,$id,$n,$json)",("$w",p.Id.ToString()),("$r",(int)r.Kind),("$collection",0),("$id",""),("$n",0),("$json",""));
             cmd.Prepare();
             foreach(var row in r.Rows)
@@ -28,15 +28,13 @@ public sealed partial class WorkspaceStore
     static void ReadResources(SqliteConnection c,SqliteTransaction tx,Workspace w)
     {
         w.Resources=Enum.GetValues<ResourceKind>().ToDictionary(k=>k,_=>new ResourceData());
-        using(var cmd=Command(c,tx,"SELECT resource,columns_json,conflicts_json,snapshot_at,undo_json,redo_json FROM resource_metadata JOIN resource_history USING(workspace_id,resource) WHERE workspace_id=$w",("$w",w.Id.ToString())))
+        using(var cmd=Command(c,tx,"SELECT resource,columns_json,conflicts_json,snapshot_at FROM resource_metadata WHERE workspace_id=$w",("$w",w.Id.ToString())))
         using(var r=cmd.ExecuteReader())while(r.Read())
         {
             var data=w.Resources[(ResourceKind)r.GetInt32(0)];
             data.Columns=JsonSerializer.Deserialize<List<string>>(r.GetString(1))!;
             data.Conflicts=JsonSerializer.Deserialize<List<MergeConflict>>(r.GetString(2))!;
             data.SnapshotAt=r.IsDBNull(3)?null:DateTimeOffset.Parse(r.GetString(3),CultureInfo.InvariantCulture);
-            data.Undo=JsonSerializer.Deserialize<List<List<DataRow>>>(r.GetString(4))!;
-            data.Redo=JsonSerializer.Deserialize<List<List<DataRow>>>(r.GetString(5))!;
         }
         using(var cmd=Command(c,tx,"SELECT resource,collection,json FROM resource_rows WHERE workspace_id=$w ORDER BY resource,collection,ordinal",("$w",w.Id.ToString())))
         using(var r=cmd.ExecuteReader())while(r.Read())
@@ -44,6 +42,7 @@ public sealed partial class WorkspaceStore
             var data=w.Resources[(ResourceKind)r.GetInt32(0)];var rows=r.GetInt32(1)==0?data.Snapshot:data.Draft;
             rows.Add(JsonSerializer.Deserialize<DataRow>(r.GetString(2))!);
         }
+        foreach(var (kind,data) in w.Resources)ReadHistory(c,tx,w.Id,kind,data);
     }
     static void WriteDelta(SqliteConnection c,SqliteTransaction tx,Guid workspaceId,ResourceRebaseDelta delta,string? snapshot,string? draft)
     {
@@ -60,6 +59,10 @@ public sealed partial class WorkspaceStore
             Execute(c,tx,"INSERT INTO resource_rows VALUES($w,$r,$c,$id,$n,$json) ON CONFLICT(workspace_id,resource,collection,local_id) DO UPDATE SET json=$json",[..args,("$n",position),("$json",json)]);
         }
         Row(0,delta.Snapshot,snapshot);Row(1,delta.Draft,draft);
-        if(delta.ClearHistory)Execute(c,tx,"UPDATE resource_history SET undo_json='[]',redo_json='[]' WHERE workspace_id=$w AND resource=$r",("$w",w),("$r",kind));
+        if(delta.ClearHistory)
+        {
+            Execute(c,tx,"DELETE FROM resource_history_steps WHERE workspace_id=$w AND resource=$r",("$w",w),("$r",kind));
+            Execute(c,tx,"UPDATE resource_history_state SET undo_json='[]',redo_json='[]' WHERE workspace_id=$w AND resource=$r",("$w",w),("$r",kind));
+        }
     }
 }

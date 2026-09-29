@@ -66,6 +66,12 @@ public sealed partial class OperationsAdapter
         { if(row==null) index.Remove(id); else index.Put(row,keys); }
         if(!session.Confirmed.TryGetValue(item.Resource,out var confirmed)) session.Confirmed[item.Resource]=confirmed=new();
         if(row==null) confirmed.Remove(id); else confirmed.Put(row,keys);
+        if(item.Resource is ResourceKind.Routes or ResourceKind.Routings)
+        {
+            // The confirmed version replaces any cached copy, including one under the old airport pair.
+            foreach(var (pair,rows) in session.Pairs) if(pair.Kind==item.Resource) rows.RemoveAll(r=>r.Identity!.RemoteId==id);
+            if(row!=null && keys.Length>0 && session.Pairs.TryGetValue((item.Resource,keys[0].Departure,keys[0].Arrival),out var current)) current.Add(row.Copy());
+        }
         session.Release(item);
     }
     public static Uri FilterUri(string path,IEnumerable<KeyValuePair<string,string>> filters)
@@ -84,14 +90,25 @@ public sealed partial class OperationsAdapter
             { ct.ThrowIfCancellationRequested(); if(seen.Add(row.Identity!.RemoteId)) yield return row.Copy(); }
         if(item.Resource is ResourceKind.Routes or ResourceKind.Routings)
         {
+            var pair=(item.Resource,signature.Departure,signature.Arrival);
+            if(session.Pairs.TryGetValue(pair,out var cached))
+            {
+                foreach(var row in cached)
+                { ct.ThrowIfCancellationRequested(); if(seen.Add(row.Identity!.RemoteId)) yield return row.Copy(); }
+                yield break;
+            }
             var suffix=item.Resource==ResourceKind.Routes?"_id":"_airport_id";
             var filters=new Dictionary<string,string>
             {
                 ["departure"+suffix]=signature.Departure.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["arrival"+suffix]=signature.Arrival.ToString(System.Globalization.CultureInfo.InvariantCulture)
             };
+            // Rows still stream so an early duplicate stops paging; only a fully read pair is cached.
+            var complete=new List<DataRow>();
             await foreach(var row in ReadFiltered(item.Resource,Collection(item.Resource),filters,ct))
-                if(seen.Add(row.Identity!.RemoteId)) yield return row;
+            { complete.Add(row.Copy()); if(seen.Add(row.Identity!.RemoteId)) yield return row; }
+            ct.ThrowIfCancellationRequested(); session.Bind(workspace.Id,workspace.AirlineId);
+            session.Pairs[pair]=complete;
             yield break;
         }
         if(!session.Indexes.TryGetValue(item.Resource,out var rows))

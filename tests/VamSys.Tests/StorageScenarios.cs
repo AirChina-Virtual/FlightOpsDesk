@@ -17,7 +17,7 @@ static class StorageScenarios
         var w=new Workspace{Name="Storage fixture",AirlineId="7",Mode=RunMode.Online};
         var r=new DataRow{Fields=new(){["Name"]="New",["Type Code"]="B738",["Type (pax/cargo/...)"]="pax",["Max Passengers"]="180",["Unknown"]="001"}};
         w.Resources[ResourceKind.Fleets].Draft.Add(r);
-        w.Resources[ResourceKind.Fleets].Checkpoint();
+        w.Resources[ResourceKind.Fleets].Edit([],()=>{});
         w.Jobs.Add(new(){Mode=RunMode.Online,Items=new ChangePlanner().Plan(ResourceKind.Fleets,w.Resources[ResourceKind.Fleets])});
         return w;
     }
@@ -26,7 +26,7 @@ static class StorageScenarios
         var c=Open(dir);Sql(c,"PRAGMA journal_mode=WAL; CREATE TABLE workspaces(id TEXT PRIMARY KEY,name TEXT NOT NULL,json TEXT NOT NULL); CREATE TABLE secrets(id TEXT PRIMARY KEY,value BLOB NOT NULL); CREATE TABLE app_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);");
         foreach(var w in workspaces)
         {
-            var node=System.Text.Json.Nodes.JsonNode.Parse(w.Serialize())!;
+            var node=System.Text.Json.Nodes.JsonNode.Parse(HistoryScenarios.LegacyJson(w))!;
             node.AsObject().Remove("StorageRevision");
             foreach(var j in node["Jobs"]!.AsArray())foreach(var i in j!["Items"]!.AsArray())i!.AsObject().Remove("ApiSteps");
             Sql(c,"INSERT INTO workspaces VALUES($id,$name,$json)",("$id",w.Id.ToString()),("$name",w.Name),("$json",node.ToJsonString()));
@@ -74,14 +74,14 @@ static class StorageScenarios
             Check(Convert.ToInt32(Sql(c,"PRAGMA user_version"))==0);
             Check(Convert.ToInt32(Sql(c,"SELECT count(*) FROM pragma_table_info('workspaces')"))==3);
             Check(Convert.ToInt32(Sql(c,"SELECT count(*) FROM sqlite_master WHERE name='batch_items'"))==0);
-            Check(Directory.GetFiles(dir,"workspaces-before-v3-*.db").Length==1);
+            Check(Directory.GetFiles(dir,"workspaces-before-v4-*.db").Length==1);
             Sql(c,"UPDATE workspaces SET json=$json WHERE id=$id",("$id",b.Id.ToString()),("$json",FixtureWithId(b.Id).Serialize()));
             Check(new WorkspaceStore(dir).Load(a.Id).Jobs.Count==1);
         });
         await test("v3 rejects future formats and limits instances by data directory",async()=>{
-            var dir=Temp();new WorkspaceStore(dir);using var c=Open(dir);Sql(c,"PRAGMA user_version=4");
+            var dir=Temp();new WorkspaceStore(dir);using var c=Open(dir);Sql(c,"PRAGMA user_version=5");
             await Throws(()=>{new WorkspaceStore(dir);return Task.CompletedTask;},"StorageNewer");
-            Check(Convert.ToInt32(Sql(c,"PRAGMA user_version"))==4);
+            Check(Convert.ToInt32(Sql(c,"PRAGMA user_version"))==5);
             using(var lease=new DataDirectoryLease(dir))
             {
                 await Throws(()=>{using var other=new DataDirectoryLease(dir);return Task.CompletedTask;},"StorageInUse");
@@ -110,7 +110,7 @@ static class StorageScenarios
             var dir=Temp();var store=new WorkspaceStore(dir);var w=Fixture();store.Save(w);
             var staged=Workspace.Deserialize(w.Serialize());var item=staged.Jobs[0].Items[0];
             item.State=ItemState.Succeeded;item.RemoteId="10";item.Rebased=true;
-            staged.Resources[ResourceKind.Fleets].Snapshot=[item.After.Copy()];staged.Resources[ResourceKind.Fleets].Undo.Clear();staged.VerifiedOperations.Add("Fleets:Create");
+            staged.Resources[ResourceKind.Fleets].Snapshot=[item.After.Copy()];staged.Resources[ResourceKind.Fleets].ClearHistory();staged.VerifiedOperations.Add("Fleets:Create");
             store.Barrier=p=>{if(p==point)throw new IOException("fault");};
             using var run=PerformanceRun.Begin(w.Id,w.Jobs[0].Id);
             await Throws(()=>store.CheckpointWriter(w).WriteAsync(new(CheckpointKind.Rebase,staged.Jobs[0],item,staged),default));
@@ -179,7 +179,7 @@ static class StorageScenarios
             var w=Workspace.Deserialize(template);var data=w.Resources[ResourceKind.Routes];
             data.Draft=Enumerable.Range(0,rows).Select(i=>new DataRow{Fields=new(){["ID"]=i.ToString(),["Callsign"]="ACA"+i,["Remarks"]="性能"}}).ToList();
             data.Snapshot=data.Draft.Select(r=>r.Copy()).ToList();
-            for(var n=0;n<undo;n++)data.Checkpoint();
+            for(var n=0;n<undo;n++){var row=data.Draft[n%data.Draft.Count];data.Edit([row.LocalId],()=>row.Fields["Remarks"]="history "+n);}
             var dir=Temp();var store=new WorkspaceStore(dir);store.Save(w);
             using var c=Open(dir);var json=(string)Sql(c,"SELECT json FROM workspaces")!;
             Sql(c,"CREATE TRIGGER forbid_resources BEFORE UPDATE ON workspaces BEGIN SELECT RAISE(ABORT,'resource write'); END");
@@ -196,7 +196,7 @@ static class StorageScenarios
                 Check(bytes==20L*actual,"Measured bytes must equal stored header and item payloads");
             }
             Check((string)Sql(c,"SELECT json FROM workspaces")! ==json);Sql(c,"DROP TRIGGER forbid_resources");
-            var staged=Workspace.Deserialize(w.Serialize());var changed=staged.Jobs[0].Items[0];changed.State=ItemState.Succeeded;staged.Resources[ResourceKind.Fleets].Undo.Clear();
+            var staged=Workspace.Deserialize(w.Serialize());var changed=staged.Jobs[0].Items[0];changed.State=ItemState.Succeeded;staged.Resources[ResourceKind.Fleets].ClearHistory();
             before=GC.GetTotalAllocatedBytes(true);timer.Restart();
             using var rebase=PerformanceRun.Begin(w.Id,w.Jobs[0].Id);
             await store.CheckpointWriter(w).WriteAsync(new(CheckpointKind.Rebase,staged.Jobs[0],changed,staged),default);

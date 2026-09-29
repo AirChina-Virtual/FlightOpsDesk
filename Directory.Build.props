@@ -4,5 +4,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>14.0</LangVersion>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <VamSysTestSupport Condition="'$(UiVerification)' == 'true'">true</VamSysTestSupport>
+    <DefaultItemExcludes>$(DefaultItemExcludes);bin/**;obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+  <!-- Share dependency restore data, but never compiler outputs, between product and test builds. -->
+  <PropertyGroup Condition="'$(VamSysTestSupport)' == 'true'">
+    <BaseOutputPath>$(MSBuildThisFileDirectory)artifacts/test-build/bin/$(MSBuildProjectName)/</BaseOutputPath>
+    <IntermediateOutputPath>$(MSBuildThisFileDirectory)artifacts/test-build/obj/$(MSBuildProjectName)/$(Platform)/$(Configuration)/</IntermediateOutputPath>
+    <DefineConstants>$(DefineConstants);VAMSYS_TEST_SUPPORT</DefineConstants>
   </PropertyGroup>
 </Project>

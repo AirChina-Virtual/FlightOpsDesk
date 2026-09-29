@@ -1,4 +1,3 @@
-#if UI_VERIFICATION
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text.Json;
@@ -12,11 +11,15 @@ public sealed partial class MainWindow
     static extern bool PostMessage(IntPtr hwnd,uint message,IntPtr wParam,IntPtr lParam);
     readonly ManualResetEventSlim verificationRelease=new();
     volatile bool verificationArmed,verificationEntered,verificationFail;
-    int verificationSaves,verificationActions;
-    void InitializeVerification()
+    int verificationSaves,verificationActions,verificationDraftCommits,verificationFullCommits;
+    partial void ConfigureVerificationTheme()
+        => RootGrid.RequestedTheme = Environment.GetEnvironmentVariable("VAMSYS_QA_THEME") == "light" ? ElementTheme.Light : ElementTheme.Dark;
+    partial void InitializeVerification()
     {
         var pipe=Environment.GetEnvironmentVariable("VAMSYS_QA_PIPE");if(string.IsNullOrWhiteSpace(pipe))return;
         typeof(VamSys.Infrastructure.WorkspaceStore).GetProperty("Barrier",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.SetValue(store,(Action<string>)(p=>{
+            if(p=="Draft:AfterCommit")Interlocked.Increment(ref verificationDraftCommits);
+            if(p=="Full:AfterCommit")Interlocked.Increment(ref verificationFullCommits);
             if(p!="Full:BeforeCommit"||!verificationArmed||closeState.State!=WindowCloseState.Saving)return;
             verificationArmed=false;verificationSaves++;verificationEntered=true;
             if(!verificationRelease.Wait(TimeSpan.FromSeconds(45)))throw new TimeoutException("QA close barrier");
@@ -46,7 +49,11 @@ public sealed partial class MainWindow
             case "release":verificationRelease.Set();return new{released=true};
             case "fail":verificationFail=true;verificationRelease.Set();return new{released=true};
             case "action":await UserAction(()=>{verificationActions++;return Task.CompletedTask;});return new{actions=verificationActions};
-            case "state":return new{state=closeState.State.ToString(),entered=verificationEntered,saves=verificationSaves,actions=verificationActions,enabled=Navigation.IsEnabled,name=workspace.Resources[ResourceKind.Fleets].Draft[0].Get("Name")};
+            case "state":return new{state=closeState.State.ToString(),workspaceName=workspace.Name,entered=verificationEntered,saves=verificationSaves,actions=verificationActions,enabled=Navigation.IsEnabled,name=workspace.Resources[ResourceKind.Fleets].Draft.FirstOrDefault()?.Get("Name"),undo=Data.Undo.Count,redo=Data.Redo.Count,draftSaves=verificationDraftCommits,fullSaves=verificationFullCommits};
+            case "workspace-away":
+                var other=new Workspace{Name="QA other"};store.Save(other);ReloadWorkspaces();WorkspacePicker.SelectedItem=((List<WorkspaceChoice>)WorkspacePicker.ItemsSource).Single(w=>w.Id==other.Id);return new{requested=true};
+            case "workspace-back":
+                WorkspacePicker.SelectedItem=((List<WorkspaceChoice>)WorkspacePicker.ItemsSource).First(w=>w.Id!=workspace.Id);return new{requested=true};
             case "tasks":Navigation.SelectedItem=Navigation.MenuItems[4];Render();return new{jobs=taskModels.Count,builds=taskPageBuilds};
             case "cancellable":running=new();RefreshTaskAvailability();return new{ready=true};
             case "task-state":return new{selected=(taskList?.SelectedItem as TaskJobViewModel)?.Id,builds=taskPageBuilds,canceled=running?.IsCancellationRequested??false};
@@ -85,4 +92,3 @@ public sealed partial class MainWindow
         return new{error="Unknown QA command"};
     }
 }
-#endif

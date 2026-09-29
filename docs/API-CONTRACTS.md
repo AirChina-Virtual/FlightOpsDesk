@@ -12,9 +12,11 @@
 | 机型 | GET/POST `/fleet`；GET/PUT/DELETE `/fleet/{fleet_id}` | 创建 name/code/type 后 PUT 容量等；POST 裸对象，单条 GET/PUT 包装；永久删除 | 是 | 通过 | 未进行 |
 | 飞机 | GET/POST `/fleet/{fleet_id}/aircraft`；GET/PUT/DELETE `/fleet/{fleet_id}/aircraft/{aircraft_id}` | 遍历机型读取；创建 name/registration 后补充属性；单条 GET/PUT 包装；永久删除 | 是 | 通过 | 未进行 |
 | 航路 | GET/POST `/routings`；GET/PUT/DELETE `/routings/{routing_id}` | 起降为机场 ID，更新不能改变；单条 GET/POST/PUT 裸对象；tag 需创建后 PUT；永久删除 | 是 | 通过 | 未进行 |
-| 航线 | GET/POST `/routes`；GET/PUT/DELETE `/routes/{route_id}` | fleet_ids 为整数数组；UTC HH:MM:SS，日期 ISO 8601；起降不可更新；软删除 | 是，实验接口 | 通过 | 未进行 |
+| 航线 | GET/POST `/routes`；GET/PUT/DELETE `/routes/{route_id}` | RouteData 没有 `airline_id`，归属取当前连接的 VA；fleet_ids 为整数数组；UTC HH:MM:SS，日期按 `2025-01-01T00:00:00+00:00` 格式提交；callsign／flight_number 对所有类型必填；cost_index 为空、AUTO 或 0–999；起降不可更新；软删除 | 是，实验接口 | 通过 | 未进行 |
 
-集合读取处理 `data` 数组与 `meta.next_cursor_url`，分页默认 15 条，不猜测更大页数上限。分页限制 HTTPS、同源及 Operations 路径，拒绝循环页。
+集合读取处理 `data` 数组与 `meta.next_cursor_url`。每页请求 `page[size]=100`（文档默认 15 条，未写上限）；首页如果因此返回 400／422，改用服务器默认页长继续读取。分页限制 HTTPS、同源及 Operations 路径，拒绝循环页。
+
+除航线外，其余四类数据缺少 `airline_id` 时仍会拒绝，继续用于识别错误的 VA。航线数据本身不能证明连接到了哪个 VA，因此连接验证仍要读取机型或机场。
 
 ## 认证与执行
 
@@ -22,7 +24,7 @@ POST `https://vamsys.io/oauth/token`，form-urlencoded：grant_type=client_crede
 
 所有请求使用 Bearer 和 Accept: application/json。预算为进程全局共享的 60 次／分钟，保守覆盖未知 VA 及同一 VA 的多个工作区；429 遵守 Retry-After，剩余额度为零至少等待 60 秒，不假设 Reset 头单位。
 
-读取临时错误退避重试；写入不自动重试。401/403 暂停任务。422／其他错误保留脱敏诊断；500、超时和中断写入保留未知结果。分步创建在 PUT 前保存 ID。新建前检查重复，修改前检查字段冲突，删除前读取相关资源进行引用保护。
+读取临时错误退避重试；写入不自动重试。401/403 暂停任务。写入收到 429 时，请求没有被服务器处理，因此放回待执行，继续任务即可重试；已返回 ID 或已接受的写入仍按未知处理。422／其他错误保留脱敏诊断；500、超时和中断写入保留未知结果。POST 返回后先保存 `id`，再解析完整响应；分步创建在 PUT 前保存 ID。新建前检查重复，修改前检查字段冲突，删除前读取相关资源进行引用保护。
 
 ## 明确禁用与未适配
 
@@ -70,7 +72,7 @@ Pilot API 是个人授权的 Authorization Code + PKCE，涉及 profile、bookin
 
 ## 第三轮审核修复：凭据与索引生命周期
 
-任务停止时允许单独更新 Operations Client ID／Secret；保留绑定的 AirlineId、接口地址、时刻配置和原任务。更新使旧客户端失效并要求重新连接；响应的 airline_id 必须匹配原 VA，没有可识别 VA 的数据时不宣告连接验证成功。未知写入仍只读恢复。
+任务停止时允许单独更新 Operations Client ID／Secret；保留绑定的 AirlineId、接口地址、时刻配置和原任务。更新使旧客户端失效并要求重新连接；响应的 airline_id 必须匹配原 VA（航线响应不含该字段），没有可识别 VA 的数据时不宣告连接验证成功。未知写入仍只读恢复。
 
 完整刷新使用独立临时适配器及身份索引。所有资源读取、三方合并和持久化成功后才替换正式快照及索引；读取、取消、合并或保存失败保留原状态。确认删除后淘汰相应资源缓存。上述行为均属客户端生命周期保护，本地测试通过不增加真实实例验证状态。
 

@@ -4,11 +4,14 @@ using System.Text;
 using VamSys.Core;
 using VamSys.Infrastructure;
 
+if(args.Length==2 && args[0] is "--verify-package" or "--verify-qa-package")
+{PackageChecks.Verify(args[1],args[0]=="--verify-qa-package");return;}
 if(args.Length==4 && args[0]=="--storage-child"){await StorageProcessScenarios.Child(args);return;}
+if(args.Length==4 && args[0]=="--draft-child"){await StorageProcessScenarios.DraftChild(args);return;}
 if(args.Length==3 && args[0]=="--seed-storage-ui")
 {
     Directory.CreateDirectory(args[1]);var w=StorageScenarios.Fixture();using var db=StorageScenarios.Legacy(args[1],w);
-    if(args[2]=="future")StorageScenarios.Sql(db,"PRAGMA user_version=4");
+    if(args[2]=="future")StorageScenarios.Sql(db,"PRAGMA user_version=5");
     Console.WriteLine("Seeded isolated storage UI");return;
 }
 if(args.Length==2 && args[0]=="--seed-task-ui")
@@ -24,17 +27,40 @@ if(args.Length==2 && args[0]=="--assert-close-ui")
     if(w.Resources[ResourceKind.Fleets].Draft[0].Get("Name")!="accepted after failure")throw new Exception("Closing retry did not persist draft");
     Console.WriteLine("PASS restart reads the last accepted draft after failed close and retry");return;
 }
+if(args.Length==3 && args[0]=="--assert-autosave-ui")
+{
+    var store=new WorkspaceStore(args[1]);var w=store.Load(store.List()[0].Id);var name=w.Resources[ResourceKind.Fleets].Draft[0].Get("Name");
+    if(name!=args[2])throw new Exception($"Autosaved draft lost after forced exit: '{name}'");
+    Console.WriteLine("PASS restart reads the autosaved row after a forced exit");return;
+}
+if(args.Length==4 && args[0]=="--assert-history-ui")
+{
+    var store=new WorkspaceStore(args[1]);var w=store.Load(store.List().First(w=>w.Name!="QA other").Id);var d=w.Resources[ResourceKind.Fleets];
+    if(d.Draft[0].Get("Name")!=args[2])throw new Exception("Current history value lost");
+    d.UndoEdit();if(d.Draft[0].Get("Name")!=args[3])throw new Exception("Undo boundary lost");d.RedoEdit();if(d.Draft[0].Get("Name")!=args[2])throw new Exception("Redo boundary lost");
+    Console.WriteLine("PASS restart restores complete last history step");return;
+}
 int passed = 0;
+var suite = Stopwatch.StartNew(); var durations = new List<(string Name, TimeSpan Elapsed)>();
 async Task Test(string name, Func<Task> test)
 {
-    await test(); Console.WriteLine("PASS " + name); passed++;
+    var started = Stopwatch.GetTimestamp();
+    await test(); var elapsed = Stopwatch.GetElapsedTime(started); durations.Add((name, elapsed));
+    // Wall-clock waits belong in virtual time; slow scenarios are reported so they stay visible.
+    Console.WriteLine("PASS " + name + (elapsed >= TimeSpan.FromSeconds(1) ? $" ({elapsed.TotalSeconds:0.0} s)" : "")); passed++;
+}
+void Summary(string label)
+{
+    Console.WriteLine($"  Duration: {suite.Elapsed.TotalSeconds:0.0} s; slowest: " + string.Join("; ", durations.OrderByDescending(d => d.Elapsed).Take(5).Select(d => $"{d.Name} {d.Elapsed.TotalSeconds:0.0} s")));
+    Console.WriteLine($"{passed} {label}passed.");
 }
 Task Sync(Action a) { a(); return Task.CompletedTask; }
 void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
 DataRow Row(params (string, string)[] fields) => new() { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
 if(args.Length==1 && args[0]=="--v3"){await StorageV3Scenarios.Run(Test);await TaskViewModelScenarios.Run(Test);Console.WriteLine($"{passed} v3 scenarios passed.");return;}
+if(args.Length==1 && args[0]=="--history"){await HistoryScenarios.Run(Test);Summary("history ");return;}
 if(args.Length==2 && args[0]=="--benchmark-v3"){await StorageV3Scenarios.Benchmark(args[1]);return;}
-if(args.Length==1 && args[0]=="--storage"){await StorageScenarios.Run(Test);Console.WriteLine($"{passed} storage scenarios passed.");return;}
+if(args.Length==1 && args[0]=="--storage"){await StorageScenarios.Run(Test);await DraftSaveScenarios.Run(Test);Console.WriteLine($"{passed} storage scenarios passed.");return;}
 if(args.Length==2 && args[0]=="--benchmark-storage"){await StorageScenarios.Benchmark(args[1]);return;}
 var csv = new CsvAdapter(); var planner = new ChangePlanner();
 if (args.Length == 2 && args[0] == "--seed-recovery-ui")
@@ -112,7 +138,7 @@ await Test("SQLite workspace isolation, persisted undo, and DPAPI", () => Sync((
 {
     var folder = Path.Combine(Path.GetTempPath(),"vamsys-test-"+Guid.NewGuid());
     var store = new WorkspaceStore(folder); var a = new Workspace { Name = "A" }; var b = new Workspace { Name = "B" };
-    a.Resources[ResourceKind.Airports].Draft.Add(Row(("ICAO/IATA","ZBAA"))); a.Resources[ResourceKind.Airports].Checkpoint(); store.Save(a); store.Save(b);
+    a.Resources[ResourceKind.Airports].Draft.Add(Row(("ICAO/IATA","ZBAA"))); a.Resources[ResourceKind.Airports].Edit([],()=>{}); store.Save(a); store.Save(b);
     Check(store.Load(a.Id).Resources[ResourceKind.Airports].Undo.Count == 1); Check(store.Load(b.Id).Resources[ResourceKind.Airports].Draft.Count == 0);
     if (OperatingSystem.IsWindows()) { store.SaveSecret(a.Id,"secret"); Check(store.LoadSecret(a.Id)=="secret"); Check(store.LoadSecret(b.Id)==null); }
 }));
@@ -140,7 +166,7 @@ await Test("Remote conflict blocks overwrite", async () =>
 await Test("Transport follows cursor pages, protects origin and reports auth", async () =>
 {
     var handler = new FakeHttp(); using var http=new HttpClient(handler); var token=new TokenProvider(_=>Task.FromResult(new AccessToken("fake",DateTimeOffset.UtcNow.AddHours(1))));
-    var transport=new OperationsTransport(http,new Uri("https://example.test"),Guid.NewGuid().ToString(),token);
+    var transport=new OperationsTransport(http,new Uri("https://example.test"),Guid.NewGuid().ToString(),token,InstantTime.Requests());
     int count=0; await foreach(var r in transport.ReadPagesAsync(new Uri("https://example.test/routes"),CancellationToken.None)) count++;
     Check(count==2 && handler.Calls==2);
     try { await transport.GetAsync(new Uri("https://elsewhere.test/routes"),CancellationToken.None); throw new Exception("Origin accepted"); } catch(InvalidOperationException) { }
@@ -150,7 +176,7 @@ await Test("20,000-route planning and validation performance", () => Sync(() =>
 {
     var w=new Workspace(); var d=w.Resources[ResourceKind.Routes];
     CsvAdapter.Import(ResourceKind.Airports,w.Resources[ResourceKind.Airports],[Row(("ICAO/IATA","ZBAA"),("Name","A")),Row(("ICAO/IATA","ZSPD"),("Name","B"))],true);
-    d.Draft=Enumerable.Range(0,20000).Select(i=>Row(("ID",i.ToString()),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Type","jumpseat"))).ToList(); d.Snapshot=d.Draft.Select(r=>r.Copy()).ToList();
+    d.Draft=Enumerable.Range(0,20000).Select(i=>Row(("ID",i.ToString()),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Type","jumpseat"),("Callsign","ACA123"),("Flight Number","AC123"))).ToList(); d.Snapshot=d.Draft.Select(r=>r.Copy()).ToList();
     var sw=Stopwatch.StartNew(); Check(planner.Plan(ResourceKind.Routes,d).Count==0); Check(Schemas.Validate(w,ResourceKind.Routes).Count==0);
     Console.WriteLine($"  20k plan+validate: {sw.ElapsedMilliseconds} ms"); Check(sw.Elapsed < TimeSpan.FromSeconds(10));
 }));
@@ -192,7 +218,7 @@ await Test("401/403 pauses batch without sending later rows", async () =>
 await Test("429 honors Retry-After and retries without losing page", async () =>
 {
     using var http = new HttpClient(new ThrottledHttp());
-    var transport=new OperationsTransport(http,new Uri("https://example.test"),Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("fake",DateTimeOffset.UtcNow.AddHours(1)))));
+    var transport=new OperationsTransport(http,new Uri("https://example.test"),Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("fake",DateTimeOffset.UtcNow.AddHours(1)))),InstantTime.Requests());
     using var result=await transport.GetAsync(new Uri("https://example.test/routes"),CancellationToken.None); Check(result.RootElement.GetProperty("data").GetArrayLength()==0);
 });
 await Test("Recovered create with persisted remote ID verifies without repeat", async () =>
@@ -368,13 +394,16 @@ await Test("Fleet labels translate generated annotations without translating nam
 }));
 await ApiScenarios.Run(Test);
 await AuditScenarios.Run(Test);
+await ContractScenarios.Run(Test);
 await ReauditScenarios.Run(Test);
 await LifecycleScenarios.Run(Test);
 await CredentialSaveScenarios.Run(Test);
 await PerformanceScenarios.Run(Test); await CandidateIndexScenarios.Run(Test);
 await StorageScenarios.Run(Test);
 await StorageV3Scenarios.Run(Test);await TaskViewModelScenarios.Run(Test);
-Console.WriteLine($"{passed} scenarios passed.");
+await DraftSaveScenarios.Run(Test);
+await HistoryScenarios.Run(Test);
+Summary("scenarios ");
 
 sealed class CountingService(DemoService inner) : IResourceReader,IResourceWriter
 {

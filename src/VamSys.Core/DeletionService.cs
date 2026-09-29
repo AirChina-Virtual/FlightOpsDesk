@@ -51,15 +51,17 @@ public sealed class DeletionService
         var current = Preview(workspace, plan.Resource, plan.RemoveDrafts.Concat(plan.MarkExisting));
         if (current.Issues.Count > 0) throw MessageErrors.Attach(new InvalidOperationException(Messages.Define("Text_0829856E83")), Messages.Define("Text_0829856E83"));
         if (current.RemoveDrafts.Count + current.MarkExisting.Count == 0) return;
-        var data = workspace.Resources[plan.Resource]; data.Checkpoint();
+        var data = workspace.Resources[plan.Resource];
         var remove = current.RemoveDrafts.ToHashSet(); var mark = current.MarkExisting.ToHashSet();
-        data.Draft.RemoveAll(r => remove.Contains(r.LocalId));
-        foreach (var row in data.Draft.Where(r => mark.Contains(r.LocalId))) row.Fields["_delete"] = "TRUE";
+        data.Edit(remove.Concat(mark),()=>{
+            data.Draft.RemoveAll(r => remove.Contains(r.LocalId));
+            foreach (var row in data.Draft.Where(r => mark.Contains(r.LocalId))) row.Fields["_delete"] = "TRUE";
+        },structural:remove.Count>0);
     }
     public void Restore(ResourceData data, IEnumerable<Guid> selected)
     {
         var ids = selected.ToHashSet(); var rows = data.Draft.Where(r => ids.Contains(r.LocalId) && Schemas.Deleted(r)).ToList();
         if (rows.Count == 0) return;
-        data.Checkpoint(); foreach (var row in rows) row.Fields["_delete"] = "FALSE";
+        data.Edit(rows.Select(r=>r.LocalId),()=>{foreach (var row in rows) row.Fields["_delete"] = "FALSE";});
     }
 }

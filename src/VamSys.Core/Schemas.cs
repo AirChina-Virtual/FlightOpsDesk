@@ -34,6 +34,9 @@ public static class Schemas
         ResourceKind.Routings => ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)"],
         _ => []
     };
+    // Documented values: empty, AUTO or an integer from 0 to 999.
+    public static bool ValidCostIndex(string value) => value is "" or "AUTO"
+        || int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n <= 999;
     public static bool Deleted(DataRow row) => row.Get("_delete").Equals("TRUE", StringComparison.OrdinalIgnoreCase);
     public static List<Issue> Validate(Workspace workspace, ResourceKind kind)
     {
@@ -81,12 +84,12 @@ public static class Schemas
             if (kind == ResourceKind.Routes)
             {
                 if (!new[] { "scheduled", "cargo", "charter", "training", "vfr", "repositioning", "jumpseat" }.Contains(r.Get("Type"))) Add(r, "Type", Messages.Define("Text_EFB86BD704"));
-                if (r.Get("Type") != "jumpseat")
-                {
-                    foreach (var f in new[] { "Callsign", "Flight Number", "Fleet IDs" }) if (r.Get(f) == "") Add(r, f, Messages.Define("Text_134FD96D33"));
-                    if (r.Get("Callsign").Length is < 4 or > 7) Add(r, "Callsign", Messages.Define("Text_39CD1EC048"));
-                    if (r.Get("Flight Number").Length is < 3 or > 6) Add(r, "Flight Number", Messages.Define("Text_D60FFE3B83"));
-                }
+                // StoreRouteRequest requires callsign and flight_number for every type, jumpseat included.
+                foreach (var f in new[] { "Callsign", "Flight Number" }) if (r.Get(f) == "") Add(r, f, Messages.Define("Text_B283E8E5F2"));
+                if (r.Get("Type") != "jumpseat" && r.Get("Fleet IDs") == "") Add(r, "Fleet IDs", Messages.Define("Text_134FD96D33"));
+                if (r.Get("Callsign") != "" && r.Get("Callsign").Length is < 4 or > 7) Add(r, "Callsign", Messages.Define("Text_39CD1EC048"));
+                if (r.Get("Flight Number") != "" && r.Get("Flight Number").Length is < 3 or > 6) Add(r, "Flight Number", Messages.Define("Text_D60FFE3B83"));
+                if (!ValidCostIndex(r.Get("Cost Index"))) Add(r, "Cost Index", Messages.Define("CostIndexInvalid"));
             }
             if (kind == ResourceKind.Routings && before != null)
                 foreach (var f in new[] { "Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)" })

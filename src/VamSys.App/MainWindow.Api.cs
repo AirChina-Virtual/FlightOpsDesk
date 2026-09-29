@@ -71,7 +71,7 @@ public sealed partial class MainWindow
             var dialog=new ContentDialog { XamlRoot=Content.XamlRoot,Title=L("ApiConflict"),Content=content,PrimaryButtonText=L("ApiKeepLocal"),SecondaryButtonText=L("ApiUseRemote"),CloseButtonText=L("Text_2CD0F3BE87"),DefaultButton=ContentDialogButton.Close,IsPrimaryButtonEnabled=conflict.Field!="*" };
             var choice=await dialog.ShowAsync(); if(choice==ContentDialogResult.None) break;
             if(choice==ContentDialogResult.Secondary)
-            { if(conflict.Field=="*") Data.Draft.Remove(row); else row.Fields[conflict.Field]=conflict.Remote??""; }
+            { Data.Edit([row.LocalId],()=>{if(conflict.Field=="*") Data.Draft.Remove(row); else row.Fields[conflict.Field]=conflict.Remote??"";},newStep:false,structural:conflict.Field=="*"); }
             Data.Conflicts.Remove(conflict); await Save();
         }
         Render();
@@ -175,7 +175,7 @@ public sealed partial class MainWindow
             {
                 if(!await Confirm(L("ApiUnknownReview"),Text(()=>L("ApiManualDelete",("id",item.RemoteId ?? item.After.Identity?.RemoteId))),L("ApiManualConfirm"))) continue;
                 item.State=ItemState.ManuallyConfirmed; item.SetMessage(Messages.Define("ApiManualResult")); item.Rebased=true;
-                var data=workspace.Resources[item.Resource];data.Draft.RemoveAll(r=>r.LocalId==item.After.LocalId);data.Snapshot.RemoveAll(r=>r.LocalId==item.After.LocalId);data.Undo.Clear();data.Redo.Clear();
+                var data=workspace.Resources[item.Resource];data.Draft.RemoveAll(r=>r.LocalId==item.After.LocalId);data.Snapshot.RemoveAll(r=>r.LocalId==item.After.LocalId);data.ClearHistory();
                 if(apiSessions.TryGetValue(workspace.Id,out var session) && (item.RemoteId ?? item.After.Identity?.RemoteId) is string removedId) session.Api.Forget(item.Resource,removedId);
                 job.SetStatus(JobStatus.NeedsAttention,Messages.Define("ApiManualResult")); await Save();NotifyTask(new(workspace.Id,job.Id,item.Id,true));
             }

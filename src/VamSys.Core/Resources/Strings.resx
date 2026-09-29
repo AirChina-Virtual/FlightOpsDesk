@@ -840,7 +840,13 @@
     <value>暂不支持在线转换到或离开 Jumpseat 类型，此操作会清除关联。</value>
   </data>
   <data name="ApiSoftDelete" xml:space="preserve">
-    <value>删除请求已接收；软删除的最终状态仍需在 Orwell 核对，不会自动重发。</value>
+    <value>删除请求已接收。按官方文档，机场和航线是软删除，服务器上仍会保留记录，因此软件无法自动确认结果；请在 Orwell 核对，此请求不会自动重发。</value>
+  </data>
+  <data name="ApiRateLimited" xml:space="preserve">
+    <value>API 限流（HTTP 429），请求未被处理，已放回待执行；稍后继续任务即可重试。</value>
+  </data>
+  <data name="CostIndexInvalid" xml:space="preserve">
+    <value>成本指数须为空、AUTO 或 0–999 的整数</value>
   </data>
   <data name="ApiBlocked" xml:space="preserve">
     <value>以下变更暂不能在线提交</value>
