@@ -74,8 +74,20 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:Restor
 | scripts | 生成程序和图标、自动操作窗口的辅助脚本 |
 | docs | 使用方法、API 支持情况、升级说明和测试结果 |
 | examples | CSV 示例 |
+| packaging | 正式版和 QA 版随包附带的说明 |
+| artifacts | 当前正式包、QA 包、回归基线和最新验证结果（本地生成） |
+| archive | 已归档的历史产物、原路径清单和校验记录（仅保存在本机） |
+| .tools | 构建脚本使用的本机 .NET SDK |
 
 生成的程序、测试数据库和本机开发工具不会提交到 GitHub。代码中的旧项目名和本地数据目录继续保留，已有工作区可以接着使用。
+
+## 本地产物与归档
+
+2026-09-29 整理后，当前正式程序保留在 artifacts/flightops-app，QA 版保留在 artifacts/v3-qa。artifacts/step5-v3-baseline 是真实旧版程序的回归基线，不能当作普通旧发布包清理；artifacts/step5-performance、step5 日志及 storage-v3-20260922 目录中的报告也保留在原处。
+
+旧审计、旧窗口测试数据、截图、早期发布包及日志已压缩到本机 archive/2026-09-29/historical-files.zip，包内保留原来的相对路径。历史报告仍按测量时的路径记录结果，可在同目录的 archive-files.csv 中查找对应文件。恢复时先解压到单独目录，再按需取回文件；归档索引和校验结果见该目录的 README.txt。
+
+编译缓存 bin、obj 和 artifacts/test-build 可以重新生成。清理后首次运行测试需要使用完整的 dotnet run 命令，构建完成后才能使用 --no-build。归档目录与本机生成产物一样不提交到 Git。
 
 ## 验证记录
 

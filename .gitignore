@@ -2,6 +2,7 @@
 **/bin/
 **/obj/
 artifacts/
+archive/
 .vs/
 *.user
 *.db*
