@@ -15,12 +15,21 @@ public record Issue(Guid RowId, string Field, MessageDescriptor Description)
 
 public sealed class DataRow
 {
-    public Guid LocalId { get; set; } = Guid.NewGuid();
+    public DataRow() { LocalId=Guid.NewGuid(); Fields=new(StringComparer.Ordinal); }
+    // A copy already has its identity and fields; avoid allocating defaults to overwrite.
+    DataRow(DataRow source)
+    {
+        LocalId=source.LocalId; Identity=source.Identity; RawApiJson=source.RawApiJson;
+        Fields=new(source.Fields,StringComparer.Ordinal);
+    }
+    internal DataRow(Guid localId,ResourceIdentity? identity,string? rawApiJson,Dictionary<string,string> fields)
+    { LocalId=localId; Identity=identity; RawApiJson=rawApiJson; Fields=fields; }
+    public Guid LocalId { get; set; }
     public ResourceIdentity? Identity { get; set; }
     public string? RawApiJson { get; set; }
-    public Dictionary<string, string> Fields { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, string> Fields { get; set; }
     public string Get(string key) => Fields.GetValueOrDefault(key, "");
-    public DataRow Copy() => new() { LocalId = LocalId, Identity = Identity, RawApiJson = RawApiJson, Fields = new(Fields, StringComparer.Ordinal) };
+    public DataRow Copy() => new(this);
 }
 public sealed record ResourceIdentity(string RemoteId, string ConnectionId, string? ParentFleetId = null);
 public sealed record MergeConflict(Guid RowId, string Field, string? Original, string? Local, string? Remote);
@@ -30,7 +39,7 @@ public sealed partial class ResourceData
 {
     public List<DataRow> Snapshot { get; set; } = [];
     List<DataRow> draft = [];
-    Dictionary<Guid, DataRow>? draftIndex;
+    Dictionary<Guid, int>? draftIndex;
     public List<DataRow> Draft { get => draft; set { draft = value; InvalidateDraftIndex(); } }
     public List<string> Columns { get; set; } = [];
     public DateTimeOffset? SnapshotAt { get; set; }
@@ -41,8 +50,42 @@ public sealed partial class ResourceData
     // New collections over the same row objects. Callers must replace rows, never edit them in place.
     public ResourceData ShallowCopy() => new() { Snapshot = [..Snapshot], Draft = [..Draft], Columns = [..Columns], SnapshotAt = SnapshotAt, History = History.Copy(), Conflicts = [..Conflicts] };
     public void InvalidateDraftIndex() => draftIndex = null;
-    public DataRow? FindDraftRow(Guid id) => (draftIndex ??= Draft.ToDictionary(r => r.LocalId)).GetValueOrDefault(id);
-    public void ClearHistory() { History.Clear(); InvalidateDraftIndex(); }
+    internal void EnsureDraftIndex()
+    {
+        if (draftIndex != null && draftIndex.Count == Draft.Count) return;
+        var index = new Dictionary<Guid, int>(Draft.Count);
+        for (var i = 0; i < Draft.Count; i++) index.Add(Draft[i].LocalId, i);
+        draftIndex = index;
+    }
+    internal Dictionary<Guid,int> GetDraftPositions() { EnsureDraftIndex(); return draftIndex!; }
+    // Used only after history has validated every source and destination position.
+    internal void ReplaceIndexedDraft(List<DataRow> rows,Dictionary<Guid,int> positions)
+    { draft=rows; draftIndex=positions; }
+    public int FindDraftPosition(Guid id)
+    {
+        EnsureDraftIndex();
+        if (!draftIndex!.TryGetValue(id, out var position)) return -1;
+        if (Draft[position].LocalId == id) return position;
+        InvalidateDraftIndex(); EnsureDraftIndex();
+        return draftIndex!.GetValueOrDefault(id, -1);
+    }
+    public DataRow? FindDraftRow(Guid id) => FindDraftPosition(id) is var position && position >= 0 ? Draft[position] : null;
+    // Same-ID replacements preserve order and the position index. Use Edit around
+    // this operation when it must create an undo step; missing targets are ignored.
+    public void ReplaceDraftRows(IEnumerable<DataRow> replacements)
+    {
+        var count = replacements.TryGetNonEnumeratedCount(out var knownCount) ? knownCount : 0;
+        var prepared = new List<(int Position, DataRow Row)>(count);
+        var seen = new HashSet<Guid>(count);
+        foreach (var row in replacements)
+        {
+            if (!seen.Add(row.LocalId)) throw new ArgumentException("Duplicate replacement LocalId.", nameof(replacements));
+            var position = FindDraftPosition(row.LocalId);
+            if (position >= 0) prepared.Add((position, row));
+        }
+        foreach (var (position, row) in prepared) Draft[position] = row;
+    }
+    public void ClearHistory(bool invalidateIndex = true) { History.Clear(); if (invalidateIndex) InvalidateDraftIndex(); }
     public void UndoEdit() => History.Move(this, undo: true);
     public void RedoEdit() => History.Move(this, undo: false);
 }
@@ -85,12 +128,14 @@ public sealed record RecoveryCandidateAttempt(string RemoteId, DateTimeOffset Pr
 
 public sealed class ChangeItem
 {
+    public ChangeItem() { After=new(); Fields=[]; }
+    internal ChangeItem(DataRow after, Dictionary<string,FieldChange> fields) { After=after; Fields=fields; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public ResourceKind Resource { get; set; }
     public ChangeKind Kind { get; set; }
     public DataRow? Before { get; set; }
-    public DataRow After { get; set; } = new();
-    public Dictionary<string, FieldChange> Fields { get; set; } = [];
+    public DataRow After { get; set; }
+    public Dictionary<string, FieldChange> Fields { get; set; }
     public List<Guid> Dependencies { get; set; } = [];
     public ItemState State { get; set; }
     public string? RemoteId { get; set; }

@@ -918,4 +918,20 @@ Remote: {remote}</value>
   <data name="StorageStale" xml:space="preserve"><value>A newer local state has been saved. Reload before continuing.</value></data>
   <data name="StorageInUse" xml:space="preserve"><value>Another application instance is using this data directory. Close it first.</value></data>
   <data name="StorageReload" xml:space="preserve"><value>Saved data could not be reloaded. Close and restart the application before continuing.</value></data>
-<data name="CloseBlocked" xml:space="preserve"><value>Finish the current operation or close its dialog before exiting.</value></data><data name="CloseSaving" xml:space="preserve"><value>Saving before closing… Editing is temporarily disabled.</value></data></root>
+<data name="CloseBlocked" xml:space="preserve"><value>Finish the current operation or close its dialog before exiting.</value></data><data name="CloseSaving" xml:space="preserve"><value>Saving before closing… Editing is temporarily disabled.</value></data><data name="TableFirst" xml:space="preserve"><value>First</value></data>
+<data name="TablePrevious" xml:space="preserve"><value>Previous</value></data>
+<data name="TableNext" xml:space="preserve"><value>Next</value></data>
+<data name="TableLast" xml:space="preserve"><value>Last</value></data>
+<data name="TableGo" xml:space="preserve"><value>Go</value></data>
+<data name="TablePageSize" xml:space="preserve"><value>Rows per page</value></data>
+<data name="TablePageSummary" xml:space="preserve"><value>Page {page}/{pages} · {first}–{last} of {total}</value></data>
+<data name="TableSelectionSummary" xml:space="preserve"><value>Selected {total} · On this page {page}</value></data>
+<data name="TableSelectPage" xml:space="preserve"><value>Select page</value></data>
+<data name="TableSelectAll" xml:space="preserve"><value>Select all results</value></data>
+<data name="TableClearSelection" xml:space="preserve"><value>Clear selection</value></data>
+<data name="TableCancelQuery" xml:space="preserve"><value>Cancel query</value></data>
+<data name="TableInvalidPage" xml:space="preserve"><value>Enter a valid page number.</value></data>
+<data name="TableLoading" xml:space="preserve"><value>Filtering records…</value></data>
+<data name="TableReady" xml:space="preserve"><value>Loaded {count} matching records.</value></data>
+<data name="TableQueryCanceled" xml:space="preserve"><value>Query canceled; previous results retained.</value></data>
+</root>

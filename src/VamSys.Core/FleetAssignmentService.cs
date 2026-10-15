@@ -74,9 +74,7 @@ public sealed class FleetAssignmentService
         if (preview.Issues.Count > 0) throw MessageErrors.Attach(new InvalidOperationException(Messages.Define("Text_919362E2F8")), Messages.Define("Text_919362E2F8"));
         if (preview.Rows.Count == 0) return;
         var replacements = preview.Rows.ToDictionary(r => r.LocalId);
-        data.Edit(replacements.Keys,()=>{
-            for (int i = 0; i < data.Draft.Count; i++) if (replacements.TryGetValue(data.Draft[i].LocalId, out var replacement)) data.Draft[i] = replacement.Copy();
-        },replaceRows:true);
+        data.Edit(replacements.Keys,()=>data.ReplaceDraftRows(replacements.Values.Select(r=>r.Copy())));
         if (!data.Columns.Contains(preview.Field)) data.Columns.Add(preview.Field);
     }
 }

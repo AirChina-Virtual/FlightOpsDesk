@@ -1,5 +1,8 @@
-param([string]$DataDirectory=('F:\vamsys\artifacts\storage-v3-20260922\startup-ui-'+[Guid]::NewGuid().ToString('N')))
+param([string]$DataDirectory)
 $ErrorActionPreference='Stop'
+$repo=Split-Path $PSScriptRoot -Parent
+if(!$DataDirectory){$DataDirectory=Join-Path $repo ('artifacts/ui-regression/test-storage-ui-'+[Guid]::NewGuid().ToString('N'))}
+if(Test-Path -LiteralPath $DataDirectory){throw 'UI tests require a new isolated directory; existing data is never used'}
 Add-Type -AssemblyName UIAutomationClient
 if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close existing app before isolated test'}
 $owned=[Collections.Generic.List[Diagnostics.Process]]::new()
@@ -39,12 +42,14 @@ try {
     Write-Output 'PASS second instance rejected with bilingual storage prompt; original remains usable'
     $null=$primary.CloseMainWindow();if(!$primary.WaitForExit(10000)){throw 'Primary did not close'}
     $futureDir=$DataDirectory+'-future'
+    if(Test-Path -LiteralPath $futureDir){throw 'Future-format test directory already exists'}
     & "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build --project "$PSScriptRoot/../tests/VamSys.Tests" -c Release -- --seed-storage-ui $futureDir future
     if($LASTEXITCODE -ne 0){throw 'Future seed failed'}
     $future=Launch $futureDir
     WaitText $future @('数据库由更新版本创建','This database requires a newer application version.')
     Write-Output 'PASS future storage format rejected in startup UI in both languages'
 } finally {
+    Remove-Item Env:VAMSYS_DATA_DIR -ErrorAction SilentlyContinue
     foreach($p in $owned) {
         if(!$p.HasExited){$null=$p.CloseMainWindow();if(!$p.WaitForExit(10000)){throw 'Owned QA instance did not close'}}
     }

@@ -46,6 +46,7 @@ public sealed partial class MainWindow
     void NotifyTask(BatchProgress change)
     {
         if(change.WorkspaceId!=workspace.Id)return;
+        InvalidateDataViews();
         EnsureTasks();
         if(!taskIndex.TryGetValue(change.JobId,out var vm))return;
         vm.Update(change.ItemId,false);

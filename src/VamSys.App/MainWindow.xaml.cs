@@ -81,6 +81,7 @@ public sealed partial class MainWindow : Window
     readonly DraftEdits edits = new();
     async Task Save()
     {
+        InvalidateDataViews();
         await saveGate.WaitAsync();
         var taken = edits.Take();
         try { if(storageBlocked) throw OperationsAdapter.Block("StorageReload"); await store.SaveAsync(workspace); }
@@ -117,12 +118,12 @@ public sealed partial class MainWindow : Window
     }
     Button Button(Func<string> label, Func<Task> action, bool enabled = true)
     {
-        var b = new Button { IsEnabled = enabled }.Localize(localization, "Content", () => label()); b.Click += async (_, _) => await UserAction(action); return b;
+        var b = new Button { IsEnabled = enabled }.Localize(localization, "Content", () => label()); b.Click += async (_, _) => { if (!querying) await UserAction(action); }; return b;
     }
     AppBarButton Command(Func<string> label, Symbol icon, Func<Task> action, bool enabled = true)
     {
         var button = new AppBarButton { Icon = new SymbolIcon(icon), IsEnabled = enabled }.Localize(localization, "Label", () => label());
-        button.Click += async (_, _) => await UserAction(action); return button;
+        button.Click += async (_, _) => { if (!querying) await UserAction(action); }; return button;
     }
     static StackPanel Stack(params UIElement[] children) { var s = new StackPanel { Spacing = 12 }; foreach (var c in children) s.Children.Add(c); return s; }
     static StackPanel Row(params UIElement[] children) { var s = Stack(children); s.Orientation = Orientation.Horizontal; return s; }
@@ -136,15 +137,16 @@ public sealed partial class MainWindow : Window
     }
     void Navigate(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        if (!ready || !closeState.IsOpen) return; page = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString() ?? "workspace"; Render();
+        if (!ready || !closeState.IsOpen) return; CancelDataQuery(); page = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString() ?? "workspace"; Render();
     }
     async void WorkspaceChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!ready || !closeState.IsOpen || busy || WorkspacePicker.SelectedItem is not WorkspaceChoice choice || choice.Id == workspace.Id) return;
+        CancelDataQuery();
         await UserAction(async () => { autosave.Stop(); await Save(); workspace = store.Load(choice.Id); if (apiSessions.Remove(choice.Id, out var previous)) previous.Client.Dispose(); if (workspace.Mode == RunMode.Online) workspace.Mode = RunMode.Offline; Render(); });
     }
     void ResourceChanged(object sender, SelectionChangedEventArgs e)
-    { if (!ready || !closeState.IsOpen || busy) return; resource = (ResourceKind)ResourcePicker.SelectedIndex; Render(); }
+    { if (!ready || !closeState.IsOpen || busy) return; CancelDataQuery(); resource = (ResourceKind)ResourcePicker.SelectedIndex; Render(); }
     void Render()
     {
         if (!ready) return;
@@ -163,7 +165,7 @@ public sealed partial class MainWindow : Window
         foreach (var (kind, data) in workspace.Resources)
         {
             var captured = kind;
-            cards.Children.Add(new Border { Padding = new Thickness(18), CornerRadius = new CornerRadius(8), Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"], Child = Row(Text(() => L(Schemas.All[kind].Name), 20), Text(() => L("Text_B9B43D4DAA", ("arg0", data.Draft.Count), ("arg1", planner.Plan(kind, data).Count))), Button(() => L("Text_C771248E51"), () => { resource = captured; ResourcePicker.SelectedIndex = (int)resource; Navigation.SelectedItem = Navigation.MenuItems[1]; return Task.CompletedTask; })) });
+            cards.Children.Add(new Border { Padding = new Thickness(18), CornerRadius = new CornerRadius(8), Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"], Child = Row(Text(() => L(Schemas.All[kind].Name), 20), Text(() => L("Text_B9B43D4DAA", ("arg0", data.Draft.Count), ("arg1", CountChanges(data)))), Button(() => L("Text_C771248E51"), () => { resource = captured; ResourcePicker.SelectedIndex = (int)resource; Navigation.SelectedItem = Navigation.MenuItems[1]; return Task.CompletedTask; })) });
         }
         return Scroll(Stack(Text(() => L("Text_2C33D5F7DE")),
             Row(Button(() => L("Text_946897D107"), async () =>
@@ -177,20 +179,25 @@ public sealed partial class MainWindow : Window
             })), cards,
             Text(() => L("Text_8B0B7AD880"))));
     }
-    UIElement DataPage()
+    UIElement DataPage() => GetDataPage();
+    UIElement BuildDataPage()
     {
         var state = CurrentDataState; shownState = state;
         var grid = new Grid { RowSpacing = 10 };
-        grid.RowDefinitions.Add(new() { Height = GridLength.Auto }); grid.RowDefinitions.Add(new() { Height = GridLength.Auto }); grid.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
+        grid.RowDefinitions.Add(new() { Height = GridLength.Auto }); grid.RowDefinitions.Add(new() { Height = GridLength.Auto }); grid.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) }); grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         var search = new TextBox { Width = 220 }.Localize(localization, "PlaceholderText", () => L("Text_762B9F2664"));
         var filter = new ComboBox { Width = 140, SelectedIndex = 0 }.Localize(localization, "ItemsSource", () => new[] { L("Text_5C55A67935"), L("Text_682D211B71"), L("Text_549986E82C") });
         var sort = new ComboBox { Width = 190, ItemsSource = Data.Columns.Count > 0 ? Data.Columns : Schemas.All[resource].Columns.ToList(), SelectedIndex = 0 };
         searchBox = search; filterBox = filter; sortBox = sort;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(search, "DataSearch");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(filter, "DataFilter");
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(sort, "DataSort");
         search.Text = state.Search; filter.SelectedIndex = state.Filter;
         if (state.Sort != null && sort.Items.Contains(state.Sort)) sort.SelectedItem = state.Sort;
-        var toolbar = Row(search, filter, sort, Button(() => L("Text_0DE280B4DF"), () => { LoadRows(search.Text, filter.SelectedIndex, sort.SelectedItem?.ToString()); return Task.CompletedTask; }));
+        var toolbar = Row(search, filter, sort, Button(() => L("Text_0DE280B4DF"), () => { return LoadRowsAsync(search.Text, filter.SelectedIndex, sort.SelectedItem?.ToString()); }));
         grid.Children.Add(new ScrollViewer { Content = toolbar, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled });
         var actions = new CommandBar { DefaultLabelPosition = CommandBarDefaultLabelPosition.Right, HorizontalContentAlignment = HorizontalAlignment.Left, IsDynamicOverflowEnabled = true };
+        dataActions = actions;
         actions.PrimaryCommands.Add(Command(() => L("ApiRefresh"), Symbol.Refresh, RefreshApi, !busy));
         actions.PrimaryCommands.Add(Command(() => L("Text_E306752B35"), Symbol.Edit, EditRules));
         actions.PrimaryCommands.Add(Command(() => L("Text_48A195CA7E"), Symbol.View, () => { Navigation.SelectedItem = Navigation.MenuItems[3]; return Task.CompletedTask; }));
@@ -205,19 +212,12 @@ public sealed partial class MainWindow : Window
         actions.SecondaryCommands.Add(Command(() => L("Text_41B0AF8C5C"), Symbol.Accept, Validate));
         Grid.SetRow(actions, 1); grid.Children.Add(actions);
         table = new ListView { SelectionMode = ListViewSelectionMode.Multiple, HorizontalContentAlignment = HorizontalAlignment.Stretch, IsEnabled = !busy };
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(table, "DataTable");
+        table.SelectionChanged += DataSelectionChanged;
         table.ItemTemplate = (DataTemplate)XamlReader.Load("""
             <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-              <ItemsControl ItemsSource="{Binding Cells}">
+              <ItemsControl ItemsSource="{Binding Cells}" ItemTemplateSelector="{Binding CellTemplates}">
                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate><DataTemplate>
-                  <Grid Width="{Binding Width}" Margin="0,3,6,3">
-                    <TextBox Visibility="{Binding EditorVisibility}" IsReadOnly="{Binding IsReadOnly}" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" ToolTipService.ToolTip="{Binding Field}" AutomationProperties.Name="{Binding Field}"/>
-                    <Button Visibility="{Binding FleetVisibility}" IsEnabled="{Binding IsEnabled}" Command="{Binding ChooseFleet}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" ToolTipService.ToolTip="{Binding DisplayValue}" AutomationProperties.Name="{Binding FleetAutomationName}">
-                      <TextBlock Text="{Binding DisplayValue}" TextTrimming="CharacterEllipsis"/>
-                    </Button>
-                    <TextBlock Visibility="{Binding StatusVisibility}" Text="{Binding DisplayValue}" VerticalAlignment="Center" Margin="8,0"/>
-                  </Grid>
-                </DataTemplate></ItemsControl.ItemTemplate>
               </ItemsControl>
             </DataTemplate>
             """);
@@ -225,8 +225,10 @@ public sealed partial class MainWindow : Window
         table.Header = headers;
         var horizontal = new ScrollViewer { Content = table, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollMode = ScrollMode.Disabled };
         horizontalTable = horizontal; shownDataPage = grid;
-        Grid.SetRow(horizontal, 2); grid.Children.Add(horizontal); LoadRows(state.AppliedSearch, state.AppliedFilter, state.AppliedSort);
-        RestoreTableState(table, horizontal, state); return grid;
+        Grid.SetRow(horizontal, 2); grid.Children.Add(horizontal);
+        var pager = DataPager(); Grid.SetRow(pager, 3); grid.Children.Add(pager);
+        table.Loaded += (_, _) => RestoreDataOffsets(state);
+        return grid;
     }
     List<string> DisplayColumns()
     {
@@ -234,32 +236,6 @@ public sealed partial class MainWindow : Window
         if (resource is ResourceKind.Aircraft or ResourceKind.Routes) leading.Add(FleetAssignmentService.Field(resource));
         return leading.Concat(Data.Columns.Count == 0 ? Schemas.All[resource].Columns : Data.Columns).Distinct().ToList();
     }
-    void LoadRows(string search, int filter, string? sort)
-    {
-        if (table is null) return;
-        if (shownState != null) { shownState.AppliedSearch = search; shownState.AppliedFilter = filter; shownState.AppliedSort = sort; }
-        // One plan per load serves both the "changed" filter and the row status labels.
-        var columns = DisplayColumns(); var modifiedIds = planner.Plan(resource, Data).Select(i => i.After.LocalId).ToHashSet();
-        IEnumerable<DataRow> rows = Data.Draft.Where(r => (search == "" || r.Fields.Values.Any(v => v.Contains(search, StringComparison.OrdinalIgnoreCase))) && (filter != 1 || modifiedIds.Contains(r.LocalId)) && (filter != 2 || Schemas.Deleted(r)));
-        if (sort != null) rows = rows.OrderBy(r => r.Get(sort), StringComparer.OrdinalIgnoreCase);
-        var existingIds = Data.Snapshot.Select(r => r.LocalId).ToHashSet();
-        var conflictIds = Data.Conflicts.Select(c => c.RowId).ToHashSet();
-        var fleetLabels = fleets.Options(workspace).ToDictionary(o => o.Token, StringComparer.OrdinalIgnoreCase);
-        visible = rows.Select(r => new RowViewModel(r, columns.Select(f => new CellViewModel(f, r.Get(f), value =>
-        {
-            if (!closeState.IsOpen || busy || Schemas.Deleted(r) || f == "_delete") return;
-            var cellKey = r.LocalId + ":" + f; var checkpointed = lastEditedCell != cellKey;
-            Data.Edit([r.LocalId],()=>r.Fields[f] = value,newStep:checkpointed); lastEditedCell = cellKey;
-            edits.Cell(workspace, resource, r.LocalId, checkpointed); SaveSoon(); Status(() => L("Text_75141EDE81"));
-        })
-        {
-            CanEdit=()=>closeState.IsOpen&&!busy, IsReadOnly = Schemas.Deleted(r), FleetName = () => L("ChooseFleet"),
-            DisplayText = () => f == "_delete" ? (Schemas.Deleted(r) ? L("Text_EE96DC1EBE") : conflictIds.Contains(r.LocalId) ? L("ApiRowConflict") : modifiedIds.Contains(r.LocalId) && existingIds.Contains(r.LocalId) ? L("ApiRowDraft") : existingIds.Contains(r.LocalId) ? L("Text_20D2382F10") : L("Text_4EF7F62706"))
-                : f is "Fleet ID" or "Fleet IDs" ? (string.Join("; ", FleetAssignmentService.Tokens(r.Get(f)).Select(t => fleetLabels.TryGetValue(t, out var option) ? option.Describe(localization) : L("Text_C221144914") + t)) is var label && label.Length > 0 ? label : L("Text_F274578907")) : "",
-            ChooseFleet = f is "Fleet ID" or "Fleet IDs" ? new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Guard(() => ChooseFleets(r))) : null
-        }).ToList())).ToList(); table.ItemsSource = visible;
-    }
-    List<DataRow> SelectedRows() => table?.SelectedItems.Cast<RowViewModel>().Select(v => v.Row).ToList() ?? [];
     async Task DeleteSelected()
     {
         if (!closeState.IsOpen || busy || !closeState.IsOpen) return; var selected = SelectedRows(); if (selected.Count == 0) { Status(() => L("Text_BAB47FB928")); return; }
@@ -277,7 +253,7 @@ public sealed partial class MainWindow : Window
     }
     async Task EditRules()
     {
-        if (!closeState.IsOpen || busy || !closeState.IsOpen) return; var selected = SelectedRows(); var rows = (selected.Count > 0 ? selected : visible.Select(v => v.Row).ToList()).Where(r => !Schemas.Deleted(r)).ToList();
+        if (!closeState.IsOpen || busy || !closeState.IsOpen) return; var selected = SelectedRows(); var rows = (selected.Count > 0 ? selected : FilteredRows()).Where(r => !Schemas.Deleted(r)).ToList();
         if (rows.Count == 0) { Status(() => L("Text_4BB22EC98B")); return; }
         var field = new ComboBox { ItemsSource = DisplayColumns().Where(f => f is not "_delete" and not "Fleet ID" and not "Fleet IDs").ToList(), SelectedIndex = 0, MinWidth = 330 }.Localize(localization, "Header", () => L("Text_86F623E5CC"));
         var kind = new ComboBox { ItemsSource = new[] { L("Text_A30D395090"), L("Text_5B7341C2D6"), L("Text_795CBFF909"), L("Text_6FE8FC1819"), L("Text_FAC7E021A1"), L("Text_E79453E164"), L("Text_6797F1B017") }, SelectedIndex = 0 }.Localize(localization, "Header", () => L("Text_ED31FBB483")).Localize(localization, "ItemsSource", () => new[] { L("Text_A30D395090"), L("Text_5B7341C2D6"), L("Text_795CBFF909"), L("Text_6FE8FC1819"), L("Text_FAC7E021A1"), L("Text_E79453E164"), L("Text_6797F1B017") });
@@ -291,7 +267,7 @@ public sealed partial class MainWindow : Window
         var samples = preview.Take(8).Select((r, i) => $"{rows[i].Get(Schemas.All[resource].Key)}：{rows[i].Get(targetField)} → {r.Get(targetField)}");
         if (!await Confirm(L("Text_AD86791376"), Stack(Text(() => L("Text_42F23885A7", ("arg0", rows.Count))), Text(() => string.Join("\n", samples))), L("Text_2354C137CE"))) return;
         var map = preview.ToDictionary(r => r.LocalId);
-        Data.Edit(map.Keys,()=>{for (int i = 0; i < Data.Draft.Count; i++) if (map.TryGetValue(Data.Draft[i].LocalId, out var r)) Data.Draft[i] = r;},replaceRows:true);
+        Data.Edit(map.Keys,()=>Data.ReplaceDraftRows(map.Values));
         if (!Data.Columns.Contains(targetField)) Data.Columns.Add(targetField);
         await Save(); Render(); Status(() => L("Text_13292B3343", ("arg0", rows.Count)));
     }
@@ -398,7 +374,7 @@ public sealed partial class MainWindow : Window
                 else
                 {
                     var updated = item.After.Copy(); if (item.RemoteId != null) updated.Fields[Schemas.All[item.Resource].Key] = item.RemoteId;
-                    data.Snapshot.Add(updated.Copy()); var index = data.Draft.FindIndex(r => r.LocalId == updated.LocalId);
+                    data.Snapshot.Add(updated.Copy()); var index = data.FindDraftPosition(updated.LocalId);
                     if (index >= 0)
                     {
                         // Preserve edits made after a recovered job was submitted; only rebase identity/references.
@@ -408,7 +384,7 @@ public sealed partial class MainWindow : Window
                             if (current.Get(field).Contains("local:", StringComparison.OrdinalIgnoreCase)) current.Fields[field] = updated.Get(field);
                     }
                 }
-                item.Rebased = true; data.SnapshotAt = DateTimeOffset.UtcNow; data.ClearHistory();
+                item.Rebased = true; data.SnapshotAt = DateTimeOffset.UtcNow; data.ClearHistory(invalidateIndex:item.Kind == ChangeKind.Delete);
             }
             await Save(); foreach(var item in job.Items)NotifyTask(new(workspace.Id,job.Id,item.Id));FlushTasks(); running.Dispose(); running = null; Render(); Status(() => L("Text_B64A075682") + JobText(job));
         });

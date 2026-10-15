@@ -1,8 +1,11 @@
-param([string]$DataDirectory = 'F:\vamsys\artifacts\ui-language-smoke', [string]$AppDirectory = "$PSScriptRoot/../artifacts/flightops-app")
+param([string]$DataDirectory, [string]$AppDirectory = "$PSScriptRoot/../artifacts/flightops-app")
 $ErrorActionPreference = 'Stop'
+$repo=Split-Path $PSScriptRoot -Parent
+if(!$DataDirectory){$DataDirectory=Join-Path $repo ('artifacts/ui-regression/test-localization-ui-'+[Guid]::NewGuid().ToString('N'))}
+if(Test-Path -LiteralPath $DataDirectory){throw 'UI tests require a new isolated directory; existing data is never used'}
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
 $scope=[System.Windows.Automation.TreeScope]::Descendants
-function Root { $p=Get-Process FlightOpsDesk -ErrorAction SilentlyContinue | Select-Object -First 1; if($p -and $p.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)} }
+function Root { if($testProcess -and !$testProcess.HasExited){$testProcess.Refresh();if($testProcess.MainWindowHandle -ne [IntPtr]::Zero){[System.Windows.Automation.AutomationElement]::FromHandle($testProcess.MainWindowHandle)}} }
 function Elements {
     for($attempt=0;$attempt -lt 3;$attempt++) {
         try { $r=Root; if($r){return $r.FindAll($scope,[System.Windows.Automation.Condition]::TrueCondition)}; return }
@@ -26,7 +29,8 @@ function DataRow { Elements | Where-Object {$_.Current.ControlType -eq [System.W
 function Assert($condition,$message) { if(!$condition){throw $message} }
 if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close the existing app before running isolated UI tests'}
 $env:VAMSYS_DATA_DIR=$DataDirectory
-Start-Process -FilePath (Join-Path $AppDirectory 'FlightOpsDesk.exe') -WindowStyle Hidden
+$testProcess=Start-Process -FilePath (Join-Path $AppDirectory 'FlightOpsDesk.exe') -WindowStyle Hidden -PassThru
+try {
 WaitFor {Named '连接与设置' 'ListItem'} | Out-Null
 SelectItem '连接与设置'
 WaitFor {Named 'Client ID' 'Edit'} | Out-Null
@@ -77,3 +81,7 @@ Write-Output 'PASS draft, filter, selection, fleet dialog, delete and restore'
 SelectItem 'Change review'; WaitFor {Named 'Export changes as CSV' 'Button'} | Out-Null
 Assert (!(Named 'Submit to API' 'Button').Current.IsEnabled) 'Live API unexpectedly enabled'
 Write-Output 'PASS English change review and disabled live API'
+} finally {
+    if(!$testProcess.HasExited){$null=$testProcess.CloseMainWindow();if(!$testProcess.WaitForExit(15000)){$testProcess.Kill();$testProcess.WaitForExit()}}
+    Remove-Item Env:VAMSYS_DATA_DIR -ErrorAction SilentlyContinue
+}

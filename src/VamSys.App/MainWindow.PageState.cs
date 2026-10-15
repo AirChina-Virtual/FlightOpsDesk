@@ -11,7 +11,11 @@ public sealed partial class MainWindow
         public string Search = "", AppliedSearch = "";
         public int Filter, AppliedFilter;
         public string? Sort, AppliedSort;
-        public HashSet<Guid> Selected = [];
+        public DataTableViewModel Model = new();
+        public HashSet<Guid> Selected => Model.Selected;
+        public Dictionary<Guid, DataRow>? Baseline;
+        public HashSet<Guid> Conflicts = [];
+        public Dictionary<string, FleetOption> FleetLabels = new(StringComparer.OrdinalIgnoreCase);
         public double Vertical, Horizontal;
     }
     readonly Dictionary<(Guid, ResourceKind), DataPageState> dataStates = [];
@@ -37,7 +41,7 @@ public sealed partial class MainWindow
         shownState.Search = searchBox?.Text ?? "";
         shownState.Filter = filterBox?.SelectedIndex ?? 0;
         shownState.Sort = sortBox?.SelectedItem as string;
-        shownState.Selected = SelectedRows().Select(r => r.LocalId).ToHashSet();
+        shownState.Model.SelectPage(table.SelectedItems.Cast<RowViewModel>().Select(r => r.Row.LocalId));
         shownState.Vertical = FindVisual<ScrollViewer>(table)?.VerticalOffset ?? 0;
         shownState.Horizontal = horizontalTable?.HorizontalOffset ?? 0;
     }

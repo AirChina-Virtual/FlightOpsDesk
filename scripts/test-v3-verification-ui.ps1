@@ -27,7 +27,8 @@ function Wait([scriptblock]$condition) {
     throw "Timeout: $condition"
 }
 function Click([string]$name){
-    $button=Wait {All|Where-Object{($_.Current.Name -eq $name -or ($name -eq 'More' -and $_.Current.AutomationId -eq 'MoreButton')) -and $_.GetSupportedPatterns().Id.Contains([System.Windows.Automation.InvokePattern]::Pattern.Id)}|Select-Object -First 1}
+    if($name -in @('More','Undo','Redo')){Wait {(Q state).idle}|Out-Null}
+    $button=Wait {All|Where-Object{($_.Current.Name -eq $name -or ($name -eq 'More' -and $_.Current.AutomationId -eq 'MoreButton')) -and ($_.GetSupportedPatterns().Id -contains [System.Windows.Automation.InvokePattern]::Pattern.Id)}|Select-Object -First 1}
     ([System.Windows.Automation.InvokePattern]$button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke()
 }
 try {
@@ -50,7 +51,7 @@ try {
         Wait {(Q state).name -eq $start.name}|Out-Null
         Click 'More';Click 'Redo'
         Wait {(Q state).name -eq 'history second'}|Out-Null
-        Q close|Out-Null;Assert ($p.WaitForExit(10000)) 'Close did not persist history'
+        Wait {(Q state).idle}|Out-Null;Q close|Out-Null;Assert ($p.WaitForExit(10000)) 'Close did not persist history'
         & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --assert-history-ui $dir 'history second' $start.name
         if($LASTEXITCODE -ne 0){throw 'History restart verification failed'}
         Write-Output 'PASS actual Undo/Redo buttons, same-cell continuation across autosaves, workspace switch and history after restart'
@@ -117,5 +118,5 @@ try {
     }
 } finally {
     if(!$p.HasExited){$null=$p.CloseMainWindow();if(!$p.WaitForExit(10000)){$p.Kill();$p.WaitForExit()}}
-    $pipe.Dispose();Remove-Item Env:VAMSYS_QA_PIPE -ErrorAction SilentlyContinue
+    $pipe.Dispose();Remove-Item Env:VAMSYS_QA_PIPE -ErrorAction SilentlyContinue;Remove-Item Env:VAMSYS_DATA_DIR -ErrorAction SilentlyContinue
 }

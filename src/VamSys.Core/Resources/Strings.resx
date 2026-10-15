@@ -918,4 +918,20 @@
   <data name="StorageStale" xml:space="preserve"><value>本地数据已被其他保存更新，请重新载入后再操作。</value></data>
   <data name="StorageInUse" xml:space="preserve"><value>该数据目录已由另一个程序实例使用，请先关闭该实例。</value></data>
   <data name="StorageReload" xml:space="preserve"><value>无法重新载入已保存数据，请关闭并重新启动程序后再操作。</value></data>
-<data name="CloseBlocked" xml:space="preserve"><value>请先完成当前操作或关闭对话框，再退出程序。</value></data><data name="CloseSaving" xml:space="preserve"><value>正在保存并关闭，暂时禁止编辑。</value></data></root>
+<data name="CloseBlocked" xml:space="preserve"><value>请先完成当前操作或关闭对话框，再退出程序。</value></data><data name="CloseSaving" xml:space="preserve"><value>正在保存并关闭，暂时禁止编辑。</value></data><data name="TableFirst" xml:space="preserve"><value>首页</value></data>
+<data name="TablePrevious" xml:space="preserve"><value>上一页</value></data>
+<data name="TableNext" xml:space="preserve"><value>下一页</value></data>
+<data name="TableLast" xml:space="preserve"><value>末页</value></data>
+<data name="TableGo" xml:space="preserve"><value>跳转</value></data>
+<data name="TablePageSize" xml:space="preserve"><value>每页</value></data>
+<data name="TablePageSummary" xml:space="preserve"><value>第 {page}/{pages} 页 · {first}–{last} / {total} 条</value></data>
+<data name="TableSelectionSummary" xml:space="preserve"><value>已选 {total} 条 · 当前页 {page} 条</value></data>
+<data name="TableSelectPage" xml:space="preserve"><value>全选本页</value></data>
+<data name="TableSelectAll" xml:space="preserve"><value>选择全部筛选结果</value></data>
+<data name="TableClearSelection" xml:space="preserve"><value>清空选择</value></data>
+<data name="TableCancelQuery" xml:space="preserve"><value>取消查询</value></data>
+<data name="TableInvalidPage" xml:space="preserve"><value>请输入有效页码。</value></data>
+<data name="TableLoading" xml:space="preserve"><value>正在筛选数据…</value></data>
+<data name="TableReady" xml:space="preserve"><value>已加载 {count} 条结果。</value></data>
+<data name="TableQueryCanceled" xml:space="preserve"><value>查询已取消，保留原有结果。</value></data>
+</root>

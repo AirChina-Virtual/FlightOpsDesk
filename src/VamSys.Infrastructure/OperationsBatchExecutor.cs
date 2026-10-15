@@ -25,7 +25,7 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
         {
             if(writer==null) { ApplyRebase(workspace,item,verified); api.ConfirmCandidate(item,verified,queries); if(verified==null && (item.RemoteId ?? item.Before?.Identity?.RemoteId) is string id)api.Forget(item.Resource,id); return; }
             var original=workspace.Resources[item.Resource];
-            var current=original.Draft.FirstOrDefault(r=>r.LocalId==item.After.LocalId);
+            var current=original.FindDraftRow(item.After.LocalId);
             var data=new ResourceData{Draft=current==null?[]:[current.Copy()],SnapshotAt=original.SnapshotAt};
             var staged=workspace.StageResource(item.Resource,data);
             var stagedItem=System.Text.Json.JsonSerializer.Deserialize<ChangeItem>(System.Text.Json.JsonSerializer.Serialize(item))!;
@@ -39,8 +39,8 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
             original.Snapshot.RemoveAll(r=>r.LocalId==delta.LocalId);
             if(delta.Snapshot.Row!=null)original.Snapshot.Add(delta.Snapshot.Row);
             if(delta.Draft.Action==RowMutationKind.Delete)original.Draft.RemoveAll(r=>r.LocalId==delta.LocalId);
-            else if(delta.Draft.Row!=null)original.Draft[original.Draft.FindIndex(r=>r.LocalId==delta.LocalId)]=delta.Draft.Row;
-            original.ClearHistory();original.SnapshotAt=delta.SnapshotAt;
+            else if(delta.Draft.Row!=null)original.ReplaceDraftRows([delta.Draft.Row]);
+            original.ClearHistory(invalidateIndex:delta.Draft.Action==RowMutationKind.Delete);original.SnapshotAt=delta.SnapshotAt;
             workspace.VerifiedOperations=staged.VerifiedOperations;
             item.RemoteId=stagedItem.RemoteId;item.After=stagedItem.After;item.CreateCompleted=stagedItem.CreateCompleted;
             item.RecoveryCandidateId=stagedItem.RecoveryCandidateId;item.Rebased=stagedItem.Rebased;
@@ -168,10 +168,10 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
             if(item.Kind==ChangeKind.Create) item.CreateCompleted=true;
             item.RecoveryCandidateId=null;
             verified.LocalId=item.After.LocalId;
-            var current=data.Draft.FirstOrDefault(r=>r.LocalId==verified.LocalId);
+            var current=data.FindDraftRow(verified.LocalId);
             if(current!=null)
             {
-                var position=data.Draft.IndexOf(current);current=current.Copy();data.Draft[position]=current;
+                current=current.Copy();data.ReplaceDraftRows([current]);
                 foreach(var field in verified.Fields.Keys)
                     if(field=="ID" || current.Get(field)==item.After.Get(field) || current.Get(field).Contains("local:")) current.Fields[field]=verified.Get(field);
                 current.Identity=verified.Identity; current.RawApiJson=verified.RawApiJson;
@@ -180,7 +180,7 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
             data.Snapshot.Add(verified.Copy());
         }
         item.Rebased=true; item.State=ItemState.Succeeded; item.SetMessage(Messages.Define("Text_631F4DBEC2"));
-        data.ClearHistory(); data.SnapshotAt=DateTimeOffset.UtcNow;
+        data.ClearHistory(invalidateIndex:verified is null); data.SnapshotAt=DateTimeOffset.UtcNow;
         var operation=$"{item.Resource}:{item.Kind}";
         if(!workspace.VerifiedOperations.Contains(operation)) workspace.VerifiedOperations.Add(operation);
     }

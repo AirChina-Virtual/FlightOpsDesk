@@ -6,7 +6,8 @@ public sealed partial class MainWindow
     int interactiveOperations,dialogs;
     void FreezeClosing(bool frozen)
     {
-        autosave.Stop();
+        autosave.Stop(); CancelDataQuery();
+        RefreshDataAvailability();
         Navigation.IsEnabled=!frozen;WorkspacePicker.IsEnabled=!frozen;AppTitleBar.IsPaneToggleButtonVisible=!frozen;
         BusyRing.IsActive=frozen;
         if(frozen)Status(()=>L("CloseSaving"));

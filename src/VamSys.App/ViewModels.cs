@@ -9,22 +9,49 @@ public sealed class CellViewModel : ObservableObject
     readonly Action<string> commit;
     public string Field { get; }
     public double Width => Field == "_delete" ? 150 : Field is "ID" or "ICAO/IATA" ? 110 : Field is "Fleet ID" or "Fleet IDs" ? 260 : 180;
-    public bool IsReadOnly { get; init; }
+    bool readOnly;
+    public bool IsReadOnly { get => readOnly; set { if (SetProperty(ref readOnly,value)) OnPropertyChanged(nameof(IsEnabled)); } }
     public bool IsEnabled => !IsReadOnly;
     public string EditorVisibility => Field is "_delete" or "Fleet ID" or "Fleet IDs" ? "Collapsed" : "Visible";
     public string FleetVisibility => Field is "Fleet ID" or "Fleet IDs" ? "Visible" : "Collapsed";
     public string StatusVisibility => Field == "_delete" ? "Visible" : "Collapsed";
     public Func<string> DisplayText { get; init; } = () => "";
+    string? lastDisplay, lastFleetName;
     public string DisplayValue => DisplayText();
     public Func<string> FleetName { get; init; } = () => "";
     public string FleetAutomationName => FleetName();
-    public void RefreshLanguage() { OnPropertyChanged(nameof(DisplayValue)); OnPropertyChanged(nameof(FleetAutomationName)); }
+    public void RefreshLanguage()
+    {
+        if (Field is "_delete" or "Fleet ID" or "Fleet IDs")
+        {
+            var text=DisplayText();
+            if(lastDisplay!=text){lastDisplay=text;OnPropertyChanged(nameof(DisplayValue));}
+        }
+        if (Field is "Fleet ID" or "Fleet IDs")
+        {
+            var name=FleetName();
+            if(lastFleetName!=name){lastFleetName=name;OnPropertyChanged(nameof(FleetAutomationName));}
+        }
+    }
+    public void SyncFromSource(string text, bool isReadOnly)
+    { SetProperty(ref value,text,nameof(Value)); IsReadOnly=isReadOnly; RefreshLanguage(); }
     public IAsyncRelayCommand? ChooseFleet { get; init; }
     public Func<bool> CanEdit {get;init;}=()=>true;
     public string Value { get => value; set { if (!CanEdit() || this.value == value) return; commit(value); SetProperty(ref this.value, value); } }
     public CellViewModel(string field, string value, Action<string> commit) { Field = field; this.value = value; this.commit = commit; }
 }
-public sealed record RowViewModel(DataRow Row, List<CellViewModel> Cells);
+public sealed class RowViewModel(DataRow row, List<CellViewModel> cells)
+{
+    public DataRow Row { get; private set; } = row;
+    public List<CellViewModel> Cells { get; } = cells;
+    public object? CellTemplates { get; init; }
+    public void Rebind(DataRow row)
+    {
+        Row=row;
+        foreach(var cell in Cells) cell.SyncFromSource(row.Get(cell.Field),Schemas.Deleted(row));
+    }
+    public override string ToString() => nameof(RowViewModel)+" "+Row.LocalId;
+}
 public sealed record WorkspaceChoice(Guid Id, string Name);
 
 public sealed class FleetOptionViewModel : ObservableObject

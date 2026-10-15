@@ -34,14 +34,28 @@ public sealed class ChangePlanner : IChangePlanner
         foreach (var row in data.Draft)
         {
             baseline.TryGetValue(row.LocalId, out var before);
-            var fields = row.Fields.Where(p => p.Key != "_delete" && (before is null || !before.Fields.TryGetValue(p.Key, out var old) || old != p.Value))
-                .ToDictionary(p => p.Key, p => new FieldChange(p.Value == "" ? FieldIntent.Clear : FieldIntent.Set, p.Value));
+            Dictionary<string, FieldChange>? fields = null;
+            foreach (var field in row.Fields)
+                if (Changed(field, before))
+                    (fields ??= new(StringComparer.Ordinal)).Add(field.Key,
+                        new(field.Value == "" ? FieldIntent.Clear : FieldIntent.Set, field.Value));
             var delete = Schemas.Deleted(row);
-            if (before != null && !delete && fields.Count == 0) continue;
+            if (before != null && !delete && fields is null) continue;
             if (before is null && delete) continue;
-            result.Add(new() { Resource = kind, Kind = delete ? ChangeKind.Delete : before is null ? ChangeKind.Create : ChangeKind.Update, Before = before?.Copy(), After = row.Copy(), Fields = fields });
+            result.Add(new(row.Copy(), fields ?? new(StringComparer.Ordinal)) { Resource = kind, Kind = delete ? ChangeKind.Delete : before is null ? ChangeKind.Create : ChangeKind.Update, Before = before?.Copy() });
         }
         return result;
+    }
+    static bool Changed(KeyValuePair<string, string> field, DataRow? baseline)
+        => field.Key != "_delete" && (baseline is null || !baseline.Fields.TryGetValue(field.Key, out var old) || old != field.Value);
+
+    public static ChangeKind? GetChangeKind(DataRow row, DataRow? baseline)
+    {
+        if (Schemas.Deleted(row)) return baseline is null ? null : ChangeKind.Delete;
+        if (baseline is null) return ChangeKind.Create;
+        foreach (var field in row.Fields)
+            if (Changed(field, baseline)) return ChangeKind.Update;
+        return null;
     }
 }
 public enum RuleKind { Set, Replace, AddTags, RemoveTags, ShiftMinutes, ShiftDays, Retire }

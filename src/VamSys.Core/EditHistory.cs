@@ -10,10 +10,26 @@ public sealed record RowImage(Guid LocalId, ResourceIdentity? Identity, string? 
     public static RowImage Capture(DataRow row) => new(row.LocalId,row.Identity,row.RawApiJson,row.Fields.ToImmutableDictionary(StringComparer.Ordinal),[..row.Fields.Keys]);
     public DataRow Restore()
     {
-        if(FieldOrder.IsDefault||FieldOrder.Length!=Fields.Count||FieldOrder.Distinct(StringComparer.Ordinal).Count()!=Fields.Count||FieldOrder.Any(k=>!Fields.ContainsKey(k)))throw new InvalidDataException("Invalid history field order.");
-        return new() { LocalId=LocalId,Identity=Identity,RawApiJson=RawApiJson,Fields=FieldOrder.ToDictionary(k=>k,k=>Fields[k],StringComparer.Ordinal) };
+        if(FieldOrder.IsDefault||FieldOrder.Length!=Fields.Count)throw new InvalidDataException("Invalid history field order.");
+        var fields=new Dictionary<string,string>(Fields.Count,StringComparer.Ordinal);
+        foreach(var key in FieldOrder)
+            if(key is null||!Fields.TryGetValue(key,out var value)||!fields.TryAdd(key,value))throw new InvalidDataException("Invalid history field order.");
+        return new(LocalId,Identity,RawApiJson,fields);
     }
     public static bool Same(RowImage? a,RowImage? b) => ReferenceEquals(a,b) || a!=null && b!=null && a.LocalId==b.LocalId && a.Identity==b.Identity && a.RawApiJson==b.RawApiJson && a.Fields.Count==b.Fields.Count && a.FieldOrder.SequenceEqual(b.FieldOrder) && a.Fields.All(p=>b.Fields.TryGetValue(p.Key,out var v)&&v==p.Value);
+    internal static bool Matches(RowImage? image, DataRow? row)
+    {
+        if (image is null || row is null) return image is null && row is null;
+        if (image.LocalId != row.LocalId || image.Identity != row.Identity || image.RawApiJson != row.RawApiJson
+            || image.Fields.Count != row.Fields.Count || image.FieldOrder.IsDefault
+            || image.FieldOrder.Length != row.Fields.Count) return false;
+        var orderIndex=0;
+        foreach(var field in row.Fields)
+            if(field.Key!=image.FieldOrder[orderIndex++])return false;
+        foreach (var field in image.Fields)
+            if (!row.Fields.TryGetValue(field.Key, out var value) || value != field.Value) return false;
+        return true;
+    }
 }
 public sealed record RowEdit(Guid LocalId,RowImage? Before,RowImage? After);
 public sealed record HistoryStep(Guid StepId,ImmutableArray<RowEdit> Rows,ImmutableArray<Guid>? BeforeOrder,ImmutableArray<Guid>? AfterOrder);
@@ -65,21 +81,52 @@ public sealed class EditHistory
     // Validate every precondition before mutating any row or stack.
     static void Apply(ResourceData data,HistoryStep step,bool forward)
     {
-        var index=data.Draft.ToDictionary(r=>r.LocalId);
+        if (step.BeforeOrder is null && step.AfterOrder is null && step.Rows.All(r => r.Before != null && r.After != null))
+        {
+            data.EnsureDraftIndex();
+            var prepared = new List<DataRow>(step.Rows.Length);
+            var touched = new HashSet<Guid>(step.Rows.Length);
+            foreach (var edit in step.Rows)
+            {
+                var before = forward ? edit.Before! : edit.After!;
+                var after = forward ? edit.After! : edit.Before!;
+                if (!touched.Add(edit.LocalId) || before.LocalId != edit.LocalId || after.LocalId != edit.LocalId)
+                    throw new InvalidDataException("Invalid history row.");
+                if (!RowImage.Matches(before, data.FindDraftRow(edit.LocalId)))
+                    throw new InvalidDataException("History row does not match draft.");
+                prepared.Add(after.Restore());
+            }
+            data.ReplaceDraftRows(prepared);
+            return;
+        }
+        var draft=data.Draft;var positions=data.GetDraftPositions();
+        // Validate the complete cached source index, including undeclared external reorders.
+        for(var n=0;n<draft.Count;n++)
+            if(!positions.TryGetValue(draft[n].LocalId,out var at)||at!=n)
+            {data.InvalidateDraftIndex();positions=data.GetDraftPositions();break;}
         var from=forward?step.BeforeOrder:step.AfterOrder;var to=forward?step.AfterOrder:step.BeforeOrder;
-        if((from==null)!=(to==null)||from is {} order&&!data.Draft.Select(r=>r.LocalId).SequenceEqual(order))throw new InvalidDataException("History order does not match draft.");
-        var seen=new HashSet<Guid>();
+        if((from==null)!=(to==null)||from is {} order&&!draft.Select(r=>r.LocalId).SequenceEqual(order))throw new InvalidDataException("History order does not match draft.");
+        var changes=new Dictionary<Guid,DataRow?>(step.Rows.Length);var count=draft.Count;
         foreach(var edit in step.Rows)
         {
             var before=forward?edit.Before:edit.After;var after=forward?edit.After:edit.Before;
-            if(!seen.Add(edit.LocalId)||before!=null&&before.LocalId!=edit.LocalId||after!=null&&after.LocalId!=edit.LocalId||before==null&&after==null)throw new InvalidDataException("Invalid history row.");
-            var actual=index.GetValueOrDefault(edit.LocalId);
-            if(!RowImage.Same(before,actual==null?null:RowImage.Capture(actual)))throw new InvalidDataException("History row does not match draft.");
-            if(after==null)index.Remove(edit.LocalId);else index[edit.LocalId]=after.Restore();
+            if(changes.ContainsKey(edit.LocalId)||before!=null&&before.LocalId!=edit.LocalId||after!=null&&after.LocalId!=edit.LocalId||before==null&&after==null)throw new InvalidDataException("Invalid history row.");
+            var actual=positions.TryGetValue(edit.LocalId,out var at)?draft[at]:null;
+            if(!RowImage.Matches(before,actual))throw new InvalidDataException("History row does not match draft.");
+            changes.Add(edit.LocalId,after?.Restore());
+            if(before==null)count++;else if(after==null)count--;
         }
-        var resultOrder=to??[..data.Draft.Select(r=>r.LocalId)];
-        if(resultOrder.Length!=index.Count||resultOrder.Distinct().Count()!=index.Count||resultOrder.Any(id=>!index.ContainsKey(id)))throw new InvalidDataException("Invalid history result order.");
-        data.Draft=resultOrder.Select(id=>index[id]).ToList();
+        var resultOrder=to??[..draft.Select(r=>r.LocalId)];
+        if(resultOrder.Length!=count)throw new InvalidDataException("Invalid history result order.");
+        var nextPositions=new Dictionary<Guid,int>(count);var restoredRows=new List<DataRow>(count);
+        foreach(var id in resultOrder)
+        {
+            if(!nextPositions.TryAdd(id,restoredRows.Count))throw new InvalidDataException("Invalid history result order.");
+            var row=changes.TryGetValue(id,out var changed)?changed:positions.TryGetValue(id,out var at)?draft[at]:null;
+            if(row==null)throw new InvalidDataException("Invalid history result order.");
+            restoredRows.Add(row);
+        }
+        data.ReplaceIndexedDraft(restoredRows,nextPositions);
     }
     public void Validate(ResourceData data)
     {
@@ -87,7 +134,8 @@ public sealed class EditHistory
         if(undo.Count>20||undo.Concat(redo).Select(s=>s.StepId).Distinct().Count()!=undo.Count+redo.Count||undo.Concat(redo).Any(s=>s.StepId==Guid.Empty))throw new InvalidDataException("Invalid history steps.");
         foreach(var backwards in new[]{true,false})
         {
-            var probe=new ResourceData {Draft=data.Draft.Select(r=>r.Copy()).ToList()};
+            // Apply replaces rows; untouched row objects can be shared safely.
+            var probe=new ResourceData {Draft=[..data.Draft]};
             foreach(var step in (backwards?undo:redo).AsEnumerable().Reverse())Apply(probe,step,!backwards);
         }
     }

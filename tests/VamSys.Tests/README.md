@@ -4,6 +4,8 @@
 
 测试直接调用 Infrastructure 和 Core 中的实际代码。任务页面的数据处理也使用 App/TaskViewModels.cs 原文件，确保检查的是程序真正使用的逻辑，而不是另一份只供测试的版本。
 
+数据页查询、分页、选择及单元格模型同样链接 App 中的原文件，能够在不启动 WinUI 的情况下检查完整数据查询、模型重新绑定和跨页选择。
+
 测试引用会为 Infrastructure 启用 `VamSysTestSupport=true`，从 tests/TestSupport 链接存储故障注入和内部访问授权；这些依赖编译到 artifacts/test-build，正式构建不会复用。测试运行器本身仍位于本项目 bin/Release，因此原有 `--no-build` 和子进程恢复入口保持有效。
 
 ## 运行入口
@@ -28,6 +30,16 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -- --hist
 
 # 测量确认修改成功后保存一条记录的开销，并写入文件
 dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -- --benchmark-v3 artifacts/v3-rebase.json
+
+# 核心规划、索引、撤销替换与 20 步历史校验；每场景 5 次预热、20 次采样
+dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-core artifacts/core-performance/current.json
+
+# 完整 JSON 反序列化和 20 步历史校验，包含全部数据行
+dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-core-load artifacts/core-performance/current-load.json
+
+# 分别只检查核心优化或数据页模型
+dotnet run --project tests/VamSys.Tests -c Release -- --core-optimization
+dotnet run --project tests/VamSys.Tests -c Release -- --data-table
 ~~~
 
 部分检查会调用 Windows 的密钥保护功能或启动额外进程，因此完整测试应在 Windows 上运行。测试文件和数据库要放在单独的目录，不能使用用户真正工作的数据。
@@ -50,6 +62,8 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -- --benc
 | HistoryScenarios.cs | 旧全快照独立对照、全部历史迁移、异步载荷、实际写入范围、淘汰分支、字段顺序与规模基准 |
 | TaskViewModelScenarios.cs | 检查页面是否只显示已保存结果，以及更新时计数和列表是否正确 |
 | PerformanceScenarios.cs | 统计请求次数，并测量大量记录下的查重和处理速度 |
+| CoreOptimizationScenarios.cs、CorePerformanceBenchmark.cs | 原规划对照、位置索引、局部回放失败原子性和 1 千／2 万／5 万行基准 |
+| DataTableScenarios.cs、DataUiFixture.cs | 分页、跨页选择、完整查询、模型重新绑定和安全的窗口种子数据 |
 | TestTime.cs | 两种虚拟时钟，让测试不必真实等待（见下节） |
 | PackageChecks.cs | 读取正式／QA 发布程序集元数据，检查测试入口、依赖、文件清单和用户文档链接 |
 
@@ -74,6 +88,15 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -- --benc
 
 ## 怎样检查实际窗口
 
+所有 `--seed-*` 窗口入口在写入前拒绝已有文件的目录；窗口脚本默认创建 artifacts 下的新 GUID 目录，只清理自己启动的进程，不调用真实 API。性能脚本使用全部 20 个航线字段、20 步历史的演示数据，测量原生窗口绑定与布局，并验证重新绑定的文本框不会修改上一页记录：
+
+~~~powershell
+./scripts/test-data-performance-ui.ps1 -Rows 20000 -Executable "$PWD/artifacts/v3-qa/FlightOpsDesk.exe"
+./scripts/test-data-performance-ui.ps1 -Rows 50000 -Executable "$PWD/artifacts/v3-qa/FlightOpsDesk.exe"
+~~~
+
+结果位于 artifacts/ui-performance/<行数>；翻页、语言切换、单格处理及撤销加完整保存均预热 5 次、采样 20 次。首次展示和全字段搜索另行计时，计算期间保留旧结果。核心旧版比较使用修改前的实际源码副本编译，同一份基准运行器分别执行。
+
 --seed-task-ui、--seed-storage-ui、--seed-recovery-ui 等参数会生成专门用于检查窗口的测试数据，不要对正常数据目录运行。`scripts/test-v3-verification-ui.ps1 -Autosave` 会在实际窗口中编辑两次单元格，确认自动保存只写行、没有完整保存，然后强制结束程序，重新读取数据库确认编辑没有丢失。../../scripts 中的脚本会实际操作窗口，需要可用的 Windows 桌面。模拟保存失败等检查还需要通过 `UiVerification=true` 构建的专用测试版本。
 
 使用 `./scripts/build.ps1 -Publish -UiVerification` 生成 QA 版本到 artifacts/v3-qa；窗口辅助代码位于 tests/UiVerification，不编译进正式程序。`./scripts/build.ps1 -Publish` 生成正式包到 artifacts/flightops-app。两种发布均会运行对应的包隔离检查，也可单独执行：
@@ -87,7 +110,7 @@ dotnet run --no-build --project tests/VamSys.Tests -c Release -- --verify-qa-pac
 
 ## 如何读取报告
 
-本轮本机共有 192 项自动测试通过，全部运行约 26–28 秒。其中真实 v3 二进制拒绝 v4 的附加用例在 artifacts/step5-v3-baseline 存在时运行；没有该本地基线时为 191 项。`--history` 覆盖 3 个种子各 1,000 次随机操作及固定旧格式夹具；`test-v3-verification-ui.ps1 -History` 使用实际撤销／重做按钮检查跨自动保存、工作区切换和重启。比较速度时也要看数据量、机器配置和测量方法。
+本轮本机共有 202 项自动测试通过。其中真实 v3 二进制拒绝 v4 的附加用例在 artifacts/step5-v3-baseline 存在时运行；没有该本地基线时为 201 项。`--history` 覆盖 3 个种子各 1,000 次随机操作及固定旧格式夹具；`test-v3-verification-ui.ps1 -History` 使用实际撤销／重做按钮检查跨自动保存、工作区切换和重启。比较速度时也要看数据量、机器配置和测量方法。
 
 为新问题补测试时，应检查真正可能出错的结果，例如多发了一次请求、重复创建了记录，或保存失败后数据只更新了一半。
 
