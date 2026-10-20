@@ -1,4 +1,4 @@
-param([string]$DataDirectory = ('F:\vamsys\artifacts\credentials-ui-' + [Guid]::NewGuid().ToString('N')))
+param([string]$DataDirectory = ("$PSScriptRoot\..\artifacts\credentials-ui-" + [Guid]::NewGuid().ToString('N')))
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 $scope=[System.Windows.Automation.TreeScope]::Descendants
