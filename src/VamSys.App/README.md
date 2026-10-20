@@ -20,6 +20,9 @@
 | MainWindow.Closing.cs | 关闭时暂时禁用操作并保存；失败后允许继续编辑和重试 |
 | MainWindow.Tasks.cs | 只创建可见的任务卡片和详情行；保存成功后更新发生变化的内容 |
 | TaskViewModels.cs | 记住每条任务的显示内容和数量，避免每次进度变化都重新统计全部任务 |
+| MainWindow.Review.cs、ReviewPlanBuilder.cs | 工作区分组审阅、提交资格与同一份确认清单；不依赖 WinUI 的预览逻辑供测试复用 |
+| MainWindow.Batch.cs、BatchEditPreview.cs | 已选记录范围、实际变化计数及预览期间的本地操作锁 |
+| MainWindow.DataLayout.cs | 响应式页头、舒适／紧凑密度、统一表头及滚动锚点恢复 |
 | MainWindow.PageState.cs | 页面状态保存，支持返回页面时恢复交互位置 |
 | MainWindow.Data.cs | 缓存数据页、分片捕获查询输入、取消过期查询、分页、跨页选择和当前页控件复用 |
 | DataTableViewModel.cs | 不依赖 WinUI 的完整结果 ID、查询、分页状态及已选 ID 模型 |
