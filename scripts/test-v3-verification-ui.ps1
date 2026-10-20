@@ -1,4 +1,4 @@
-param([switch]$Tasks,[switch]$InteractionsOnly,[switch]$Autosave,[switch]$History)
+param([switch]$Tasks,[switch]$InteractionsOnly,[switch]$Autosave,[switch]$History,[string]$Executable)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 $repo=Split-Path $PSScriptRoot -Parent
@@ -9,7 +9,8 @@ if($Tasks){& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/te
 else {& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --seed-storage-ui $dir legacy}
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $env:VAMSYS_DATA_DIR=$dir;$env:VAMSYS_QA_PIPE=$pipeName
-$p=Start-Process "$repo/artifacts/v3-qa/FlightOpsDesk.exe" -WindowStyle Hidden -PassThru
+if(!$Executable){$Executable="$repo/artifacts/v3-qa/FlightOpsDesk.exe"}
+$p=Start-Process $Executable -WindowStyle Hidden -PassThru
 $pipe=[IO.Pipes.NamedPipeClientStream]::new('.',$pipeName,[IO.Pipes.PipeDirection]::InOut)
 function Q([string]$command){
     $writer.WriteLine($command);$line=$reader.ReadLine()
@@ -40,10 +41,13 @@ try {
         Q 'edit:history second'|Out-Null
         Wait {(Q state).draftSaves -ge $start.draftSaves+2}|Out-Null
         Assert ((Q state).undo -eq $start.undo+1) 'Same cell was not grouped across saves'
+        $beforeButtons=Q state
         Click 'More';Click 'Undo'
         Wait {(Q state).name -eq $start.name}|Out-Null
         Click 'More';Click 'Redo'
         Wait {(Q state).name -eq 'history second'}|Out-Null
+        $afterButtons=Wait {$s=Q state;if($s.idle -and $s.draftSaves -ge $beforeButtons.draftSaves+2){$s}}
+        Assert ($afterButtons.fullSaves -eq $beforeButtons.fullSaves) 'Undo/Redo of an edited cell used a full save'
         Q workspace-away|Out-Null;Wait {(Q state).workspaceName -eq 'QA other'}|Out-Null
         Q workspace-back|Out-Null;Wait {(Q state).workspaceName -eq $start.workspaceName}|Out-Null;Q prepare|Out-Null
         Assert ((Q state).name -eq 'history second') 'Workspace switching lost history'

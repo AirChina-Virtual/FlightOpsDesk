@@ -21,10 +21,10 @@ function Remove-PublishDirectory([string]$Path) {
 Push-Location $repo
 try {
     # Tests reference a separately compiled Infrastructure with fault-injection support.
-    & $sdk run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
+    & $sdk run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true -p:BuildInParallel=false -p:UseSharedCompilation=false
     if ($LASTEXITCODE -ne 0) { throw 'Behavior tests failed' }
     $qa = $UiVerification.IsPresent.ToString().ToLowerInvariant()
-    $properties = @('-p:Platform=x64', '-p:RestoreLockedMode=true', "-p:UiVerification=$qa", "-p:VamSysTestSupport=$qa")
+    $properties = @('-m:1', '-nr:false', '-p:UseSharedCompilation=false', '-p:Platform=x64', '-p:RestoreLockedMode=true', "-p:UiVerification=$qa", "-p:VamSysTestSupport=$qa")
     if (!$Publish) {
         & $sdk build src/VamSys.App/VamSys.App.csproj -c Release @properties
         if ($LASTEXITCODE -ne 0) { throw 'Desktop build failed' }

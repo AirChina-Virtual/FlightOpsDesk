@@ -16,6 +16,9 @@
 # 运行全部自动检查
 dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
 
+# 工作区审阅、批量选择范围及密度偏好
+dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -- --ui-interactions
+
 # 只检查 v3 保存方式和任务页面的数据更新
 dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -- --v3
 
@@ -60,6 +63,7 @@ dotnet run --project tests/VamSys.Tests -c Release -- --data-table
 | StorageProcessScenarios.cs | 强制结束正在执行的测试程序，再启动它，检查是否重复提交；也检查只保存编辑行时被强制结束的情况 |
 | DraftSaveScenarios.cs | 编辑单元格后只保存对应行：检查写入范围、重新读取后与内存一致、旧版本号和缺失行的处理，以及保存失败后的交接 |
 | HistoryScenarios.cs | 旧全快照独立对照、全部历史迁移、异步载荷、实际写入范围、淘汰分支、字段顺序与规模基准 |
+| UiInteractionScenarios.cs | 工作区审阅、小样本与依赖闭包、预览失效、无网络预览、批量范围与 no-op、密度偏好 |
 | TaskViewModelScenarios.cs | 检查页面是否只显示已保存结果，以及更新时计数和列表是否正确 |
 | PerformanceScenarios.cs | 统计请求次数，并测量大量记录下的查重和处理速度 |
 | CoreOptimizationScenarios.cs、CorePerformanceBenchmark.cs | 原规划对照、位置索引、局部回放失败原子性和 1 千／2 万／5 万行基准 |
@@ -95,6 +99,8 @@ dotnet run --project tests/VamSys.Tests -c Release -- --data-table
 ./scripts/test-data-performance-ui.ps1 -Rows 50000 -Executable "$PWD/artifacts/v3-qa/FlightOpsDesk.exe"
 ~~~
 
+范围与密度窗口验收另用 `./scripts/test-ui-interactions.ps1 -Rows 20000`（或 50000），结果写入 artifacts/ui-interactions/<行数>，记录实际缩放、行高、完整可见行数、锚点、预览锁及 16 种布局组合。窗口截图使用 PrintWindow；仅渲染 RootGrid 的位图可能保留滚动控件的旧合成缓存，不用其判断原生文本是否正确。
+
 结果位于 artifacts/ui-performance/<行数>；翻页、语言切换、单格处理及撤销加完整保存均预热 5 次、采样 20 次。首次展示和全字段搜索另行计时，计算期间保留旧结果。核心旧版比较使用修改前的实际源码副本编译，同一份基准运行器分别执行。
 
 --seed-task-ui、--seed-storage-ui、--seed-recovery-ui 等参数会生成专门用于检查窗口的测试数据，不要对正常数据目录运行。`scripts/test-v3-verification-ui.ps1 -Autosave` 会在实际窗口中编辑两次单元格，确认自动保存只写行、没有完整保存，然后强制结束程序，重新读取数据库确认编辑没有丢失。../../scripts 中的脚本会实际操作窗口，需要可用的 Windows 桌面。模拟保存失败等检查还需要通过 `UiVerification=true` 构建的专用测试版本。
@@ -110,7 +116,7 @@ dotnet run --no-build --project tests/VamSys.Tests -c Release -- --verify-qa-pac
 
 ## 如何读取报告
 
-本轮本机共有 202 项自动测试通过。其中真实 v3 二进制拒绝 v4 的附加用例在 artifacts/step5-v3-baseline 存在时运行；没有该本地基线时为 201 项。`--history` 覆盖 3 个种子各 1,000 次随机操作及固定旧格式夹具；`test-v3-verification-ui.ps1 -History` 使用实际撤销／重做按钮检查跨自动保存、工作区切换和重启。比较速度时也要看数据量、机器配置和测量方法。
+本轮本机共有 214 项自动测试通过。其中真实 v3 二进制拒绝 v4 的附加用例在 artifacts/step5-v3-baseline 存在时运行；没有该本地基线时为 213 项。`--history` 覆盖 3 个种子各 1,000 次随机操作及固定旧格式夹具；`test-v3-verification-ui.ps1 -History` 使用实际撤销／重做按钮检查跨自动保存、工作区切换和重启。比较速度时也要看数据量、机器配置和测量方法。
 
 为新问题补测试时，应检查真正可能出错的结果，例如多发了一次请求、重复创建了记录，或保存失败后数据只更新了一半。
 

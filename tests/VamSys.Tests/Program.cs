@@ -67,6 +67,7 @@ if(args.Length==2 && args[0]=="--benchmark-storage"){await StorageScenarios.Benc
 if(args.Length==2 && args[0]=="--benchmark-core"){CorePerformanceBenchmark.Run(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-core-load"){CorePerformanceBenchmark.RunLoad(args[1]);return;}
 if(args.Length==1 && args[0]=="--core-optimization"){await CoreOptimizationScenarios.Run(Test);Summary("core optimization ");return;}
+if(args.Length==1 && args[0]=="--ui-interactions"){await UiInteractionScenarios.Run(Test);Summary("UI interactions ");return;}
 if(args.Length==1 && args[0]=="--data-table"){await DataTableScenarios.Run(Test);Summary("data table ");return;}
 if(args.Length==3 && args[0]=="--seed-data-ui"){DataUiFixture.Seed(args[1],int.Parse(args[2]));return;}
 var csv = new CsvAdapter(); var planner = new ChangePlanner();
@@ -412,6 +413,7 @@ await DraftSaveScenarios.Run(Test);
 await HistoryScenarios.Run(Test);
 await CoreOptimizationScenarios.Run(Test);
 await DataTableScenarios.Run(Test);
+await UiInteractionScenarios.Run(Test);
 Summary("scenarios ");
 
 sealed class CountingService(DemoService inner) : IResourceReader,IResourceWriter

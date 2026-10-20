@@ -53,8 +53,12 @@ try{
     Q 'language:zh-CN'|Out-Null;Q 'data-page:1'|Out-Null
     Q ('data-screenshot:'+(Join-Path $OutputDirectory 'first-page-zh.png'))|Out-Null
     $undoSamples=@();for($n=0;$n -lt 25;$n++){$sample=Q 'data-undo-save';if($n -ge 5){$undoSamples+=$sample}}
-    $undoOrdered=@($undoSamples.totalMilliseconds|Sort-Object);$coreOrdered=@($undoSamples.coreMilliseconds|Sort-Object)
-    $undo=@{samples=$undoSamples;totalMedian=$undoOrdered[10];totalP95=$undoOrdered[18];coreMedian=$coreOrdered[10];coreP95=$coreOrdered[18]}
+    $undoOrdered=@($undoSamples.totalMilliseconds|Sort-Object);$redoOrdered=@($undoSamples.redoMilliseconds|Sort-Object)
+    $undo=@{samples=$undoSamples;totalMedian=$undoOrdered[10];totalP95=$undoOrdered[18];redoMedian=$redoOrdered[10];redoP95=$redoOrdered[18]}
+    # Replacing undo/redo steps must not fall back to a full workspace save.
+    Assert (@($undoSamples|Where-Object{$_.fullCommits -ne 0 -or $_.draftCommits -ne 2}).Count -eq 0) 'Undo/redo of a replaced row did not use the row save'
+    # ...nor re-run the full-data query; the shown rows are rebound in place instead.
+    Assert (@($undoSamples|Where-Object{$_.queries -ne 0 -or !$_.rowsMatch}).Count -eq 0) 'Undo/redo re-queried or left stale rows on the page'
     $process.Refresh();$result=@{rows=$Rows;opened=$opened;search=$search;benchmark=$metrics;last=$last;workingSetBytes=$process.WorkingSet64;dataDirectory=$dir}
     $result.undoWithSave=$undo;$result.reboundEditor=$rebound
     $result|ConvertTo-Json -Depth 15|Set-Content -LiteralPath (Join-Path $OutputDirectory 'benchmark.json') -Encoding utf8
