@@ -1,69 +1,62 @@
 # VamSys.App — FlightOps Desk 桌面界面
 
-这个项目负责你看到和操作的窗口，编译后生成 FlightOpsDesk.exe。文件夹和代码内部仍使用 VamSys.App 这个旧名字，避免仅仅改名就影响其他代码。
+这个项目负责窗口和交互，编译后生成 `FlightOpsDesk.exe`。文件夹和命名空间仍使用 VamSys.App 这个旧名字，避免只为改名而影响其他代码。
 
-## 这个项目负责什么
+使用 C#、WinUI 3 和 CommunityToolkit.Mvvm，目标框架为 net10.0-windows10.0.22621.0，发布为 Windows 11 x64 自包含目录，直接引用 Infrastructure，再由它接入 Core。界面负责点击、编辑表格、选择文件和显示进度；发送请求、判断服务器结果和保存数据库都交给其他项目。用户的修改必须经过检查和审阅，不能从页面直接绕过这些步骤提交。
 
-使用 C#、WinUI 3 和 CommunityToolkit.Mvvm，目标为 net10.0-windows10.0.22621.0，发布 Windows 11 x64 自包含目录。直接引用 Infrastructure，由其接入 Core 业务层。
+## 文件分工
 
-它处理点击按钮、编辑表格、选择文件和显示进度。真正发送请求、判断服务器是否完成操作以及保存数据库的工作，交给其他项目。用户的修改仍然要经过检查和审阅，不能从页面直接绕过这些步骤提交。
-
-## 文件与交互分工
-
-| 文件 | 具体作用 |
+| 文件 | 作用 |
 |---|---|
-| App.xaml.cs | 启动程序；防止两个窗口同时使用同一份数据；记录和显示启动错误 |
-| MainWindow.xaml | 融合标题栏、工作区选择、导航、资源入口与状态栏 |
-| MainWindow.xaml.cs | 切换页面、接收表格修改，并让各次保存按顺序完成 |
-| MainWindow.Api.cs | 连接服务器、刷新数据、提交修改；填写待核对的记录 ID 并恢复任务 |
-| MainWindow.Fleets.cs | 当前工作区内的机型单选、多选及批量分配预览 |
-| MainWindow.Closing.cs | 关闭时暂时禁用操作并保存；失败后允许继续编辑和重试 |
-| MainWindow.Tasks.cs | 只创建可见的任务卡片和详情行；保存成功后更新发生变化的内容 |
-| TaskViewModels.cs | 记住每条任务的显示内容和数量，避免每次进度变化都重新统计全部任务 |
-| MainWindow.Review.cs、ReviewPlanBuilder.cs | 工作区分组审阅、提交资格与同一份确认清单；不依赖 WinUI 的预览逻辑供测试复用 |
-| MainWindow.Batch.cs、BatchEditPreview.cs | 已选记录范围、实际变化计数及预览期间的本地操作锁 |
-| MainWindow.DataLayout.cs | 响应式页头、舒适／紧凑密度、统一表头及滚动锚点恢复 |
-| MainWindow.PageState.cs | 页面状态保存，支持返回页面时恢复交互位置 |
-| MainWindow.Data.cs | 缓存数据页、分片捕获查询输入、取消过期查询、分页、跨页选择和当前页控件复用 |
-| DataTableViewModel.cs | 不依赖 WinUI 的完整结果 ID、查询、分页状态及已选 ID 模型 |
-| CellTemplateSelector.cs | 按字段创建文本框、机型按钮或状态文字，每个单元格只创建所需控件 |
-| MainWindow.Localization.cs、UiLocalization.cs | 即时切换中英文文字，并为读屏软件提供控件名称 |
-| ViewModels.cs | 显示和编辑表格内容，在切换语言后更新提示 |
-| ../../tests/UiVerification/MainWindow.Verification.cs | 仅链接到专用测试版本，用来暂停保存、模拟故障和检查窗口；正式程序不编译此文件 |
-| Assets | SVG、PNG 和多尺寸 ICO 品牌资源 |
+| App.xaml.cs | 启动程序；防止两个窗口同时使用同一份数据；记录并显示启动错误 |
+| MainWindow.xaml、MainWindow.xaml.cs | 标题栏、工作区选择、导航和状态栏；切换页面和工作区；保存顺序；撤销／重做 |
+| MainWindow.Data.cs | 数据页：后台查询、分页、跨页选择、当前页行模型复用、查询期间锁定表格 |
+| MainWindow.DataLayout.cs、MainWindow.PageState.cs | 响应式页头、舒适／紧凑密度、表头；各工作区和资源的查询条件、页码与滚动位置 |
+| DataTableTemplates.xaml | 行和单元格的数据模板，使用编译绑定（x:Bind） |
+| DataRowPresenter.cs | 一行的单元格布局。行容器被回收给另一条记录时，保留单元格控件，只更换数据 |
+| EditableCell.cs | 平时显示文本，点击或用 Tab 进入时才创建 TextBox；自动化接口仍报告为可编辑控件 |
+| CellTemplateSelector.cs | 按字段选择文本单元格、机型按钮或状态文字 |
+| ViewModels.cs、ViewModels.Xaml.cs | 行和单元格模型；ViewModels.cs 不依赖 WinUI，测试项目也会编译它 |
+| DataTableViewModel.cs | 不依赖 WinUI 的完整结果 ID、查询、分页和已选 ID |
+| MainWindow.Review.cs、ReviewPlanBuilder.cs | 工作区审阅：后台构建计划、内容键（SHA-256）、提交前检查；ReviewPlanBuilder 不依赖 WinUI |
+| MainWindow.Batch.cs、BatchEditPreview.cs | 已选记录范围、实际变化计数、本地操作锁 |
+| MainWindow.Fleets.cs | 机型单选、多选和批量分配预览 |
+| MainWindow.Api.cs | 连接服务器、刷新数据、提交、填写待核对的 ID 并恢复任务 |
+| MainWindow.Tasks.cs、TaskViewModels.cs | 任务页只创建可见内容，进度变化只更新相关记录 |
+| MainWindow.Closing.cs | 关闭时冻结操作并保存；失败后恢复编辑并允许重试 |
+| MainWindow.Localization.cs、UiLocalization.cs | 即时切换中英文，为读屏软件提供控件名称 |
+| ../../tests/UiVerification/MainWindow.Verification.cs | 只编译进 QA 版本：窗口控制、故障注入和测量命令；正式程序不包含此文件 |
+| Assets | SVG、PNG 和多尺寸 ICO 图标 |
 
 ## 修改代码时要保留的行为
 
-关闭分为“正常使用、正在保存、已关闭”三个阶段。用户点击关闭后，先禁止继续编辑，再等待保存完成。保存失败时窗口保持打开，草稿还在，并允许继续操作。这样可以避免保存期间新输入的内容丢失。
+**保存。** 编辑单元格后，700 毫秒内没有新的输入就自动保存，并且只写被编辑的行（`SaveEdits`）。只替换已有行的撤销或重做，也通过 `SaveEdits` 保存这些行和撤销栈顺序。其他会修改数据的操作，都必须在修改后立即调用完整保存 `Save()`。完整保存会同时写入尚未保存的单元格编辑，是“数据库与内存一致”的保证。新增修改数据的操作时，不能只依赖自动保存。关闭窗口仍使用完整保存。只记录任务或连接状态、不改动任何行的保存，用 `Save(dataChanged: false)`，这样不会让数据页失效。
 
-编辑单元格后，700 毫秒内没有新的编辑就自动保存，而且只写被编辑的行（`SaveEdits`）。其他会修改数据的操作，都必须在修改后调用完整保存 `Save()`：完整保存会同时写入尚未保存的单元格编辑，它是"数据库和内存一致"的保证。如果新增一种修改数据的操作，不能只依赖自动保存。关闭窗口仍使用完整保存，作为最后一道保护。
+**数据页。** 只保留当前页的行和单元格模型。翻页、切换工作区或资源时，复用页面和行模型，只重新绑定；重新绑定不得触发编辑。单元格的回调经由 `RowLink` 读取当前的工作区和资源，不能直接捕获它们，否则切换后旧工作区无法回收。后台查询只读取界面线程分批捕获的不可变数据，完成后要核对取消状态、查询代次、工作区和资源，再应用结果。普通单格编辑和只替换行的撤销，只更新相关行的状态；下一次应用查询时，才重新筛选和排序。
 
-任务进度必须先保存成功，再显示到页面。界面可以把 50 毫秒内的多次变化一起显示，但不能因此推迟保存。页面只显示已保存的结果，不能提前显示还在处理中的下一步。
+**查询期间锁定表格时，不要切换 `IsEnabled`。** 这个属性会传到每个已实现的单元格，WinUI 会为每个控件排队一条事件；积压之后，关闭窗口要花很长时间。应改用 `LockDataTable`：屏蔽输入、降低不透明度、移走焦点。
 
-切换语言时只更新文字，不重新打开任务页，所以选中的记录和滚动位置可以保留。软件名始终为 FlightOps Desk；服务器字段名和用户自己输入的数据保持原样。
+**审阅。** 审阅计划在后台构建，期间用 `WhileLocked` 锁定编辑和导航。外层本地操作结束时，如果后台仍在读取工作区，要由后台任务负责解锁。提交前在后台重建计划，并与显示的计划比较内容键；有任何变化都要刷新清单，并要求重新审阅。
 
-数据页只保留当前页的行与单元格模型，同列结构的翻页会重新绑定这些模型并复用控件。重新绑定不得触发编辑；提交和机型回调必须读取模型当前的行。后台查询只读取 UI 线程分片捕获的不可变投影，完成后核对取消状态、查询代数、工作区与资源再应用。完整保存和远端确认使相关查询失效；普通单格编辑仅更新行状态，下一次应用查询才重新筛选和排序。
+**任务。** 进度必须先保存成功，再显示到页面。界面可以把 50 毫秒内的多次变化合并显示，但不能因此推迟保存，也不能提前显示还在处理中的下一步。
+
+**语言。** 切换语言时只更新文字，不重新打开页面，所以选中的记录和滚动位置会保留。软件名称始终为 FlightOps Desk；服务器字段名和用户输入的数据保持原样。
 
 ## 构建与窗口验证
 
-从仓库根目录使用 PowerShell 7：
+在仓库根目录使用 PowerShell 7：
 
 ~~~powershell
-./scripts/build.ps1 -Publish
+./scripts/build.ps1 -Publish                # 正式包 → artifacts/flightops-app
+./scripts/build.ps1 -Publish -UiVerification # QA 版本 → artifacts/v3-qa
 ~~~
 
-入口为 artifacts/flightops-app/FlightOpsDesk.exe。同目录中的 PRI、XBF、Assets 和运行库均需保留。
+两种发布都会先运行全部自动测试，再检查程序集中是否含有测试入口，以及包内的文件清单。QA 版本的编译目录独立于正式程序。入口为 `FlightOpsDesk.exe`；同目录中的 PRI、XBF、Assets 和运行库都需要保留。只有 Windows PowerShell 5.1 时，可以直接用 `.tools/dotnet/dotnet.exe publish` 生成，参数见 [性能报告](../../docs/PERFORMANCE.md#测量方法与复现)。
 
-~~~powershell
-./scripts/test-localization-ui.ps1 -DataDirectory "$PWD/artifacts/ui-isolated"
-~~~
-
-窗口测试需要可操作的 Windows 桌面，并使用单独的测试数据目录。运行前先关闭正在使用的程序。模拟保存故障等检查需要专用测试版本；正常交付的程序不启用 UiVerification。
-
-使用 `./scripts/build.ps1 -Publish -UiVerification` 生成 artifacts/v3-qa。QA 的编译目录独立于正式程序，避免先构建 QA 后发布时复用测试程序集。正式包发布前还会读取程序集元数据，确认窗口控制入口和存储故障注入均不存在。
+窗口脚本需要可操作的 Windows 桌面和单独的测试数据目录，运行前要关闭正在使用的程序。各脚本说明见 [Tests 项目说明](../../tests/VamSys.Tests/README.md#实际窗口检查)。
 
 ## 品牌与兼容
 
-EXE 品牌元数据、标题栏和系统窗口使用 FlightOps Desk；图标原始文件为 Assets/FlightOpsDesk.svg。默认数据目录仍为 %LOCALAPPDATA%/VamSysBatch，环境变量仍为 VAMSYS_DATA_DIR。
+EXE 元数据、标题栏和系统窗口使用 FlightOps Desk；图标原始文件为 Assets/FlightOpsDesk.svg。默认数据目录仍为 `%LOCALAPPDATA%/VamSysBatch`，环境变量仍为 `VAMSYS_DATA_DIR`。
 
-[品牌说明](../../docs/BRANDING.md) · [实际窗口验证记录](../../docs/TEST-REPORT.md) · [项目首页](../../README.md)
+[品牌说明](../../docs/BRANDING.md) · [测试报告](../../docs/TEST-REPORT.md) · [项目首页](../../README.md)
