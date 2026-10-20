@@ -58,6 +58,36 @@ static class DraftSaveScenarios
             Console.WriteLine($"  20k rows/20 undo: full save {fullBytes:N0} B {fullMs:F0} ms; 2 edited rows {rowBytes:N0} B {rowMs:F1} ms; with new undo step {historyBytes:N0} B");
             Assert(rowBytes<4096&&historyBytes<8192,"Row save serialized unrelated data");
         });
+        await test("Undo and redo of replaced rows save only those rows and the stack order; structural steps ask for a full save",async()=>
+        {
+            var dir=Temp();var store=new WorkspaceStore(dir);var w=Large(20000,19);store.Save(w);
+            using(var c=Open(dir))Sql(c,Touched);
+            var data=w.Resources[ResourceKind.Routes];var edits=new DraftEdits();
+            foreach(var undo in new[]{true,true,false})
+            {
+                var move=undo?data.UndoEdit():data.RedoEdit();
+                Assert(move.Moved&&move.ReplacedRows is {Count:1},"Replaced-row step not reported");
+                edits.Rows(w,ResourceKind.Routes,move.ReplacedRows!);var taken=edits.Take();
+                long bytes;using(var run=PerformanceRun.Begin(w.Id,Guid.NewGuid())){Assert(await store.TrySaveDraftRowsAsync(w,taken.Changes),"Row save refused");bytes=run.JsonBytes;Assert(run.Checkpoints["Draft"]==1&&!run.Checkpoints.ContainsKey("Full"));}
+                using(var c=Open(dir))
+                {
+                    // One row and the undo/redo order; the moved step itself is unchanged.
+                    Assert(Convert.ToInt32(Sql(c,"SELECT count(*) FROM touched"))==2,"Undo/redo wrote unrelated data");
+                    Assert(Convert.ToInt32(Sql(c,"SELECT count(*) FROM touched WHERE tbl='rows' AND local_id=$id",("$id",move.ReplacedRows![0].ToString())))==1);
+                    Assert(Convert.ToInt32(Sql(c,"SELECT count(*) FROM touched WHERE tbl='history'"))==1);
+                    Sql(c,"DELETE FROM touched");
+                }
+                Assert(bytes<4096,"Undo/redo serialized unrelated data");
+                var disk=store.Load(w.Id);Assert(disk.Serialize()==w.Serialize(),"Reload differs after undo/redo row save");
+            }
+            Assert(data.Undo.Count==18&&data.Redo.Count==1);
+            // A new row is structural: no replaced rows, so the caller saves everything.
+            var added=new DataRow{Fields=new(){["ID"]="new"}};data.Edit([added.LocalId],()=>data.Draft.Add(added),structural:true);
+            var structural=data.UndoEdit();Assert(structural.Moved&&structural.ReplacedRows is null,"Structural undo reported replaced rows");
+            data.RedoEdit();store.Save(w);
+            while(data.Redo.Count>0)data.RedoEdit();
+            var nothing=data.RedoEdit();Assert(!nothing.Moved&&nothing.ReplacedRows is {Count:0},"Empty redo reported a move");
+        });
         await test("Row save refuses stale revisions and missing rows without writing",async()=>
         {
             var dir=Temp();var store=new WorkspaceStore(dir);var w=Fixture();store.Save(w);

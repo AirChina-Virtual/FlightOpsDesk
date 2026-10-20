@@ -35,6 +35,9 @@ public sealed record RowEdit(Guid LocalId,RowImage? Before,RowImage? After);
 public sealed record HistoryStep(Guid StepId,ImmutableArray<RowEdit> Rows,ImmutableArray<Guid>? BeforeOrder,ImmutableArray<Guid>? AfterOrder);
 public sealed record HistorySnapshot(ImmutableArray<HistoryStep> Undo,ImmutableArray<HistoryStep> Redo);
 public sealed record HistoryChanges(HistorySnapshot Captured,ImmutableArray<HistoryStep> Upserts,ImmutableArray<Guid> Deletes,bool OrderChanged);
+// Result of an undo or redo. ReplacedRows lists the draft rows replaced at their existing positions;
+// null when the step added, removed or reordered rows.
+public sealed record HistoryMove(bool Moved,IReadOnlyList<Guid>? ReplacedRows);
 
 public sealed class EditHistory
 {
@@ -72,16 +75,18 @@ public sealed class EditHistory
         if(undo.Count>0)undo[^1]=Change(undo[^1],true);
         if(redo.Count>0)redo[^1]=Change(redo[^1],false);
     }
-    internal void Move(ResourceData data,bool undo)
+    internal HistoryMove Move(ResourceData data,bool undo)
     {
         var source=undo?this.undo:redo;var target=undo?redo:this.undo;
-        if(source.Count==0)return;
+        if(source.Count==0)return new(false,[]);
         var step=source[^1];Apply(data,step,!undo);source.RemoveAt(source.Count-1);target.Add(step);
+        return new(true,InPlace(step)?[..step.Rows.Select(r=>r.LocalId)]:null);
     }
+    static bool InPlace(HistoryStep step) => step.BeforeOrder is null && step.AfterOrder is null && step.Rows.All(r => r.Before != null && r.After != null);
     // Validate every precondition before mutating any row or stack.
     static void Apply(ResourceData data,HistoryStep step,bool forward)
     {
-        if (step.BeforeOrder is null && step.AfterOrder is null && step.Rows.All(r => r.Before != null && r.After != null))
+        if (InPlace(step))
         {
             data.EnsureDraftIndex();
             var prepared = new List<DataRow>(step.Rows.Length);

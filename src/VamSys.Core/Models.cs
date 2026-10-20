@@ -86,8 +86,8 @@ public sealed partial class ResourceData
         foreach (var (position, row) in prepared) Draft[position] = row;
     }
     public void ClearHistory(bool invalidateIndex = true) { History.Clear(); if (invalidateIndex) InvalidateDraftIndex(); }
-    public void UndoEdit() => History.Move(this, undo: true);
-    public void RedoEdit() => History.Move(this, undo: false);
+    public HistoryMove UndoEdit() => History.Move(this, undo: true);
+    public HistoryMove RedoEdit() => History.Move(this, undo: false);
 }
 
 public sealed class Workspace

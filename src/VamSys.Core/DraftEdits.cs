@@ -13,12 +13,14 @@ public sealed class DraftEdits
     public bool RequiresFullSave { get; private set; }
 
     // A value edited in place; checkpointed when the edit also added an undo step.
-    public void Cell(Workspace workspace, ResourceKind kind, Guid row, bool checkpointed)
+    public void Cell(Workspace workspace, ResourceKind kind, Guid row, bool checkpointed) => Rows(workspace, kind, [row]);
+    // Rows replaced in place, e.g. by an undo or redo; the moved step is saved with that resource's history.
+    public void Rows(Workspace workspace, ResourceKind kind, IEnumerable<Guid> changed)
     {
         if (Owner != null && !ReferenceEquals(Owner, workspace)) RequiresFullSave = true;
         Owner = workspace;
         if (!rows.TryGetValue(kind, out var ids)) rows[kind] = ids = [];
-        ids.Add(row);
+        ids.UnionWith(changed);
         // Continuations change the same step's After image, even after a previous autosave.
         history.Add(kind);
     }
