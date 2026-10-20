@@ -35,7 +35,7 @@ public sealed partial class MainWindow
                 ()=>UserAction(async()=>{
                     if(busy||!closeState.IsOpen)return;
                     var reset=job.Items.Where(i=>i.State==ItemState.Failed).ToList();foreach(var i in reset)i.State=ItemState.Pending;
-                    await Save();foreach(var i in reset)vm!.Update(i.Id);
+                    await Save(dataChanged:false);foreach(var i in reset)vm!.Update(i.Id);
                     await ExecuteDemo(job);
                 }));
             taskIndex.Add(job.Id,vm);

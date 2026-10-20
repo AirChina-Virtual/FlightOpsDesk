@@ -47,6 +47,7 @@ public sealed partial class MainWindow
             RefreshShell();FlushTasks();foreach(var task in taskModels)task.RefreshLanguage();
             StatusLabel.Text = statusText();
             foreach (var row in visible) foreach (var cell in row.Cells) cell.RefreshLanguage();
+            if (page == "review") foreach (var row in reviewRows) row.RefreshLanguage();
             RefreshDataAvailability();
         }
         finally { ready = previous; }

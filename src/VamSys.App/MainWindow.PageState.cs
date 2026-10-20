@@ -17,6 +17,8 @@ public sealed partial class MainWindow
         public HashSet<Guid> Conflicts = [];
         public Dictionary<string, FleetOption> FleetLabels = new(StringComparer.OrdinalIgnoreCase);
         public double Vertical, Horizontal;
+        public bool SelectionCountsDirty = true;
+        public int SelectedActive, SelectedDeleted, SelectedDeletable;
     }
     readonly Dictionary<(Guid, ResourceKind), DataPageState> dataStates = [];
     readonly Dictionary<Guid, UIElement> settingsPages = [];
@@ -53,6 +55,23 @@ public sealed partial class MainWindow
             FindVisual<ScrollViewer>(target)?.ChangeView(null, state.Vertical, null, true);
             horizontal.ChangeView(state.Horizontal, null, null, true);
         });
+    }
+    // Views built for a replaced Workspace instance. A discarded page is released by WinUI only some
+    // time after it leaves the tree, and until then its rows' edit closures keep the old workspace
+    // alive; switching back then loads the new copy beside it, and the GC keeps both peaks committed.
+    Workspace? viewsWorkspace;
+    void ReleaseWorkspaceViews()
+    {
+        var previous = viewsWorkspace; viewsWorkspace = workspace;
+        if (previous is null || ReferenceEquals(previous, workspace)) return;
+        // The data page and its row pool are kept and rebound when shown again; only the rows go.
+        CancelDataQuery();
+        shownState = null; dataPageOwner = null; ClearDataRows();
+        pooledLink?.Detach(); pooledData = null; changeCounts.Clear();
+        tableBaseline = []; tableConflicts = []; tableFleetLabels = new(StringComparer.OrdinalIgnoreCase);
+        tasksOwner = null; tasksPage = null; taskList = null; taskModels.Clear(); taskIndex.Clear(); pendingTaskItems.Clear();
+        // Each session's adapter holds the instance it was created for; a reload gets a new one anyway.
+        if (apiSessions.Remove(previous.Id, out var session)) session.Client.Dispose();
     }
     UIElement GetSettingsPage()
     {

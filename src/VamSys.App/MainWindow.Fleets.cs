@@ -7,12 +7,11 @@ namespace VamSys.App;
 
 public sealed partial class MainWindow
 {
-    async Task ChooseFleets(DataRow? single)
+    Task ChooseFleets(DataRow? single) => LocalOperation(async () =>
     {
-        if (!closeState.IsOpen || busy) return;
-        var rows = single is null ? SelectedRows() : new List<DataRow> { single };
-        if (rows.Count == 0) { Status(() => L("Text_1AB133520F")); return; }
-        if (rows.Any(Schemas.Deleted)) { Status(() => L("Text_A1896E4C88")); return; }
+        var selection = BatchSelection.Capture(single is null ? SelectedRows() : new List<DataRow> { single });
+        var rows = selection.Eligible;
+        if (rows.Count == 0) { Status(() => L("BatchNothing")); return; }
         var field = FleetAssignmentService.Field(resource);
         var initial = rows.Count == 1 ? FleetAssignmentService.Tokens(rows[0].Get(field)) : new List<string>();
         var options = fleets.Options(workspace, rows.SelectMany(r => FleetAssignmentService.Tokens(r.Get(field))));
@@ -37,27 +36,26 @@ public sealed partial class MainWindow
         search.TextChanged += (_, _) => list.ItemsSource = choices.Where(c => c.Label.Contains(search.Text, StringComparison.OrdinalIgnoreCase)).ToList();
         mode.SelectionChanged += (_, _) => { foreach (var c in choices) c.AllowRemoval = mode.SelectedIndex == 2; };
         if (!await Confirm(resource == ResourceKind.Aircraft ? L("Text_F1439C5A73") : L("Text_F042305012"),
-            new ScrollViewer { MaxHeight = Math.Max(160, RootGrid.ActualHeight - 220), Content = Stack(Text(() => L("Text_182B2BEF88", ("arg0", rows.Count))), mode, search, list, summary) }, L("Text_5C250CFB41"))) return;
+            new ScrollViewer { MaxHeight = Math.Max(160, RootGrid.ActualHeight - 220), Content = Stack(BatchTargets(selection, single != null), mode, search, list, summary) }, L("Text_5C250CFB41"))) return;
         var preview = fleets.Preview(workspace, resource, rows, choices.Where(c => c.Selected).Select(c => c.Option.Token), (FleetAssignmentMode)mode.SelectedIndex);
         if (preview.Issues.Count > 0) { await Confirm(L("Text_7B23705C3B"), new ScrollViewer { MaxHeight = 350, Content = Text(() => string.Join("\n", preview.Issues.Take(60).Select(i => L(i.Description)))) }, L("Text_3FD47EDCE4")); return; }
-        if (preview.Rows.Count == 0) { Status(() => L("Text_AB90F9524E")); return; }
+        if (preview.Rows.Count == 0) { Status(() => BatchScope(selection, 0)); return; }
         var labels = options.ToDictionary(o => o.Token, o => o.Describe(localization), StringComparer.OrdinalIgnoreCase);
         string Label(string value) => string.Join("；", FleetAssignmentService.Tokens(value).Select(t => labels.GetValueOrDefault(t, t)));
         var before = rows.ToDictionary(r => r.LocalId);
-        if (!await Confirm(L("Text_D1482F496E"), new ListView { MaxHeight = 380, Header = Text(() => L("Text_CCFF94DA2A", ("arg0", preview.Rows.Count))), ItemsSource = preview.Rows.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n{Label(before[r.LocalId].Get(field))} → {Label(r.Get(field))}").ToList() }, L("Text_2354C137CE"))) return;
-        fleets.Apply(Data, preview); await Save(); Render(); Status(() => L("Text_46F566CD0E", ("arg0", preview.Rows.Count)));
-    }
+        if (!await Confirm(L("Text_D1482F496E"), new ListView { MaxHeight = 380, Header = Text(() => BatchScope(selection, preview.Rows.Count)), ItemsSource = preview.Rows.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n{Label(before[r.LocalId].Get(field))} → {Label(r.Get(field))}").ToList() }, L("Text_2354C137CE"))) return;
+        fleets.Apply(Data, preview); await Save(); Status(() => BatchScope(selection, preview.Rows.Count));
+    });
 
-    async Task RetireSelected()
+    Task RetireSelected() => LocalOperation(async () =>
     {
-        if (!closeState.IsOpen || busy || resource != ResourceKind.Routes) return;
-        var rows = SelectedRows();
-        if (rows.Count == 0 || rows.Any(Schemas.Deleted)) { Status(() => L("Text_C124B32C00")); return; }
-        // A past date remains past regardless of the VA's configured time zone.
+        if (resource != ResourceKind.Routes) return;
+        var selection = BatchSelection.Capture(SelectedRows());
+        if (selection.Eligible.Count == 0) { Status(() => L("BatchNothing")); return; }
         var end = DateTime.UtcNow.AddDays(-2).ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
-        if (!await Confirm(L("Text_B80DA74EC5"), new ListView { MaxHeight = 350, Header = Text(() => L("Text_A5124DA2BA", ("arg0", rows.Count), ("arg1", end))), ItemsSource = rows.Select(r => $"{r.Get("ID")} · {r.Get("Flight Number")} · {r.Get("End Date")} → {end}").ToList() }, L("Text_52D4945C25"))) return;
-        Data.Edit(rows.Select(r=>r.LocalId),()=>{foreach (var row in rows) row.Fields["End Date"] = end;});
-        if (!Data.Columns.Contains("End Date")) Data.Columns.Add("End Date");
-        await Save(); Render(); Status(() => L("Text_B4F14FDEB3"));
-    }
+        var preview = BatchEditPreview.Rule(selection, new(RuleKind.Set, "End Date", end));
+        if (preview.Changes.Count == 0) { Status(() => BatchScope(selection, 0)); return; }
+        if (!await Confirm(L("Text_B80DA74EC5"), BatchPreview(selection, preview.Field, preview.Changes), L("Text_52D4945C25"))) return;
+        preview.Apply(Data); await Save(); Status(() => BatchScope(selection, preview.Changes.Count));
+    });
 }

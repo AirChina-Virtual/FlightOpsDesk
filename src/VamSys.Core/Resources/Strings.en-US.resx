@@ -934,4 +934,35 @@ Remote: {remote}</value>
 <data name="TableLoading" xml:space="preserve"><value>Filtering records…</value></data>
 <data name="TableReady" xml:space="preserve"><value>Loaded {count} matching records.</value></data>
 <data name="TableQueryCanceled" xml:space="preserve"><value>Query canceled; previous results retained.</value></data>
+  <data name="ReviewWorkspace" xml:space="preserve"><value>Review entire workspace</value></data>
+  <data name="ReviewCounts" xml:space="preserve"><value>Total {total} · Submit now {ready} · Deferred {deferred} · Blocked {blocked}</value></data>
+  <data name="ReviewMode" xml:space="preserve"><value>Mode: {mode}</value></data>
+  <data name="ReviewConnect" xml:space="preserve"><value>Draft review only. Connect to check submission eligibility.</value></data>
+  <data name="ReviewSample" xml:space="preserve"><value>Only the first three samples of this operation are included. Remaining changes stay in the draft.</value></data>
+  <data name="ReviewDependency" xml:space="preserve"><value>A required create operation is not in this submission. This change stays in the draft.</value></data>
+  <data name="ReviewSubmit" xml:space="preserve"><value>Submit workspace changes</value></data>
+  <data name="ReviewDemoSubmit" xml:space="preserve"><value>Simulate workspace submission</value></data>
+  <data name="ReviewExport" xml:space="preserve"><value>Export {resource} CSV</value></data>
+  <data name="ReviewChanged" xml:space="preserve"><value>Changes or submission conditions have changed. Review the updated list and submit again.</value></data>
+  <data name="ReviewPreparing" xml:space="preserve"><value>Preparing the review list…</value></data>
+  <data name="ReviewState_Ready" xml:space="preserve"><value>Submit now</value></data>
+  <data name="ReviewState_Deferred" xml:space="preserve"><value>Deferred · stays in draft</value></data>
+  <data name="ReviewState_Blocked" xml:space="preserve"><value>Blocked · needs attention</value></data>
+  <data name="ReviewState_AwaitingConnection" xml:space="preserve"><value>Awaiting connection · draft review</value></data>
+  <data name="BatchCounts" xml:space="preserve"><value>Selected {selected} · Skipped {skipped} · Unchanged {unchanged} · Changed {changed}</value></data>
+  <data name="BatchTargets" xml:space="preserve"><value>Selected records only: {selected} selected, {skipped} skipped, {eligible} eligible.</value></data>
+  <data name="BatchSingle" xml:space="preserve"><value>Single record: {eligible} eligible, {skipped} skipped.</value></data>
+  <data name="BatchNothing" xml:space="preserve"><value>No eligible selected records. Select records first.</value></data>
+  <data name="BatchOnlySelected" xml:space="preserve"><value>Batch actions affect selected records only</value></data>
+  <data name="TableSelection" xml:space="preserve"><value>Select</value></data>
+  <data name="TableUnapplied" xml:space="preserve"><value>Unapplied conditions</value></data>
+  <data name="TableDensity" xml:space="preserve"><value>Table density</value></data>
+  <data name="DensityComfortable" xml:space="preserve"><value>Comfortable</value></data>
+  <data name="DensityCompact" xml:space="preserve"><value>Compact</value></data>
+  <data name="ColumnStatus" xml:space="preserve"><value>Status</value></data>
+  <data name="TableSort" xml:space="preserve"><value>Sort field</value></data>
+  <data name="BatchSelectionHint" xml:space="preserve"><value>Selected only</value></data>
+  <data name="ReviewIssues" xml:space="preserve"><value>View all {count} validation issues</value></data>
+  <data name="BatchRestored" xml:space="preserve"><value>Restored to editable draft</value></data>
+  <data name="ReviewValidationIssue" xml:space="preserve"><value>{resource} · {key} · {field}: {reason}</value></data>
 </root>

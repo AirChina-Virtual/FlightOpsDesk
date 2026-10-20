@@ -44,6 +44,21 @@ public sealed partial class WorkspaceStore
         using var c = Open(); using var cmd = c.CreateCommand(); cmd.CommandText = "INSERT INTO app_settings VALUES('language',$value) ON CONFLICT(key) DO UPDATE SET value=$value";
         cmd.Parameters.AddWithValue("$value", language == "en-US" ? language : "zh-CN"); cmd.ExecuteNonQuery(); }
     }
+    public string LoadTableDensity()
+    {
+        using var c = Open(); using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT value FROM app_settings WHERE key='table_density'";
+        return cmd.ExecuteScalar() as string == "compact" ? "compact" : "comfortable";
+    }
+    public void SaveTableDensity(string density)
+    {
+        lock (writeLock)
+        {
+            using var c = Open(); using var cmd = c.CreateCommand();
+            cmd.CommandText = "INSERT INTO app_settings VALUES('table_density',$value) ON CONFLICT(key) DO UPDATE SET value=$value";
+            cmd.Parameters.AddWithValue("$value", density == "compact" ? "compact" : "comfortable"); cmd.ExecuteNonQuery();
+        }
+    }
     public List<(Guid Id, string Name)> List()
     {
         using var c = Open(); using var cmd = c.CreateCommand(); cmd.CommandText = "SELECT id,name FROM workspaces ORDER BY name";

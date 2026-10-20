@@ -20,14 +20,15 @@
         <NavigationViewItem Tag="tasks" Icon="List"/>
         <NavigationViewItem Tag="settings" Icon="Setting"/>
       </NavigationView.MenuItems>
-      <Grid Margin="28,20,28,12" RowSpacing="14">
+      <Grid x:Name="BodyGrid" Margin="28,20,28,12" RowSpacing="14" ColumnSpacing="16">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <TextBlock x:Name="PageTitle" FontSize="28" FontWeight="SemiBold"/>
-        <StackPanel x:Name="ResourceBar" Grid.Row="1" Orientation="Horizontal" Spacing="12">
+        <StackPanel x:Name="ResourceBar" Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
           <ComboBox x:Name="ResourcePicker" Width="160" SelectionChanged="ResourceChanged"/>
-          <TextBlock x:Name="SnapshotLabel" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+          <TextBlock x:Name="SnapshotLabel" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
         </StackPanel>
-        <ContentControl x:Name="PageHost" Grid.Row="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+        <ContentControl x:Name="PageHost" Grid.Row="2" Grid.ColumnSpan="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
       </Grid>
     </NavigationView>
     <Grid Grid.Row="2" Padding="24,8" ColumnSpacing="12">

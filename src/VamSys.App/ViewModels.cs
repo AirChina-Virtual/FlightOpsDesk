@@ -3,15 +3,19 @@ using VamSys.Core;
 using CommunityToolkit.Mvvm.Input;
 
 namespace VamSys.App;
-public sealed class CellViewModel : ObservableObject
+public sealed partial class CellViewModel : ObservableObject
 {
     string value;
     readonly Action<string> commit;
     public string Field { get; }
     public double Width => Field == "_delete" ? 150 : Field is "ID" or "ICAO/IATA" ? 110 : Field is "Fleet ID" or "Fleet IDs" ? 260 : 180;
+    // Table density: set when the page's cell models are created, and rebuilt with them.
+    public double Height { get; init; } = 32;
+    public bool Compact { get; init; }
     bool readOnly;
-    public bool IsReadOnly { get => readOnly; set { if (SetProperty(ref readOnly,value)) OnPropertyChanged(nameof(IsEnabled)); } }
+    public bool IsReadOnly { get => readOnly; set { if (SetProperty(ref readOnly,value)) { OnPropertyChanged(nameof(IsEnabled)); OnPropertyChanged(nameof(TextOpacity)); } } }
     public bool IsEnabled => !IsReadOnly;
+    public double TextOpacity => IsReadOnly ? 0.6 : 1;
     public string EditorVisibility => Field is "_delete" or "Fleet ID" or "Fleet IDs" ? "Collapsed" : "Visible";
     public string FleetVisibility => Field is "Fleet ID" or "Fleet IDs" ? "Visible" : "Collapsed";
     public string StatusVisibility => Field == "_delete" ? "Visible" : "Collapsed";
@@ -40,7 +44,7 @@ public sealed class CellViewModel : ObservableObject
     public string Value { get => value; set { if (!CanEdit() || this.value == value) return; commit(value); SetProperty(ref this.value, value); } }
     public CellViewModel(string field, string value, Action<string> commit) { Field = field; this.value = value; this.commit = commit; }
 }
-public sealed class RowViewModel(DataRow row, List<CellViewModel> cells)
+public sealed partial class RowViewModel(DataRow row, List<CellViewModel> cells)
 {
     public DataRow Row { get; private set; } = row;
     public List<CellViewModel> Cells { get; } = cells;

@@ -934,4 +934,35 @@
 <data name="TableLoading" xml:space="preserve"><value>正在筛选数据…</value></data>
 <data name="TableReady" xml:space="preserve"><value>已加载 {count} 条结果。</value></data>
 <data name="TableQueryCanceled" xml:space="preserve"><value>查询已取消，保留原有结果。</value></data>
+  <data name="ReviewWorkspace" xml:space="preserve"><value>审阅整个工作区</value></data>
+  <data name="ReviewCounts" xml:space="preserve"><value>全部 {total} 条 · 本次提交 {ready} 条 · 暂缓 {deferred} 条 · 受阻 {blocked} 条</value></data>
+  <data name="ReviewMode" xml:space="preserve"><value>运行模式：{mode}</value></data>
+  <data name="ReviewConnect" xml:space="preserve"><value>尚未连接，仅审阅草稿。连接后可检查提交条件。</value></data>
+  <data name="ReviewSample" xml:space="preserve"><value>本次仅执行该类操作的前三条样本，其余修改保留为草稿。</value></data>
+  <data name="ReviewDependency" xml:space="preserve"><value>依赖的创建操作不在本次提交清单中，保留为草稿。</value></data>
+  <data name="ReviewSubmit" xml:space="preserve"><value>提交工作区修改</value></data>
+  <data name="ReviewDemoSubmit" xml:space="preserve"><value>模拟提交工作区修改</value></data>
+  <data name="ReviewExport" xml:space="preserve"><value>导出{resource} CSV</value></data>
+  <data name="ReviewChanged" xml:space="preserve"><value>审阅内容或提交条件已变化，已更新清单。请核对后再次提交。</value></data>
+  <data name="ReviewPreparing" xml:space="preserve"><value>正在整理审阅清单…</value></data>
+  <data name="ReviewState_Ready" xml:space="preserve"><value>本次提交</value></data>
+  <data name="ReviewState_Deferred" xml:space="preserve"><value>暂缓 · 保留草稿</value></data>
+  <data name="ReviewState_Blocked" xml:space="preserve"><value>受阻 · 需处理</value></data>
+  <data name="ReviewState_AwaitingConnection" xml:space="preserve"><value>待连接 · 仅审阅草稿</value></data>
+  <data name="BatchCounts" xml:space="preserve"><value>已选 {selected} 条 · 跳过 {skipped} 条 · 未变化 {unchanged} 条 · 实际变化 {changed} 条</value></data>
+  <data name="BatchTargets" xml:space="preserve"><value>仅处理已选记录：已选 {selected} 条，跳过 {skipped} 条，适用 {eligible} 条。</value></data>
+  <data name="BatchSingle" xml:space="preserve"><value>单条记录：适用 {eligible} 条，跳过 {skipped} 条。</value></data>
+  <data name="BatchNothing" xml:space="preserve"><value>没有适用的已选记录，请先选择记录。</value></data>
+  <data name="BatchOnlySelected" xml:space="preserve"><value>批量操作仅处理已选记录</value></data>
+  <data name="TableSelection" xml:space="preserve"><value>选择</value></data>
+  <data name="TableUnapplied" xml:space="preserve"><value>条件未应用</value></data>
+  <data name="TableDensity" xml:space="preserve"><value>表格密度</value></data>
+  <data name="DensityComfortable" xml:space="preserve"><value>舒适</value></data>
+  <data name="DensityCompact" xml:space="preserve"><value>紧凑</value></data>
+  <data name="ColumnStatus" xml:space="preserve"><value>状态</value></data>
+  <data name="TableSort" xml:space="preserve"><value>排序字段</value></data>
+  <data name="BatchSelectionHint" xml:space="preserve"><value>批量仅已选</value></data>
+  <data name="ReviewIssues" xml:space="preserve"><value>查看全部 {count} 项校验问题</value></data>
+  <data name="BatchRestored" xml:space="preserve"><value>恢复为可编辑草稿</value></data>
+  <data name="ReviewValidationIssue" xml:space="preserve"><value>{resource} · {key} · {field}：{reason}</value></data>
 </root>
