@@ -12,5 +12,6 @@
     <ProjectReference Include="../VamSys.TestSupport/VamSys.TestSupport.csproj" />
     <ProjectReference Include="../../src/VamSys.Infrastructure/VamSys.Infrastructure.csproj" AdditionalProperties="VamSysTestSupport=true" />
   </ItemGroup>
+  <ItemGroup><Compile Include="../../src/VamSys.App/ReviewPlanBuilder.cs" Link="RealData/ReviewPlanBuilder.cs" /></ItemGroup>
   <ItemGroup><Using Include="Xunit" /></ItemGroup>
 </Project>
