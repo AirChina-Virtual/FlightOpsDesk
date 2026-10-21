@@ -1,0 +1,9 @@
+ID,Departure Airport (ICAO/IATA),Arrival Airport (ICAO/IATA),Route String,_delete,Remarks,Internal Remarks,Extra 备注,CR only
+11,Departure Airport (ICAO/IATA) update-new,Arrival Airport (ICAO/IATA) update-new,Route String update-new changed,FALSE,Remarks update-new changed,Internal Remarks update-new,更新后,
+12,Departure Airport (ICAO/IATA) delete,Arrival Airport (ICAO/IATA) delete,Route String delete,TRUE,Remarks delete,Internal Remarks delete,,
+,Departure Airport (ICAO/IATA) create,Arrival Airport (ICAO/IATA) create,Route String create,FALSE,Remarks create,Internal Remarks create,,
+,Departure Airport (ICAO/IATA) special,Arrival Airport (ICAO/IATA) special,"He said ""go"", then
+stop 中文,逗号",FALSE,"He said ""go"", then
+stop 中文,逗号","He said ""go"", then
+stop 中文,逗号","红白,""双""线
+第二行","linebreak"

@@ -1,0 +1,361 @@
+{
+  "headers": [
+    "ID",
+    "Name (csv)",
+    "Type Code",
+    "Type (pax/cargo/...)",
+    "Extra 备注",
+    "CR only"
+  ],
+  "rows": [
+    [
+      "11",
+      "Name update-new changed",
+      "Type Code update-new",
+      "Type (pax/cargo/...) update-new",
+      "更新后",
+      ""
+    ],
+    [
+      "12",
+      "Name create",
+      "Type Code create",
+      "Type (pax/cargo/...) create",
+      "",
+      ""
+    ],
+    [
+      "13",
+      "He said \"go\", then\nstop 中文,逗号",
+      "Type Code special",
+      "Type (pax/cargo/...) special",
+      "红白,\"双\"线\r\n第二行",
+      "line\rbreak"
+    ]
+  ],
+  "baseline": {
+    "Snapshot": [
+      {
+        "LocalId": "<guid-08>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "11",
+          "Name": "Name update-new changed",
+          "Type Code": "Type Code update-new",
+          "Type (pax/cargo/...)": "Type (pax/cargo/...) update-new",
+          "Extra 备注": "更新后",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-09>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Name": "Name create",
+          "Type Code": "Type Code create",
+          "Type (pax/cargo/...)": "Type (pax/cargo/...) create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-10>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Name": "He said \"go\", then\nstop 中文,逗号",
+          "Type Code": "Type Code special",
+          "Type (pax/cargo/...)": "Type (pax/cargo/...) special",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Draft": [
+      {
+        "LocalId": "<guid-08>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "11",
+          "Name": "Name update-new changed",
+          "Type Code": "Type Code update-new",
+          "Type (pax/cargo/...)": "Type (pax/cargo/...) update-new",
+          "Extra 备注": "更新后",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-09>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Name": "Name create",
+          "Type Code": "Type Code create",
+          "Type (pax/cargo/...)": "Type (pax/cargo/...) create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-10>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Name": "He said \"go\", then\nstop 中文,逗号",
+          "Type Code": "Type Code special",
+          "Type (pax/cargo/...)": "Type (pax/cargo/...) special",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Columns": [
+      "ID",
+      "Name",
+      "Type Code",
+      "Type (pax/cargo/...)",
+      "Extra 备注",
+      "CR only"
+    ],
+    "SnapshotAt": "<time-02>",
+    "Conflicts": [],
+    "History": {
+      "Version": 1,
+      "Undo": [],
+      "Redo": []
+    }
+  },
+  "merge-into-existing-draft": {
+    "Snapshot": [
+      {
+        "LocalId": "<guid-11>",
+        "Identity": {
+          "RemoteId": "11",
+          "ConnectionId": "7",
+          "ParentFleetId": null
+        },
+        "RawApiJson": "{\"id\":11}",
+        "Fields": {
+          "_delete": "FALSE",
+          "ID": "11",
+          "Name": "Name update-base",
+          "Type Code": "Type Code update-base",
+          "Type (pax/cargo/...)": "Type (pax/cargo/...) update-base",
+          "Max Passengers": "Max Passengers update-base",
+          "Max Freight": "Max Freight update-base",
+          "Extra 备注": "",
+          "CR only": "",
+          "Local only": "kept"
+        }
+      }
+    ],
+    "Draft": [
+      {
+        "LocalId": "<guid-11>",
+        "Identity": {
+          "RemoteId": "11",
+          "ConnectionId": "7",
+          "ParentFleetId": null
+        },
+        "RawApiJson": "{\"id\":11}",
+        "Fields": {
+          "_delete": "FALSE",
+          "ID": "11",
+          "Name": "Name update-new changed",
+          "Type Code": "Type Code update-new",
+          "Type (pax/cargo/...)": "Type (pax/cargo/...) update-new",
+          "Max Passengers": "Max Passengers update-base",
+          "Max Freight": "Max Freight update-base",
+          "Extra 备注": "更新后",
+          "CR only": "",
+          "Local only": "kept"
+        }
+      },
+      {
+        "LocalId": "<guid-12>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Name": "Name create",
+          "Type Code": "Type Code create",
+          "Type (pax/cargo/...)": "Type (pax/cargo/...) create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-13>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Name": "He said \"go\", then\nstop 中文,逗号",
+          "Type Code": "Type Code special",
+          "Type (pax/cargo/...)": "Type (pax/cargo/...) special",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Columns": [
+      "_delete",
+      "ID",
+      "Name",
+      "Type Code",
+      "Type (pax/cargo/...)",
+      "Max Passengers",
+      "Max Freight",
+      "Extra 备注",
+      "CR only",
+      "Local only"
+    ],
+    "SnapshotAt": null,
+    "Conflicts": [],
+    "History": {
+      "Version": 1,
+      "Undo": [
+        {
+          "StepId": "<guid-14>",
+          "Rows": [
+            {
+              "LocalId": "<guid-11>",
+              "Before": {
+                "LocalId": "<guid-11>",
+                "Identity": {
+                  "RemoteId": "11",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":11}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "11",
+                  "Name": "Name update-base",
+                  "Type Code": "Type Code update-base",
+                  "Type (pax/cargo/...)": "Type (pax/cargo/...) update-base",
+                  "Max Passengers": "Max Passengers update-base",
+                  "Max Freight": "Max Freight update-base",
+                  "Extra 备注": "",
+                  "CR only": "",
+                  "Local only": "kept"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Extra 备注",
+                  "CR only",
+                  "Local only"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-11>",
+                "Identity": {
+                  "RemoteId": "11",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":11}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "11",
+                  "Name": "Name update-new changed",
+                  "Type Code": "Type Code update-new",
+                  "Type (pax/cargo/...)": "Type (pax/cargo/...) update-new",
+                  "Max Passengers": "Max Passengers update-base",
+                  "Max Freight": "Max Freight update-base",
+                  "Extra 备注": "更新后",
+                  "CR only": "",
+                  "Local only": "kept"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Extra 备注",
+                  "CR only",
+                  "Local only"
+                ]
+              }
+            },
+            {
+              "LocalId": "<guid-12>",
+              "Before": null,
+              "After": {
+                "LocalId": "<guid-12>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "12",
+                  "Name": "Name create",
+                  "Type Code": "Type Code create",
+                  "Type (pax/cargo/...)": "Type (pax/cargo/...) create",
+                  "Extra 备注": "",
+                  "CR only": ""
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Extra 备注",
+                  "CR only"
+                ]
+              }
+            },
+            {
+              "LocalId": "<guid-13>",
+              "Before": null,
+              "After": {
+                "LocalId": "<guid-13>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "13",
+                  "Name": "He said \"go\", then\nstop 中文,逗号",
+                  "Type Code": "Type Code special",
+                  "Type (pax/cargo/...)": "Type (pax/cargo/...) special",
+                  "Extra 备注": "红白,\"双\"线\r\n第二行",
+                  "CR only": "line\rbreak"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Extra 备注",
+                  "CR only"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": [
+            "<guid-11>"
+          ],
+          "AfterOrder": [
+            "<guid-11>",
+            "<guid-12>",
+            "<guid-13>"
+          ]
+        }
+      ],
+      "Redo": []
+    }
+  }
+}

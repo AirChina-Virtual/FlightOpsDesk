@@ -1,0 +1,3 @@
+ID,Departure Airport (ICAO/IATA),Arrival Airport (ICAO/IATA),Route String,_delete,Remarks,Internal Remarks,Extra 备注,CR only
+11,Departure Airport (ICAO/IATA) update-new,Arrival Airport (ICAO/IATA) update-new,Route String update-new changed,FALSE,Remarks update-new changed,Internal Remarks update-new,更新后,
+12,Departure Airport (ICAO/IATA) delete,Arrival Airport (ICAO/IATA) delete,Route String delete,TRUE,Remarks delete,Internal Remarks delete,,

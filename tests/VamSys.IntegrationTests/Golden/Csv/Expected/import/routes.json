@@ -1,0 +1,382 @@
+{
+  "headers": [
+    "ID",
+    "Departure Airport (ICAO/IATA) (csv)",
+    "Arrival Airport (ICAO/IATA)",
+    "Type",
+    "Extra 备注",
+    "CR only"
+  ],
+  "rows": [
+    [
+      "11",
+      "Departure Airport (ICAO/IATA) update-new",
+      "Arrival Airport (ICAO/IATA) update-new",
+      "Type update-new",
+      "更新后",
+      ""
+    ],
+    [
+      "12",
+      "Departure Airport (ICAO/IATA) create",
+      "Arrival Airport (ICAO/IATA) create",
+      "Type create",
+      "",
+      ""
+    ],
+    [
+      "13",
+      "Departure Airport (ICAO/IATA) special",
+      "Arrival Airport (ICAO/IATA) special",
+      "Type special",
+      "红白,\"双\"线\r\n第二行",
+      "line\rbreak"
+    ]
+  ],
+  "baseline": {
+    "Snapshot": [
+      {
+        "LocalId": "<guid-29>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "11",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-new",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-new",
+          "Type": "Type update-new",
+          "Extra 备注": "更新后",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-30>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) create",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) create",
+          "Type": "Type create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-31>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) special",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) special",
+          "Type": "Type special",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Draft": [
+      {
+        "LocalId": "<guid-29>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "11",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-new",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-new",
+          "Type": "Type update-new",
+          "Extra 备注": "更新后",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-30>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) create",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) create",
+          "Type": "Type create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-31>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) special",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) special",
+          "Type": "Type special",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Columns": [
+      "ID",
+      "Departure Airport (ICAO/IATA)",
+      "Arrival Airport (ICAO/IATA)",
+      "Type",
+      "Extra 备注",
+      "CR only"
+    ],
+    "SnapshotAt": "<time-05>",
+    "Conflicts": [],
+    "History": {
+      "Version": 1,
+      "Undo": [],
+      "Redo": []
+    }
+  },
+  "merge-into-existing-draft": {
+    "Snapshot": [
+      {
+        "LocalId": "<guid-32>",
+        "Identity": {
+          "RemoteId": "11",
+          "ConnectionId": "7",
+          "ParentFleetId": null
+        },
+        "RawApiJson": "{\"id\":11}",
+        "Fields": {
+          "_delete": "FALSE",
+          "ID": "11",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-base",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-base",
+          "Type": "Type update-base",
+          "Callsign": "Callsign update-base",
+          "Flight Number": "Flight Number update-base",
+          "Fleet IDs": "Fleet IDs update-base",
+          "Start Date": "Start Date update-base",
+          "End Date": "End Date update-base",
+          "Extra 备注": "",
+          "CR only": "",
+          "Local only": "kept"
+        }
+      }
+    ],
+    "Draft": [
+      {
+        "LocalId": "<guid-32>",
+        "Identity": {
+          "RemoteId": "11",
+          "ConnectionId": "7",
+          "ParentFleetId": null
+        },
+        "RawApiJson": "{\"id\":11}",
+        "Fields": {
+          "_delete": "FALSE",
+          "ID": "11",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-new",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-new",
+          "Type": "Type update-new",
+          "Callsign": "Callsign update-base",
+          "Flight Number": "Flight Number update-base",
+          "Fleet IDs": "Fleet IDs update-base",
+          "Start Date": "Start Date update-base",
+          "End Date": "End Date update-base",
+          "Extra 备注": "更新后",
+          "CR only": "",
+          "Local only": "kept"
+        }
+      },
+      {
+        "LocalId": "<guid-33>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) create",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) create",
+          "Type": "Type create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-34>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) special",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) special",
+          "Type": "Type special",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Columns": [
+      "_delete",
+      "ID",
+      "Departure Airport (ICAO/IATA)",
+      "Arrival Airport (ICAO/IATA)",
+      "Type",
+      "Callsign",
+      "Flight Number",
+      "Fleet IDs",
+      "Start Date",
+      "End Date",
+      "Extra 备注",
+      "CR only",
+      "Local only"
+    ],
+    "SnapshotAt": null,
+    "Conflicts": [],
+    "History": {
+      "Version": 1,
+      "Undo": [
+        {
+          "StepId": "<guid-35>",
+          "Rows": [
+            {
+              "LocalId": "<guid-32>",
+              "Before": {
+                "LocalId": "<guid-32>",
+                "Identity": {
+                  "RemoteId": "11",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":11}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "11",
+                  "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-base",
+                  "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-base",
+                  "Type": "Type update-base",
+                  "Callsign": "Callsign update-base",
+                  "Flight Number": "Flight Number update-base",
+                  "Fleet IDs": "Fleet IDs update-base",
+                  "Start Date": "Start Date update-base",
+                  "End Date": "End Date update-base",
+                  "Extra 备注": "",
+                  "CR only": "",
+                  "Local only": "kept"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)",
+                  "Type",
+                  "Callsign",
+                  "Flight Number",
+                  "Fleet IDs",
+                  "Start Date",
+                  "End Date",
+                  "Extra 备注",
+                  "CR only",
+                  "Local only"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-32>",
+                "Identity": {
+                  "RemoteId": "11",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":11}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "11",
+                  "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-new",
+                  "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-new",
+                  "Type": "Type update-new",
+                  "Callsign": "Callsign update-base",
+                  "Flight Number": "Flight Number update-base",
+                  "Fleet IDs": "Fleet IDs update-base",
+                  "Start Date": "Start Date update-base",
+                  "End Date": "End Date update-base",
+                  "Extra 备注": "更新后",
+                  "CR only": "",
+                  "Local only": "kept"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)",
+                  "Type",
+                  "Callsign",
+                  "Flight Number",
+                  "Fleet IDs",
+                  "Start Date",
+                  "End Date",
+                  "Extra 备注",
+                  "CR only",
+                  "Local only"
+                ]
+              }
+            },
+            {
+              "LocalId": "<guid-33>",
+              "Before": null,
+              "After": {
+                "LocalId": "<guid-33>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "12",
+                  "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) create",
+                  "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) create",
+                  "Type": "Type create",
+                  "Extra 备注": "",
+                  "CR only": ""
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)",
+                  "Type",
+                  "Extra 备注",
+                  "CR only"
+                ]
+              }
+            },
+            {
+              "LocalId": "<guid-34>",
+              "Before": null,
+              "After": {
+                "LocalId": "<guid-34>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "13",
+                  "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) special",
+                  "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) special",
+                  "Type": "Type special",
+                  "Extra 备注": "红白,\"双\"线\r\n第二行",
+                  "CR only": "line\rbreak"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)",
+                  "Type",
+                  "Extra 备注",
+                  "CR only"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": [
+            "<guid-32>"
+          ],
+          "AfterOrder": [
+            "<guid-32>",
+            "<guid-33>",
+            "<guid-34>"
+          ]
+        }
+      ],
+      "Redo": []
+    }
+  }
+}

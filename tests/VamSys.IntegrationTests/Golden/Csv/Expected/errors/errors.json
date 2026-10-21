@@ -1,0 +1,110 @@
+[
+  {
+    "case": "parse-empty",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_EB79E7A05C",
+      "text": "CSV 为空"
+    }
+  },
+  {
+    "case": "parse-ragged-row",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_7D9C54257B",
+      "text": "CSV 数据列数与表头不一致"
+    }
+  },
+  {
+    "case": "parse-unterminated-quote",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_FDC11D46D9",
+      "text": "CSV 存在未闭合引号"
+    }
+  },
+  {
+    "case": "parse-text-after-closing-quote",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_269E09BE6D",
+      "text": "CSV 引号格式错误"
+    }
+  },
+  {
+    "case": "parse-quote-inside-unquoted-field",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_269E09BE6D",
+      "text": "CSV 引号格式错误"
+    }
+  },
+  {
+    "case": "parse-duplicate-headers",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_147B7E591C",
+      "text": "CSV 列名为空或重复"
+    }
+  },
+  {
+    "case": "parse-blank-header",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_147B7E591C",
+      "text": "CSV 列名为空或重复"
+    }
+  },
+  {
+    "case": "map-two-headers-to-one-name",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_E93E44505B",
+      "text": "映射后的字段为空或重复"
+    }
+  },
+  {
+    "case": "import-baseline-without-key",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_FF27EDEC0D",
+      "text": "原始快照中的记录必须有标识；新增记录请取消“作为原始快照”"
+    }
+  },
+  {
+    "case": "import-duplicate-incoming-keys",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_FC5C1BF085",
+      "text": "导入文件含重复标识"
+    }
+  },
+  {
+    "case": "import-duplicate-draft-keys",
+    "error": {
+      "type": "FormatException",
+      "code": "Text_DFA07F45EA",
+      "text": "工作区含重复标识，不能合并"
+    }
+  },
+  {
+    "case": "export-local-reference",
+    "error": {
+      "type": "InvalidOperationException",
+      "code": "Text_6597D6DF98",
+      "text": "本地引用必须先取得远端 ID 才能导出 CSV；请先导入基础资源并重新读取其 ID"
+    }
+  },
+  {
+    "case": "export-row-larger-than-max-bytes",
+    "error": {
+      "type": "InvalidOperationException",
+      "code": "Text_924C111685",
+      "text": "单行超过文件大小限制"
+    }
+  },
+  {
+    "case": "export-nothing",
+    "error": null
+  }
+]

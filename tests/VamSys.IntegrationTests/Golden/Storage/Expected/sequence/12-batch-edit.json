@@ -1,0 +1,1576 @@
+{
+  "user_version": 4,
+  "journal_mode": "wal",
+  "schema": [
+    {
+      "type": "index",
+      "name": "resource_row_order",
+      "tbl_name": "resource_rows",
+      "sql": "CREATE UNIQUE INDEX resource_row_order ON resource_rows(workspace_id,resource,collection,ordinal)"
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_app_settings_1",
+      "tbl_name": "app_settings",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_batch_items_1",
+      "tbl_name": "batch_items",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_batch_jobs_1",
+      "tbl_name": "batch_jobs",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_resource_history_state_1",
+      "tbl_name": "resource_history_state",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_resource_history_steps_1",
+      "tbl_name": "resource_history_steps",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_resource_metadata_1",
+      "tbl_name": "resource_metadata",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_resource_rows_1",
+      "tbl_name": "resource_rows",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_secrets_1",
+      "tbl_name": "secrets",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_workspace_revisions_1",
+      "tbl_name": "workspace_revisions",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_workspaces_1",
+      "tbl_name": "workspaces",
+      "sql": null
+    },
+    {
+      "type": "table",
+      "name": "app_settings",
+      "tbl_name": "app_settings",
+      "sql": "CREATE TABLE app_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)"
+    },
+    {
+      "type": "table",
+      "name": "batch_items",
+      "tbl_name": "batch_items",
+      "sql": "CREATE TABLE batch_items(workspace_id TEXT NOT NULL,job_id TEXT NOT NULL,id TEXT NOT NULL,ordinal INTEGER NOT NULL,json TEXT NOT NULL,PRIMARY KEY(workspace_id,job_id,id),FOREIGN KEY(workspace_id,job_id) REFERENCES batch_jobs(workspace_id,id) ON DELETE CASCADE)"
+    },
+    {
+      "type": "table",
+      "name": "batch_jobs",
+      "tbl_name": "batch_jobs",
+      "sql": "CREATE TABLE batch_jobs(workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,id TEXT NOT NULL,ordinal INTEGER NOT NULL,json TEXT NOT NULL,PRIMARY KEY(workspace_id,id))"
+    },
+    {
+      "type": "table",
+      "name": "resource_history_state",
+      "tbl_name": "resource_history_state",
+      "sql": "CREATE TABLE resource_history_state(workspace_id TEXT NOT NULL,resource INTEGER NOT NULL,undo_json TEXT NOT NULL,redo_json TEXT NOT NULL,PRIMARY KEY(workspace_id,resource),FOREIGN KEY(workspace_id,resource) REFERENCES resource_metadata(workspace_id,resource) ON DELETE CASCADE)"
+    },
+    {
+      "type": "table",
+      "name": "resource_history_steps",
+      "tbl_name": "resource_history_steps",
+      "sql": "CREATE TABLE resource_history_steps(workspace_id TEXT NOT NULL,resource INTEGER NOT NULL,step_id TEXT NOT NULL,json TEXT NOT NULL,PRIMARY KEY(workspace_id,resource,step_id),FOREIGN KEY(workspace_id,resource) REFERENCES resource_metadata(workspace_id,resource) ON DELETE CASCADE)"
+    },
+    {
+      "type": "table",
+      "name": "resource_metadata",
+      "tbl_name": "resource_metadata",
+      "sql": "CREATE TABLE resource_metadata(workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,resource INTEGER NOT NULL,columns_json TEXT NOT NULL,conflicts_json TEXT NOT NULL,snapshot_at TEXT,PRIMARY KEY(workspace_id,resource))"
+    },
+    {
+      "type": "table",
+      "name": "resource_rows",
+      "tbl_name": "resource_rows",
+      "sql": "CREATE TABLE resource_rows(workspace_id TEXT NOT NULL,resource INTEGER NOT NULL,collection INTEGER NOT NULL,local_id TEXT NOT NULL,ordinal INTEGER NOT NULL,json TEXT NOT NULL,PRIMARY KEY(workspace_id,resource,collection,local_id),FOREIGN KEY(workspace_id,resource) REFERENCES resource_metadata(workspace_id,resource) ON DELETE CASCADE)"
+    },
+    {
+      "type": "table",
+      "name": "secrets",
+      "tbl_name": "secrets",
+      "sql": "CREATE TABLE secrets(id TEXT PRIMARY KEY,value BLOB NOT NULL)"
+    },
+    {
+      "type": "table",
+      "name": "workspace_revisions",
+      "tbl_name": "workspace_revisions",
+      "sql": "CREATE TABLE workspace_revisions(workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,revision INTEGER NOT NULL)"
+    },
+    {
+      "type": "table",
+      "name": "workspaces",
+      "tbl_name": "workspaces",
+      "sql": "CREATE TABLE workspaces(id TEXT PRIMARY KEY,name TEXT NOT NULL,json TEXT NOT NULL,format_version INTEGER NOT NULL)"
+    },
+    {
+      "type": "trigger",
+      "name": "workspace_format_insert",
+      "tbl_name": "workspaces",
+      "sql": "CREATE TRIGGER workspace_format_insert BEFORE INSERT ON workspaces WHEN NEW.format_version!=4 BEGIN SELECT RAISE(ABORT,'unsupported workspace format'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "workspace_format_update",
+      "tbl_name": "workspaces",
+      "sql": "CREATE TRIGGER workspace_format_update BEFORE UPDATE ON workspaces WHEN NEW.format_version!=4 BEGIN SELECT RAISE(ABORT,'unsupported workspace format'); END"
+    }
+  ],
+  "tables": {
+    "app_settings": [],
+    "batch_items": [],
+    "batch_jobs": [],
+    "resource_history_state": [
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 0,
+        "undo_json": [
+          "<guid-12>"
+        ],
+        "redo_json": []
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "undo_json": [
+          "<guid-13>",
+          "<guid-14>",
+          "<guid-16>",
+          "<guid-17>",
+          "<guid-18>",
+          "<guid-19>"
+        ],
+        "redo_json": []
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 2,
+        "undo_json": [],
+        "redo_json": []
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 3,
+        "undo_json": [],
+        "redo_json": []
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 4,
+        "undo_json": [
+          "<guid-20>",
+          "<guid-21>",
+          "<guid-22>"
+        ],
+        "redo_json": []
+      }
+    ],
+    "resource_history_steps": [
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 0,
+        "step_id": "<guid-12>",
+        "json": {
+          "StepId": "<guid-12>",
+          "Rows": [
+            {
+              "LocalId": "<guid-04>",
+              "Before": {
+                "LocalId": "<guid-04>",
+                "Identity": {
+                  "RemoteId": "103",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":103,\"airline_id\":7,\"icao\":\"ZBAA\",\"iata\":\"PEK\",\"name\":\"北京首都\"}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ICAO/IATA": "ZBAA",
+                  "Name": "北京首都"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ICAO/IATA",
+                  "Name"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-04>",
+                "Identity": {
+                  "RemoteId": "103",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":103,\"airline_id\":7,\"icao\":\"ZBAA\",\"iata\":\"PEK\",\"name\":\"北京首都\"}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ICAO/IATA": "ZBAA",
+                  "Name": "Beijing Capital"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ICAO/IATA",
+                  "Name"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": null,
+          "AfterOrder": null
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "step_id": "<guid-13>",
+        "json": {
+          "StepId": "<guid-13>",
+          "Rows": [
+            {
+              "LocalId": "<guid-05>",
+              "Before": {
+                "LocalId": "<guid-05>",
+                "Identity": {
+                  "RemoteId": "4",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":4,\"airline_id\":7,\"name\":\"Fleet Alpha\",\"code\":\"B738\",\"type\":\"pax\",\"max_pax\":180}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "4",
+                  "Name": "Fleet Alpha",
+                  "Type Code": "B738",
+                  "Type (pax/cargo/...)": "pax",
+                  "Max Passengers": "180"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-05>",
+                "Identity": {
+                  "RemoteId": "4",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":4,\"airline_id\":7,\"name\":\"Fleet Alpha\",\"code\":\"B738\",\"type\":\"pax\",\"max_pax\":180}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "4",
+                  "Name": "Fleet Alpha 3",
+                  "Type Code": "B738",
+                  "Type (pax/cargo/...)": "pax",
+                  "Max Passengers": "180"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": null,
+          "AfterOrder": null
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "step_id": "<guid-14>",
+        "json": {
+          "StepId": "<guid-14>",
+          "Rows": [
+            {
+              "LocalId": "<guid-15>",
+              "Before": null,
+              "After": {
+                "LocalId": "<guid-15>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "",
+                  "Name": "",
+                  "Type Code": "",
+                  "Type (pax/cargo/...)": "",
+                  "Max Passengers": "",
+                  "Max Freight": "",
+                  "Container Units": "",
+                  "Hide in Phoenix": "",
+                  "Allowed Prefix IDs": "",
+                  "Parameter IDs": "",
+                  "_delete": "FALSE"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Container Units",
+                  "Hide in Phoenix",
+                  "Allowed Prefix IDs",
+                  "Parameter IDs",
+                  "_delete"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": [
+            "<guid-05>",
+            "<guid-06>"
+          ],
+          "AfterOrder": [
+            "<guid-05>",
+            "<guid-06>",
+            "<guid-15>"
+          ]
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "step_id": "<guid-16>",
+        "json": {
+          "StepId": "<guid-16>",
+          "Rows": [
+            {
+              "LocalId": "<guid-15>",
+              "Before": {
+                "LocalId": "<guid-15>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "",
+                  "Name": "",
+                  "Type Code": "",
+                  "Type (pax/cargo/...)": "",
+                  "Max Passengers": "",
+                  "Max Freight": "",
+                  "Container Units": "",
+                  "Hide in Phoenix": "",
+                  "Allowed Prefix IDs": "",
+                  "Parameter IDs": "",
+                  "_delete": "FALSE"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Container Units",
+                  "Hide in Phoenix",
+                  "Allowed Prefix IDs",
+                  "Parameter IDs",
+                  "_delete"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-15>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "",
+                  "Name": "New Fleet Gamma",
+                  "Type Code": "",
+                  "Type (pax/cargo/...)": "",
+                  "Max Passengers": "",
+                  "Max Freight": "",
+                  "Container Units": "",
+                  "Hide in Phoenix": "",
+                  "Allowed Prefix IDs": "",
+                  "Parameter IDs": "",
+                  "_delete": "FALSE"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Container Units",
+                  "Hide in Phoenix",
+                  "Allowed Prefix IDs",
+                  "Parameter IDs",
+                  "_delete"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": null,
+          "AfterOrder": null
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "step_id": "<guid-17>",
+        "json": {
+          "StepId": "<guid-17>",
+          "Rows": [
+            {
+              "LocalId": "<guid-15>",
+              "Before": {
+                "LocalId": "<guid-15>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "",
+                  "Name": "New Fleet Gamma",
+                  "Type Code": "",
+                  "Type (pax/cargo/...)": "",
+                  "Max Passengers": "",
+                  "Max Freight": "",
+                  "Container Units": "",
+                  "Hide in Phoenix": "",
+                  "Allowed Prefix IDs": "",
+                  "Parameter IDs": "",
+                  "_delete": "FALSE"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Container Units",
+                  "Hide in Phoenix",
+                  "Allowed Prefix IDs",
+                  "Parameter IDs",
+                  "_delete"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-15>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "",
+                  "Name": "New Fleet Gamma",
+                  "Type Code": "A320",
+                  "Type (pax/cargo/...)": "",
+                  "Max Passengers": "",
+                  "Max Freight": "",
+                  "Container Units": "",
+                  "Hide in Phoenix": "",
+                  "Allowed Prefix IDs": "",
+                  "Parameter IDs": "",
+                  "_delete": "FALSE"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Container Units",
+                  "Hide in Phoenix",
+                  "Allowed Prefix IDs",
+                  "Parameter IDs",
+                  "_delete"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": null,
+          "AfterOrder": null
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "step_id": "<guid-18>",
+        "json": {
+          "StepId": "<guid-18>",
+          "Rows": [
+            {
+              "LocalId": "<guid-15>",
+              "Before": {
+                "LocalId": "<guid-15>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "",
+                  "Name": "New Fleet Gamma",
+                  "Type Code": "A320",
+                  "Type (pax/cargo/...)": "",
+                  "Max Passengers": "",
+                  "Max Freight": "",
+                  "Container Units": "",
+                  "Hide in Phoenix": "",
+                  "Allowed Prefix IDs": "",
+                  "Parameter IDs": "",
+                  "_delete": "FALSE"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Container Units",
+                  "Hide in Phoenix",
+                  "Allowed Prefix IDs",
+                  "Parameter IDs",
+                  "_delete"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-15>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "",
+                  "Name": "New Fleet Gamma",
+                  "Type Code": "A320",
+                  "Type (pax/cargo/...)": "pax",
+                  "Max Passengers": "",
+                  "Max Freight": "",
+                  "Container Units": "",
+                  "Hide in Phoenix": "",
+                  "Allowed Prefix IDs": "",
+                  "Parameter IDs": "",
+                  "_delete": "FALSE"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Container Units",
+                  "Hide in Phoenix",
+                  "Allowed Prefix IDs",
+                  "Parameter IDs",
+                  "_delete"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": null,
+          "AfterOrder": null
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "step_id": "<guid-19>",
+        "json": {
+          "StepId": "<guid-19>",
+          "Rows": [
+            {
+              "LocalId": "<guid-15>",
+              "Before": {
+                "LocalId": "<guid-15>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "",
+                  "Name": "New Fleet Gamma",
+                  "Type Code": "A320",
+                  "Type (pax/cargo/...)": "pax",
+                  "Max Passengers": "",
+                  "Max Freight": "",
+                  "Container Units": "",
+                  "Hide in Phoenix": "",
+                  "Allowed Prefix IDs": "",
+                  "Parameter IDs": "",
+                  "_delete": "FALSE"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Container Units",
+                  "Hide in Phoenix",
+                  "Allowed Prefix IDs",
+                  "Parameter IDs",
+                  "_delete"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-15>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "",
+                  "Name": "New Fleet Gamma",
+                  "Type Code": "A320",
+                  "Type (pax/cargo/...)": "pax",
+                  "Max Passengers": "150",
+                  "Max Freight": "",
+                  "Container Units": "",
+                  "Hide in Phoenix": "",
+                  "Allowed Prefix IDs": "",
+                  "Parameter IDs": "",
+                  "_delete": "FALSE"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Type Code",
+                  "Type (pax/cargo/...)",
+                  "Max Passengers",
+                  "Max Freight",
+                  "Container Units",
+                  "Hide in Phoenix",
+                  "Allowed Prefix IDs",
+                  "Parameter IDs",
+                  "_delete"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": null,
+          "AfterOrder": null
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 4,
+        "step_id": "<guid-20>",
+        "json": {
+          "StepId": "<guid-20>",
+          "Rows": [
+            {
+              "LocalId": "<guid-11>",
+              "Before": {
+                "LocalId": "<guid-11>",
+                "Identity": {
+                  "RemoteId": "42",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":42,\"type\":\"scheduled\",\"departure_id\":102,\"arrival_id\":101,\"callsign\":\"ACA124\",\"flight_number\":\"AC124\",\"fleet_ids\":[4,5],\"remarks\":\"回程\"}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "42",
+                  "Type": "scheduled",
+                  "Callsign": "ACA124",
+                  "Flight Number": "AC124",
+                  "Fleet IDs": "4,5",
+                  "Remarks": "回程",
+                  "Departure Airport (ICAO/IATA)": "EGKK",
+                  "Arrival Airport (ICAO/IATA)": "EGLL"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Type",
+                  "Callsign",
+                  "Flight Number",
+                  "Fleet IDs",
+                  "Remarks",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-11>",
+                "Identity": {
+                  "RemoteId": "42",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":42,\"type\":\"scheduled\",\"departure_id\":102,\"arrival_id\":101,\"callsign\":\"ACA124\",\"flight_number\":\"AC124\",\"fleet_ids\":[4,5],\"remarks\":\"回程\"}",
+                "Fields": {
+                  "_delete": "TRUE",
+                  "ID": "42",
+                  "Type": "scheduled",
+                  "Callsign": "ACA124",
+                  "Flight Number": "AC124",
+                  "Fleet IDs": "4,5",
+                  "Remarks": "回程",
+                  "Departure Airport (ICAO/IATA)": "EGKK",
+                  "Arrival Airport (ICAO/IATA)": "EGLL"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Type",
+                  "Callsign",
+                  "Flight Number",
+                  "Fleet IDs",
+                  "Remarks",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": null,
+          "AfterOrder": null
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 4,
+        "step_id": "<guid-21>",
+        "json": {
+          "StepId": "<guid-21>",
+          "Rows": [
+            {
+              "LocalId": "<guid-11>",
+              "Before": {
+                "LocalId": "<guid-11>",
+                "Identity": {
+                  "RemoteId": "42",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":42,\"type\":\"scheduled\",\"departure_id\":102,\"arrival_id\":101,\"callsign\":\"ACA124\",\"flight_number\":\"AC124\",\"fleet_ids\":[4,5],\"remarks\":\"回程\"}",
+                "Fields": {
+                  "_delete": "TRUE",
+                  "ID": "42",
+                  "Type": "scheduled",
+                  "Callsign": "ACA124",
+                  "Flight Number": "AC124",
+                  "Fleet IDs": "4,5",
+                  "Remarks": "回程",
+                  "Departure Airport (ICAO/IATA)": "EGKK",
+                  "Arrival Airport (ICAO/IATA)": "EGLL"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Type",
+                  "Callsign",
+                  "Flight Number",
+                  "Fleet IDs",
+                  "Remarks",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-11>",
+                "Identity": {
+                  "RemoteId": "42",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":42,\"type\":\"scheduled\",\"departure_id\":102,\"arrival_id\":101,\"callsign\":\"ACA124\",\"flight_number\":\"AC124\",\"fleet_ids\":[4,5],\"remarks\":\"回程\"}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "42",
+                  "Type": "scheduled",
+                  "Callsign": "ACA124",
+                  "Flight Number": "AC124",
+                  "Fleet IDs": "4,5",
+                  "Remarks": "回程",
+                  "Departure Airport (ICAO/IATA)": "EGKK",
+                  "Arrival Airport (ICAO/IATA)": "EGLL"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Type",
+                  "Callsign",
+                  "Flight Number",
+                  "Fleet IDs",
+                  "Remarks",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": null,
+          "AfterOrder": null
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 4,
+        "step_id": "<guid-22>",
+        "json": {
+          "StepId": "<guid-22>",
+          "Rows": [
+            {
+              "LocalId": "<guid-10>",
+              "Before": {
+                "LocalId": "<guid-10>",
+                "Identity": {
+                  "RemoteId": "41",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":41,\"type\":\"scheduled\",\"departure_id\":101,\"arrival_id\":102,\"callsign\":\"ACA123\",\"flight_number\":\"AC123\",\"fleet_ids\":[4]}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "41",
+                  "Type": "scheduled",
+                  "Callsign": "ACA123",
+                  "Flight Number": "AC123",
+                  "Fleet IDs": "4",
+                  "Departure Airport (ICAO/IATA)": "EGLL",
+                  "Arrival Airport (ICAO/IATA)": "EGKK"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Type",
+                  "Callsign",
+                  "Flight Number",
+                  "Fleet IDs",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-10>",
+                "Identity": {
+                  "RemoteId": "41",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":41,\"type\":\"scheduled\",\"departure_id\":101,\"arrival_id\":102,\"callsign\":\"ACA123\",\"flight_number\":\"AC123\",\"fleet_ids\":[4]}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "41",
+                  "Type": "scheduled",
+                  "Callsign": "ACA123",
+                  "Flight Number": "AC123",
+                  "Fleet IDs": "4",
+                  "Departure Airport (ICAO/IATA)": "EGLL",
+                  "Arrival Airport (ICAO/IATA)": "EGKK",
+                  "Tags": "golden,批量"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Type",
+                  "Callsign",
+                  "Flight Number",
+                  "Fleet IDs",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)",
+                  "Tags"
+                ]
+              }
+            },
+            {
+              "LocalId": "<guid-11>",
+              "Before": {
+                "LocalId": "<guid-11>",
+                "Identity": {
+                  "RemoteId": "42",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":42,\"type\":\"scheduled\",\"departure_id\":102,\"arrival_id\":101,\"callsign\":\"ACA124\",\"flight_number\":\"AC124\",\"fleet_ids\":[4,5],\"remarks\":\"回程\"}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "42",
+                  "Type": "scheduled",
+                  "Callsign": "ACA124",
+                  "Flight Number": "AC124",
+                  "Fleet IDs": "4,5",
+                  "Remarks": "回程",
+                  "Departure Airport (ICAO/IATA)": "EGKK",
+                  "Arrival Airport (ICAO/IATA)": "EGLL"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Type",
+                  "Callsign",
+                  "Flight Number",
+                  "Fleet IDs",
+                  "Remarks",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-11>",
+                "Identity": {
+                  "RemoteId": "42",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":42,\"type\":\"scheduled\",\"departure_id\":102,\"arrival_id\":101,\"callsign\":\"ACA124\",\"flight_number\":\"AC124\",\"fleet_ids\":[4,5],\"remarks\":\"回程\"}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "42",
+                  "Type": "scheduled",
+                  "Callsign": "ACA124",
+                  "Flight Number": "AC124",
+                  "Fleet IDs": "4,5",
+                  "Remarks": "回程",
+                  "Departure Airport (ICAO/IATA)": "EGKK",
+                  "Arrival Airport (ICAO/IATA)": "EGLL",
+                  "Tags": "golden,批量"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Type",
+                  "Callsign",
+                  "Flight Number",
+                  "Fleet IDs",
+                  "Remarks",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)",
+                  "Tags"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": null,
+          "AfterOrder": null
+        }
+      }
+    ],
+    "resource_metadata": [
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 0,
+        "columns_json": [
+          "_delete",
+          "ICAO/IATA",
+          "Name"
+        ],
+        "conflicts_json": [],
+        "snapshot_at": "<time-01>"
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "columns_json": [
+          "_delete",
+          "ID",
+          "Name",
+          "Type Code",
+          "Type (pax/cargo/...)",
+          "Max Passengers",
+          "Max Freight",
+          "Container Units",
+          "Hide in Phoenix",
+          "Allowed Prefix IDs",
+          "Parameter IDs"
+        ],
+        "conflicts_json": [],
+        "snapshot_at": "<time-02>"
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 2,
+        "columns_json": [
+          "_delete",
+          "ID",
+          "Name",
+          "Registration",
+          "Fleet ID"
+        ],
+        "conflicts_json": [],
+        "snapshot_at": "<time-03>"
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 3,
+        "columns_json": [
+          "_delete",
+          "ID",
+          "Route String",
+          "Departure Airport (ICAO/IATA)",
+          "Arrival Airport (ICAO/IATA)"
+        ],
+        "conflicts_json": [],
+        "snapshot_at": "<time-04>"
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 4,
+        "columns_json": [
+          "_delete",
+          "ID",
+          "Type",
+          "Callsign",
+          "Flight Number",
+          "Fleet IDs",
+          "Departure Airport (ICAO/IATA)",
+          "Arrival Airport (ICAO/IATA)",
+          "Remarks",
+          "Tags"
+        ],
+        "conflicts_json": [],
+        "snapshot_at": "<time-05>"
+      }
+    ],
+    "resource_rows": [
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 0,
+        "collection": 0,
+        "local_id": "<guid-02>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-02>",
+          "Identity": {
+            "RemoteId": "101",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":101,\"airline_id\":7,\"icao\":\"EGLL\",\"iata\":\"LHR\",\"name\":\"London Heathrow\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ICAO/IATA": "EGLL",
+            "Name": "London Heathrow"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 0,
+        "collection": 0,
+        "local_id": "<guid-03>",
+        "ordinal": 1,
+        "json": {
+          "LocalId": "<guid-03>",
+          "Identity": {
+            "RemoteId": "102",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":102,\"airline_id\":7,\"icao\":\"EGKK\",\"iata\":\"LGW\",\"name\":\"London Gatwick\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ICAO/IATA": "EGKK",
+            "Name": "London Gatwick"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 0,
+        "collection": 0,
+        "local_id": "<guid-04>",
+        "ordinal": 2,
+        "json": {
+          "LocalId": "<guid-04>",
+          "Identity": {
+            "RemoteId": "103",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":103,\"airline_id\":7,\"icao\":\"ZBAA\",\"iata\":\"PEK\",\"name\":\"北京首都\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ICAO/IATA": "ZBAA",
+            "Name": "北京首都"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 0,
+        "collection": 1,
+        "local_id": "<guid-02>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-02>",
+          "Identity": {
+            "RemoteId": "101",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":101,\"airline_id\":7,\"icao\":\"EGLL\",\"iata\":\"LHR\",\"name\":\"London Heathrow\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ICAO/IATA": "EGLL",
+            "Name": "London Heathrow"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 0,
+        "collection": 1,
+        "local_id": "<guid-03>",
+        "ordinal": 1,
+        "json": {
+          "LocalId": "<guid-03>",
+          "Identity": {
+            "RemoteId": "102",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":102,\"airline_id\":7,\"icao\":\"EGKK\",\"iata\":\"LGW\",\"name\":\"London Gatwick\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ICAO/IATA": "EGKK",
+            "Name": "London Gatwick"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 0,
+        "collection": 1,
+        "local_id": "<guid-04>",
+        "ordinal": 2,
+        "json": {
+          "LocalId": "<guid-04>",
+          "Identity": {
+            "RemoteId": "103",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":103,\"airline_id\":7,\"icao\":\"ZBAA\",\"iata\":\"PEK\",\"name\":\"北京首都\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ICAO/IATA": "ZBAA",
+            "Name": "Beijing Capital"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "collection": 0,
+        "local_id": "<guid-05>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-05>",
+          "Identity": {
+            "RemoteId": "4",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":4,\"airline_id\":7,\"name\":\"Fleet Alpha\",\"code\":\"B738\",\"type\":\"pax\",\"max_pax\":180}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "4",
+            "Name": "Fleet Alpha",
+            "Type Code": "B738",
+            "Type (pax/cargo/...)": "pax",
+            "Max Passengers": "180"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "collection": 0,
+        "local_id": "<guid-06>",
+        "ordinal": 1,
+        "json": {
+          "LocalId": "<guid-06>",
+          "Identity": {
+            "RemoteId": "5",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":5,\"airline_id\":7,\"name\":\"Cargo Beta\",\"code\":\"B77F\",\"type\":\"cargo\",\"max_cargo\":100000}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "5",
+            "Name": "Cargo Beta",
+            "Type Code": "B77F",
+            "Type (pax/cargo/...)": "cargo",
+            "Max Freight": "100000"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "collection": 1,
+        "local_id": "<guid-05>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-05>",
+          "Identity": {
+            "RemoteId": "4",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":4,\"airline_id\":7,\"name\":\"Fleet Alpha\",\"code\":\"B738\",\"type\":\"pax\",\"max_pax\":180}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "4",
+            "Name": "Fleet Alpha 3",
+            "Type Code": "B738",
+            "Type (pax/cargo/...)": "pax",
+            "Max Passengers": "180"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "collection": 1,
+        "local_id": "<guid-06>",
+        "ordinal": 1,
+        "json": {
+          "LocalId": "<guid-06>",
+          "Identity": {
+            "RemoteId": "5",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":5,\"airline_id\":7,\"name\":\"Cargo Beta\",\"code\":\"B77F\",\"type\":\"cargo\",\"max_cargo\":100000}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "5",
+            "Name": "Cargo Beta",
+            "Type Code": "B77F",
+            "Type (pax/cargo/...)": "cargo",
+            "Max Freight": "100000"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 1,
+        "collection": 1,
+        "local_id": "<guid-15>",
+        "ordinal": 2,
+        "json": {
+          "LocalId": "<guid-15>",
+          "Identity": null,
+          "RawApiJson": null,
+          "Fields": {
+            "ID": "",
+            "Name": "New Fleet Gamma",
+            "Type Code": "A320",
+            "Type (pax/cargo/...)": "pax",
+            "Max Passengers": "150",
+            "Max Freight": "",
+            "Container Units": "",
+            "Hide in Phoenix": "",
+            "Allowed Prefix IDs": "",
+            "Parameter IDs": "",
+            "_delete": "FALSE"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 2,
+        "collection": 0,
+        "local_id": "<guid-07>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-07>",
+          "Identity": {
+            "RemoteId": "21",
+            "ConnectionId": "7",
+            "ParentFleetId": "4"
+          },
+          "RawApiJson": "{\"id\":21,\"airline_id\":7,\"fleet_id\":4,\"name\":\"Alpha One\",\"registration\":\"B-1001\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "21",
+            "Name": "Alpha One",
+            "Registration": "B-1001",
+            "Fleet ID": "4"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 2,
+        "collection": 0,
+        "local_id": "<guid-08>",
+        "ordinal": 1,
+        "json": {
+          "LocalId": "<guid-08>",
+          "Identity": {
+            "RemoteId": "22",
+            "ConnectionId": "7",
+            "ParentFleetId": "4"
+          },
+          "RawApiJson": "{\"id\":22,\"airline_id\":7,\"fleet_id\":4,\"name\":\"Alpha Two\",\"registration\":\"B-1002\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "22",
+            "Name": "Alpha Two",
+            "Registration": "B-1002",
+            "Fleet ID": "4"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 2,
+        "collection": 1,
+        "local_id": "<guid-07>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-07>",
+          "Identity": {
+            "RemoteId": "21",
+            "ConnectionId": "7",
+            "ParentFleetId": "4"
+          },
+          "RawApiJson": "{\"id\":21,\"airline_id\":7,\"fleet_id\":4,\"name\":\"Alpha One\",\"registration\":\"B-1001\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "21",
+            "Name": "Alpha One",
+            "Registration": "B-1001",
+            "Fleet ID": "4"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 2,
+        "collection": 1,
+        "local_id": "<guid-08>",
+        "ordinal": 1,
+        "json": {
+          "LocalId": "<guid-08>",
+          "Identity": {
+            "RemoteId": "22",
+            "ConnectionId": "7",
+            "ParentFleetId": "4"
+          },
+          "RawApiJson": "{\"id\":22,\"airline_id\":7,\"fleet_id\":4,\"name\":\"Alpha Two\",\"registration\":\"B-1002\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "22",
+            "Name": "Alpha Two",
+            "Registration": "B-1002",
+            "Fleet ID": "4"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 3,
+        "collection": 0,
+        "local_id": "<guid-09>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-09>",
+          "Identity": {
+            "RemoteId": "31",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":31,\"airline_id\":7,\"departure_airport_id\":101,\"arrival_airport_id\":102,\"route\":\"DCT\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "31",
+            "Route String": "DCT",
+            "Departure Airport (ICAO/IATA)": "EGLL",
+            "Arrival Airport (ICAO/IATA)": "EGKK"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 3,
+        "collection": 1,
+        "local_id": "<guid-09>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-09>",
+          "Identity": {
+            "RemoteId": "31",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":31,\"airline_id\":7,\"departure_airport_id\":101,\"arrival_airport_id\":102,\"route\":\"DCT\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "31",
+            "Route String": "DCT",
+            "Departure Airport (ICAO/IATA)": "EGLL",
+            "Arrival Airport (ICAO/IATA)": "EGKK"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 4,
+        "collection": 0,
+        "local_id": "<guid-10>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-10>",
+          "Identity": {
+            "RemoteId": "41",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":41,\"type\":\"scheduled\",\"departure_id\":101,\"arrival_id\":102,\"callsign\":\"ACA123\",\"flight_number\":\"AC123\",\"fleet_ids\":[4]}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "41",
+            "Type": "scheduled",
+            "Callsign": "ACA123",
+            "Flight Number": "AC123",
+            "Fleet IDs": "4",
+            "Departure Airport (ICAO/IATA)": "EGLL",
+            "Arrival Airport (ICAO/IATA)": "EGKK"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 4,
+        "collection": 0,
+        "local_id": "<guid-11>",
+        "ordinal": 1,
+        "json": {
+          "LocalId": "<guid-11>",
+          "Identity": {
+            "RemoteId": "42",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":42,\"type\":\"scheduled\",\"departure_id\":102,\"arrival_id\":101,\"callsign\":\"ACA124\",\"flight_number\":\"AC124\",\"fleet_ids\":[4,5],\"remarks\":\"回程\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "42",
+            "Type": "scheduled",
+            "Callsign": "ACA124",
+            "Flight Number": "AC124",
+            "Fleet IDs": "4,5",
+            "Remarks": "回程",
+            "Departure Airport (ICAO/IATA)": "EGKK",
+            "Arrival Airport (ICAO/IATA)": "EGLL"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 4,
+        "collection": 1,
+        "local_id": "<guid-10>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-10>",
+          "Identity": {
+            "RemoteId": "41",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":41,\"type\":\"scheduled\",\"departure_id\":101,\"arrival_id\":102,\"callsign\":\"ACA123\",\"flight_number\":\"AC123\",\"fleet_ids\":[4]}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "41",
+            "Type": "scheduled",
+            "Callsign": "ACA123",
+            "Flight Number": "AC123",
+            "Fleet IDs": "4",
+            "Departure Airport (ICAO/IATA)": "EGLL",
+            "Arrival Airport (ICAO/IATA)": "EGKK",
+            "Tags": "golden,批量"
+          }
+        }
+      },
+      {
+        "workspace_id": "<guid-01>",
+        "resource": 4,
+        "collection": 1,
+        "local_id": "<guid-11>",
+        "ordinal": 1,
+        "json": {
+          "LocalId": "<guid-11>",
+          "Identity": {
+            "RemoteId": "42",
+            "ConnectionId": "7",
+            "ParentFleetId": null
+          },
+          "RawApiJson": "{\"id\":42,\"type\":\"scheduled\",\"departure_id\":102,\"arrival_id\":101,\"callsign\":\"ACA124\",\"flight_number\":\"AC124\",\"fleet_ids\":[4,5],\"remarks\":\"回程\"}",
+          "Fields": {
+            "_delete": "FALSE",
+            "ID": "42",
+            "Type": "scheduled",
+            "Callsign": "ACA124",
+            "Flight Number": "AC124",
+            "Fleet IDs": "4,5",
+            "Remarks": "回程",
+            "Departure Airport (ICAO/IATA)": "EGKK",
+            "Arrival Airport (ICAO/IATA)": "EGLL",
+            "Tags": "golden,批量"
+          }
+        }
+      }
+    ],
+    "secrets": [],
+    "workspace_revisions": [
+      {
+        "workspace_id": "<guid-01>",
+        "revision": 11
+      }
+    ],
+    "workspaces": [
+      {
+        "id": "<guid-01>",
+        "name": "Golden workspace",
+        "json": {
+          "Id": "<guid-01>",
+          "StorageRevision": 10,
+          "Name": "Golden workspace",
+          "Mode": 2,
+          "LocalRouteTimes": false,
+          "InstanceUrl": "",
+          "AirlineId": "7",
+          "ClientId": null,
+          "ConnectedAt": null,
+          "ContractHash": null,
+          "VerifiedOperations": [
+            "Airports:Read",
+            "Fleets:Read",
+            "Aircraft:Read",
+            "Routings:Read",
+            "Routes:Read"
+          ]
+        },
+        "format_version": 4
+      }
+    ]
+  }
+}

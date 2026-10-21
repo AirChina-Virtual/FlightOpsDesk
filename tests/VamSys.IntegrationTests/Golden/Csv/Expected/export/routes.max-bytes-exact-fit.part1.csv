@@ -1,0 +1,3 @@
+ID,Departure Airport (ICAO/IATA),Arrival Airport (ICAO/IATA),Type,_delete,Callsign,Flight Number,Fleet IDs,Start Date,End Date,Extra 备注,CR only
+11,Departure Airport (ICAO/IATA) update-new,Arrival Airport (ICAO/IATA) update-new,Type update-new,FALSE,Callsign update-new,Flight Number update-new,Fleet IDs update-new,Start Date update-new,End Date update-new,更新后,
+12,Departure Airport (ICAO/IATA) delete,Arrival Airport (ICAO/IATA) delete,Type delete,TRUE,Callsign delete,Flight Number delete,Fleet IDs delete,Start Date delete,End Date delete,,
