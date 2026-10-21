@@ -46,7 +46,7 @@ public static class Schemas
         var issues = new List<Issue>();
         var snapshot = data.Snapshot.ToDictionary(r => r.LocalId);
         var referenceKeys = workspace.Resources.ToDictionary(p => p.Key, p => p.Value.Draft.Where(r => !Deleted(r)).Select(r => Key(p.Key, r)).ToHashSet());
-        var localKeys = workspace.Resources.ToDictionary(p => p.Key, p => p.Value.Draft.Where(r => !Deleted(r)).Select(r => "local:" + r.LocalId).ToHashSet(StringComparer.OrdinalIgnoreCase));
+        var localKeys = workspace.Resources.ToDictionary(p => p.Key, p => p.Value.Draft.Where(r => !Deleted(r)).Select(r => LocalReference.Format(r.LocalId)).ToHashSet(StringComparer.OrdinalIgnoreCase));
         void Add(DataRow r, string f, MessageDescriptor m) => issues.Add(new(r.LocalId, f, m));
         var duplicates = data.Draft.Where(r => Key(kind, r) != "").GroupBy(r => Key(kind, r)).Where(g => g.Count() > 1);
         foreach (var group in duplicates)

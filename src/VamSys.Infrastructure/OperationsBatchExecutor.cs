@@ -104,9 +104,9 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api, Workspace wor
                 foreach (var field in Schemas.ReferenceFields(item.Resource))
                 {
                     var tokens = item.After.Get(field).Split(',', StringSplitOptions.TrimEntries);
-                    if (!tokens.Any(t => t.StartsWith("local:")))
+                    if (!tokens.Any(LocalReference.IsLocal))
                         continue;
-                    var resolved = tokens.Select(t => t.StartsWith("local:") ? job.Items.Single(d => "local:" + d.After.LocalId == t).RemoteId ?? throw OperationsAdapter.Block("ApiRefreshFirst") : t);
+                    var resolved = tokens.Select(t => LocalReference.IsLocal(t) ? (LocalReference.TryParse(t, out var localId) ? job.Items.Single(d => d.After.LocalId == localId).RemoteId : null) ?? throw OperationsAdapter.Block("ApiRefreshFirst") : t);
                     item.After.Fields[field] = string.Join(',', resolved);
                     item.Fields[field] = new(FieldIntent.Set, item.After.Fields[field]);
                 }
@@ -315,7 +315,7 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api, Workspace wor
                 current = current.Copy();
                 data.ReplaceDraftRows([current]);
                 foreach (var field in verified.Fields.Keys)
-                    if (field == "ID" || current.Get(field) == item.After.Get(field) || current.Get(field).Contains("local:"))
+                    if (field == "ID" || current.Get(field) == item.After.Get(field) || LocalReference.ContainsLocal(current.Get(field)))
                         current.Fields[field] = verified.Get(field);
                 current.Identity = verified.Identity;
                 current.RawApiJson = verified.RawApiJson;

@@ -105,6 +105,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         }
         return SessionAirlineId != null;
     }
+    DataRow? LocalDraft(ResourceKind kind, string token) => LocalReference.TryParse(token, out var localId) ? workspace.Resources[kind].Draft.FirstOrDefault(r => r.LocalId == localId) : null;
     DataRow? Known(ResourceKind kind, string id) => known.GetValueOrDefault((kind, id)) ?? workspace.Resources[kind].Snapshot.FirstOrDefault(r => r.Identity?.RemoteId == id && r.Identity.ConnectionId == workspace.AirlineId);
     public async IAsyncEnumerable<DataRow> ReadAllAsync(ResourceKind kind, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
@@ -169,7 +170,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         if (kind == ResourceKind.Aircraft)
         {
             var parent = identity?.ParentFleetId ?? row.Get("Fleet ID");
-            if (preview && parent.StartsWith("local:"))
+            if (preview && LocalReference.IsLocal(parent))
                 parent = PreviewReference(parent, ResourceKind.Fleets).ToString(CultureInfo.InvariantCulture);
             PositiveId(parent);
             return $"fleet/{parent}/aircraft" + (id == null ? "" : "/" + PositiveId(id));
@@ -199,13 +200,13 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
     static long PositiveId(string text) => long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var id) && id > 0 ? id : throw Block("ApiInvalid", text);
     long PreviewReference(string token, ResourceKind kind)
     {
-        if (token.StartsWith("local:") && workspace.Resources[kind].Draft.Any(r => "local:" + r.LocalId == token && !Schemas.Deleted(r)))
+        if (LocalDraft(kind, token) is { } draft && !Schemas.Deleted(draft))
             return 1;
         return PositiveId(token);
     }
     long AirportId(string code, bool preview = false)
     {
-        if (preview && code.StartsWith("local:"))
+        if (preview && LocalReference.IsLocal(code))
             return PreviewReference(code, ResourceKind.Airports);
         // Exactly one remote airport may carry the code as its key, remote ID, ICAO or IATA; zero or several block.
         if (!AirportIndex().TryGetValue(code, out var ids) || ids.Count != 1)

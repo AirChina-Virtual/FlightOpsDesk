@@ -57,8 +57,8 @@ public sealed partial class OperationsAdapter
         }
         foreach (var token in FleetAssignmentService.Tokens(item.After.Get("Fleet IDs")))
         {
-            var local = token.StartsWith("local:", StringComparison.Ordinal);
-            var fleet = local ? workspace.Resources[ResourceKind.Fleets].Draft.FirstOrDefault(r => "local:" + r.LocalId == token) : Known(ResourceKind.Fleets, token);
+            var local = LocalReference.IsLocal(token);
+            var fleet = local ? LocalDraft(ResourceKind.Fleets, token) : Known(ResourceKind.Fleets, token);
             if (fleet == null || Schemas.Deleted(fleet))
                 throw Block("ApiInvalid", "Fleet IDs");
             CheckConnection(fleet);

@@ -17,17 +17,17 @@ public sealed partial class OperationsAdapter
             throw Block("ApiMoveTarget");
         if (item.Fields["Fleet ID"].Intent != FieldIntent.Set || item.Fields["Fleet ID"].Value != target)
             throw Block("ApiInvalid", "Fleet ID");
-        if (preview && target.StartsWith("local:"))
+        if (preview && LocalReference.IsLocal(target))
             PreviewReference(target, ResourceKind.Fleets);
         else
             PositiveId(target);
         if (target == item.Before!.Identity?.ParentFleetId)
             throw Block("ApiNoChanges");
-        var fleet = target.StartsWith("local:") ? workspace.Resources[ResourceKind.Fleets].Draft.FirstOrDefault(r => "local:" + r.LocalId == target) : Known(ResourceKind.Fleets, target);
+        var fleet = LocalReference.IsLocal(target) ? LocalDraft(ResourceKind.Fleets, target) : Known(ResourceKind.Fleets, target);
         if (fleet is null || Schemas.Deleted(fleet))
             throw Block("ApiMoveTarget");
         CheckConnection(fleet);
-        if (!target.StartsWith("local:") && fleet.Identity?.RemoteId != target)
+        if (!LocalReference.IsLocal(target) && fleet.Identity?.RemoteId != target)
             throw Block("ApiMoveTarget");
         var body = new Dictionary<string, object?> { ["fleet_id"] = preview ? PreviewReference(target, ResourceKind.Fleets) : PositiveId(target) };
         ValidateMoveBody(body);

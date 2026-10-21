@@ -74,6 +74,11 @@ public sealed class CsvAdapter : ICsvResourceAdapter
 
     public static void Import(ResourceKind kind, ResourceData data, List<DataRow> rows, bool baseline)
     {
+        // Stored drafts always spell the prefix in lowercase, whatever the file used.
+        foreach (var row in rows)
+            foreach (var field in Schemas.ReferenceFields(kind))
+                if (row.Fields.TryGetValue(field, out var text) && LocalReference.ContainsLocal(text))
+                    row.Fields[field] = LocalReference.Normalize(text);
         if (baseline)
         {
             if (rows.Any(r => Schemas.Key(kind, r) == ""))
@@ -130,7 +135,7 @@ public sealed class CsvAdapter : ICsvResourceAdapter
         var items = changes.ToList();
         if (items.Count == 0)
             return [];
-        if (items.Any(i => Schemas.ReferenceFields(kind).Any(f => i.After.Get(f).Contains("local:", StringComparison.OrdinalIgnoreCase))))
+        if (items.Any(i => Schemas.ReferenceFields(kind).Any(f => LocalReference.ContainsLocal(i.After.Get(f)))))
             throw MessageErrors.Attach(new InvalidOperationException(Messages.Define("Text_6597D6DF98")), Messages.Define("Text_6597D6DF98"));
         // Separate differing column sets: absent fields must not become explicit empty cells.
         var groups = items.GroupBy(i => string.Join("\u001f", i.After.Fields.Keys.Order(StringComparer.Ordinal))).ToList();

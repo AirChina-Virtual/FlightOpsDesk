@@ -56,13 +56,13 @@ public sealed class BatchExecutor(IResourceReader reader, IResourceWriter writer
                 foreach (var f in Schemas.ReferenceFields(item.Resource))
                 {
                     var original = item.After.Get(f);
-                    if (!original.Contains("local:", StringComparison.OrdinalIgnoreCase))
+                    if (!LocalReference.ContainsLocal(original))
                         continue;
                     var resolved = original.Split(',', StringSplitOptions.TrimEntries).Select(token =>
                     {
-                        if (!token.StartsWith("local:", StringComparison.OrdinalIgnoreCase))
+                        if (!LocalReference.IsLocal(token))
                             return token;
-                        var dependency = job.Items.FirstOrDefault(i => ("local:" + i.After.LocalId).Equals(token, StringComparison.OrdinalIgnoreCase));
+                        var dependency = job.Items.FirstOrDefault(i => LocalReference.TryParse(token, out var localId) && i.After.LocalId == localId);
                         return dependency?.State == ItemState.Succeeded && dependency.RemoteId != null ? dependency.RemoteId : throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_4B53041E43")), Messages.Define("Text_4B53041E43"));
                     });
                     item.After.Fields[f] = string.Join(',', resolved);
