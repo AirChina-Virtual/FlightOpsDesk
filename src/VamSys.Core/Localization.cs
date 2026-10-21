@@ -47,13 +47,16 @@ public sealed class LocalizationService : ILocalizationService
     public void SetLanguage(string language)
     {
         var target = language == "en-US" ? language : "zh-CN";
-        if (target == Language) return;
-        Language = target; LanguageChanged?.Invoke(this, EventArgs.Empty);
+        if (target == Language)
+            return;
+        Language = target;
+        LanguageChanged?.Invoke(this, EventArgs.Empty);
     }
     public string Get(string key, params (string Name, object? Value)[] arguments) => Format(Messages.Define(key, arguments));
     public string Format(MessageDescriptor message)
     {
-        if (message.Code is null) return message.Literal ?? "";
+        if (message.Code is null)
+            return message.Literal ?? "";
         var resourceCulture = Language == "en-US" ? DisplayCulture : CultureInfo.InvariantCulture;
         var template = Resources.GetResourceSet(resourceCulture, true, false)?.GetString(message.Code);
         if (template is null)
@@ -65,11 +68,15 @@ public sealed class LocalizationService : ILocalizationService
         // Single pass: parameter values (including user data with braces) are never reinterpreted.
         return Regex.Replace(template, @"\{(?<name>\w+)(?::(?<format>[^}]+))?\}", match =>
         {
-            if (!message.Arguments.TryGetValue(match.Groups["name"].Value, out var arg)) return match.Value;
+            if (!message.Arguments.TryGetValue(match.Groups["name"].Value, out var arg))
+                return match.Value;
             var format = match.Groups["format"].Success ? match.Groups["format"].Value : null;
-            if (arg.Message is not null) return Format(arg.Message);
-            if (arg.Number is decimal n) return n.ToString(format, DisplayCulture);
-            if (arg.Date is DateTimeOffset d) return d.ToString(format, DisplayCulture);
+            if (arg.Message is not null)
+                return Format(arg.Message);
+            if (arg.Number is decimal n)
+                return n.ToString(format, DisplayCulture);
+            if (arg.Date is DateTimeOffset d)
+                return d.ToString(format, DisplayCulture);
             return arg.Text ?? "";
         });
     }

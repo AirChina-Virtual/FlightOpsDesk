@@ -15,15 +15,17 @@ public record Issue(Guid RowId, string Field, MessageDescriptor Description)
 
 public sealed class DataRow
 {
-    public DataRow() { LocalId=Guid.NewGuid(); Fields=new(StringComparer.Ordinal); }
+    public DataRow() { LocalId = Guid.NewGuid(); Fields = new(StringComparer.Ordinal); }
     // A copy already has its identity and fields; avoid allocating defaults to overwrite.
     DataRow(DataRow source)
     {
-        LocalId=source.LocalId; Identity=source.Identity; RawApiJson=source.RawApiJson;
-        Fields=new(source.Fields,StringComparer.Ordinal);
+        LocalId = source.LocalId;
+        Identity = source.Identity;
+        RawApiJson = source.RawApiJson;
+        Fields = new(source.Fields, StringComparer.Ordinal);
     }
-    internal DataRow(Guid localId,ResourceIdentity? identity,string? rawApiJson,Dictionary<string,string> fields)
-    { LocalId=localId; Identity=identity; RawApiJson=rawApiJson; Fields=fields; }
+    internal DataRow(Guid localId, ResourceIdentity? identity, string? rawApiJson, Dictionary<string, string> fields)
+    { LocalId = localId; Identity = identity; RawApiJson = rawApiJson; Fields = fields; }
     public Guid LocalId { get; set; }
     public ResourceIdentity? Identity { get; set; }
     public string? RawApiJson { get; set; }
@@ -48,25 +50,30 @@ public sealed partial class ResourceData
     public IReadOnlyList<HistoryStep> Redo => History.Redo;
     public List<MergeConflict> Conflicts { get; set; } = [];
     // New collections over the same row objects. Callers must replace rows, never edit them in place.
-    public ResourceData ShallowCopy() => new() { Snapshot = [..Snapshot], Draft = [..Draft], Columns = [..Columns], SnapshotAt = SnapshotAt, History = History.Copy(), Conflicts = [..Conflicts] };
+    public ResourceData ShallowCopy() => new() { Snapshot = [.. Snapshot], Draft = [.. Draft], Columns = [.. Columns], SnapshotAt = SnapshotAt, History = History.Copy(), Conflicts = [.. Conflicts] };
     public void InvalidateDraftIndex() => draftIndex = null;
     internal void EnsureDraftIndex()
     {
-        if (draftIndex != null && draftIndex.Count == Draft.Count) return;
+        if (draftIndex != null && draftIndex.Count == Draft.Count)
+            return;
         var index = new Dictionary<Guid, int>(Draft.Count);
-        for (var i = 0; i < Draft.Count; i++) index.Add(Draft[i].LocalId, i);
+        for (var i = 0; i < Draft.Count; i++)
+            index.Add(Draft[i].LocalId, i);
         draftIndex = index;
     }
-    internal Dictionary<Guid,int> GetDraftPositions() { EnsureDraftIndex(); return draftIndex!; }
+    internal Dictionary<Guid, int> GetDraftPositions() { EnsureDraftIndex(); return draftIndex!; }
     // Used only after history has validated every source and destination position.
-    internal void ReplaceIndexedDraft(List<DataRow> rows,Dictionary<Guid,int> positions)
-    { draft=rows; draftIndex=positions; }
+    internal void ReplaceIndexedDraft(List<DataRow> rows, Dictionary<Guid, int> positions)
+    { draft = rows; draftIndex = positions; }
     public int FindDraftPosition(Guid id)
     {
         EnsureDraftIndex();
-        if (!draftIndex!.TryGetValue(id, out var position)) return -1;
-        if (Draft[position].LocalId == id) return position;
-        InvalidateDraftIndex(); EnsureDraftIndex();
+        if (!draftIndex!.TryGetValue(id, out var position))
+            return -1;
+        if (Draft[position].LocalId == id)
+            return position;
+        InvalidateDraftIndex();
+        EnsureDraftIndex();
         return draftIndex!.GetValueOrDefault(id, -1);
     }
     public DataRow? FindDraftRow(Guid id) => FindDraftPosition(id) is var position && position >= 0 ? Draft[position] : null;
@@ -79,11 +86,14 @@ public sealed partial class ResourceData
         var seen = new HashSet<Guid>(count);
         foreach (var row in replacements)
         {
-            if (!seen.Add(row.LocalId)) throw new ArgumentException("Duplicate replacement LocalId.", nameof(replacements));
+            if (!seen.Add(row.LocalId))
+                throw new ArgumentException("Duplicate replacement LocalId.", nameof(replacements));
             var position = FindDraftPosition(row.LocalId);
-            if (position >= 0) prepared.Add((position, row));
+            if (position >= 0)
+                prepared.Add((position, row));
         }
-        foreach (var (position, row) in prepared) Draft[position] = row;
+        foreach (var (position, row) in prepared)
+            Draft[position] = row;
     }
     public void ClearHistory(bool invalidateIndex = true) { History.Clear(); if (invalidateIndex) InvalidateDraftIndex(); }
     public HistoryMove UndoEdit() => History.Move(this, undo: true);
@@ -107,17 +117,19 @@ public sealed class Workspace
     public List<BatchJob> Jobs { get; set; } = [];
     // Used to stage an atomic rebase. The caller replaces the changed ResourceData;
     // unchanged resources and jobs are shared for read-only serialization.
-    public Workspace StageResource(ResourceKind kind,ResourceData data)
+    public Workspace StageResource(ResourceKind kind, ResourceData data)
     {
-        var copy=(Workspace)MemberwiseClone();
-        copy.Resources=new(Resources){[kind]=data};copy.VerifiedOperations=[..VerifiedOperations];
+        var copy = (Workspace)MemberwiseClone();
+        copy.Resources = new(Resources) { [kind] = data };
+        copy.VerifiedOperations = [.. VerifiedOperations];
         return copy;
     }
     // Stages a change to every resource without deep-copying rows, jobs or undo history.
     public Workspace StageResources()
     {
-        var copy=(Workspace)MemberwiseClone();
-        copy.Resources=Resources.ToDictionary(p=>p.Key,p=>p.Value.ShallowCopy());copy.VerifiedOperations=[..VerifiedOperations];
+        var copy = (Workspace)MemberwiseClone();
+        copy.Resources = Resources.ToDictionary(p => p.Key, p => p.Value.ShallowCopy());
+        copy.VerifiedOperations = [.. VerifiedOperations];
         return copy;
     }
     public string Serialize() => JsonSerializer.Serialize(this);
@@ -128,8 +140,8 @@ public sealed record RecoveryCandidateAttempt(string RemoteId, DateTimeOffset Pr
 
 public sealed class ChangeItem
 {
-    public ChangeItem() { After=new(); Fields=[]; }
-    internal ChangeItem(DataRow after, Dictionary<string,FieldChange> fields) { After=after; Fields=fields; }
+    public ChangeItem() { After = new(); Fields = []; }
+    internal ChangeItem(DataRow after, Dictionary<string, FieldChange> fields) { After = after; Fields = fields; }
     public Guid Id { get; set; } = Guid.NewGuid();
     public ResourceKind Resource { get; set; }
     public ChangeKind Kind { get; set; }
@@ -142,23 +154,26 @@ public sealed class ChangeItem
     public Dictionary<string, JsonElement>? ApiExpectedValues { get; set; }
     public List<BatchStep> ApiSteps { get; set; } = [];
     // Missing in old saved tasks: retain their original association semantics during recovery.
-    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool RequiresAirlineParameter { get; set; }
     public string? RecoveryCandidateId { get; set; }
     public List<RecoveryCandidateAttempt> RecoveryCandidates { get; set; } = [];
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool CanProposeRecoveryId => State==ItemState.Unknown && Kind==ChangeKind.Create && !CreateCompleted && After.Identity==null;
+    public bool CanProposeRecoveryId => State == ItemState.Unknown && Kind == ChangeKind.Create && !CreateCompleted && After.Identity == null;
     [System.Text.Json.Serialization.JsonIgnore]
     public string? EditableRecoveryId => RecoveryCandidateId ?? (CanProposeRecoveryId ? RemoteId : null);
     public void ProposeRecoveryId(string value)
     {
-        if(!CanProposeRecoveryId) throw new InvalidOperationException(Messages.Define("ApiUnknown"));
-        if(!long.TryParse(value,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out var id) || id<=0)
-            throw new FormatException(Messages.Define("ApiInvalid",("field","Remote ID")));
+        if (!CanProposeRecoveryId)
+            throw new InvalidOperationException(Messages.Define("ApiUnknown"));
+        if (!long.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var id) || id <= 0)
+            throw new FormatException(Messages.Define("ApiInvalid", ("field", "Remote ID")));
         // Earlier versions stored unverified user input in RemoteId.
-        if(RemoteId!=null && !RecoveryCandidates.Any(a=>a.RemoteId==RemoteId)) RecoveryCandidates.Add(new(RemoteId,DateTimeOffset.UtcNow));
-        RemoteId=null; RecoveryCandidateId=id.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        RecoveryCandidates.Add(new(RecoveryCandidateId,DateTimeOffset.UtcNow));
+        if (RemoteId != null && !RecoveryCandidates.Any(a => a.RemoteId == RemoteId))
+            RecoveryCandidates.Add(new(RemoteId, DateTimeOffset.UtcNow));
+        RemoteId = null;
+        RecoveryCandidateId = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        RecoveryCandidates.Add(new(RecoveryCandidateId, DateTimeOffset.UtcNow));
     }
     public bool Rebased { get; set; }
     public bool CreateCompleted { get; set; }
@@ -166,9 +181,9 @@ public sealed class ChangeItem
     public string? Diagnostic { get; set; }
     public ApiDiagnostic? DiagnosticDetails { get; set; }
     public ApiDiagnostic? ReadbackDetails { get; set; }
-    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public ApiDeletionVerification? DeletionVerification { get; set; }
-    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public ApiManualResolution? ManualResolution { get; set; }
     public ApiSnapshotComparison? PreflightComparison { get; set; }
     public List<ApiFieldDifference> VerificationDifferences { get; set; } = [];

@@ -12,13 +12,19 @@ public static class IndependentApiEvidence
 
     public static bool Covers(ChangeItem item, string? contractHash)
     {
-        if (contractHash != ContractHash) return false;
-        if (!Enum.IsDefined(item.Resource)) return false;
+        if (contractHash != ContractHash)
+            return false;
+        if (!Enum.IsDefined(item.Resource))
+            return false;
         var type = (item.Before ?? item.After).Get("Type");
-        if (item.Resource == ResourceKind.Routes && type is not ("scheduled" or "jumpseat")) return false;
-        if(item.Resource==ResourceKind.Fleets&&item.Kind==ChangeKind.Create&&item.After.Get("Type (pax/cargo/...)") is not ("pax-cargo" or "cargo"))return false;
-        if (item.Kind == ChangeKind.Delete) return true;
-        if (item.Kind is not (ChangeKind.Create or ChangeKind.Update)) return false;
+        if (item.Resource == ResourceKind.Routes && type is not ("scheduled" or "jumpseat"))
+            return false;
+        if (item.Resource == ResourceKind.Fleets && item.Kind == ChangeKind.Create && item.After.Get("Type (pax/cargo/...)") is not ("pax-cargo" or "cargo"))
+            return false;
+        if (item.Kind == ChangeKind.Delete)
+            return true;
+        if (item.Kind is not (ChangeKind.Create or ChangeKind.Update))
+            return false;
         string[] allowed = (item.Resource, item.Kind) switch
         {
             (ResourceKind.Airports, ChangeKind.Create) => ["ICAO/IATA", "Name"],
@@ -36,8 +42,10 @@ public static class IndependentApiEvidence
             (ResourceKind.Routes, ChangeKind.Update) => ["Remarks", "Cost Index", "Departure Time (HH:MM)", "Arrival Time (HH:MM)"],
             _ => []
         };
-        if(item.Resource==ResourceKind.Routes&&item.Kind==ChangeKind.Create&&type=="jumpseat")allowed=[..allowed,"Cost Index"];
-        if(item.Resource==ResourceKind.Routes&&item.Kind==ChangeKind.Create&&type=="scheduled")allowed=[..allowed,"Fleet IDs"];
+        if (item.Resource == ResourceKind.Routes && item.Kind == ChangeKind.Create && type == "jumpseat")
+            allowed = [.. allowed, "Cost Index"];
+        if (item.Resource == ResourceKind.Routes && item.Kind == ChangeKind.Create && type == "scheduled")
+            allowed = [.. allowed, "Fleet IDs"];
         return item.Fields.Where(p => p.Value.Intent != FieldIntent.Unspecified && p.Key != "_delete" && !(item.Kind == ChangeKind.Create && string.IsNullOrEmpty(p.Value.Value)))
             .All(p => allowed.Contains(p.Key, StringComparer.Ordinal));
     }

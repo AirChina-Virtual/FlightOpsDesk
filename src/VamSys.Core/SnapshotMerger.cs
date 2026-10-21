@@ -19,11 +19,14 @@ public static class SnapshotMerger
         {
             old.TryGetValue(local.LocalId, out var baseline);
             var key = Key(baseline ?? local);
-            if ((baseline ?? local).Identity == null && aliases.TryGetValue(Schemas.Key(kind,baseline ?? local),out var matched) && matched.Count == 1) key = matched.Single();
+            if ((baseline ?? local).Identity == null && aliases.TryGetValue(Schemas.Key(kind, baseline ?? local), out var matched) && matched.Count == 1)
+                key = matched.Single();
             if (key.Length == 0 || !remote.Remove(key, out var fresh))
             {
-                if (baseline == null) { merged.Add(local.Copy()); continue; }
-                if (Schemas.Deleted(local)) continue;
+                if (baseline == null)
+                { merged.Add(local.Copy()); continue; }
+                if (Schemas.Deleted(local))
+                    continue;
                 if (local.Fields.Any(f => f.Value != baseline.Get(f.Key)))
                 { merged.Add(local.Copy()); conflicts.Add(new(local.LocalId, "*", "exists", "edited", null)); }
                 continue;
@@ -33,8 +36,10 @@ public static class SnapshotMerger
             foreach (var field in local.Fields.Keys.Union(baseline?.Fields.Keys.AsEnumerable() ?? []))
             {
                 var original = baseline?.Get(field);
-                var mine = local.Get(field); var theirs = fresh.Get(field);
-                if(kind==ResourceKind.Airports && field=="ICAO/IATA" && Schemas.MatchKeys(kind,fresh).Contains(mine.Trim().ToUpperInvariant())) continue;
+                var mine = local.Get(field);
+                var theirs = fresh.Get(field);
+                if (kind == ResourceKind.Airports && field == "ICAO/IATA" && Schemas.MatchKeys(kind, fresh).Contains(mine.Trim().ToUpperInvariant()))
+                    continue;
                 // Imported candidates with identifiers require explicit review against API state.
                 if (baseline == null || mine != original)
                 {
@@ -42,7 +47,8 @@ public static class SnapshotMerger
                     if (mine != theirs && (baseline == null || theirs != original))
                         conflicts.Add(new(local.LocalId, field, original, mine, theirs));
                 }
-                else if (!fresh.Fields.ContainsKey(field)) result.Fields[field] = mine; // CSV-only columns
+                else if (!fresh.Fields.ContainsKey(field))
+                    result.Fields[field] = mine; // CSV-only columns
             }
             if (Schemas.Deleted(local) && baseline != null && fresh.Fields.Any(f => f.Value != baseline.Get(f.Key)))
                 conflicts.Add(new(local.LocalId, "_delete", "FALSE", "TRUE", "FALSE"));
@@ -53,9 +59,12 @@ public static class SnapshotMerger
         var mergedIds = merged.Select(r => r.LocalId).ToHashSet();
         var recorded = conflicts.Select(c => (c.RowId, c.Field)).ToHashSet();
         foreach (var c in data.Conflicts)
-            if (mergedIds.Contains(c.RowId) && recorded.Add((c.RowId, c.Field))) conflicts.Add(c);
-        data.Snapshot = incoming.Select(r => r.Copy()).ToList(); data.Draft = merged;
-        data.Conflicts = conflicts; data.SnapshotAt = DateTimeOffset.UtcNow;
+            if (mergedIds.Contains(c.RowId) && recorded.Add((c.RowId, c.Field)))
+                conflicts.Add(c);
+        data.Snapshot = incoming.Select(r => r.Copy()).ToList();
+        data.Draft = merged;
+        data.Conflicts = conflicts;
+        data.SnapshotAt = DateTimeOffset.UtcNow;
         data.Columns = data.Columns.Concat(merged.SelectMany(r => r.Fields.Keys)).Distinct().ToList();
         data.ClearHistory();
     }

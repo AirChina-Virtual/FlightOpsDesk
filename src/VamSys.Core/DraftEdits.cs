@@ -17,9 +17,11 @@ public sealed class DraftEdits
     // Rows replaced in place, e.g. by an undo or redo; the moved step is saved with that resource's history.
     public void Rows(Workspace workspace, ResourceKind kind, IEnumerable<Guid> changed)
     {
-        if (Owner != null && !ReferenceEquals(Owner, workspace)) RequiresFullSave = true;
+        if (Owner != null && !ReferenceEquals(Owner, workspace))
+            RequiresFullSave = true;
         Owner = workspace;
-        if (!rows.TryGetValue(kind, out var ids)) rows[kind] = ids = [];
+        if (!rows.TryGetValue(kind, out var ids))
+            rows[kind] = ids = [];
         ids.UnionWith(changed);
         // Continuations change the same step's After image, even after a previous autosave.
         history.Add(kind);
@@ -32,9 +34,13 @@ public sealed class DraftEdits
     public DraftEdits Take()
     {
         var taken = new DraftEdits { Owner = Owner, RequiresFullSave = RequiresFullSave };
-        foreach (var (kind, ids) in rows) taken.rows[kind] = ids;
+        foreach (var (kind, ids) in rows)
+            taken.rows[kind] = ids;
         taken.history.UnionWith(history);
-        rows.Clear(); history.Clear(); Owner = null; RequiresFullSave = false;
+        rows.Clear();
+        history.Clear();
+        Owner = null;
+        RequiresFullSave = false;
         return taken;
     }
     // After a failed save nothing about the database is assumed; the next save writes everything.

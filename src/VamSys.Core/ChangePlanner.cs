@@ -11,16 +11,19 @@ public sealed class ChangePlanner : IChangePlanner
         var known = workspace.Resources.SelectMany(p => p.Value.Snapshot.Select(r => (Token: "local:" + r.LocalId, Key: Schemas.Key(p.Key, r)))).ToDictionary(p => p.Token, p => p.Key, StringComparer.OrdinalIgnoreCase);
         foreach (var item in items)
         {
-            item.RequiresAirlineParameter=workspace.Mode==RunMode.Online && item.Resource==ResourceKind.Fleets && item.Kind==ChangeKind.Create;
+            item.RequiresAirlineParameter = workspace.Mode == RunMode.Online && item.Resource == ResourceKind.Fleets && item.Kind == ChangeKind.Create;
             foreach (var field in Schemas.ReferenceFields(item.Resource))
             {
                 var original = item.After.Get(field);
-                if (!original.Contains("local:", StringComparison.OrdinalIgnoreCase)) continue;
+                if (!original.Contains("local:", StringComparison.OrdinalIgnoreCase))
+                    continue;
                 var tokens = original.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
                 for (int i = 0; i < tokens.Length; i++)
                 {
-                    if (creates.TryGetValue(tokens[i], out var dependency)) item.Dependencies.Add(dependency.Id);
-                    else if (known.TryGetValue(tokens[i], out var key)) tokens[i] = key;
+                    if (creates.TryGetValue(tokens[i], out var dependency))
+                        item.Dependencies.Add(dependency.Id);
+                    else if (known.TryGetValue(tokens[i], out var key))
+                        tokens[i] = key;
                 }
                 item.After.Fields[field] = string.Join(',', tokens);
                 item.Fields[field] = new(FieldIntent.Set, item.After.Fields[field]);
@@ -31,7 +34,8 @@ public sealed class ChangePlanner : IChangePlanner
     }
     public List<ChangeItem> Plan(ResourceKind kind, ResourceData data)
     {
-        var baseline = data.Snapshot.ToDictionary(r => r.LocalId); var result = new List<ChangeItem>();
+        var baseline = data.Snapshot.ToDictionary(r => r.LocalId);
+        var result = new List<ChangeItem>();
         foreach (var row in data.Draft)
         {
             baseline.TryGetValue(row.LocalId, out var before);
@@ -41,8 +45,10 @@ public sealed class ChangePlanner : IChangePlanner
                     (fields ??= new(StringComparer.Ordinal)).Add(field.Key,
                         new(field.Value == "" ? FieldIntent.Clear : FieldIntent.Set, field.Value));
             var delete = Schemas.Deleted(row);
-            if (before != null && !delete && fields is null) continue;
-            if (before is null && delete) continue;
+            if (before != null && !delete && fields is null)
+                continue;
+            if (before is null && delete)
+                continue;
             result.Add(new(row.Copy(), fields ?? new(StringComparer.Ordinal)) { Resource = kind, Kind = delete ? ChangeKind.Delete : before is null ? ChangeKind.Create : ChangeKind.Update, Before = before?.Copy() });
         }
         return result;
@@ -52,10 +58,13 @@ public sealed class ChangePlanner : IChangePlanner
 
     public static ChangeKind? GetChangeKind(DataRow row, DataRow? baseline)
     {
-        if (Schemas.Deleted(row)) return baseline is null ? null : ChangeKind.Delete;
-        if (baseline is null) return ChangeKind.Create;
+        if (Schemas.Deleted(row))
+            return baseline is null ? null : ChangeKind.Delete;
+        if (baseline is null)
+            return ChangeKind.Create;
         foreach (var field in row.Fields)
-            if (Changed(field, baseline)) return ChangeKind.Update;
+            if (Changed(field, baseline))
+                return ChangeKind.Update;
         return null;
     }
 }
@@ -67,7 +76,8 @@ public static class RuleEngine
     {
         return rows.Select(row =>
         {
-            var copy = row.Copy(); var old = row.Get(rule.Field);
+            var copy = row.Copy();
+            var old = row.Get(rule.Field);
             var value = rule.Kind switch
             {
                 RuleKind.Set => rule.Value,

@@ -31,7 +31,8 @@ public sealed class FleetAssignmentService
         }).GroupBy(o => o.Token, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).OrderBy(o => o.Name.ToString(), StringComparer.OrdinalIgnoreCase).ToList();
         foreach (var token in (existing ?? []).Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            if (options.Any(o => o.Token.Equals(token, StringComparison.OrdinalIgnoreCase))) continue;
+            if (options.Any(o => o.Token.Equals(token, StringComparison.OrdinalIgnoreCase)))
+                continue;
             // Legacy local aliases for already-identified rows remain representable and resolvable.
             var alias = rows.FirstOrDefault(r => ("local:" + r.LocalId).Equals(token, StringComparison.OrdinalIgnoreCase));
             options.Add(alias is null
@@ -43,13 +44,18 @@ public sealed class FleetAssignmentService
 
     public FleetAssignmentPreview Preview(Workspace workspace, ResourceKind kind, IEnumerable<DataRow> rows, IEnumerable<string> selected, FleetAssignmentMode mode)
     {
-        var field = Field(kind); var chosen = selected.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var source = rows.ToList(); var result = new List<DataRow>(); var issues = new List<Issue>();
-        if (kind == ResourceKind.Aircraft && mode != FleetAssignmentMode.Replace) throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_1C6416508F")), Messages.Define("Text_1C6416508F"));
+        var field = Field(kind);
+        var chosen = selected.Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var source = rows.ToList();
+        var result = new List<DataRow>();
+        var issues = new List<Issue>();
+        if (kind == ResourceKind.Aircraft && mode != FleetAssignmentMode.Replace)
+            throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_1C6416508F")), Messages.Define("Text_1C6416508F"));
         var catalog = Options(workspace, source.SelectMany(r => Tokens(r.Get(field))).Concat(chosen)).ToDictionary(o => o.Token, StringComparer.OrdinalIgnoreCase);
         foreach (var row in source)
         {
-            if (Schemas.Deleted(row)) { issues.Add(new(row.LocalId, field, Messages.Define("Text_92C7B26624"))); continue; }
+            if (Schemas.Deleted(row))
+            { issues.Add(new(row.LocalId, field, Messages.Define("Text_92C7B26624"))); continue; }
             var old = Tokens(row.Get(field));
             var target = mode switch
             {
@@ -58,23 +64,32 @@ public sealed class FleetAssignmentService
                 FleetAssignmentMode.Remove => old.Except(chosen, StringComparer.OrdinalIgnoreCase).ToList(),
                 _ => throw new ArgumentOutOfRangeException(nameof(mode))
             };
-            if (kind == ResourceKind.Aircraft && target.Count != 1) issues.Add(new(row.LocalId, field, Messages.Define("Text_0CEB89655F")));
-            if (kind == ResourceKind.Routes && row.Get("Type") != "jumpseat" && target.Count == 0) issues.Add(new(row.LocalId, field, Messages.Define("Text_2335DBC57B")));
+            if (kind == ResourceKind.Aircraft && target.Count != 1)
+                issues.Add(new(row.LocalId, field, Messages.Define("Text_0CEB89655F")));
+            if (kind == ResourceKind.Routes && row.Get("Type") != "jumpseat" && target.Count == 0)
+                issues.Add(new(row.LocalId, field, Messages.Define("Text_2335DBC57B")));
             foreach (var token in target.Where(t => !old.Contains(t, StringComparer.OrdinalIgnoreCase)))
-                if (!catalog[token].Available) issues.Add(new(row.LocalId, field, Messages.Define("Text_F7B2F3BC0C", ("arg0", token), ("arg1", catalog[token].Problem))));
+                if (!catalog[token].Available)
+                    issues.Add(new(row.LocalId, field, Messages.Define("Text_F7B2F3BC0C", ("arg0", token), ("arg1", catalog[token].Problem))));
             // Preserve exact strings on set-equivalent no-ops, including unresolved imported references.
-            if (old.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(target)) continue;
-            var copy = row.Copy(); copy.Fields[field] = string.Join(',', target); result.Add(copy);
+            if (old.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(target))
+                continue;
+            var copy = row.Copy();
+            copy.Fields[field] = string.Join(',', target);
+            result.Add(copy);
         }
         return new(field, result, issues);
     }
 
     public void Apply(ResourceData data, FleetAssignmentPreview preview)
     {
-        if (preview.Issues.Count > 0) throw MessageErrors.Attach(new InvalidOperationException(Messages.Define("Text_919362E2F8")), Messages.Define("Text_919362E2F8"));
-        if (preview.Rows.Count == 0) return;
+        if (preview.Issues.Count > 0)
+            throw MessageErrors.Attach(new InvalidOperationException(Messages.Define("Text_919362E2F8")), Messages.Define("Text_919362E2F8"));
+        if (preview.Rows.Count == 0)
+            return;
         var replacements = preview.Rows.ToDictionary(r => r.LocalId);
-        data.Edit(replacements.Keys,()=>data.ReplaceDraftRows(replacements.Values.Select(r=>r.Copy())));
-        if (!data.Columns.Contains(preview.Field)) data.Columns.Add(preview.Field);
+        data.Edit(replacements.Keys, () => data.ReplaceDraftRows(replacements.Values.Select(r => r.Copy())));
+        if (!data.Columns.Contains(preview.Field))
+            data.Columns.Add(preview.Field);
     }
 }
