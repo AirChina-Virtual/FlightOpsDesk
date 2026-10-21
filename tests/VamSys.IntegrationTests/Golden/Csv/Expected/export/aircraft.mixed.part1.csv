@@ -1,0 +1,7 @@
+ID,Name,Registration,Fleet ID,_delete,SELCAL,Fin Number,Extra 备注,CR only
+11,Name update-new changed,Registration update-new,Fleet ID update-new,FALSE,SELCAL update-new,Fin Number update-new,更新后,
+12,Name delete,Registration delete,Fleet ID delete,TRUE,SELCAL delete,Fin Number delete,,
+,Name create,Registration create,Fleet ID create,FALSE,SELCAL create,Fin Number create,,
+,"He said ""go"", then
+stop 中文,逗号",Registration special,Fleet ID special,FALSE,SELCAL special,Fin Number special,"红白,""双""线
+第二行","linebreak"

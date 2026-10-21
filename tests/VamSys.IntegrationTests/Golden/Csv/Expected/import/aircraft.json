@@ -1,0 +1,361 @@
+{
+  "headers": [
+    "ID",
+    "Name (csv)",
+    "Registration",
+    "Fleet ID",
+    "Extra 备注",
+    "CR only"
+  ],
+  "rows": [
+    [
+      "11",
+      "Name update-new changed",
+      "Registration update-new",
+      "Fleet ID update-new",
+      "更新后",
+      ""
+    ],
+    [
+      "12",
+      "Name create",
+      "Registration create",
+      "Fleet ID create",
+      "",
+      ""
+    ],
+    [
+      "13",
+      "He said \"go\", then\nstop 中文,逗号",
+      "Registration special",
+      "Fleet ID special",
+      "红白,\"双\"线\r\n第二行",
+      "line\rbreak"
+    ]
+  ],
+  "baseline": {
+    "Snapshot": [
+      {
+        "LocalId": "<guid-15>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "11",
+          "Name": "Name update-new changed",
+          "Registration": "Registration update-new",
+          "Fleet ID": "Fleet ID update-new",
+          "Extra 备注": "更新后",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-16>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Name": "Name create",
+          "Registration": "Registration create",
+          "Fleet ID": "Fleet ID create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-17>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Name": "He said \"go\", then\nstop 中文,逗号",
+          "Registration": "Registration special",
+          "Fleet ID": "Fleet ID special",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Draft": [
+      {
+        "LocalId": "<guid-15>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "11",
+          "Name": "Name update-new changed",
+          "Registration": "Registration update-new",
+          "Fleet ID": "Fleet ID update-new",
+          "Extra 备注": "更新后",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-16>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Name": "Name create",
+          "Registration": "Registration create",
+          "Fleet ID": "Fleet ID create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-17>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Name": "He said \"go\", then\nstop 中文,逗号",
+          "Registration": "Registration special",
+          "Fleet ID": "Fleet ID special",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Columns": [
+      "ID",
+      "Name",
+      "Registration",
+      "Fleet ID",
+      "Extra 备注",
+      "CR only"
+    ],
+    "SnapshotAt": "<time-03>",
+    "Conflicts": [],
+    "History": {
+      "Version": 1,
+      "Undo": [],
+      "Redo": []
+    }
+  },
+  "merge-into-existing-draft": {
+    "Snapshot": [
+      {
+        "LocalId": "<guid-18>",
+        "Identity": {
+          "RemoteId": "11",
+          "ConnectionId": "7",
+          "ParentFleetId": null
+        },
+        "RawApiJson": "{\"id\":11}",
+        "Fields": {
+          "_delete": "FALSE",
+          "ID": "11",
+          "Name": "Name update-base",
+          "Registration": "Registration update-base",
+          "Fleet ID": "Fleet ID update-base",
+          "SELCAL": "SELCAL update-base",
+          "Fin Number": "Fin Number update-base",
+          "Extra 备注": "",
+          "CR only": "",
+          "Local only": "kept"
+        }
+      }
+    ],
+    "Draft": [
+      {
+        "LocalId": "<guid-18>",
+        "Identity": {
+          "RemoteId": "11",
+          "ConnectionId": "7",
+          "ParentFleetId": null
+        },
+        "RawApiJson": "{\"id\":11}",
+        "Fields": {
+          "_delete": "FALSE",
+          "ID": "11",
+          "Name": "Name update-new changed",
+          "Registration": "Registration update-new",
+          "Fleet ID": "Fleet ID update-new",
+          "SELCAL": "SELCAL update-base",
+          "Fin Number": "Fin Number update-base",
+          "Extra 备注": "更新后",
+          "CR only": "",
+          "Local only": "kept"
+        }
+      },
+      {
+        "LocalId": "<guid-19>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Name": "Name create",
+          "Registration": "Registration create",
+          "Fleet ID": "Fleet ID create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-20>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Name": "He said \"go\", then\nstop 中文,逗号",
+          "Registration": "Registration special",
+          "Fleet ID": "Fleet ID special",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Columns": [
+      "_delete",
+      "ID",
+      "Name",
+      "Registration",
+      "Fleet ID",
+      "SELCAL",
+      "Fin Number",
+      "Extra 备注",
+      "CR only",
+      "Local only"
+    ],
+    "SnapshotAt": null,
+    "Conflicts": [],
+    "History": {
+      "Version": 1,
+      "Undo": [
+        {
+          "StepId": "<guid-21>",
+          "Rows": [
+            {
+              "LocalId": "<guid-18>",
+              "Before": {
+                "LocalId": "<guid-18>",
+                "Identity": {
+                  "RemoteId": "11",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":11}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "11",
+                  "Name": "Name update-base",
+                  "Registration": "Registration update-base",
+                  "Fleet ID": "Fleet ID update-base",
+                  "SELCAL": "SELCAL update-base",
+                  "Fin Number": "Fin Number update-base",
+                  "Extra 备注": "",
+                  "CR only": "",
+                  "Local only": "kept"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Name",
+                  "Registration",
+                  "Fleet ID",
+                  "SELCAL",
+                  "Fin Number",
+                  "Extra 备注",
+                  "CR only",
+                  "Local only"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-18>",
+                "Identity": {
+                  "RemoteId": "11",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":11}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "11",
+                  "Name": "Name update-new changed",
+                  "Registration": "Registration update-new",
+                  "Fleet ID": "Fleet ID update-new",
+                  "SELCAL": "SELCAL update-base",
+                  "Fin Number": "Fin Number update-base",
+                  "Extra 备注": "更新后",
+                  "CR only": "",
+                  "Local only": "kept"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Name",
+                  "Registration",
+                  "Fleet ID",
+                  "SELCAL",
+                  "Fin Number",
+                  "Extra 备注",
+                  "CR only",
+                  "Local only"
+                ]
+              }
+            },
+            {
+              "LocalId": "<guid-19>",
+              "Before": null,
+              "After": {
+                "LocalId": "<guid-19>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "12",
+                  "Name": "Name create",
+                  "Registration": "Registration create",
+                  "Fleet ID": "Fleet ID create",
+                  "Extra 备注": "",
+                  "CR only": ""
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Registration",
+                  "Fleet ID",
+                  "Extra 备注",
+                  "CR only"
+                ]
+              }
+            },
+            {
+              "LocalId": "<guid-20>",
+              "Before": null,
+              "After": {
+                "LocalId": "<guid-20>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "13",
+                  "Name": "He said \"go\", then\nstop 中文,逗号",
+                  "Registration": "Registration special",
+                  "Fleet ID": "Fleet ID special",
+                  "Extra 备注": "红白,\"双\"线\r\n第二行",
+                  "CR only": "line\rbreak"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Name",
+                  "Registration",
+                  "Fleet ID",
+                  "Extra 备注",
+                  "CR only"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": [
+            "<guid-18>"
+          ],
+          "AfterOrder": [
+            "<guid-18>",
+            "<guid-19>",
+            "<guid-20>"
+          ]
+        }
+      ],
+      "Redo": []
+    }
+  }
+}

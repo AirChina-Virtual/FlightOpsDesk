@@ -1,0 +1,2 @@
+ID,Departure Airport (ICAO/IATA),Arrival Airport (ICAO/IATA),Route String,_delete,Remarks,Internal Remarks,CR only
+,Departure Airport (ICAO/IATA) create,Arrival Airport (ICAO/IATA) create,Route String create,FALSE,Remarks create,Internal Remarks create,

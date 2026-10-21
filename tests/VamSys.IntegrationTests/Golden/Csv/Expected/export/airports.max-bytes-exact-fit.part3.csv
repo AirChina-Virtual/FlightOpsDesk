@@ -1,0 +1,4 @@
+ICAO/IATA,Name,_delete,Category,Container IDs,Pax LF ID,Cargo LF ID,Extra 备注,CR only
+ZBAA,"He said ""go"", then
+stop 中文,逗号",FALSE,Category special,Container IDs special,Pax LF ID special,Cargo LF ID special,"红白,""双""线
+第二行","linebreak"

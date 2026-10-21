@@ -1,0 +1,361 @@
+{
+  "headers": [
+    "ID",
+    "Departure Airport (ICAO/IATA) (csv)",
+    "Arrival Airport (ICAO/IATA)",
+    "Route String",
+    "Extra 备注",
+    "CR only"
+  ],
+  "rows": [
+    [
+      "11",
+      "Departure Airport (ICAO/IATA) update-new",
+      "Arrival Airport (ICAO/IATA) update-new",
+      "Route String update-new changed",
+      "更新后",
+      ""
+    ],
+    [
+      "12",
+      "Departure Airport (ICAO/IATA) create",
+      "Arrival Airport (ICAO/IATA) create",
+      "Route String create",
+      "",
+      ""
+    ],
+    [
+      "13",
+      "Departure Airport (ICAO/IATA) special",
+      "Arrival Airport (ICAO/IATA) special",
+      "He said \"go\", then\nstop 中文,逗号",
+      "红白,\"双\"线\r\n第二行",
+      "line\rbreak"
+    ]
+  ],
+  "baseline": {
+    "Snapshot": [
+      {
+        "LocalId": "<guid-22>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "11",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-new",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-new",
+          "Route String": "Route String update-new changed",
+          "Extra 备注": "更新后",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-23>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) create",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) create",
+          "Route String": "Route String create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-24>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) special",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) special",
+          "Route String": "He said \"go\", then\nstop 中文,逗号",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Draft": [
+      {
+        "LocalId": "<guid-22>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "11",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-new",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-new",
+          "Route String": "Route String update-new changed",
+          "Extra 备注": "更新后",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-23>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) create",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) create",
+          "Route String": "Route String create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-24>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) special",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) special",
+          "Route String": "He said \"go\", then\nstop 中文,逗号",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Columns": [
+      "ID",
+      "Departure Airport (ICAO/IATA)",
+      "Arrival Airport (ICAO/IATA)",
+      "Route String",
+      "Extra 备注",
+      "CR only"
+    ],
+    "SnapshotAt": "<time-04>",
+    "Conflicts": [],
+    "History": {
+      "Version": 1,
+      "Undo": [],
+      "Redo": []
+    }
+  },
+  "merge-into-existing-draft": {
+    "Snapshot": [
+      {
+        "LocalId": "<guid-25>",
+        "Identity": {
+          "RemoteId": "11",
+          "ConnectionId": "7",
+          "ParentFleetId": null
+        },
+        "RawApiJson": "{\"id\":11}",
+        "Fields": {
+          "_delete": "FALSE",
+          "ID": "11",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-base",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-base",
+          "Route String": "Route String update-base",
+          "Remarks": "Remarks update-base",
+          "Internal Remarks": "Internal Remarks update-base",
+          "Extra 备注": "",
+          "CR only": "",
+          "Local only": "kept"
+        }
+      }
+    ],
+    "Draft": [
+      {
+        "LocalId": "<guid-25>",
+        "Identity": {
+          "RemoteId": "11",
+          "ConnectionId": "7",
+          "ParentFleetId": null
+        },
+        "RawApiJson": "{\"id\":11}",
+        "Fields": {
+          "_delete": "FALSE",
+          "ID": "11",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-new",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-new",
+          "Route String": "Route String update-new changed",
+          "Remarks": "Remarks update-base",
+          "Internal Remarks": "Internal Remarks update-base",
+          "Extra 备注": "更新后",
+          "CR only": "",
+          "Local only": "kept"
+        }
+      },
+      {
+        "LocalId": "<guid-26>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "12",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) create",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) create",
+          "Route String": "Route String create",
+          "Extra 备注": "",
+          "CR only": ""
+        }
+      },
+      {
+        "LocalId": "<guid-27>",
+        "Identity": null,
+        "RawApiJson": null,
+        "Fields": {
+          "ID": "13",
+          "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) special",
+          "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) special",
+          "Route String": "He said \"go\", then\nstop 中文,逗号",
+          "Extra 备注": "红白,\"双\"线\r\n第二行",
+          "CR only": "line\rbreak"
+        }
+      }
+    ],
+    "Columns": [
+      "_delete",
+      "ID",
+      "Departure Airport (ICAO/IATA)",
+      "Arrival Airport (ICAO/IATA)",
+      "Route String",
+      "Remarks",
+      "Internal Remarks",
+      "Extra 备注",
+      "CR only",
+      "Local only"
+    ],
+    "SnapshotAt": null,
+    "Conflicts": [],
+    "History": {
+      "Version": 1,
+      "Undo": [
+        {
+          "StepId": "<guid-28>",
+          "Rows": [
+            {
+              "LocalId": "<guid-25>",
+              "Before": {
+                "LocalId": "<guid-25>",
+                "Identity": {
+                  "RemoteId": "11",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":11}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "11",
+                  "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-base",
+                  "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-base",
+                  "Route String": "Route String update-base",
+                  "Remarks": "Remarks update-base",
+                  "Internal Remarks": "Internal Remarks update-base",
+                  "Extra 备注": "",
+                  "CR only": "",
+                  "Local only": "kept"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)",
+                  "Route String",
+                  "Remarks",
+                  "Internal Remarks",
+                  "Extra 备注",
+                  "CR only",
+                  "Local only"
+                ]
+              },
+              "After": {
+                "LocalId": "<guid-25>",
+                "Identity": {
+                  "RemoteId": "11",
+                  "ConnectionId": "7",
+                  "ParentFleetId": null
+                },
+                "RawApiJson": "{\"id\":11}",
+                "Fields": {
+                  "_delete": "FALSE",
+                  "ID": "11",
+                  "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) update-new",
+                  "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) update-new",
+                  "Route String": "Route String update-new changed",
+                  "Remarks": "Remarks update-base",
+                  "Internal Remarks": "Internal Remarks update-base",
+                  "Extra 备注": "更新后",
+                  "CR only": "",
+                  "Local only": "kept"
+                },
+                "FieldOrder": [
+                  "_delete",
+                  "ID",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)",
+                  "Route String",
+                  "Remarks",
+                  "Internal Remarks",
+                  "Extra 备注",
+                  "CR only",
+                  "Local only"
+                ]
+              }
+            },
+            {
+              "LocalId": "<guid-26>",
+              "Before": null,
+              "After": {
+                "LocalId": "<guid-26>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "12",
+                  "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) create",
+                  "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) create",
+                  "Route String": "Route String create",
+                  "Extra 备注": "",
+                  "CR only": ""
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)",
+                  "Route String",
+                  "Extra 备注",
+                  "CR only"
+                ]
+              }
+            },
+            {
+              "LocalId": "<guid-27>",
+              "Before": null,
+              "After": {
+                "LocalId": "<guid-27>",
+                "Identity": null,
+                "RawApiJson": null,
+                "Fields": {
+                  "ID": "13",
+                  "Departure Airport (ICAO/IATA)": "Departure Airport (ICAO/IATA) special",
+                  "Arrival Airport (ICAO/IATA)": "Arrival Airport (ICAO/IATA) special",
+                  "Route String": "He said \"go\", then\nstop 中文,逗号",
+                  "Extra 备注": "红白,\"双\"线\r\n第二行",
+                  "CR only": "line\rbreak"
+                },
+                "FieldOrder": [
+                  "ID",
+                  "Departure Airport (ICAO/IATA)",
+                  "Arrival Airport (ICAO/IATA)",
+                  "Route String",
+                  "Extra 备注",
+                  "CR only"
+                ]
+              }
+            }
+          ],
+          "BeforeOrder": [
+            "<guid-25>"
+          ],
+          "AfterOrder": [
+            "<guid-25>",
+            "<guid-26>",
+            "<guid-27>"
+          ]
+        }
+      ],
+      "Redo": []
+    }
+  }
+}

@@ -1,0 +1,2 @@
+ID,Departure Airport (ICAO/IATA),Arrival Airport (ICAO/IATA),Type,_delete,Callsign,Flight Number,Fleet IDs,Start Date,End Date,Extra 备注,CR only
+,Departure Airport (ICAO/IATA) create,Arrival Airport (ICAO/IATA) create,Type create,FALSE,Callsign create,Flight Number create,Fleet IDs create,Start Date create,End Date create,,

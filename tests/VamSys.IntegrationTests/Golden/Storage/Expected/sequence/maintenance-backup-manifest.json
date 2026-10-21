@@ -1,0 +1,16 @@
+{
+  "formatVersion": 1,
+  "createdAtUtc": "<time-14>",
+  "workspaceId": "<guid-01>",
+  "workspaceName": "Golden workspace",
+  "storageVersion": 4,
+  "revision": 33,
+  "databaseSha256": "<sha256 of backup file>",
+  "scope": "Full local database backup; only the selected workspace is cleared",
+  "snapshotRows": 12,
+  "draftRows": 12,
+  "jobs": 1,
+  "conflicts": 0,
+  "historySteps": 0,
+  "remoteRollbackSupported": false
+}

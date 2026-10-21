@@ -1,0 +1,4 @@
+ID,Name,Type Code,Type (pax/cargo/...),_delete,Max Passengers,Max Freight,Extra 备注,CR only
+,"He said ""go"", then
+stop 中文,逗号",Type Code special,Type (pax/cargo/...) special,FALSE,Max Passengers special,Max Freight special,"红白,""双""线
+第二行","linebreak"

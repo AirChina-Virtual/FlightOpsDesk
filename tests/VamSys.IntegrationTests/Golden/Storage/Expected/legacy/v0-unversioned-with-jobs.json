@@ -1,0 +1,466 @@
+{
+  "user_version": 4,
+  "journal_mode": "wal",
+  "schema": [
+    {
+      "type": "index",
+      "name": "resource_row_order",
+      "tbl_name": "resource_rows",
+      "sql": "CREATE UNIQUE INDEX resource_row_order ON resource_rows(workspace_id,resource,collection,ordinal)"
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_app_settings_1",
+      "tbl_name": "app_settings",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_batch_items_1",
+      "tbl_name": "batch_items",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_batch_jobs_1",
+      "tbl_name": "batch_jobs",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_resource_history_state_1",
+      "tbl_name": "resource_history_state",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_resource_history_steps_1",
+      "tbl_name": "resource_history_steps",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_resource_metadata_1",
+      "tbl_name": "resource_metadata",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_resource_rows_1",
+      "tbl_name": "resource_rows",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_secrets_1",
+      "tbl_name": "secrets",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_workspace_revisions_1",
+      "tbl_name": "workspace_revisions",
+      "sql": null
+    },
+    {
+      "type": "index",
+      "name": "sqlite_autoindex_workspaces_1",
+      "tbl_name": "workspaces",
+      "sql": null
+    },
+    {
+      "type": "table",
+      "name": "app_settings",
+      "tbl_name": "app_settings",
+      "sql": "CREATE TABLE app_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL)"
+    },
+    {
+      "type": "table",
+      "name": "batch_items",
+      "tbl_name": "batch_items",
+      "sql": "CREATE TABLE batch_items(workspace_id TEXT NOT NULL,job_id TEXT NOT NULL,id TEXT NOT NULL,ordinal INTEGER NOT NULL,json TEXT NOT NULL,PRIMARY KEY(workspace_id,job_id,id),FOREIGN KEY(workspace_id,job_id) REFERENCES batch_jobs(workspace_id,id) ON DELETE CASCADE)"
+    },
+    {
+      "type": "table",
+      "name": "batch_jobs",
+      "tbl_name": "batch_jobs",
+      "sql": "CREATE TABLE batch_jobs(workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,id TEXT NOT NULL,ordinal INTEGER NOT NULL,json TEXT NOT NULL,PRIMARY KEY(workspace_id,id))"
+    },
+    {
+      "type": "table",
+      "name": "resource_history_state",
+      "tbl_name": "resource_history_state",
+      "sql": "CREATE TABLE resource_history_state(workspace_id TEXT NOT NULL,resource INTEGER NOT NULL,undo_json TEXT NOT NULL,redo_json TEXT NOT NULL,PRIMARY KEY(workspace_id,resource),FOREIGN KEY(workspace_id,resource) REFERENCES resource_metadata(workspace_id,resource) ON DELETE CASCADE)"
+    },
+    {
+      "type": "table",
+      "name": "resource_history_steps",
+      "tbl_name": "resource_history_steps",
+      "sql": "CREATE TABLE resource_history_steps(workspace_id TEXT NOT NULL,resource INTEGER NOT NULL,step_id TEXT NOT NULL,json TEXT NOT NULL,PRIMARY KEY(workspace_id,resource,step_id),FOREIGN KEY(workspace_id,resource) REFERENCES resource_metadata(workspace_id,resource) ON DELETE CASCADE)"
+    },
+    {
+      "type": "table",
+      "name": "resource_metadata",
+      "tbl_name": "resource_metadata",
+      "sql": "CREATE TABLE resource_metadata(workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,resource INTEGER NOT NULL,columns_json TEXT NOT NULL,conflicts_json TEXT NOT NULL,snapshot_at TEXT,PRIMARY KEY(workspace_id,resource))"
+    },
+    {
+      "type": "table",
+      "name": "resource_rows",
+      "tbl_name": "resource_rows",
+      "sql": "CREATE TABLE resource_rows(workspace_id TEXT NOT NULL,resource INTEGER NOT NULL,collection INTEGER NOT NULL,local_id TEXT NOT NULL,ordinal INTEGER NOT NULL,json TEXT NOT NULL,PRIMARY KEY(workspace_id,resource,collection,local_id),FOREIGN KEY(workspace_id,resource) REFERENCES resource_metadata(workspace_id,resource) ON DELETE CASCADE)"
+    },
+    {
+      "type": "table",
+      "name": "secrets",
+      "tbl_name": "secrets",
+      "sql": "CREATE TABLE secrets(id TEXT PRIMARY KEY,value BLOB NOT NULL)"
+    },
+    {
+      "type": "table",
+      "name": "workspace_revisions",
+      "tbl_name": "workspace_revisions",
+      "sql": "CREATE TABLE workspace_revisions(workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,revision INTEGER NOT NULL)"
+    },
+    {
+      "type": "table",
+      "name": "workspaces",
+      "tbl_name": "workspaces",
+      "sql": "CREATE TABLE workspaces(id TEXT PRIMARY KEY,name TEXT NOT NULL,json TEXT NOT NULL, format_version INTEGER NOT NULL DEFAULT 4)"
+    },
+    {
+      "type": "trigger",
+      "name": "workspace_format_insert",
+      "tbl_name": "workspaces",
+      "sql": "CREATE TRIGGER workspace_format_insert BEFORE INSERT ON workspaces WHEN NEW.format_version!=4 BEGIN SELECT RAISE(ABORT,'unsupported workspace format'); END"
+    },
+    {
+      "type": "trigger",
+      "name": "workspace_format_update",
+      "tbl_name": "workspaces",
+      "sql": "CREATE TRIGGER workspace_format_update BEFORE UPDATE ON workspaces WHEN NEW.format_version!=4 BEGIN SELECT RAISE(ABORT,'unsupported workspace format'); END"
+    }
+  ],
+  "tables": {
+    "app_settings": [
+      {
+        "key": "language",
+        "value": "en-US"
+      }
+    ],
+    "batch_items": [
+      {
+        "workspace_id": "<guid-07>",
+        "job_id": "<guid-08>",
+        "id": "<guid-09>",
+        "ordinal": 0,
+        "json": {
+          "Id": "<guid-09>",
+          "Resource": 1,
+          "Kind": 0,
+          "Before": null,
+          "After": {
+            "LocalId": "<guid-10>",
+            "Identity": null,
+            "RawApiJson": null,
+            "Fields": {
+              "Name": "New",
+              "Type Code": "B738",
+              "Type (pax/cargo/...)": "pax",
+              "Max Passengers": "180",
+              "Unknown": "001"
+            }
+          },
+          "Fields": {
+            "Name": {
+              "Intent": 1,
+              "Value": "New"
+            },
+            "Type Code": {
+              "Intent": 1,
+              "Value": "B738"
+            },
+            "Type (pax/cargo/...)": {
+              "Intent": 1,
+              "Value": "pax"
+            },
+            "Max Passengers": {
+              "Intent": 1,
+              "Value": "180"
+            },
+            "Unknown": {
+              "Intent": 1,
+              "Value": "001"
+            }
+          },
+          "Dependencies": [],
+          "State": 4,
+          "RemoteId": null,
+          "ApiExpectedValues": null,
+          "ApiSteps": [],
+          "RecoveryCandidateId": "103",
+          "RecoveryCandidates": [
+            {
+              "RemoteId": "102",
+              "ProposedAt": "<time-01>"
+            },
+            {
+              "RemoteId": "103",
+              "ProposedAt": "<time-02>"
+            }
+          ],
+          "Rebased": false,
+          "CreateCompleted": false,
+          "WriteAccepted": false,
+          "Diagnostic": null,
+          "DiagnosticDetails": null,
+          "ReadbackDetails": null,
+          "PreflightComparison": null,
+          "VerificationDifferences": [],
+          "PreCreateCandidateIds": null,
+          "Message": "历史原文",
+          "Description": null
+        }
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "job_id": "<guid-11>",
+        "id": "<guid-12>",
+        "ordinal": 0,
+        "json": {
+          "Id": "<guid-12>",
+          "Resource": 0,
+          "Kind": 0,
+          "Before": null,
+          "After": {
+            "LocalId": "<guid-13>",
+            "Identity": null,
+            "RawApiJson": null,
+            "Fields": {}
+          },
+          "Fields": {},
+          "Dependencies": [],
+          "State": 0,
+          "RemoteId": null,
+          "ApiExpectedValues": null,
+          "ApiSteps": [],
+          "RecoveryCandidateId": null,
+          "RecoveryCandidates": [],
+          "Rebased": false,
+          "CreateCompleted": false,
+          "WriteAccepted": false,
+          "Diagnostic": null,
+          "DiagnosticDetails": null,
+          "ReadbackDetails": null,
+          "PreflightComparison": null,
+          "VerificationDifferences": [],
+          "PreCreateCandidateIds": null,
+          "Message": "second item",
+          "Description": null
+        }
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "job_id": "<guid-11>",
+        "id": "<guid-14>",
+        "ordinal": 1,
+        "json": {
+          "Id": "<guid-14>",
+          "Resource": 0,
+          "Kind": 0,
+          "Before": null,
+          "After": {
+            "LocalId": "<guid-15>",
+            "Identity": null,
+            "RawApiJson": null,
+            "Fields": {}
+          },
+          "Fields": {},
+          "Dependencies": [],
+          "State": 0,
+          "RemoteId": null,
+          "ApiExpectedValues": null,
+          "ApiSteps": [],
+          "RecoveryCandidateId": null,
+          "RecoveryCandidates": [],
+          "Rebased": false,
+          "CreateCompleted": false,
+          "WriteAccepted": false,
+          "Diagnostic": null,
+          "DiagnosticDetails": null,
+          "ReadbackDetails": null,
+          "PreflightComparison": null,
+          "VerificationDifferences": [],
+          "PreCreateCandidateIds": null,
+          "Message": "third item",
+          "Description": null
+        }
+      }
+    ],
+    "batch_jobs": [
+      {
+        "workspace_id": "<guid-07>",
+        "id": "<guid-08>",
+        "ordinal": 0,
+        "json": {
+          "Id": "<guid-08>",
+          "Created": "<time-03>",
+          "Mode": 2,
+          "Status": "旧状态",
+          "StatusCode": 0,
+          "Description": null
+        }
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "id": "<guid-11>",
+        "ordinal": 1,
+        "json": {
+          "Id": "<guid-11>",
+          "Created": "<time-04>",
+          "Mode": 0,
+          "Status": "待执行",
+          "StatusCode": 0,
+          "Description": null
+        }
+      }
+    ],
+    "resource_history_state": [
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 0,
+        "undo_json": [],
+        "redo_json": []
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 1,
+        "undo_json": [
+          "<guid-16>"
+        ],
+        "redo_json": []
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 2,
+        "undo_json": [],
+        "redo_json": []
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 3,
+        "undo_json": [],
+        "redo_json": []
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 4,
+        "undo_json": [],
+        "redo_json": []
+      }
+    ],
+    "resource_history_steps": [
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 1,
+        "step_id": "<guid-16>",
+        "json": {
+          "StepId": "<guid-16>",
+          "Rows": [],
+          "BeforeOrder": null,
+          "AfterOrder": null
+        }
+      }
+    ],
+    "resource_metadata": [
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 0,
+        "columns_json": [],
+        "conflicts_json": [],
+        "snapshot_at": null
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 1,
+        "columns_json": [],
+        "conflicts_json": [],
+        "snapshot_at": null
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 2,
+        "columns_json": [],
+        "conflicts_json": [],
+        "snapshot_at": null
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 3,
+        "columns_json": [],
+        "conflicts_json": [],
+        "snapshot_at": null
+      },
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 4,
+        "columns_json": [],
+        "conflicts_json": [],
+        "snapshot_at": null
+      }
+    ],
+    "resource_rows": [
+      {
+        "workspace_id": "<guid-07>",
+        "resource": 1,
+        "collection": 1,
+        "local_id": "<guid-10>",
+        "ordinal": 0,
+        "json": {
+          "LocalId": "<guid-10>",
+          "Identity": null,
+          "RawApiJson": null,
+          "Fields": {
+            "Name": "New",
+            "Type Code": "B738",
+            "Type (pax/cargo/...)": "pax",
+            "Max Passengers": "180",
+            "Unknown": "001"
+          }
+        }
+      }
+    ],
+    "secrets": [
+      {
+        "id": "<guid-07>",
+        "value": "hex:010203"
+      }
+    ],
+    "workspace_revisions": [
+      {
+        "workspace_id": "<guid-07>",
+        "revision": 0
+      }
+    ],
+    "workspaces": [
+      {
+        "id": "<guid-07>",
+        "name": "Legacy fixture",
+        "json": {
+          "Id": "<guid-07>",
+          "StorageRevision": 0,
+          "Name": "Legacy fixture",
+          "Mode": 2,
+          "LocalRouteTimes": false,
+          "InstanceUrl": "",
+          "AirlineId": "7",
+          "ClientId": null,
+          "ConnectedAt": null,
+          "ContractHash": null,
+          "VerifiedOperations": []
+        },
+        "format_version": 4
+      }
+    ]
+  }
+}
