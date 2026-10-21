@@ -1,0 +1,34 @@
+{
+  "scenario": "route_jumpseat_delete",
+  "requestCount": 3,
+  "outcomes": [
+    "job Completed",
+    "Routes Delete Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/11",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "DELETE",
+          "pathAndQuery": "/api/v3/operations/routes/11",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/11",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "scenario": "create_duplicate_route_found_nothing_sent",
+  "requestCount": 1,
+  "outcomes": [
+    "job NeedsAttention",
+    "Routes Create Failed ApiDuplicate"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 1,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?filter%5Bdeparture_id%5D=101&filter%5Barrival_id%5D=102&page%5Bsize%5D=100",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

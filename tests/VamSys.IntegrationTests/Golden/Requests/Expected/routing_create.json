@@ -1,0 +1,43 @@
+{
+  "scenario": "routing_create",
+  "requestCount": 3,
+  "outcomes": [
+    "job Completed",
+    "Routings Create Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings?filter%5Bdeparture_airport_id%5D=101&filter%5Barrival_airport_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/routings",
+          "body": "{\"departure_airport_id\":101,\"arrival_airport_id\":103,\"route\":\"DCT\",\"tag\":[\"a\",\"b\"]}",
+          "bodyJson": {
+            "departure_airport_id": 101,
+            "arrival_airport_id": 103,
+            "route": "DCT",
+            "tag": [
+              "a",
+              "b"
+            ]
+          }
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings/90",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

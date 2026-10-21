@@ -1,0 +1,15 @@
+{
+  "scenario": "update_cleared_field_blocked_before_any_request",
+  "requestCount": 0,
+  "outcomes": [
+    "job NeedsAttention",
+    "Routings Update Failed ApiClear"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 0,
+      "requests": []
+    }
+  ]
+}

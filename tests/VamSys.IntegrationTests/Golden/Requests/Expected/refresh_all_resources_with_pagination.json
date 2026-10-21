@@ -1,0 +1,85 @@
+{
+  "scenario": "refresh_all_resources_with_pagination",
+  "requestCount": 11,
+  "outcomes": [
+    "Airports snapshot rows 3",
+    "Fleets snapshot rows 3",
+    "Aircraft snapshot rows 2",
+    "Routings snapshot rows 1",
+    "Routes snapshot rows 3"
+  ],
+  "runs": [
+    {
+      "label": "refresh",
+      "requestCount": 11,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports?page%5Bsize%5D=100&cursor=2",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 3,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet?page%5Bsize%5D=100&cursor=2",
+          "body": null
+        },
+        {
+          "order": 4,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 5,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4/aircraft?page%5Bsize%5D=100&cursor=1",
+          "body": null
+        },
+        {
+          "order": 6,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/5/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 7,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/6/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 8,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 9,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 10,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?page%5Bsize%5D=100&cursor=2",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

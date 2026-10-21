@@ -1,0 +1,58 @@
+{
+  "scenario": "route_scheduled_fleet_ids_append",
+  "requestCount": 6,
+  "outcomes": [
+    "job Completed",
+    "Routes Update Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 6,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/10",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/parameters?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": null
+        },
+        {
+          "order": 3,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/5",
+          "body": null
+        },
+        {
+          "order": 4,
+          "method": "PUT",
+          "pathAndQuery": "/api/v3/operations/routes/10",
+          "body": "{\"fleet_ids\":[4,5]}",
+          "bodyJson": {
+            "fleet_ids": [
+              4,
+              5
+            ]
+          }
+        },
+        {
+          "order": 5,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/10",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

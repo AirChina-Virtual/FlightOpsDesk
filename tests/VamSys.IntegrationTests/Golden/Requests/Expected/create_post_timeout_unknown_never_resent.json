@@ -1,0 +1,47 @@
+{
+  "scenario": "create_post_timeout_unknown_never_resent",
+  "requestCount": 3,
+  "outcomes": [
+    "job NeedsAttention",
+    "Fleets Create Unknown ApiUnknown"
+  ],
+  "runs": [
+    {
+      "label": "first run",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/parameters?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/fleet",
+          "body": "{\"name\":\"\\u673A\\u578B New\",\"code\":\"B738\",\"type\":\"pax\",\"parameter_ids\":[\"1\"]}",
+          "bodyJson": {
+            "name": "机型 New",
+            "code": "B738",
+            "type": "pax",
+            "parameter_ids": [
+              "1"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "label": "recovery",
+      "requestCount": 0,
+      "requests": []
+    }
+  ]
+}

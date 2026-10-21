@@ -1,0 +1,37 @@
+{
+  "scenario": "route_update_time_keeps_original_seconds",
+  "requestCount": 3,
+  "outcomes": [
+    "job Completed",
+    "Routes Update Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/12",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "PUT",
+          "pathAndQuery": "/api/v3/operations/routes/12",
+          "body": "{\"departure_time\":\"00:10:37\"}",
+          "bodyJson": {
+            "departure_time": "00:10:37"
+          }
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/12",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

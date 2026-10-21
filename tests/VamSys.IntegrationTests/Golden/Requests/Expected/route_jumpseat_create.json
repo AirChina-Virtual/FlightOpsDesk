@@ -1,0 +1,43 @@
+{
+  "scenario": "route_jumpseat_create",
+  "requestCount": 3,
+  "outcomes": [
+    "job Completed",
+    "Routes Create Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?filter%5Bdeparture_id%5D=102&filter%5Barrival_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/routes",
+          "body": "{\"type\":\"jumpseat\",\"callsign\":\"CAO1234\",\"flight_number\":\"CA1234\",\"departure_id\":102,\"arrival_id\":103,\"remarks\":\"new jumpseat\",\"hidden\":true}",
+          "bodyJson": {
+            "type": "jumpseat",
+            "callsign": "CAO1234",
+            "flight_number": "CA1234",
+            "departure_id": 102,
+            "arrival_id": 103,
+            "remarks": "new jumpseat",
+            "hidden": true
+          }
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/90",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

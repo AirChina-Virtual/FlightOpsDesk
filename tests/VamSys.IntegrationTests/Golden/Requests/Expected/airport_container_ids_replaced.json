@@ -1,0 +1,40 @@
+{
+  "scenario": "airport_container_ids_replaced",
+  "requestCount": 3,
+  "outcomes": [
+    "job Completed",
+    "Airports Update Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports/101",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "PUT",
+          "pathAndQuery": "/api/v3/operations/airports/101",
+          "body": "{\"container_ids\":[2,3]}",
+          "bodyJson": {
+            "container_ids": [
+              2,
+              3
+            ]
+          }
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports/101",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

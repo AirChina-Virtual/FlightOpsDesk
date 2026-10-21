@@ -1,0 +1,56 @@
+{
+  "scenario": "create_route_candidates_found_but_not_duplicate",
+  "requestCount": 5,
+  "outcomes": [
+    "job Completed",
+    "Routes Create Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 5,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?filter%5Bdeparture_id%5D=101&filter%5Barrival_id%5D=102&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/parameters?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": null
+        },
+        {
+          "order": 3,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/routes",
+          "body": "{\"type\":\"scheduled\",\"departure_id\":101,\"arrival_id\":102,\"callsign\":\"CAO101\",\"flight_number\":\"CA101\",\"fleet_ids\":[4]}",
+          "bodyJson": {
+            "type": "scheduled",
+            "departure_id": 101,
+            "arrival_id": 102,
+            "callsign": "CAO101",
+            "flight_number": "CA101",
+            "fleet_ids": [
+              4
+            ]
+          }
+        },
+        {
+          "order": 4,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/90",
+          "body": null
+        }
+      ]
+    }
+  ]
+}
