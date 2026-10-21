@@ -20,7 +20,8 @@ public sealed class TempDataDirectory : IDisposable
         SqliteConnection.ClearAllPools();
         for (var attempt = 0; attempt < 5; attempt++)
         {
-            try { if (Directory.Exists(Path)) Directory.Delete(Path, true); return; }
+            try
+            { if (Directory.Exists(Path)) Directory.Delete(Path, true); return; }
             catch (IOException) { Thread.Sleep(50); }
             catch (UnauthorizedAccessException) { Thread.Sleep(50); }
         }

@@ -48,8 +48,10 @@ public sealed class FakeOperationsServer : HttpMessageHandler
         lock (gate)
         {
             var k = Key(method, path);
-            if (!routes.TryGetValue(k, out var q)) routes[k] = q = new();
-            foreach (var r in responses) q.Enqueue(_ => r);
+            if (!routes.TryGetValue(k, out var q))
+                routes[k] = q = new();
+            foreach (var r in responses)
+                q.Enqueue(_ => r);
         }
         return this;
     }
@@ -65,8 +67,11 @@ public sealed class FakeOperationsServer : HttpMessageHandler
             return Build(FakeResponse.Ok("{\"access_token\":\"synthetic-token\",\"expires_in\":3600,\"token_type\":\"Bearer\"}"));
         var body = request.Content == null ? null : await request.Content.ReadAsStringAsync(ct);
         var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var h in request.Headers) headers[h.Key] = string.Join(",", h.Value);
-        if (request.Content != null) foreach (var h in request.Content.Headers) headers[h.Key] = string.Join(",", h.Value);
+        foreach (var h in request.Headers)
+            headers[h.Key] = string.Join(",", h.Value);
+        if (request.Content != null)
+        foreach (var h in request.Content.Headers)
+            headers[h.Key] = string.Join(",", h.Value);
         Func<RecordedRequest, FakeResponse>? handler = null;
         RecordedRequest recorded;
         lock (gate)
@@ -74,8 +79,10 @@ public sealed class FakeOperationsServer : HttpMessageHandler
             recorded = new(requests.Count, request.Method.Method, uri.PathAndQuery, uri.AbsolutePath, body, headers);
             requests.Add(recorded);
             var k = Key(recorded.Method, recorded.Path);
-            if (routes.TryGetValue(k, out var q) && q.Count > 0) handler = q.Dequeue();
-            else fallbacks.TryGetValue(k, out handler);
+            if (routes.TryGetValue(k, out var q) && q.Count > 0)
+                handler = q.Dequeue();
+            else
+                fallbacks.TryGetValue(k, out handler);
         }
         return Build(handler?.Invoke(recorded) ?? NotFound);
     }
@@ -83,8 +90,11 @@ public sealed class FakeOperationsServer : HttpMessageHandler
     static HttpResponseMessage Build(FakeResponse r)
     {
         var response = new HttpResponseMessage(r.Status);
-        if (r.Json != null) response.Content = new StringContent(r.Json, Encoding.UTF8, "application/json");
-        if (r.Headers != null) foreach (var (k, v) in r.Headers) response.Headers.TryAddWithoutValidation(k, v);
+        if (r.Json != null)
+            response.Content = new StringContent(r.Json, Encoding.UTF8, "application/json");
+        if (r.Headers != null)
+        foreach (var (k, v) in r.Headers)
+            response.Headers.TryAddWithoutValidation(k, v);
         return response;
     }
     static string Key(HttpMethod m, string path) => Key(m.Method, path);
