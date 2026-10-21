@@ -50,7 +50,7 @@ static class ContractScenarios
         {
             var clock=new TestTime();var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=WithAirports(w,Transport(h,clock));
             var item=Route();var job=new BatchJob{Items=[item]};w.Jobs.Add(job);
-            h.Next=(r,ct)=>r.Method==HttpMethod.Post?Json("""{"id":9}""",HttpStatusCode.Created):Json(Page(""));
+            h.Next=(r,ct)=>RouteApprovalFixture.Respond(r)??(r.Method==HttpMethod.Post?Json("""{"id":9}""",HttpStatusCode.Created):Json(Page("")));
             string saved="";await clock.Drive(new OperationsBatchExecutor(a,w).ExecuteAsync(job,()=>{saved=w.Serialize();return Task.CompletedTask;},default));
             Check(item.State==ItemState.Unknown&&item.RemoteId=="9"&&item.CreateCompleted,"Created ID lost: "+item.State);
             w=Workspace.Deserialize(saved);job=w.Jobs.Single();item=job.Items.Single();Check(item.RemoteId=="9");

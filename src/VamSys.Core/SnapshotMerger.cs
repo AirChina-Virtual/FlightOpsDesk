@@ -6,7 +6,12 @@ public static class SnapshotMerger
     {
         string Key(DataRow row) => row.Identity?.RemoteId ?? Schemas.Key(kind, row);
         var remote = incoming.ToDictionary(Key);
-        var aliases = incoming.SelectMany(r=>Schemas.MatchKeys(kind,r).Where(k=>k!="").Select(k=>(Alias:k,Remote:Key(r)))).Distinct().ToDictionary(p=>p.Alias,p=>p.Remote);
+        // Several remote rows may share an alias (for example two airports with one IATA code). Such an
+        // ambiguous alias matches no local row without identity; the row stays local, like a new one.
+        var aliases = new Dictionary<string, HashSet<string>>();
+        foreach (var r in incoming)
+            foreach (var alias in Schemas.MatchKeys(kind, r).Where(k => k != ""))
+            { if (!aliases.TryGetValue(alias, out var keys)) aliases[alias] = keys = []; keys.Add(Key(r)); }
         var old = data.Snapshot.ToDictionary(r => r.LocalId);
         var merged = new List<DataRow>();
         var conflicts = new List<MergeConflict>();
@@ -14,7 +19,7 @@ public static class SnapshotMerger
         {
             old.TryGetValue(local.LocalId, out var baseline);
             var key = Key(baseline ?? local);
-            if ((baseline ?? local).Identity == null && aliases.TryGetValue(Schemas.Key(kind,baseline ?? local),out var matched)) key = matched;
+            if ((baseline ?? local).Identity == null && aliases.TryGetValue(Schemas.Key(kind,baseline ?? local),out var matched) && matched.Count == 1) key = matched.Single();
             if (key.Length == 0 || !remote.Remove(key, out var fresh))
             {
                 if (baseline == null) { merged.Add(local.Copy()); continue; }

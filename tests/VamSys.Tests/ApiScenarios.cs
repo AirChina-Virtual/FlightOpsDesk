@@ -51,12 +51,12 @@ static class ApiScenarios
             Check(data.Draft.Count==20000&&data.Draft[100].Get("Remarks")=="local"&&data.Draft[200].Get("Remarks")=="remote"&&data.Conflicts.Count==0);
             Console.WriteLine($"  20k API merge: {watch.ElapsedMilliseconds} ms");
         }));
-        await test("Official requests split creation and use sparse API fields",()=>Sync(()=>
+        await test("Current official requests create capacities atomically and use sparse API fields",()=>Sync(()=>
         {
             var w=new Workspace{AirlineId="7"};var api=Adapter(w);
             var item=Create(ResourceKind.Fleets,Row(("Name","Fleet"),("Type Code","B738"),("Type (pax/cargo/...)","pax"),("Max Passengers","189"),("unknown","keep")));
-            var steps=api.Plan(item);Check(steps.Count==2 && steps[0].Path=="fleet" && steps[0].Method==HttpMethod.Post);
-            Check(steps[0].Body.Keys.ToHashSet().SetEquals(["name","code","type"]) && (long)steps[1].Body["max_pax"]! == 189);
+            var steps=api.Plan(item);Check(steps.Count==1 && steps[0].Path=="fleet" && steps[0].Method==HttpMethod.Post);
+            Check(steps[0].Body.Keys.ToHashSet().SetEquals(["name","code","type","max_pax"]) && (long)steps[0].Body["max_pax"]! == 189);
             var fleet=Parse(api,ResourceKind.Fleets,"{\"id\":4,\"airline_id\":7,\"name\":\"Old\",\"code\":\"B738\",\"type\":\"pax\"}");
             var update=api.Plan(Edit(ResourceKind.Fleets,fleet,"Name","New")).Single();Check(update.Path=="fleet/4"&&update.Body.Count==1&&update.Body["name"]!.ToString()=="New");
             Blocked(()=>api.Plan(Edit(ResourceKind.Fleets,fleet,"Type Code","BAD")),"ApiInvalid");
@@ -70,17 +70,19 @@ static class ApiScenarios
             Check(api.Plan(Edit(ResourceKind.Airports,airport,"Name","LHR")).Single().Path=="airports/101");
             Check(((long[])api.Plan(Edit(ResourceKind.Airports,airport,"Container IDs","")).Single().Body["container_ids"]!).Length==0);
             var item=Create(ResourceKind.Routings,Row(("Departure Airport (ICAO/IATA)","LHR"),("Arrival Airport (ICAO/IATA)","EGLL"),("Route String","DCT"),("Tags","a,b")));
-            var steps=api.Plan(item);Check(steps.Count==2&&(long)steps[0].Body["departure_airport_id"]! ==101);
+            var steps=api.Plan(item);Check(steps.Count==1&&(long)steps[0].Body["departure_airport_id"]! ==101&&steps[0].Body.ContainsKey("tag"));
             var routing=Parse(api,ResourceKind.Routings,"{\"id\":9,\"airline_id\":7,\"departure_airport_id\":101,\"arrival_airport_id\":101,\"route\":\"DCT\"}");
             Blocked(()=>api.Plan(Edit(ResourceKind.Routings,routing,"Departure Airport (ICAO/IATA)","ZZZZ")),"ApiImmutable");
             var route=Parse(api,ResourceKind.Routes,"{\"id\":5,\"departure_id\":101,\"arrival_id\":101,\"type\":\"scheduled\",\"departure_time\":\"23:59:37\",\"fleet_ids\":[1,2]}");
             var time=Edit(ResourceKind.Routes,route,"Departure Time (HH:MM)","00:10");Check(api.Plan(time).Single().Body["departure_time"]!.ToString()=="00:10:37");
-            Blocked(()=>api.Plan(Edit(ResourceKind.Routes,route,"Fleet IDs","1")),"ApiFleetSet");
+            Check(api.Plan(Edit(ResourceKind.Routes,route,"Fleet IDs","1")).Single().Body.ContainsKey("fleet_ids"));
             Blocked(()=>api.Plan(Edit(ResourceKind.Routes,route,"Type","jumpseat")),"ApiJumpseat");
             Blocked(()=>api.Plan(Edit(ResourceKind.Routes,route,"Departure Airport (ICAO/IATA)","EGKK")),"ApiImmutable");
             var aircraft=Parse(api,ResourceKind.Aircraft,"{\"id\":8,\"airline_id\":7,\"fleet_id\":4,\"name\":\"Plane\"}");
             Check(api.Plan(Edit(ResourceKind.Aircraft,aircraft,"Name","New")).Single().Path=="fleet/4/aircraft/8");
-            Blocked(()=>api.Plan(Edit(ResourceKind.Aircraft,aircraft,"Fleet ID","5")),"ApiMoveFleet");
+            Parse(api,ResourceKind.Fleets,"{\"id\":5,\"airline_id\":7,\"name\":\"Target\"}");
+            var move=api.Plan(Edit(ResourceKind.Aircraft,aircraft,"Fleet ID","5")).Single();
+            Check(move.Method==HttpMethod.Patch&&move.Path=="aircraft/8"&&(long)move.Body["fleet_id"]! ==5);
         }));
         await test("Three-way refresh preserves independent edits, CSV identity and sticky conflicts",()=>Sync(()=>
         {
@@ -108,7 +110,7 @@ static class ApiScenarios
             var api=Adapter(new Workspace{AirlineId="7"},h);var rows=new List<DataRow>();await foreach(var row in api.ReadAllAsync(ResourceKind.Aircraft,default))rows.Add(row);
             Check(rows.Count==1&&rows[0].Identity!.ParentFleetId=="4");Check((await api.FindAsync(ResourceKind.Aircraft,"8",default))!.Get("Name")=="Plane");
         });
-        await test("Creation persists ID before PUT; interrupted writes never repeat POST",async()=>
+        await test("Legacy prepared creation persists ID before PUT; interrupted writes never repeat POST",async()=>
         {
             bool persisted=false;var w=new Workspace{AirlineId="7",Mode=RunMode.Online};
             var h=new ScriptedHttp([
@@ -117,12 +119,13 @@ static class ApiScenarios
                 r=>{Check(persisted&&r.Method==HttpMethod.Put&&r.RequestUri!.AbsolutePath.EndsWith("fleet/4"));throw new TimeoutException();},
                 r=>Task.FromResult(ScriptedHttp.Json("{\"data\":{\"id\":4,\"airline_id\":7,\"name\":\"Fleet\",\"code\":\"B738\",\"type\":\"pax\",\"max_pax\":189}}"))]);
             var api=Adapter(w,h);var item=Create(ResourceKind.Fleets,Row(("Name","Fleet"),("Type Code","B738"),("Type (pax/cargo/...)","pax"),("Max Passengers","189")));
+            StorageScenarios.LegacyFleetSteps(item);
             w.Resources[ResourceKind.Fleets].Draft.Add(item.After.Copy());var job=new BatchJob{Mode=RunMode.Online,Items=[item]};var executor=new OperationsBatchExecutor(api,w);
             await executor.ExecuteAsync(job,()=>{persisted=item.CreateCompleted&&item.RemoteId=="4";return Task.CompletedTask;},default);
             Check(item.State==ItemState.Unknown&&persisted&&h.Calls==3);
             await executor.ExecuteAsync(job,()=>Task.CompletedTask,default);Check(item.State==ItemState.Succeeded&&h.Calls==4&&w.Resources[ResourceKind.Fleets].Draft[0].Get("ID")=="4");
         });
-        await test("Soft delete accepted stays unknown even if GET returns 404",async()=>
+        await test("Soft delete 204 and exact-ID 404 verify API invisibility without claiming physical erasure",async()=>
         {
             var w=new Workspace{AirlineId="7"};
             var h=new ScriptedHttp([
@@ -135,7 +138,7 @@ static class ApiScenarios
                 r=>Task.FromResult(ScriptedHttp.Json("{}",HttpStatusCode.NotFound))]);
             var api=Adapter(w,h);var row=Parse(api,ResourceKind.Airports,"{\"id\":101,\"airline_id\":7,\"icao\":\"EGLL\",\"iata\":\"LHR\",\"name\":\"London\"}");
             w.Resources[ResourceKind.Airports].Draft.Add(row.Copy());var item=new ChangeItem{Resource=ResourceKind.Airports,Kind=ChangeKind.Delete,Before=row.Copy(),After=row.Copy()};
-            await new OperationsBatchExecutor(api,w).ExecuteAsync(new(){Items=[item]},()=>Task.CompletedTask,default);Check(item.State==ItemState.Unknown&&item.WriteAccepted&&!w.VerifiedOperations.Contains("Airports:Delete"));
+            await new OperationsBatchExecutor(api,w).ExecuteAsync(new(){Items=[item]},()=>Task.CompletedTask,default);Check(item.State==ItemState.Succeeded&&item.WriteAccepted&&w.VerifiedOperations.Contains("Airports:Delete")&&item.DeletionVerification?.Outcome=="ApiInvisible");
         });
         await test("Online update conflict sends no PUT and persists structured status",async()=>
         {
@@ -154,7 +157,7 @@ static class ApiScenarios
         {
             var w=new Workspace{AirlineId="7"};var api=Adapter(w);var row=Parse(api,ResourceKind.Fleets,"{\"id\":4,\"airline_id\":7,\"name\":\"机型\",\"code\":\"B738\",\"type\":\"pax\"}");
             var change=Edit(ResourceKind.Fleets,row,"Name","测试");var csv=new CsvAdapter();var before=csv.Export(ResourceKind.Fleets,[change]).Single();
-            var loc=new LocalizationService();loc.SetLanguage("en-US");Check(loc.Get("ApiMoveFleet").Contains("disabled"));Check(before.SequenceEqual(csv.Export(ResourceKind.Fleets,[change]).Single()));
+            var loc=new LocalizationService();loc.SetLanguage("en-US");Check(loc.Get("ApiMoveFleet").Contains("Change only the aircraft Fleet ID"));Check(before.SequenceEqual(csv.Export(ResourceKind.Fleets,[change]).Single()));
             change.After.Identity=null;change.After.RawApiJson=null;Check(before.SequenceEqual(csv.Export(ResourceKind.Fleets,[change]).Single()));
         }));
     }

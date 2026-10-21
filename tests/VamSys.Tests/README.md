@@ -11,10 +11,13 @@
 从仓库根目录执行：
 
 ~~~powershell
-# 全部自动检查（当前 215 项；没有 artifacts/step5-v3-baseline 时为 214 项）
+# 全部自动检查（当前 260 项；没有 artifacts/step5-v3-baseline 时为 259 项）
 dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
 
 # 只运行其中一部分
+dotnet run --project tests/VamSys.Tests -c Release -- --verified-scope    # 外部证据范围、飞机移动、软删除和历史只读核对
+dotnet run --project tests/VamSys.Tests -c Release -- --task-submission   # 任务启动交接、保存失败、上下文变化、历史 Pending 保护
+dotnet run --project tests/VamSys.Tests -c Release -- --live-compatibility # kg、诊断、参数、scheduled、jumpseat、备份清理
 dotnet run --project tests/VamSys.Tests -c Release -- --ui-interactions    # 审阅、批量范围、密度偏好
 dotnet run --project tests/VamSys.Tests -c Release -- --storage            # 数据保存与行级保存
 dotnet run --project tests/VamSys.Tests -c Release -- --history            # v4 历史随机对照、迁移、并发
@@ -39,6 +42,8 @@ dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-v3 artifacts/v
 |---|---|
 | Program.cs | 选择要运行的检查，处理命令参数，为窗口测试准备数据 |
 | ApiScenarios.cs | 发给 API 的请求，以及服务器返回数据的处理 |
+| LiveCompatibilityScenarios.cs | 10 月契约兼容、完整诊断脱敏、批准关联、集合与恢复、备份事务；调用实际产品代码 |
+| Fixtures/vcca-weight-20261020.json | 8 份保留的真实 API 响应回放：身份与追踪值脱敏，保留数值、null 和包装结构；仅在测试进程回放 |
 | AuditScenarios.cs、ReauditScenarios.cs | 重现以前发现的问题，防止再次出现 |
 | ContractScenarios.cs | 按官方规范检查航线数据、分页、写入限流、字段校验和日期格式 |
 | CandidateIndexScenarios.cs | 同名记录保留、查重结果更新、随机数据对照 |
@@ -50,6 +55,8 @@ dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-v3 artifacts/v
 | HistoryScenarios.cs | 旧全快照对照、历史迁移、异步载荷、写入范围、淘汰分支、字段顺序 |
 | UiInteractionScenarios.cs | 工作区审阅、样本与依赖、内容键（防碰撞与缓存）、无网络预览、批量范围、密度偏好 |
 | TaskViewModelScenarios.cs | 页面只显示已保存的结果，更新时计数和列表正确 |
+| TaskSubmissionScenarios.cs | 链接真实 TaskSubmission，模拟最终 Render 的慢审阅锁；真实 SQLite 与执行器验证只启动本次任务、各写一次和 Unknown 只读恢复 |
+| VerifiedScopeScenarios.cs | 15 项证据基线与字段／类型范围、真实适配器和执行器的飞机 PATCH、204／404、历史任务只读补核对、原子人工确认与旧 JSON 回归 |
 | PerformanceScenarios.cs | 请求次数，以及大量记录下的查重和处理速度 |
 | CoreOptimizationScenarios.cs、CorePerformanceBenchmark.cs | 原规划对照、位置索引、局部回放的失败原子性、1 千／2 万／5 万行基准 |
 | DataTableScenarios.cs、DataUiFixture.cs | 分页、跨页选择、完整查询、模型重新绑定；窗口测试用的合成数据 |
@@ -66,6 +73,8 @@ dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-v3 artifacts/v
 | `TestTime` | 只在测试调用 `Drive` 或 `Advance` 时前进 | 需要精确检查间隔、并发共享额度和排队取消的场景 |
 
 新写的 API 测试不要使用默认的共享协调器（系统时钟），否则会重新引入真实等待。每项测试耗时达到 1 秒时，PASS 行末尾会显示耗时；全部完成后输出总耗时和最慢的 5 项，整套约 30 秒。
+
+编译服务不可用时，可先 `dotnet build tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true -p:UseSharedCompilation=false -m:1 -nr:false`，再直接运行 `dotnet tests/VamSys.Tests/bin/Release/net10.0/VamSys.Tests.dll`。`--export-diagnostic-replay <JSON路径>` 通过模拟 422/500 生成脱敏诊断与 SHA-256；该入口只在测试运行器，不进入正式包。
 
 ## 程序突然退出后的恢复
 

@@ -1,0 +1,158 @@
+{
+  "source": "Retained 2026-10-20 independent vCCA isolation responses",
+  "normalization": "IDs, names, registrations, error IDs and trace identity replaced; numeric values, nulls and response envelopes retained. Nonessential fields omitted.",
+  "cases": [
+    {
+      "name": "01-aircraft-capacity-omitted",
+      "path": "fleet/4/aircraft/8",
+      "request": {
+        "cargo": 2205
+      },
+      "status": 200,
+      "response": {
+        "data": {
+          "id": 8,
+          "airline_id": 7,
+          "fleet_id": 4,
+          "name": "Sanitized replay fixture",
+          "registration": "QA-REPLAY",
+          "cargo": 2205,
+          "simbrief_overrides": null
+        }
+      },
+      "serverDate": "Tue, 20 Oct 2026 12:24:10 GMT",
+      "cfRay": "fixture-replay-trace"
+    },
+    {
+      "name": "02-aircraft-capacity-kg",
+      "path": "fleet/4/aircraft/8",
+      "request": {
+        "cargo": 2205,
+        "weight_unit": "kg"
+      },
+      "status": 500,
+      "response": {
+        "message": "Server Error",
+        "error_id": "replay-02-aircraft-capacity-kg"
+      },
+      "serverDate": "Tue, 20 Oct 2026 12:24:24 GMT",
+      "cfRay": "fixture-replay-trace"
+    },
+    {
+      "name": "03-aircraft-capacity-lbs",
+      "path": "fleet/4/aircraft/8",
+      "request": {
+        "cargo": 2205,
+        "weight_unit": "lbs"
+      },
+      "status": 500,
+      "response": {
+        "message": "Server Error",
+        "error_id": "replay-03-aircraft-capacity-lbs"
+      },
+      "serverDate": "Tue, 20 Oct 2026 12:24:39 GMT",
+      "cfRay": "fixture-replay-trace"
+    },
+    {
+      "name": "11-aircraft-simbrief-empty",
+      "path": "fleet/4/aircraft/8",
+      "request": {
+        "simbrief_overrides": {}
+      },
+      "status": 200,
+      "response": {
+        "data": {
+          "id": 8,
+          "airline_id": 7,
+          "fleet_id": 4,
+          "name": "Sanitized replay fixture",
+          "registration": "QA-REPLAY",
+          "cargo": 1000,
+          "simbrief_overrides": {
+            "weight_unit": "kg"
+          }
+        }
+      },
+      "serverDate": "Tue, 20 Oct 2026 12:26:05 GMT",
+      "cfRay": "fixture-replay-trace"
+    },
+    {
+      "name": "12-aircraft-simbrief-pax-only",
+      "path": "fleet/4/aircraft/8",
+      "request": {
+        "simbrief_overrides": {
+          "paxwgt": 85
+        }
+      },
+      "status": 500,
+      "response": {
+        "message": "Server Error",
+        "error_id": "replay-12-aircraft-simbrief-pax-only"
+      },
+      "serverDate": "Tue, 20 Oct 2026 12:26:19 GMT",
+      "cfRay": "fixture-replay-trace"
+    },
+    {
+      "name": "13-aircraft-simbrief-bag-only",
+      "path": "fleet/4/aircraft/8",
+      "request": {
+        "simbrief_overrides": {
+          "bagwgt": 20
+        }
+      },
+      "status": 500,
+      "response": {
+        "message": "Server Error",
+        "error_id": "replay-13-aircraft-simbrief-bag-only"
+      },
+      "serverDate": "Tue, 20 Oct 2026 12:26:33 GMT",
+      "cfRay": "fixture-replay-trace"
+    },
+    {
+      "name": "05-fleet-capacity-kg",
+      "path": "fleet/4",
+      "request": {
+        "max_cargo": 22046,
+        "weight_unit": "kg"
+      },
+      "status": 200,
+      "response": {
+        "data": {
+          "id": 4,
+          "airline_id": 7,
+          "name": "Sanitized replay fixture",
+          "code": "B738",
+          "type": "cargo",
+          "max_cargo": 22046,
+          "simbrief_overrides": null,
+          "weight_unit": "kg"
+        }
+      },
+      "serverDate": "Tue, 20 Oct 2026 12:24:59 GMT",
+      "cfRay": "fixture-replay-trace"
+    },
+    {
+      "name": "06-fleet-capacity-lbs",
+      "path": "fleet/4",
+      "request": {
+        "max_cargo": 22046,
+        "weight_unit": "lbs"
+      },
+      "status": 200,
+      "response": {
+        "data": {
+          "id": 4,
+          "airline_id": 7,
+          "name": "Sanitized replay fixture",
+          "code": "B738",
+          "type": "cargo",
+          "max_cargo": 22046,
+          "simbrief_overrides": null,
+          "weight_unit": "kg"
+        }
+      },
+      "serverDate": "Tue, 20 Oct 2026 12:25:08 GMT",
+      "cfRay": "fixture-replay-trace"
+    }
+  ]
+}

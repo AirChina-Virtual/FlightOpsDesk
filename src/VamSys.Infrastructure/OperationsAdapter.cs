@@ -7,6 +7,7 @@ using VamSys.Core;
 namespace VamSys.Infrastructure;
 
 public sealed record ApiStep(HttpMethod Method, string Path, Dictionary<string,object?> Body);
+internal sealed record ReadbackVerification(bool Passed, List<ApiFieldDifference> Differences);
 public interface IApiResourceAdapter
 {
     DataRow FromJson(ResourceKind kind, JsonElement value);
@@ -24,7 +25,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
     static readonly Dictionary<ResourceKind, Dictionary<string,string>> Maps = new()
     {
         [ResourceKind.Airports] = new() { ["Name"]="name", ["Category"]="category", ["Container IDs"]="container_ids" },
-        [ResourceKind.Fleets] = new() { ["Name"]="name", ["Type Code"]="code", ["Type (pax/cargo/...)"]="type", ["Max Passengers"]="max_pax", ["Max Freight"]="max_cargo", ["Container Units"]="container_units", ["Hide in Phoenix"]="hide_in_phoenix" },
+        [ResourceKind.Fleets] = new() { ["Name"]="name", ["Type Code"]="code", ["Type (pax/cargo/...)"]="type", ["Max Passengers"]="max_pax", ["Max Freight"]="max_cargo", ["Container Units"]="container_units", ["Hide in Phoenix"]="hide_in_phoenix", ["Parameter IDs"]="parameter_ids" },
         [ResourceKind.Aircraft] = new() { ["Name"]="name", ["Registration"]="registration", ["SELCAL"]="selcal", ["Fin Number"]="fin_number", ["Hex Code"]="hexcode", ["Passengers"]="passengers", ["Freight"]="cargo", ["Internal Remarks"]="internal_remarks" },
         [ResourceKind.Routings] = new() { ["Route String"]="route", ["Remarks"]="remarks", ["Internal Remarks"]="internal_remarks", ["Tags"]="tag", ["Days of Operation"]="days_of_operation" },
         [ResourceKind.Routes] = new() { ["Type"]="type", ["Callsign"]="callsign", ["Flight Number"]="flight_number", ["Fleet IDs"]="fleet_ids", ["Start Date"]="start_date", ["End Date"]="end_date", ["Departure Time (HH:MM)"]="departure_time", ["Arrival Time (HH:MM)"]="arrival_time", ["Service Days"]="service_days", ["Routing"]="route", ["Remarks"]="remarks", ["Internal Remarks"]="internal_remarks", ["Tags"]="tag", ["Is Hidden"]="hidden", ["Altitude"]="altitude", ["Cost Index"]="cost_index" }
@@ -34,13 +35,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
     {
         var id = value.GetProperty("id").ToString();
         string airline;
-        if (value.TryGetProperty("airline_id", out var owner) && owner.ValueKind != JsonValueKind.Null)
-        {
-            airline = owner.ToString();
-            if (workspace.AirlineId != null && workspace.AirlineId != airline) throw Block("ApiWrongVa");
-            workspace.AirlineId ??= airline;
-            SessionAirlineId = airline;
-        }
+        if (Owner(value) is string owner) airline = owner;
         // RouteData documents no airline_id; the credentials belong to exactly one VA.
         else if (kind == ResourceKind.Routes) airline = workspace.AirlineId ?? SessionAirlineId ?? throw Block("ApiConnectFirst");
         else throw Block("ApiInvalid","airline_id");
@@ -69,6 +64,28 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         }
         known[(kind,id)] = row; if (kind == ResourceKind.Airports) knownAirportsVersion++;
         return row;
+    }
+    string? Owner(JsonElement value)
+    {
+        if (!value.TryGetProperty("airline_id", out var owner) || owner.ValueKind == JsonValueKind.Null) return null;
+        var airline = owner.ToString();
+        if (workspace.AirlineId != null && workspace.AirlineId != airline) throw Block("ApiWrongVa");
+        workspace.AirlineId ??= airline;
+        SessionAirlineId = airline;
+        return airline;
+    }
+    // Fleets or airports name the VA. A new, empty VA has neither; ranks and containers also carry airline_id.
+    public async Task<bool> IdentifyAirlineAsync(CancellationToken ct)
+    {
+        await foreach (var _ in ReadAllAsync(ResourceKind.Fleets,ct)) break;
+        if (SessionAirlineId == null) await foreach (var _ in ReadAllAsync(ResourceKind.Airports,ct)) break;
+        foreach (var path in new[]{"ranks","containers"})
+        {
+            if (SessionAirlineId != null) break;
+            try { await foreach (var value in transport.ReadPagesAsync(new(BaseUri,path),ct)) { Owner(value); break; } }
+            catch (Exception e) when (e is ApiAccessException or ApiResponseException) { }
+        }
+        return SessionAirlineId != null;
     }
     DataRow? Known(ResourceKind kind, string id) => known.GetValueOrDefault((kind,id)) ?? workspace.Resources[kind].Snapshot.FirstOrDefault(r => r.Identity?.RemoteId == id && r.Identity.ConnectionId == workspace.AirlineId);
     public async IAsyncEnumerable<DataRow> ReadAllAsync(ResourceKind kind, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
@@ -219,6 +236,11 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         if(item.Resource==ResourceKind.Airports) return HasAirportAlias(current,item.After.Get("ICAO/IATA"));
         if(item.Resource is ResourceKind.Routes or ResourceKind.Routings)
         {
+            if(item.Resource==ResourceKind.Routes && (item.After.Get("Type")=="jumpseat" || current.Get("Type")=="jumpseat"))
+                return item.After.Get("Type")==current.Get("Type")
+                    && SameEndpoint(item.Resource,current,item.After,"Departure Airport (ICAO/IATA)")
+                    && SameEndpoint(item.Resource,current,item.After,"Arrival Airport (ICAO/IATA)")
+                    && new[]{"Departure Time (HH:MM)","Arrival Time (HH:MM)","Start Date","End Date"}.All(f=>current.Get(f)=="" || item.After.Get(f)=="" || current.Get(f)==item.After.Get(f));
             var signature=item.Resource==ResourceKind.Routes ? "Flight Number" : "Route String";
             return SameEndpoint(item.Resource,current,item.After,"Departure Airport (ICAO/IATA)")
                 && SameEndpoint(item.Resource,current,item.After,"Arrival Airport (ICAO/IATA)")
@@ -236,15 +258,40 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         (ResourceKind.Routes,true)=>"StoreRouteRequest",_=>"UpdateRouteRequest"
     };
     public List<ApiStep> Plan(ChangeItem c) => Plan(c,false);
-    public List<ApiStep> PreviewPlan(ChangeItem c) => Plan(c,true);
+    internal List<ApiStep> ExecutionPlan(ChangeItem item)
+    {
+        var current=Plan(item);
+        if(item.ApiSteps.Count==0)return current;
+        var saved=item.ApiSteps.Select(ToStep).ToList();
+        var wanted=ExpectedValues(current);var previous=ExpectedValues(saved);
+        if(wanted.Count!=previous.Count || wanted.Any(p=>!previous.TryGetValue(p.Key,out var v)||!JsonElement.DeepEquals(p.Value,v)))throw Block("ApiRefreshFirst");
+        if(saved.Count>2)throw Block("ApiRefreshFirst");
+        for(var n=0;n<saved.Count;n++)
+        {
+            var step=saved[n];
+            var create=item.Kind==ChangeKind.Create&&n==0;
+            var move=IndependentApiEvidence.IsMove(item);
+            var method=move?HttpMethod.Patch:create?HttpMethod.Post:item.Kind==ChangeKind.Delete?HttpMethod.Delete:HttpMethod.Put;
+            var path=move?current.Single().Path:item.Kind==ChangeKind.Create?(n==0?Path(item.Resource,Unsaved(item.After)):"{created}"):Path(item.Resource,item.Before??item.After,item.RemoteId);
+            if(step.Method!=method || step.Path!=path)throw Block("ApiRefreshFirst");
+            if(move)ValidateMoveBody(step.Body);else if(method!=HttpMethod.Delete)ValidateBody(item.Resource,create,step.Body);
+        }
+        return saved;
+    }
+    // A create's POST targets the collection even after the response stored the new identity.
+    static DataRow Unsaved(DataRow row) { var copy=row.Copy(); copy.Identity=null; return copy; }
+    static ApiStep ToStep(BatchStep s) => new(new HttpMethod(s.Method),s.Path,s.Body.ToDictionary(p=>p.Key,p=>(object?)p.Value));
+    public List<ApiStep> PreviewPlan(ChangeItem c) { var steps=Plan(c,true);ValidateParameterPreview(c);return steps; }
     List<ApiStep> Plan(ChangeItem c,bool preview)
     {
         if (c.Before != null && c.Before.Identity == null) throw Block("ApiRefreshFirst");
         if (c.Kind != ChangeKind.Create && c.After.Identity == null) throw Block("ApiRefreshFirst");
         if (c.Kind == ChangeKind.Create && c.After.Get("ID") != "" && c.RemoteId == null) throw Block("ApiRefreshFirst");
+        if(IndependentApiEvidence.IsMove(c))return [MovePlan(c,preview)];
         var path = Path(c.Resource,c.Before ?? c.After,c.RemoteId,preview);
         if(c.Kind == ChangeKind.Delete) return [new(HttpMethod.Delete,path,[])];
         bool create = c.Kind == ChangeKind.Create;
+        if(create && c.Resource==ResourceKind.Fleets && c.RequiresAirlineParameter && c.After.Get("Parameter IDs")=="")throw Block("ApiParameterRequired");
         var body = new Dictionary<string,object?>();
         foreach(var (field, intent) in c.Fields)
         {
@@ -263,7 +310,9 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             }
             if (!Maps[c.Resource].TryGetValue(field,out var wire))
             { if (Schemas.All[c.Resource].Columns.Contains(field)) throw Block("ApiUnsupported",field); continue; }
-            if (wire == "fleet_ids" && !create) throw Block("ApiFleetSet");
+            if (wire == "fleet_ids" && !create && !(c.Before?.Get("Type")=="scheduled" && c.After.Get("Type")=="scheduled")) throw Block("ApiFleetSet");
+            if(wire=="parameter_ids" && !create)throw Block("ApiParameterCreateOnly");
+            if(!create && c.Resource==ResourceKind.Routes && c.Before?.Get("Type")=="jumpseat" && (wire is "callsign" or "flight_number"))throw Block("ApiJumpseatIdentity");
             if (wire == "type" && !create && c.Resource == ResourceKind.Routes && (text == "jumpseat" || c.Before!.Get("Type") == "jumpseat")) throw Block("ApiJumpseat");
             if(text.Length == 0)
             {
@@ -276,6 +325,11 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             if (wire is "hide_in_phoenix" or "hidden") { if(!bool.TryParse(text,out var flag)) throw Block("ApiInvalid",field); result = flag; }
             if (wire is "tag" or "service_days" or "days_of_operation") result = text.Split(',',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray();
             if (wire is "fleet_ids" or "container_ids") result = text.Split(',',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries).Select(t=>preview && wire=="fleet_ids"?PreviewReference(t,ResourceKind.Fleets):PositiveId(t)).Distinct().ToArray();
+            if(wire=="parameter_ids")
+            {
+                var ids=text.Split(',',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries).Select(t=>PositiveId(t).ToString(CultureInfo.InvariantCulture)).Distinct().ToArray();
+                if(ids.Length!=1)throw Block("ApiInvalid",field);result=ids;
+            }
             if (wire is "departure_time" or "arrival_time")
             {
                 if(workspace.LocalRouteTimes) throw Block("ApiUtc");
@@ -297,6 +351,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         if (create && c.Resource == ResourceKind.Routes && c.After.Get("Type") != "jumpseat" && !body.ContainsKey("fleet_ids")) throw Block("ApiInvalid","Fleet IDs");
         if(c.Resource==ResourceKind.Routes)
         {
+            if(body.ContainsKey("fleet_ids") && c.After.Get("Type")=="scheduled" && ((long[])body["fleet_ids"]!).Length==0)throw Block("ApiInvalid","Fleet IDs");
             if(!new[]{"scheduled","cargo","charter","training","vfr","repositioning","jumpseat"}.Contains(c.After.Get("Type"))) throw Block("ApiInvalid","Type");
             foreach(var (field,min,max) in new[]{("Callsign",4,7),("Flight Number",3,6)})
                 if((create || c.Fields.ContainsKey(field)) && c.After.Get(field).Length is var length && (length<min || length>max)) throw Block("ApiInvalid",field);
@@ -318,9 +373,14 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
     }
     public static void ValidateBody(ResourceKind kind,bool create,Dictionary<string,object?> body)
     {
+        ValidateCompatibility(body);
         var schema = SchemasJson.GetProperty(SchemaName(kind,create));
         using var json = JsonDocument.Parse(JsonSerializer.Serialize(body));
         ValidateSchema(schema,json.RootElement,SchemaName(kind,create));
+    }
+    static void ValidateCompatibility(IReadOnlyDictionary<string,object?> body)
+    {
+        if(body.Keys.Any(k=>k is "weight_unit" or "simbrief_overrides"))throw Block("ApiKnownWeightRestriction");
     }
     static void ValidateSchema(JsonElement schema,JsonElement value,string field)
     {
@@ -362,8 +422,15 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             var step=steps[index];
             if(step.Method==HttpMethod.Post && change.CreateCompleted) continue;
             var path=step.Path=="{created}" ? Path(change.Resource,change.After,change.RemoteId) : step.Path;
-            var record=change.ApiSteps[index];record.Path=path;record.State=BatchStepState.InFlight;await persist();
-            using var response=await transport.SendAsync(step.Method,new(BaseUri,path),step.Method==HttpMethod.Delete?null:step.Body,ct);
+            ValidateCompatibility(step.Body);
+            var record=change.ApiSteps[index];record.Path=path;record.State=BatchStepState.InFlight;record.StartedAt=transport.UtcNow;record.FinishedAt=null;await persist();
+            JsonDocument result;
+            Func<DateTimeOffset,Task>? start=ApiOperationPolicy.IsJumpseatCreate(change)&&step.Method==HttpMethod.Post?async when=>
+                {record.StartedAt=when;record.DeadlineAt=transport.RequestTimeout>TimeSpan.Zero?when+transport.RequestTimeout:null;await persist();}:null;
+            try {result=await transport.SendAsync(step.Method,new(BaseUri,path),step.Method==HttpMethod.Delete?null:step.Body,ct,start);}
+            finally {record.FinishedAt=transport.UtcNow;}
+            change.DiagnosticDetails=transport.LastResponse is {} evidence?evidence with{Phase="Writing"}:change.DiagnosticDetails;
+            using var response=result;
             if(step.Method==HttpMethod.Post)
             {
                 // Keep the created ID durable before a full parse can fail on an unexpected response shape.
@@ -383,28 +450,15 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
     public bool Matches(ChangeItem item,DataRow current,DataRow expected,bool before)
     {
         CheckConnection(current); CheckConnection(expected);
+        if(!before) return VerifyReadback(item,current,expected,item.ApiExpectedValues ?? ExpectedValues(Plan(item))).Passed;
         if(item.Resource==ResourceKind.Airports && item.Kind==ChangeKind.Create
             && !HasAirportAlias(current,expected.Get("ICAO/IATA"))) return false;
-        if(!before)
-        {
-            if(current.RawApiJson==null) return false;
-            var values=item.ApiExpectedValues ?? ExpectedValues(Plan(item));
-            if(item.Resource==ResourceKind.Aircraft && item.Kind==ChangeKind.Create
-                && current.Identity?.ParentFleetId!=expected.Get("Fleet ID")) return false;
-            using var raw=JsonDocument.Parse(current.RawApiJson);
-            foreach(var (wire,wanted) in values)
-            {
-                if(wire=="icao_iata")
-                { if(!HasAirportAlias(current,wanted.GetString()!)) return false; continue; }
-                if(!raw.RootElement.TryGetProperty(wire,out var actual) || !WireEquivalent(wire,actual,wanted)) return false;
-            }
-            return true;
-        }
+        if(item.Resource==ResourceKind.Aircraft && current.Identity?.ParentFleetId!=expected.Identity?.ParentFleetId)return false;
         IEnumerable<string> fields = before && item.Kind==ChangeKind.Delete ? Maps[item.Resource].Keys : item.Fields.Keys;
         var relevant=fields.Where(f=>Maps[item.Resource].ContainsKey(f)||Schemas.ReferenceFields(item.Resource).Contains(f)).ToList();
         if(!relevant.All(f=>f is "Departure Airport (ICAO/IATA)" or "Arrival Airport (ICAO/IATA)"
             ? SameEndpoint(item.Resource,current,expected,f,before)
-            : Equivalent(f,current.Get(f),expected.Get(f)))) return false;
+            : Equivalent(f,current.Get(f),f=="Fleet ID"?expected.Identity?.ParentFleetId??expected.Get(f):expected.Get(f)))) return false;
         if(current.RawApiJson != null)
         {
             using var actual=JsonDocument.Parse(current.RawApiJson);
@@ -419,6 +473,54 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         }
         return true;
     }
+    // The only read-back verdict after a write: it passes exactly when no reason is listed, so the saved
+    // evidence always explains a failed check. Matches, MatchesCreated and RecordReadback all use it.
+    internal ReadbackVerification VerifyReadback(ChangeItem item,DataRow? current,DataRow expected,IReadOnlyDictionary<string,JsonElement> values)
+    {
+        var reasons=new List<ApiFieldDifference>();
+        if(current?.RawApiJson is not string json)
+        { reasons.Add(new("record",item.RemoteId??item.Before?.Identity?.RemoteId,null)); return new(false,reasons); }
+        string Aliases()=>string.Join(",",AirportAliases(current));
+        var code=expected.Get("ICAO/IATA");
+        if(item.Resource==ResourceKind.Airports && item.Kind==ChangeKind.Create && !HasAirportAlias(current,code))
+            reasons.Add(new("ICAO/IATA",code,Aliases()));
+        if(item.Resource==ResourceKind.Aircraft && (item.Kind==ChangeKind.Create || IndependentApiEvidence.IsMove(item))
+            && current.Identity?.ParentFleetId!=expected.Get("Fleet ID"))
+            reasons.Add(new("fleet_id",expected.Get("Fleet ID"),current.Identity?.ParentFleetId));
+        using var raw=JsonDocument.Parse(json);
+        foreach(var (wire,wanted) in values)
+        {
+            if(wire=="icao_iata")
+            {
+                // The same code as the row's ICAO/IATA is already listed above.
+                if(!HasAirportAlias(current,wanted.GetString()!) && !reasons.Any(r=>r.Field=="ICAO/IATA" && string.Equals(r.Expected,wanted.GetString(),StringComparison.OrdinalIgnoreCase)))
+                    reasons.Add(new(wire,wanted.GetRawText(),Aliases()));
+                continue;
+            }
+            if(!raw.RootElement.TryGetProperty(wire,out var actual)) { reasons.Add(new(wire,wanted.GetRawText(),null)); continue; }
+            if(ApiOperationPolicy.IsJumpseatCreate(item) && (wire is "callsign" or "flight_number") && actual.ValueKind==JsonValueKind.Null)continue;
+            if(!WireEquivalent(wire,actual,wanted)) reasons.Add(new(wire,wanted.GetRawText(),actual.GetRawText()));
+        }
+        if(ApiOperationPolicy.IsJumpseatCreate(item) && item.CanProposeRecoveryId)
+        {
+            // A recovered jumpseat must be new since the request and created within its time window.
+            var id=current.Identity!.RemoteId;
+            if(item.PreCreateCandidateIds==null) reasons.Add(new("pre_create_candidates","recorded",null));
+            else if(item.PreCreateCandidateIds.Contains(id)) reasons.Add(new("pre_create_candidates","new record",id));
+            var step=item.ApiSteps.FirstOrDefault(s=>s.Method=="POST");
+            var end=step?.FinishedAt??step?.DeadlineAt;
+            if(step?.StartedAt==null || end==null) reasons.Add(new("request_window","recorded",null));
+            else
+            {
+                var window=$"{step.StartedAt.Value.AddSeconds(-60):O} .. {end.Value.AddSeconds(60):O}";
+                var present=raw.RootElement.TryGetProperty("created_at",out var createdAt);
+                if(!present || !DateTimeOffset.TryParse(createdAt.ToString(),CultureInfo.InvariantCulture,DateTimeStyles.None,out var created)
+                    || created<step.StartedAt.Value.AddSeconds(-60) || created>end.Value.AddSeconds(60))
+                    reasons.Add(new("created_at",window,present?createdAt.GetRawText():null));
+            }
+        }
+        return new(reasons.Count==0,reasons);
+    }
     static bool WireEquivalent(string wire,JsonElement actual,JsonElement wanted)
     {
         if(wire is "start_date" or "end_date")
@@ -429,13 +531,14 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         {
             if(actual.ValueKind!=JsonValueKind.Array) return false;
             // The documented response allows string IDs, while requests require integer IDs.
-            string Key(JsonElement value) => wire is "fleet_ids" or "container_ids"
+            string Key(JsonElement value) => wire is "fleet_ids" or "container_ids" or "parameter_ids"
                 && long.TryParse(value.ToString(),NumberStyles.None,CultureInfo.InvariantCulture,out var id)
                 ? "id:"+id.ToString(CultureInfo.InvariantCulture) : value.ValueKind==JsonValueKind.String ? "string:"+value.GetString() : value.GetRawText();
-            return wanted.EnumerateArray().Select(Key).ToHashSet().SetEquals(actual.EnumerateArray().Select(Key));
+            var keys=actual.EnumerateArray().Select(Key).ToArray();
+            return keys.Distinct().Count()==keys.Length && wanted.EnumerateArray().Select(Key).ToHashSet().SetEquals(keys);
         }
         return JsonElement.DeepEquals(actual,wanted);
     }
-    static bool Equivalent(string field,string a,string b) => field is "Fleet IDs" or "Tags" or "Service Days" or "Days of Operation" or "Container IDs"
+    internal static bool Equivalent(string field,string a,string b) => field is "Fleet IDs" or "Tags" or "Service Days" or "Days of Operation" or "Container IDs"
         ? a.Split(',',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries).ToHashSet().SetEquals(b.Split(',',StringSplitOptions.TrimEntries|StringSplitOptions.RemoveEmptyEntries)) : a==b;
 }

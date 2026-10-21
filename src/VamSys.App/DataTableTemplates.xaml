@@ -9,7 +9,7 @@
   <DataTemplate x:Key="EditorTemplate" x:DataType="local:CellViewModel">
     <local:EditableCell Cell="{x:Bind}" Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind Margin}" AutomationProperties.Name="{x:Bind Field}">
       <Border BorderThickness="1" CornerRadius="4" Padding="9,0" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" Background="{ThemeResource ControlFillColorDefaultBrush}">
-        <TextBlock Text="{x:Bind Value, Mode=OneWay}" Opacity="{x:Bind TextOpacity, Mode=OneWay}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+        <TextBlock Text="{x:Bind VisibleText, Mode=OneWay}" Opacity="{x:Bind TextOpacity, Mode=OneWay}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
       </Border>
     </local:EditableCell>
   </DataTemplate>

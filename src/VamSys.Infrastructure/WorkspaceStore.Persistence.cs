@@ -128,9 +128,11 @@ public sealed partial class WorkspaceStore
             ct.ThrowIfCancellationRequested();
             var start=Stopwatch.GetTimestamp();var expected=workspace.StorageRevision;
             var header=Encode(checkpoint.Job,true);var item=checkpoint.Item==null?null:Encode(checkpoint.Item);
+            var items=checkpoint.Items?.Select(i=>(Id:i.Id.ToString(),Json:Encode(i))).ToList()??[];
             var delta=checkpoint.Delta;
             var full=checkpoint.RebasedWorkspace==null?null:Capture(checkpoint.RebasedWorkspace);
             if((checkpoint.Kind==CheckpointKind.Rebase)!=(delta!=null||full!=null) || delta!=null&&full!=null || checkpoint.Kind==CheckpointKind.Rebase&&item==null || full!=null&&full.Id!=workspace.Id)throw OperationsAdapter.Block("StorageInvalid");
+            if(checkpoint.Items!=null && (checkpoint.Kind!=CheckpointKind.Task || item!=null || items.Select(i=>i.Id).Distinct().Count()!=items.Count))throw OperationsAdapter.Block("StorageInvalid");
             if(delta!=null && (checkpoint.Item!.Resource!=delta.Resource || checkpoint.Item.After.LocalId!=delta.LocalId || new[]{delta.Snapshot,delta.Draft}.Any(m=>m.Action==RowMutationKind.Upsert?(m.Row==null||m.Row.LocalId!=delta.LocalId):m.Row!=null)))throw OperationsAdapter.Block("StorageInvalid");
             string? snapshot=delta?.Snapshot.Row is {} sr?Encode(sr):null, draft=delta?.Draft.Row is {} dr?Encode(dr):null;
             string? root=null;
@@ -140,11 +142,13 @@ public sealed partial class WorkspaceStore
                 if(!staged.VerifiedOperations.Contains(delta.VerifiedOperation))staged.VerifiedOperations.Add(delta.VerifiedOperation);
                 root=Encode(staged,true);
             }
-            Measured(start,header,item,root,snapshot,draft);
+            Measured(start,[header,item,root,snapshot,draft,..items.Select(i=>i.Json)]);
             var w=workspace.Id.ToString();var j=checkpoint.Job.Id.ToString();var i=checkpoint.Item?.Id.ToString();
             var next=await Task.Run(()=>store.Commit(workspace.Id,expected,checkpoint.Kind.ToString(),(c,tx)=>{
                 if(Execute(c,tx,"UPDATE batch_jobs SET json=$json WHERE workspace_id=$w AND id=$j",("$json",header),("$w",w),("$j",j))!=1) throw OperationsAdapter.Block("StorageInvalid");
                 if(item!=null && Execute(c,tx,"UPDATE batch_items SET json=$json WHERE workspace_id=$w AND job_id=$j AND id=$i",("$json",item),("$w",w),("$j",j),("$i",i))!=1) throw OperationsAdapter.Block("StorageInvalid");
+                foreach(var (id,json) in items)
+                    if(Execute(c,tx,"UPDATE batch_items SET json=$json WHERE workspace_id=$w AND job_id=$j AND id=$i",("$json",json),("$w",w),("$j",j),("$i",id))!=1) throw OperationsAdapter.Block("StorageInvalid");
                 if(full!=null){Execute(c,tx,"UPDATE workspaces SET name=$name,json=$json WHERE id=$w",("$name",full.Name),("$json",full.Json),("$w",w));WriteResources(c,tx,full);}
                 if(delta!=null){WriteDelta(c,tx,workspace.Id,delta,snapshot,draft);if(root!=null)Execute(c,tx,"UPDATE workspaces SET json=$json WHERE id=$w",("$json",root),("$w",w));}
             }));

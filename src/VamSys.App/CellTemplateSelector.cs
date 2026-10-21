@@ -9,7 +9,7 @@ public sealed class CellTemplateSelector(DataTableTemplates templates) : DataTem
 {
     readonly DataTemplate editor = templates.Template("EditorTemplate"), fleet = templates.Template("FleetTemplate"), status = templates.Template("StatusTemplate");
     protected override DataTemplate SelectTemplateCore(object item) => item is CellViewModel cell
-        ? cell.Field == "_delete" ? status : cell.Field is "Fleet ID" or "Fleet IDs" ? fleet : editor
+        ? cell.Field == "_delete" ? status : cell.Field is "Fleet ID" or "Fleet IDs" or "Parameter IDs" ? fleet : editor
         : editor;
     protected override DataTemplate SelectTemplateCore(object item, DependencyObject container) => SelectTemplateCore(item);
 }

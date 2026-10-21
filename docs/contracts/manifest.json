@@ -1,8 +1,8 @@
 {
-  "capturedAtUtc": "2026-09-20T16:46:17.6148085+00:00",
+  "capturedAtUtc": "2026-10-20T14:04:35.5698071Z",
   "contracts": [
     {
-      "sha256": "A4E624BE02A01479B98C2269BE5B0931008CD3862107F9CBF40400628AA200DF",
+      "sha256": "1EC1A869FC3C6F4D70A7A6ECD50170D5D915551794E796F9F34D5AFB944D78C2",
       "version": "3.0.0",
       "source": "https://vamsys.io/api-docs/operations.json",
       "name": "operations",
@@ -16,5 +16,7 @@
       "openapi": "3.1.0"
     }
   ],
-  "instanceValidation": "not_performed"
+  "instanceValidation": "partial_external_api_scripts",
+  "validationScope": "Independent real vCCA API scripts cover selected operations; product adapter real GET refresh passed 2026-10-20 (83 business GET, zero business writes). Product live writes and new UI visual checks remain unverified.",
+  "snapshotProvenance": "Operations snapshot copied from retained 2026-10-20 weight-isolation evidence; pilot snapshot retained from 2026-09-20. capturedAtUtc records this repository snapshot update."
 }

@@ -21,6 +21,12 @@ static class StorageScenarios
         w.Jobs.Add(new(){Mode=RunMode.Online,Items=new ChangePlanner().Plan(ResourceKind.Fleets,w.Resources[ResourceKind.Fleets])});
         return w;
     }
+    internal static void LegacyFleetSteps(ChangeItem item)
+    {
+        var post=new ApiStep(HttpMethod.Post,"fleet",new(){["name"]=item.After.Get("Name"),["code"]=item.After.Get("Type Code"),["type"]=item.After.Get("Type (pax/cargo/...)")});
+        var put=new ApiStep(HttpMethod.Put,"{created}",new(){["max_pax"]=long.Parse(item.After.Get("Max Passengers"),System.Globalization.CultureInfo.InvariantCulture)});
+        OperationsAdapter.PrepareSteps(item,[post,put]);item.ApiExpectedValues=OperationsAdapter.ExpectedValues([post,put]);
+    }
     internal static SqliteConnection Legacy(string dir,params Workspace[] workspaces)
     {
         var c=Open(dir);Sql(c,"PRAGMA journal_mode=WAL; CREATE TABLE workspaces(id TEXT PRIMARY KEY,name TEXT NOT NULL,json TEXT NOT NULL); CREATE TABLE secrets(id TEXT PRIMARY KEY,value BLOB NOT NULL); CREATE TABLE app_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);");
@@ -141,10 +147,10 @@ static class StorageScenarios
                 store.Barrier=p=>{if(fault=="id"?p=="Step:BeforeCommit"&&item.CreateCompleted:p=="Rebase:BeforeCommit")throw new IOException("injected");};
                 try {await clock.Drive(new OperationsBatchExecutor(api,w).ExecuteAsync(w.Jobs[0],store.CheckpointWriter(w),default));throw new Exception("Expected persistence stop");}
                 catch(PersistenceException){}
-                Check(puts==(fault=="id"?0:1));
+                Check(puts==0);
                 Check(item.State!=ItemState.Succeeded&&w.Resources[ResourceKind.Fleets].Snapshot.Count==0&&w.Resources[ResourceKind.Fleets].Undo.Count==1&&w.VerifiedOperations.Count==0);
                 var disk=store.Load(w.Id);Check(disk.Jobs[0].Items[0].CreateCompleted==(fault=="rebase"));
-                Check(disk.Jobs[0].Items[0].ApiSteps.Count==2&&disk.Jobs[0].Items[0].ApiExpectedValues!["max_pax"].GetInt32()==180);
+                Check(disk.Jobs[0].Items[0].ApiSteps.Count==1&&disk.Jobs[0].Items[0].ApiExpectedValues!["max_pax"].GetInt32()==180);
             }
         });
         await test("v3 recovery persists Unknown after timeout, cancellation, auth, HTTP and invalid JSON",async()=>{

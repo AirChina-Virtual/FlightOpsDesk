@@ -31,6 +31,7 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
         {
             var change = e.Change; var after = change.After;
             hash.Int((int)change.Resource); hash.Int((int)change.Kind); hash.Text(after.LocalId.ToString("N"));
+            hash.Int(change.RequiresAirlineParameter?1:0);
             hash.Fields(change.Before?.Fields); hash.Fields(after.Fields);
             hash.Text(after.Identity?.RemoteId); hash.Text(after.Identity?.ConnectionId); hash.Text(after.Identity?.ParentFleetId);
             hash.Text(after.RawApiJson);
@@ -93,7 +94,7 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
 public static class ReviewPlanBuilder
 {
     public static WorkspaceReviewPlan Build(IReadOnlyList<ChangeItem> changes, RunMode mode, bool connected,
-        ISet<string> verified, Action<ChangeItem>? preview = null, IReadOnlyList<MessageDescriptor>? blockers = null)
+        ISet<string> verified, Action<ChangeItem>? preview = null, IReadOnlyList<MessageDescriptor>? blockers = null, string? externalEvidenceContractHash = null)
     {
         var entries = new List<ReviewEntry>(changes.Count);
         var samples = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -106,14 +107,15 @@ public static class ReviewPlanBuilder
             }
             try { if (mode == RunMode.Online) preview!(change); }
             catch (Exception e) { entries.Add(new(change, ReviewDisposition.Blocked, MessageErrors.Describe(e))); continue; }
-            var operation = $"{change.Resource}:{change.Kind}";
-            if (mode == RunMode.Online && !verified.Contains(operation))
+            var operation = ApiOperationPolicy.Key(change);
+            var external = mode == RunMode.Online && IndependentApiEvidence.Covers(change, externalEvidenceContractHash);
+            if (mode == RunMode.Online && !verified.Contains(operation) && !external)
             {
                 var count = samples.GetValueOrDefault(operation);
                 samples[operation] = count + 1;
                 if (count >= 3) { entries.Add(new(change, ReviewDisposition.Deferred, Messages.Define("ReviewSample"))); continue; }
             }
-            entries.Add(new(change, ReviewDisposition.Ready, null));
+            entries.Add(new(change, ReviewDisposition.Ready, external ? Messages.Define("ApiIndependentEvidence") : null));
         }
         bool changed;
         do

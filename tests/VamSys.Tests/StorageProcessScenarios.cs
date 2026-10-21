@@ -120,10 +120,14 @@ static class StorageProcessScenarios
             "Step:BeforeCommit|PUT|ResponseReceived",
             "Rebase:BeforeCommit","Rebase:AfterCommit"})
         await test("Real process termination and read-only recovery: "+boundary,async()=>{
-            var dir=Temp();var w=Fixture();var store=new WorkspaceStore(dir);store.Save(w);var remote=new Remote();
+            var dir=Temp();var w=Fixture();LegacyFleetSteps(w.Jobs[0].Items[0]);var store=new WorkspaceStore(dir);store.Save(w);var remote=new Remote();
             await Launch(dir,w.Id,remote,m=>Match(m,boundary));
             var interrupted=store.Load(w.Id);var item=interrupted.Jobs[0].Items[0];
-            var beforeWrite=boundary=="Task:BeforeCommit";
+            // Nothing was sent at these boundaries: a step is saved as in flight before it is sent.
+            var beforeWrite=boundary is "Task:BeforeCommit" or "Task:AfterCommit" or "Step:BeforeCommit|POST|InFlight";
+            if(beforeWrite)StorageScenarios.Check(remote.Posts==0&&remote.Puts==0,"A write left before its in-flight step was saved");
+            // The answered POST is durable and the PUT never left: recovery sends only that PUT.
+            var resumable=boundary is "Step:AfterCommit|POST|ResponseReceived" or "Step:BeforeCommit|PUT|InFlight";
             var durableRebase=boundary=="Rebase:AfterCommit";
             StorageScenarios.Check((item.State==ItemState.Succeeded)==durableRebase);
             StorageScenarios.Check(interrupted.Resources[ResourceKind.Fleets].Snapshot.Count==(durableRebase?1:0));
@@ -143,6 +147,12 @@ static class StorageProcessScenarios
             await Launch(dir,w.Id,remote);
             var recovered=store.Load(w.Id);item=recovered.Jobs[0].Items[0];
             if(beforeWrite)StorageScenarios.Check(remote.Posts==1&&remote.Puts==1&&item.State==ItemState.Succeeded,$"POST={remote.Posts} PUT={remote.Puts} state={item.State} message={item.Message} diagnostic={item.Diagnostic} expected={JsonSerializer.Serialize(item.ApiExpectedValues)}");
+            else if(resumable)
+            {
+                StorageScenarios.Check(remote.Posts==posts&&remote.Puts==puts+1&&item.State==ItemState.Succeeded,$"Recovery did not resume only the never-sent PUT: POST={remote.Posts} PUT={remote.Puts} state={item.State} message={item.Message}");
+                await Launch(dir,w.Id,remote);
+                StorageScenarios.Check(remote.Posts==posts&&remote.Puts==puts+1,"A resumed create wrote again");
+            }
             else
             {
                 StorageScenarios.Check(remote.Posts==posts&&remote.Puts==puts,"Recovery repeated an uncertain write");

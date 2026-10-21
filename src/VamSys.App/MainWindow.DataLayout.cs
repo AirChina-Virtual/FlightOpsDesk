@@ -31,8 +31,8 @@ public sealed partial class MainWindow
         {
             var label = new TextBlock { Width = new CellViewModel(field, "", _ => { }).Width,
                 Margin = new Thickness(0, 0, 6, 0), TextTrimming = TextTrimming.CharacterEllipsis, FontSize = 14 }
-                .Localize(localization, "Text", () => field == "_delete" ? L("ColumnStatus") : field);
-            ToolTipService.SetToolTip(label, new ToolTip().Localize(localization, "Content", () => field == "_delete" ? L("ColumnStatus") : field));
+                .Localize(localization, "Text", () => field == "_delete" ? L("ColumnStatus") : ApiOperationPolicy.FieldLabel(field,localization));
+            ToolTipService.SetToolTip(label, new ToolTip().Localize(localization, "Content", () => field == "_delete" ? L("ColumnStatus") : ApiOperationPolicy.FieldLabel(field,localization)));
             headers.Children.Add(label);
         }
         return headers;
@@ -40,7 +40,8 @@ public sealed partial class MainWindow
 
     void StyleDataTable(ListView target)
     {
-        var style = new Style(typeof(ListViewItem));
+        // Keep WinUI's themed selection presenter, including the paired checkbox fill and glyph.
+        var style = new Style(typeof(ListViewItem)) { BasedOn = (Style)Application.Current.Resources["DefaultListViewItemStyle"] };
         style.Setters.Add(new Setter(FrameworkElement.HeightProperty, DataRowHeight));
         style.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, DataRowHeight));
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));

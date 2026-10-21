@@ -27,13 +27,13 @@ public sealed partial class MainWindow
             try
             {
                 // A documented list call checks the token, permissions and airline identity.
-                await foreach(var row in Api().ReadAllAsync(ResourceKind.Fleets,running.Token)) break;
-                if(Api().SessionAirlineId==null) await foreach(var row in Api().ReadAllAsync(ResourceKind.Airports,running.Token)) break;
-                if(Api().SessionAirlineId==null) throw OperationsAdapter.Block("ApiConnectFirst");
+                if(!await Api().IdentifyAirlineAsync(running.Token)) throw OperationsAdapter.Block("ApiConnectFirst");
                 workspace.ConnectedAt=DateTimeOffset.UtcNow; workspace.Mode=RunMode.Online;
                 if(workspace.ContractHash!=ApiContracts.Sha256) workspace.VerifiedOperations.Clear();
                 workspace.ContractHash=ApiContracts.Sha256;
-                await Save(dataChanged:false); Status(()=>L("ApiConnected",("id",workspace.AirlineId ?? "?")));
+                await Save(dataChanged:false);
+                var parameters=await ReadOptionalParameters(running.Token);
+                Status(()=>L("ApiConnected",("id",workspace.AirlineId ?? "?"))+(parameters?"":"\n"+L("ApiParametersUnavailable")));
             }
             finally { running.Dispose(); running=null; }
         });
@@ -42,7 +42,7 @@ public sealed partial class MainWindow
     {
         if(busy) return;
         if(workspace.Mode!=RunMode.Online) { Navigation.SelectedItem=Navigation.MenuItems[5]; Status(()=>L("ApiConnectFirst")); return; }
-        if(workspace.Jobs.Any(j=>j.Mode==RunMode.Online && j.Items.Any(i=>i.State is ItemState.Pending or ItemState.Running or ItemState.Unknown))) throw OperationsAdapter.Block("ApiPendingJob");
+        if(ApiOperationPolicy.HasOpenOnlineItems(workspace)) throw OperationsAdapter.Block("ApiPendingJob");
         await Work(async()=>
         {
             running=new();
@@ -55,7 +55,8 @@ public sealed partial class MainWindow
                     try { await store.SaveAsync(staged); }
                     finally { saveGate.Release(); }
                 },running.Token,(kind,count)=>Status(()=>L("ApiLoading",("resource",L(Schemas.All[kind].Name)),("count",count))));
-                Status(()=>L("ApiRefreshed",("count",workspace.Resources.Sum(p=>p.Value.Conflicts.Count))));
+                var parameters=await ReadOptionalParameters(running.Token);
+                Status(()=>L("ApiRefreshed",("count",workspace.Resources.Sum(p=>p.Value.Conflicts.Count)))+(parameters?"":"\n"+L("ApiParametersUnavailable")));
             }
             finally { running.Dispose(); running=null; }
         });
@@ -89,7 +90,7 @@ public sealed partial class MainWindow
     string ApiReview(ChangeItem change)
     {
         var text = $"{L(Schemas.All[change.Resource].Name)} · {EnumText(change.Kind)} · {Schemas.Key(change.Resource, change.After)}\n" +
-            string.Join("; ", change.Fields.Select(f => $"{f.Key}: {change.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}"));
+            string.Join("; ", change.Fields.Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key,localization)}: {change.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}"));
         try
         {
             if (change.Dependencies.Count > 0) return text + "\n" + L("ApiDependent", ("count", change.Dependencies.Count));
@@ -97,22 +98,11 @@ public sealed partial class MainWindow
         }
         catch (Exception e) { return text + "\n" + L(MessageErrors.Describe(e)); }
     }
-    async Task StartApi()
-    {
-        if (!CanEditData() || workspace.Mode != RunMode.Online) return;
-        BatchJob? job = null;
-        await LocalOperation(async () =>
-        {
-            var changes = await ConfirmWorkspaceSubmission(RunMode.Online);
-            if (changes is null) return;
-            job = new BatchJob { Mode = RunMode.Online, Items = changes };
-            workspace.Jobs.Add(job); await Save(dataChanged:false);
-        });
-        if (job != null) await ExecuteApi(job);
-    }
+    Task StartApi() => SubmitWorkspace(RunMode.Online);
     async Task ExecuteApi(BatchJob job)
     {
-        if(!closeState.IsOpen || busy || workspace.Mode!=RunMode.Online || job.Mode!=RunMode.Online) return;
+        TaskSubmission.RequireExecution(workspace, job, RunMode.Online,
+            closeState.IsOpen && !busy && !localOperation && !querying);
         await Work(async()=>
         {
             running=new();
@@ -128,10 +118,7 @@ public sealed partial class MainWindow
             }
             catch(PersistenceException)
             {
-                autosave.Stop();
-                if(apiSessions.Remove(workspace.Id,out var failed)) failed.Client.Dispose();
-                try { workspace=store.Load(workspace.Id);workspace.Mode=RunMode.Offline; }
-                catch { storageBlocked=true; }
+                ReloadAfterCheckpointFailure();
                 throw;
             }
             finally
@@ -142,6 +129,12 @@ public sealed partial class MainWindow
                 running.Dispose();running=null;
             }
         });
+    }
+    void ReloadAfterCheckpointFailure()
+    {
+        autosave.Stop();
+        if(apiSessions.Remove(workspace.Id,out var failed))failed.Client.Dispose();
+        try{workspace=store.Load(workspace.Id);workspace.Mode=RunMode.Offline;}catch{storageBlocked=true;}
     }
     sealed class AppCheckpointWriter(MainWindow owner,IBatchCheckpointWriter inner) : IBatchCheckpointWriter
     {
@@ -155,29 +148,121 @@ public sealed partial class MainWindow
     async Task ReviewUnknown(BatchJob job)
     {
         if(!closeState.IsOpen || busy || job.Mode!=RunMode.Online || workspace.Mode==RunMode.Demo) return;
-        foreach(var item in job.Items.Where(i=>i.State==ItemState.Unknown).ToList())
-        {
-            if(item.CanProposeRecoveryId)
-            {
-                var id=new TextBox { Header="Remote ID",Text=item.EditableRecoveryId ?? "" };
-                if(!await Confirm(L("ApiUnknownReview"),Stack(Text(()=>ApiReview(item)),Text(()=>L("ApiRecoverId")),id),L(workspace.Mode==RunMode.Online?"ApiCheckRemote":"ApiSaveCandidate"))) continue;
-                var candidate=JsonSerializer.Deserialize<ChangeItem>(JsonSerializer.Serialize(item))!;
-                candidate.ProposeRecoveryId(id.Text);
-                await new AppCheckpointWriter(this,store.CheckpointWriter(workspace)).WriteAsync(new(CheckpointKind.Task,job,candidate),CancellationToken.None);
-                job.Items[job.Items.IndexOf(item)]=candidate;NotifyTask(new(workspace.Id,job.Id,candidate.Id,true));
-                if(workspace.Mode==RunMode.Online) await ExecuteApi(job);
-                else Status(()=>L("ApiCandidateSaved"));
-            }
-            else if(workspace.Mode==RunMode.Online && item.Kind==ChangeKind.Delete && item.WriteAccepted && item.Resource is ResourceKind.Airports or ResourceKind.Routes)
-            {
-                if(!await Confirm(L("ApiUnknownReview"),Text(()=>L("ApiManualDelete",("id",item.RemoteId ?? item.After.Identity?.RemoteId))),L("ApiManualConfirm"))) continue;
-                item.State=ItemState.ManuallyConfirmed; item.SetMessage(Messages.Define("ApiManualResult")); item.Rebased=true;
-                var data=workspace.Resources[item.Resource];data.Draft.RemoveAll(r=>r.LocalId==item.After.LocalId);data.Snapshot.RemoveAll(r=>r.LocalId==item.After.LocalId);data.ClearHistory();
-                if(apiSessions.TryGetValue(workspace.Id,out var session) && (item.RemoteId ?? item.After.Identity?.RemoteId) is string removedId) session.Api.Forget(item.Resource,removedId);
-                job.SetStatus(JobStatus.NeedsAttention,Messages.Define("ApiManualResult")); await Save();NotifyTask(new(workspace.Id,job.Id,item.Id,true));
-            }
-            else await Confirm(L("ApiUnknownReview"),Text(()=>L("ApiUnknown")+"\n"+ApiReview(item)),L("Text_3FD47EDCE4"));
-        }
+        await UnknownReview.RunAsync(job,item=>ReviewUnknownItem(job,item),()=>ExecuteApi(job));
         Render();
+    }
+    // Returns true when a recovery ID was saved and the online job should be read back.
+    async Task<bool> ReviewUnknownItem(BatchJob job,ChangeItem item)
+    {
+        var notApplied=workspace.Mode==RunMode.Online && OperationsUnknownResolver.CanCheck(item)?L("ApiVerifyNotApplied"):null;
+        string Help()=>notApplied==null?"":"\n"+L("ApiNotAppliedHelp");
+        if(item.CanProposeRecoveryId)
+        {
+            var id=new TextBox { Header="Remote ID",Text=item.EditableRecoveryId ?? "" };
+            var choice=await Choose(L("ApiUnknownReview"),Stack(Text(()=>ApiReview(item)),Text(()=>L("ApiRecoverId")+Help()),id),L(workspace.Mode==RunMode.Online?"ApiCheckRemote":"ApiSaveCandidate"),notApplied);
+            if(choice==ContentDialogResult.Secondary) { await VerifyNotApplied(job,item); return false; }
+            if(choice!=ContentDialogResult.Primary) return false;
+            var candidate=JsonSerializer.Deserialize<ChangeItem>(JsonSerializer.Serialize(item))!;
+            candidate.ProposeRecoveryId(id.Text);
+            await new AppCheckpointWriter(this,store.CheckpointWriter(workspace)).WriteAsync(new(CheckpointKind.Task,job,candidate),CancellationToken.None);
+            job.Items[job.Items.IndexOf(item)]=candidate;NotifyTask(new(workspace.Id,job.Id,candidate.Id,true));
+            if(workspace.Mode==RunMode.Online) return true;
+            Status(()=>L("ApiCandidateSaved"));return false;
+        }
+        if(workspace.Mode==RunMode.Online && item.Kind==ChangeKind.Delete && item.WriteAccepted && item.Resource is ResourceKind.Airports or ResourceKind.Routes)
+        {
+            if(!await Confirm(L("ApiUnknownReview"),Text(()=>L("ApiManualDelete",("id",item.RemoteId ?? item.After.Identity?.RemoteId))),L("ApiManualConfirm"))) return false;
+            try{await new OperationsDeletionVerifier(Api(),workspace).ConfirmManuallyAsync(job,item,new AppCheckpointWriter(this,store.CheckpointWriter(workspace)),CancellationToken.None);}
+            catch(PersistenceException){ReloadAfterCheckpointFailure();throw;}
+            NotifyTask(new(workspace.Id,job.Id,item.Id,true));
+            return false;
+        }
+        if(workspace.Mode==RunMode.Online && OperationsDeletionVerifier.CanConfirmWithoutReceipt(item))
+        {
+            await ReviewDeleteWithoutReceipt(job,item);
+            return false;
+        }
+        if(workspace.Mode==RunMode.Online && OperationsServerValueResolver.CanAccept(item))
+        {
+            await AcceptServerValue(job,item);
+            return false;
+        }
+        if(notApplied!=null)
+        {
+            if(await Confirm(L("ApiUnknownReview"),Text(()=>L("ApiUnknown")+"\n"+ApiReview(item)+Help()),notApplied)) await VerifyNotApplied(job,item);
+            return false;
+        }
+        await Confirm(L("ApiUnknownReview"),Text(()=>L("ApiUnknown")+"\n"+ApiReview(item)),L("Text_3FD47EDCE4"));
+        return false;
+    }
+    // A soft delete without a write receipt: GET once, then let the user confirm what the read shows.
+    // 404 confirms the deletion; a record that reads exactly as before the change can be marked not
+    // applied after a reminder; any other record stays Unknown. Nothing is ever resent.
+    async Task ReviewDeleteWithoutReceipt(BatchJob job,ChangeItem item)
+    {
+        var verifier=new OperationsDeletionVerifier(Api(),workspace);
+        NoReceiptReview? review=null;
+        await Work(async()=>
+        {
+            running=new();
+            try{review=await verifier.InspectWithoutReceiptAsync(job,item,running.Token);}
+            finally{running.Dispose();running=null;}
+        });
+        if(review==null) return;
+        var id=item.RemoteId ?? item.After.Identity?.RemoteId;
+        if(!review.CanConfirmDeleted && !review.CanMarkUnchanged)
+        {
+            var differences=string.Join("\n",review.Differences.Select(d=>$"{d.Field}: {d.Expected??"∅"} → {d.Actual??"∅"}"));
+            await Confirm(L("ApiUnknownReview"),Text(()=>L("ApiNoReceiptStillReadable",("id",id))+"\n"+differences),L("Text_3FD47EDCE4"));
+            return;
+        }
+        var deleted=review.CanConfirmDeleted;
+        if(!await Confirm(L("ApiUnknownReview"),Text(()=>L(deleted?"ApiConfirmNoReceipt":"ApiSoftDeleteUnchangedHelp",("id",id))),L(deleted?"ApiManualConfirm":"ApiMarkNotApplied"))) return;
+        var writer=new AppCheckpointWriter(this,store.CheckpointWriter(workspace));
+        try{if(deleted)await verifier.ConfirmWithoutReceiptAsync(job,review,writer);else await verifier.MarkUnchangedAsync(job,review,writer);}
+        catch(PersistenceException){ReloadAfterCheckpointFailure();throw;}
+        NotifyTask(new(workspace.Id,job.Id,item.Id,true));
+        Status(()=>L(deleted?"ApiManualDeleteNoReceipt":"ApiSoftDeleteUnchanged"));
+    }
+    // Read-only: GET the record and show every difference; only an explicit confirmation saves the
+    // server's current value as manually confirmed. Nothing is ever resent.
+    async Task AcceptServerValue(BatchJob job,ChangeItem item)
+    {
+        var resolver=new OperationsServerValueResolver(Api(),workspace);
+        ServerValueReview? review=null;
+        await Work(async()=>
+        {
+            running=new();
+            try{review=await resolver.InspectAsync(job,item,running.Token);}
+            finally{running.Dispose();running=null;}
+        });
+        if(review==null) return;
+        if(!review.CanAccept)
+        {
+            await Confirm(L("ApiUnknownReview"),Text(()=>L(review.Current==null?"ApiAcceptMissing":"ApiAcceptNowMatches")+"\n"+ApiReview(item)),L("Text_3FD47EDCE4"));
+            return;
+        }
+        var differences=string.Join("\n",review.Differences.Select(d=>$"{d.Field}: {d.Expected??"∅"} → {d.Actual??"∅"}"));
+        string Help()=>item.Kind==ChangeKind.Delete?L("ApiAcceptDeleteHelp",("id",review.Current!.Identity!.RemoteId)):L("ApiAcceptServerHelp");
+        if(!await Confirm(L("ApiUnknownReview"),Text(()=>ApiReview(item)+"\n"+Help()+"\n"+differences),L("ApiAcceptServerValue"))) return;
+        try{await resolver.AcceptAsync(job,review,new AppCheckpointWriter(this,store.CheckpointWriter(workspace)));}
+        catch(PersistenceException){ReloadAfterCheckpointFailure();throw;}
+        NotifyTask(new(workspace.Id,job.Id,item.Id,true));
+        Status(()=>L(item.Kind==ChangeKind.Delete?"ApiAcceptedServerRecord":"ApiAcceptedServerValue"));
+    }
+    // Read-only: a proven item becomes Failed and keeps its draft; otherwise nothing changes.
+    async Task VerifyNotApplied(BatchJob job,ChangeItem item)
+    {
+        bool? proven=null;
+        await Work(async()=>
+        {
+            running=new();
+            try{proven=await new OperationsUnknownResolver(Api(),workspace).ResolveNotAppliedAsync(job,item,new AppCheckpointWriter(this,store.CheckpointWriter(workspace)),running.Token);}
+            catch(PersistenceException){ReloadAfterCheckpointFailure();throw;}
+            finally{running.Dispose();running=null;}
+        });
+        if(proven is not bool result) return;
+        NotifyTask(new(workspace.Id,job.Id,item.Id,true));
+        Status(()=>L(result?"ApiNotAppliedVerified":"ApiNotAppliedUnproven"));
     }
 }

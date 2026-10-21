@@ -11,7 +11,7 @@ public static class Schemas
     public static readonly Dictionary<ResourceKind, ResourceSchema> All = new()
     {
         [ResourceKind.Airports] = new(Messages.Define("Text_6A5347AC5F"), "ICAO/IATA", ["ICAO/IATA", "Name"], ["Category", "Container IDs", "Pax LF ID", "Cargo LF ID"]),
-        [ResourceKind.Fleets] = new(Messages.Define("Text_D082D02D37"), "ID", ["Name", "Type Code", "Type (pax/cargo/...)"], ["Max Passengers", "Max Freight", "Container Units", "Hide in Phoenix", "Allowed Prefix IDs"]),
+        [ResourceKind.Fleets] = new(Messages.Define("Text_D082D02D37"), "ID", ["Name", "Type Code", "Type (pax/cargo/...)"], ["Max Passengers", "Max Freight", "Container Units", "Hide in Phoenix", "Allowed Prefix IDs", "Parameter IDs"]),
         [ResourceKind.Aircraft] = new(Messages.Define("Text_C05F7CD6ED"), "ID", ["Name", "Registration", "Fleet ID"], ["SELCAL", "Fin Number", "Hex Code", "Passengers", "Freight", "Internal Remarks"]),
         [ResourceKind.Routings] = new(Messages.Define("Text_ABF79C546F"), "ID", ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Route String"], ["Remarks", "Internal Remarks", "Tags", "Days of Operation"]),
         [ResourceKind.Routes] = new(Messages.Define("Text_486B1DF063"), "ID", ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Type"], ["Callsign", "Flight Number", "Fleet IDs", "Start Date", "End Date", "Departure Time (HH:MM)", "Arrival Time (HH:MM)", "Service Days", "Routing", "Remarks", "Internal Remarks", "Tags", "Is Hidden", "Altitude", "Cost Index"])
@@ -62,6 +62,9 @@ public static class Schemas
             foreach (var (f, v) in r.Fields)
             {
                 if (v == "") continue;
+                if(workspace.Mode==RunMode.Online && (f is "Freight" or "Max Freight")
+                    && (!long.TryParse(v,NumberStyles.None,CultureInfo.InvariantCulture,out var kg) || kg<0))
+                    Add(r,f,Messages.Define("WeightIntegerKg"));
                 if (f is "_delete" or "Is Hidden" or "Hide in Phoenix")
                     if (v is not "TRUE" and not "FALSE") Add(r, f, Messages.Define("Text_1B7AB7E0F1"));
                 if (f is "Start Date" or "End Date")
@@ -85,7 +88,8 @@ public static class Schemas
             {
                 if (!new[] { "scheduled", "cargo", "charter", "training", "vfr", "repositioning", "jumpseat" }.Contains(r.Get("Type"))) Add(r, "Type", Messages.Define("Text_EFB86BD704"));
                 // StoreRouteRequest requires callsign and flight_number for every type, jumpseat included.
-                foreach (var f in new[] { "Callsign", "Flight Number" }) if (r.Get(f) == "") Add(r, f, Messages.Define("Text_B283E8E5F2"));
+                foreach (var f in new[] { "Callsign", "Flight Number" })
+                    if (r.Get(f) == "" && !(r.Get("Type")=="jumpseat" && before?.Identity!=null)) Add(r, f, Messages.Define("Text_B283E8E5F2"));
                 if (r.Get("Type") != "jumpseat" && r.Get("Fleet IDs") == "") Add(r, "Fleet IDs", Messages.Define("Text_134FD96D33"));
                 if (r.Get("Callsign") != "" && r.Get("Callsign").Length is < 4 or > 7) Add(r, "Callsign", Messages.Define("Text_39CD1EC048"));
                 if (r.Get("Flight Number") != "" && r.Get("Flight Number").Length is < 3 or > 6) Add(r, "Flight Number", Messages.Define("Text_D60FFE3B83"));
@@ -119,7 +123,9 @@ public static class Schemas
             ResourceKind.Aircraft => ["Registration"],
             _ => new[] { "Name" }
         };
-        foreach (var group in data.Draft.Where(r => !Deleted(r)).GroupBy(r => string.Join("\u001f", signatureFields.Select(r.Get))))
+        foreach (var group in data.Draft.Where(r => !Deleted(r)).GroupBy(r => kind==ResourceKind.Routes && r.Get("Type")=="jumpseat"
+            ? string.Join("\u001f",r.Get("Departure Airport (ICAO/IATA)"),r.Get("Arrival Airport (ICAO/IATA)"),ApiOperationPolicy.JumpseatSignature(r))
+            : string.Join("\u001f", signatureFields.Select(r.Get))))
             if (group.Count() > 1 && group.Any(r => Key(kind, r) == ""))
                 foreach (var r in group.Where(r => Key(kind, r) == "")) Add(r, schema.Key, Messages.Define("Text_CDDA93CCD1"));
         var deletedIds = data.Draft.Where(Deleted).Select(r => r.LocalId).ToHashSet();

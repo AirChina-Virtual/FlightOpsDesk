@@ -246,11 +246,15 @@ public sealed partial class MainWindow
                 edits.Cell(owner, link.Kind, currentId, newStep); SaveSoon(); Status(() => L("Text_75141EDE81"));
             })
             {
-                CanEdit = Editable, IsReadOnly = Schemas.Deleted(row), FleetName = () => L("ChooseFleet"),
+                CanEdit = Editable, IsReadOnly = CellReadOnly(row,field),ReadOnlyForRow=r=>CellReadOnly(r,field),
+                FleetName = () => field=="Parameter IDs"?L("AirlineParameter"):L("ChooseFleet"),
+                ShowServerNull=()=>view?.Row.Identity!=null && view.Row.Get("Type")=="jumpseat" && (field is "Callsign" or "Flight Number"),
+                ServerNullLabel=()=>L("JumpseatNotPreserved"),
                 Compact = tableDensity == "compact", Height = tableDensity == "compact" ? 28 : 32,
                 DisplayText = () => field == "_delete" ? RowStatus(view!.Row, tableBaseline, tableConflicts)
-                    : field is "Fleet ID" or "Fleet IDs" ? FleetLabel(view!.Row.Get(field), tableFleetLabels) : "",
-                ChooseFleet = field is "Fleet ID" or "Fleet IDs" ? new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Guard(() => ChooseFleets(view!.Row))) : null
+                    : field=="Parameter IDs"?view!.Row.Get(field):field is "Fleet ID" or "Fleet IDs" ? FleetLabel(view!.Row.Get(field), tableFleetLabels) : "",
+                ChooseFleet = field=="Parameter IDs"?new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(()=>Guard(()=>ChooseParameter(view!.Row)))
+                    :field is "Fleet ID" or "Fleet IDs" ? new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Guard(() => ChooseFleets(view!.Row))) : null
             }).ToList();
             view = new(row, cells) { CellTemplates = cellTemplates }; rows.Add(view); pageRowPool.Add(view);
         }
@@ -266,6 +270,8 @@ public sealed partial class MainWindow
         if (resetVertical) { shownState.Vertical = 0; FindVisual<ScrollViewer>(table)?.ChangeView(null, 0, null, true); }
         RefreshDataAvailability();
     }
+    bool CellReadOnly(DataRow row,string field)=>Schemas.Deleted(row) || workspace.Mode==RunMode.Online && row.Identity!=null
+        && (field=="Parameter IDs" || row.Get("Type")=="jumpseat" && (field is "Callsign" or "Flight Number"));
     string RowStatus(DataRow row, Dictionary<Guid, DataRow> baseline, HashSet<Guid> conflicts)
     {
         if (Schemas.Deleted(row)) return L("Text_EE96DC1EBE");

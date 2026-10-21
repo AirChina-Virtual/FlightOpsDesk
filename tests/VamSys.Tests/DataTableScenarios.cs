@@ -7,6 +7,16 @@ static class DataTableScenarios
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     public static async Task Run(Func<string, Func<Task>, Task> test)
     {
+        await test("Null jumpseat presentation and immutable cells survive row recycling without edits",()=>
+        {
+            var commits=0;var serverNull=true;
+            var cell=new CellViewModel("Callsign","",_=>commits++){ShowServerNull=()=>serverNull,ServerNullLabel=()=>"Server did not retain",ReadOnlyForRow=r=>r.Identity!=null};
+            var row=new DataRow{Identity=new("9","7")};var model=new RowViewModel(row,[cell]);model.Rebind(row);
+            Check(cell.VisibleText=="Server did not retain"&&cell.IsReadOnly,"Null presentation missing");
+            cell.Value="blocked";Check(commits==0&&cell.Value=="","Read-only identity accepted input");
+            serverNull=false;model.Rebind(new DataRow{Fields=new(){["Callsign"]="ACA123"}});cell.Value="ACA124";
+            Check(!cell.IsReadOnly&&cell.VisibleText=="ACA124"&&commits==1,"Recycled new record remains locked");return Task.CompletedTask;
+        });
         await test("Cell label notifications skip unchanged text and preserve language updates", () =>
         {
             var label="Fleet";var name="Choose";var notices=new List<string?>();

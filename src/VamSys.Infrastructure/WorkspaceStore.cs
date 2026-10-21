@@ -85,7 +85,7 @@ public sealed partial class WorkspaceStore
         => SaveConnection(workspace,clientId,secret,true,null,null);
     public void SaveConnectionSettings(Workspace workspace,string clientId,string secret,string url,bool localRouteTimes)
     {
-        if(workspace.Jobs.Any(j=>j.Mode==RunMode.Online && j.Items.Any(i=>i.State is ItemState.Pending or ItemState.Running or ItemState.Unknown))) throw OperationsAdapter.Block("ApiPendingJob");
+        if(ApiOperationPolicy.HasOpenOnlineItems(workspace)) throw OperationsAdapter.Block("ApiPendingJob");
         url=url.Trim();
         if(url!="" && (!Uri.TryCreate(url,UriKind.Absolute,out var uri) || uri.Scheme!="https" || uri.UserInfo!="")) throw OperationsAdapter.Block("ApiInvalid","URL");
         SaveConnection(workspace,clientId,secret,false,url,localRouteTimes);

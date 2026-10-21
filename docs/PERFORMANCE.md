@@ -78,3 +78,7 @@
 ~~~
 
 本轮的原始结果（JSON、截图、日志）已压缩到本机 `archive/2026-10-19-performance/performance-round-results.zip`，原路径和 SHA-256 记录在同目录的 `performance-round-results-files.csv`。历史记录中提到的 artifacts 路径都可以在这里查到。
+
+2026-10-20 整理后，`artifacts/core-performance`（包括 baseline-src）、step5 性能／构建日志与 storage-v3 报告另归档到 `archive/2026-10-20-cleanup/historical-results.zip`，原路径和逐文件哈希见同目录 `historical-results-files.csv`。上面的命令仍可重新生成当前基准和 QA 包；现有正式包位于 `artifacts/flightops-app`，用于兼容性测试的 `artifacts/step5-v3-baseline` 继续原位保留。
+
+任务启动修复的 238 项回归重新生成了 `artifacts/step5-performance` 下 6 份 JSON；这些结果已单独归档至 `archive/2026-10-20-startup-fix-cleanup/step5-performance-results.zip`，原路径和 SHA-256 见同目录 `step5-performance-results-files.csv`。本轮构建缓存已删除，基准与测试命令仍可重新生成它们。

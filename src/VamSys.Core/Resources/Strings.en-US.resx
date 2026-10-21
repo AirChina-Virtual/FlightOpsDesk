@@ -772,13 +772,13 @@
     <value>Demo airline {time}</value>
   </data>
   <data name="ApiMoveFleet" xml:space="preserve">
-    <value>Moving aircraft between fleets is disabled: MoveAircraftFleetData has no documented request fields.</value>
+    <value>This change is not a separate aircraft fleet move. Change only the aircraft Fleet ID, then review and submit.</value>
   </data>
   <data name="ApiSubmitScope" xml:space="preserve">
     <value>Target: {va} (airline {id}), {count} records. Unverified operations run as small samples; successful read-back records operation verification.</value>
   </data>
   <data name="ApiCapability" xml:space="preserve">
-    <value>Official contracts implemented. Connect to verify reads; unverified writes are limited to 3 samples per operation. Fleet moves, route fleet updates and unconfirmed clearing remain disabled.</value>
+    <value>Verified independent live requests and readbacks enable the supported scope across five resources. Other writes retain sampling and compatibility restrictions. Shared throttling, conflict checks and read-only recovery remain active.</value>
   </data>
   <data name="ApiSettingsHelp" xml:space="preserve">
     <value>Use the Operations Client ID and Secret configured in Orwell. Refresh manually after connecting; drafts are never submitted automatically. API weights use kg; dates and times use UTC.</value>
@@ -965,4 +965,65 @@ Remote: {remote}</value>
   <data name="ReviewIssues" xml:space="preserve"><value>View all {count} validation issues</value></data>
   <data name="BatchRestored" xml:space="preserve"><value>Restored to editable draft</value></data>
   <data name="ReviewValidationIssue" xml:space="preserve"><value>{resource} · {key} · {field}: {reason}</value></data>
+  <data name="FreightKg" xml:space="preserve"><value>Cargo capacity (kg)</value></data>
+  <data name="MaxFreightKg" xml:space="preserve"><value>Maximum cargo capacity (kg)</value></data>
+  <data name="WeightIntegerKg" xml:space="preserve"><value>Online cargo capacity must be a non-negative integer in kg. Values are never rounded or converted automatically.</value></data>
+  <data name="WeightCsvHint" xml:space="preserve"><value>Freight and Max Freight are interpreted as kg. CSV headers stay unchanged; online submissions require non-negative integers.</value></data>
+  <data name="AirlineParameter" xml:space="preserve"><value>Airline parameter</value></data>
+  <data name="ParameterSelect" xml:space="preserve"><value>Select one approved, unrestricted airline parameter for the new fleet</value></data>
+  <data name="ApiParametersLoad" xml:space="preserve"><value>Read airline parameters</value></data>
+  <data name="ApiParametersLoaded" xml:space="preserve"><value>Read {count} airline parameters for approval checks and new fleet associations only.</value></data>
+  <data name="ApiParametersUnavailable" xml:space="preserve"><value>Read airline parameters first. Permission or read failures only block operations that need approval checks.</value></data>
+  <data name="ApiParameterRequired" xml:space="preserve"><value>Select one approved, unrestricted parameter belonging to the current airline.</value></data>
+  <data name="ApiParameterCreateOnly" xml:space="preserve"><value>Parameter associations are supported only when creating a fleet. Reassigning or removing existing associations is unavailable.</value></data>
+  <data name="ApiPrefixDenied" xml:space="preserve"><value>Fleet “{fleet}” is not approved for the prefixes of {callsign} / {flight}. Check its airline parameter association.</value></data>
+  <data name="ApiKnownWeightRestriction" xml:space="preserve"><value>This instance has weight-unit and SimBrief write errors. This version submits kg values only and blocks weight_unit and simbrief_overrides.</value></data>
+  <data name="ApiJumpseatIdentity" xml:space="preserve"><value>The server does not retain jumpseat callsigns or flight numbers. Online changes to these fields on existing records are unavailable.</value></data>
+  <data name="JumpseatNotPreserved" xml:space="preserve"><value>Not retained by server</value></data>
+  <data name="ApiRejected" xml:space="preserve"><value>Request returned HTTP {status}: {reason}</value></data>
+  <data name="ApiUnknownError" xml:space="preserve"><value>Result unknown (HTTP {status}). Check with reads only; do not resubmit. {reason}</value></data>
+  <data name="ApiReadbackMismatch" xml:space="preserve"><value>The request may have completed, but readback fields differ. The result remains unknown; recovery is read-only.</value></data>
+  <data name="ApiSoftDeleteEvidence" xml:space="preserve"><value>Deactivation accepted (HTTP {writeStatus}); detail read returned {status}. This does not prove physical deletion; review manually.</value></data>
+  <data name="ApiEvidenceExport" xml:space="preserve"><value>Export diagnostics</value></data>
+  <data name="MaintenanceTitle" xml:space="preserve"><value>Local workspace maintenance</value></data>
+  <data name="BackupClear" xml:space="preserve"><value>Back up, then clear this workspace</value></data>
+  <data name="BackupClearPreview" xml:space="preserve"><value>Workspace: {name}; data directory: {path}. Clear {snapshots} snapshot rows, {drafts} draft rows, {jobs} jobs, {conflicts} conflicts and {history} undo/redo steps. Back up the entire local database first; clear only this workspace, retain connection settings and credentials, and make no remote API calls.</value></data>
+  <data name="MaintenanceUnsafe" xml:space="preserve"><value>Unresolved or in-flight remote writes must be checked using reads first. A backup cannot replace write-result verification.</value></data>
+  <data name="MaintenanceDone" xml:space="preserve"><value>Workspace cleared; credentials retained. Backup: {path}. Connect and refresh again.</value></data>
+  <data name="MaintenanceBackupFailed" xml:space="preserve"><value>Backup integrity verification failed. The workspace was not cleared.</value></data>
+  <data name="ApiEvidenceSaved" xml:space="preserve"><value>Exported redacted diagnostics and SHA-256: {path}</value></data>
+  <data name="TaskStartBlocked" xml:space="preserve"><value>The task did not start because the workspace, run mode or operation lock changed. Review it in the Task Center before continuing manually; it will not start or resubmit automatically.</value></data>
+  <data name="ApiIndependentEvidence" xml:space="preserve"><value>Enabled within independently tested live API scope.</value></data>
+  <data name="ApiIndependentScope" xml:space="preserve"><value>Fields with successful independent live requests and readbacks are enabled across the five resources. Other variants retain sampling. This evidence is separate from this workspace's software readback verification.</value></data>
+  <data name="ApiMoveSeparate" xml:space="preserve"><value>Submit aircraft fleet moves separately, changing only Fleet ID. Submit other field changes after the move is verified.</value></data>
+  <data name="ApiMoveTarget" xml:space="preserve"><value>The target fleet must be readable, belong to the current VA and not be marked for deletion. Refresh first.</value></data>
+  <data name="ApiDeletedInvisible" xml:space="preserve"><value>API invisibility verified: the original DELETE returned 204 and this detail GET returned 404. This does not establish physical erasure.</value></data>
+  <data name="ApiVerifyDeletes" xml:space="preserve"><value>Read-only API deletion check</value></data>
+  <data name="ApiDeleteCheckDone" xml:space="preserve"><value>Read-only deletion check completed. Unconfirmed items keep their status; no DELETE was resubmitted.</value></data>
+  <data name="ApiTaskCounts" xml:space="preserve"><value>API verified {success}/{total} · Manually confirmed {manual} · Unknown {unknown}</value></data>
+  <data name="ApiNotSent" xml:space="preserve"><value>The request was not sent to the server (interrupted while waiting for the rate limit, refreshing the token or canceling). It is pending again; resume the task to retry.</value></data>
+  <data name="ApiResumeCreate" xml:space="preserve"><value>The record was created, but later steps were not processed by the server. Resuming first verifies the created record, then sends the remaining steps without creating it again.</value></data>
+  <data name="ApiVerifyNotApplied" xml:space="preserve"><value>Verify not applied via API</value></data>
+  <data name="ApiNotAppliedHelp" xml:space="preserve"><value>If you believe this write did not take effect, check with read-only API calls: a create must have no record matching its duplicate rule; an update or delete must still read exactly as before the change. If the check passes, the item is marked failed and its draft is kept for review and resubmission; otherwise it keeps its status.</value></data>
+  <data name="ApiNotAppliedVerified" xml:space="preserve"><value>Read-only API check confirmed this write did not take effect. It is marked failed; the draft is kept for review and resubmission.</value></data>
+  <data name="ApiNotAppliedUnproven" xml:space="preserve"><value>Read-only API checks could not prove this write did not take effect (it may have, or the record was changed by someone else). The status is unchanged; review it in Orwell.</value></data>
+  <data name="ApiDiscardedUnsent" xml:space="preserve"><value>Discarded, never sent: this item never reached the server. It is marked failed and resuming the task will not send it; the draft is kept for review and resubmission.</value></data>
+  <data name="ItemStateDiscarded" xml:space="preserve"><value>Discarded</value></data>
+  <data name="ApiTaskDiscarded" xml:space="preserve"><value> · Discarded {count}</value></data>
+  <data name="ApiDiscardPending" xml:space="preserve"><value>Discard unsent items</value></data>
+  <data name="ApiDiscardConfirm" xml:space="preserve"><value>Discard {count} pending items that never reached the server? They are marked failed as "Discarded, never sent" and resuming the task will not send them; the drafts are kept for review and resubmission. Items that were sent, answered or accepted are not affected.</value></data>
+  <data name="ApiDiscarded" xml:space="preserve"><value>Discarded {count} unsent items; drafts are kept, and these items no longer block refresh or submission.</value></data>
+  <data name="ApiAcceptServerValue" xml:space="preserve"><value>Accept server's current value</value></data>
+  <data name="ApiAcceptServerHelp" xml:space="preserve"><value>The server accepted this write, but a read-only GET returns values that differ from what was sent (the server may have normalized them, or someone changed the record at the same time). You can accept the server's current value: the item is marked manually confirmed, the local snapshot becomes the server's value, and draft values that did not take effect are listed as conflicts for you to keep or drop. Nothing is resent and this is not counted as a verified operation. Differences (sent → server):</value></data>
+  <data name="ApiAcceptDeleteHelp" xml:space="preserve"><value>The server accepted the delete request, but a read-only GET still returns record {id}. You can accept the server's current value: the item is marked manually confirmed, the record is kept and the local deletion mark is removed. The delete is not resent and this is not counted as a verified operation.</value></data>
+  <data name="ApiAcceptedServerValue" xml:space="preserve"><value>Server's current value accepted manually; not verified by API read-back. The local snapshot now holds the server's value; draft values that did not take effect are listed as conflicts.</value></data>
+  <data name="ApiAcceptedServerRecord" xml:space="preserve"><value>Server's current value accepted manually: the record still exists, so it is kept and the deletion mark is removed. The deletion was not verified by API.</value></data>
+  <data name="ApiAcceptMissing" xml:space="preserve"><value>A read-only GET cannot find this record (HTTP 404), so its current value cannot be accepted; the status is unchanged. For a delete, resume the task to finish the read-only check; otherwise review it in Orwell.</value></data>
+  <data name="ApiAcceptNowMatches" xml:space="preserve"><value>The server's current value now matches what was sent; the status is unchanged. Resume the task to finish read-back verification.</value></data>
+  <data name="ApiManualDeleteNoReceipt" xml:space="preserve"><value>Deletion confirmed manually (no write receipt): the server never answered the delete request and a read-only GET returned 404. This is not the full 204/404 API proof and is not counted as a verified operation.</value></data>
+  <data name="ApiConfirmNoReceipt" xml:space="preserve"><value>The server never answered the request to delete record {id} (timeout or 5xx), so there is no write receipt; a read-only GET returned 404. First verify in Orwell that the record is disabled or deleted as intended. Confirming marks the item manually confirmed (no write receipt) and archives the local deletion draft. The delete is never resent.</value></data>
+  <data name="ApiNoReceiptStillReadable" xml:space="preserve"><value>The server never answered the request to delete record {id}. A read-only GET still returns the record, but it differs from the data before the change (someone may have edited it), so neither deletion nor "not applied" can be confirmed; the status is unchanged. Review it in Orwell. Differences from before the change (before → now):</value></data>
+  <data name="ApiSoftDeleteUnchangedHelp" xml:space="preserve"><value>Note: the server never answered the request to delete record {id} (timeout or 5xx), so there is no write receipt. A read-only GET still returns the record and it matches the data before the change, so the deletion appears not to have taken effect. Check it in Orwell first. Confirming marks the item not applied: it becomes failed and the local deletion draft is kept for review and resubmission. The delete is never resent and this is not counted as a verified operation.</value></data>
+  <data name="ApiMarkNotApplied" xml:space="preserve"><value>Mark not applied</value></data>
+  <data name="ApiSoftDeleteUnchanged" xml:space="preserve"><value>The delete had no write receipt and a read-only GET matched the data before the change; marked not applied after manual confirmation. The local deletion draft is kept for review and resubmission.</value></data>
 </root>

@@ -58,6 +58,7 @@ static class PerformanceScenarios
                 var next=100;
                 return (r,ct)=>
                 {
+                    if(kind==ResourceKind.Routes && RouteApprovalFixture.Respond(r) is {} approval)return approval;
                     var path=r.RequestUri!.AbsolutePath;var q=Uri.UnescapeDataString(r.RequestUri.Query);
                     if(r.Method==HttpMethod.Post){using var body=JsonDocument.Parse(r.Content!.ReadAsStringAsync(ct).Result);var id=next++;remote[id]=body.RootElement.GetProperty(wire).GetString()!;return Json(Remote(id,remote[id]),HttpStatusCode.Created);}
                     if(q.Contains("filter[")||q.Contains("cursor="))
@@ -122,6 +123,7 @@ static class PerformanceScenarios
                 var serverNext=1000;
                 h.Next=(r,ct)=>
                 {
+                    if(RouteApprovalFixture.Respond(r) is {} approval)return approval;
                     var q=Uri.UnescapeDataString(r.RequestUri!.Query);var path=r.RequestUri.AbsolutePath;
                     if(r.Method==HttpMethod.Post){using var body=JsonDocument.Parse(r.Content!.ReadAsStringAsync(ct).Result);var b=body.RootElement;var id=serverNext++;remote[id]=(b.GetProperty("departure_id").GetInt64(),b.GetProperty("arrival_id").GetInt64(),b.GetProperty("flight_number").GetString()!);return PerformanceScenarios.Json(Json(id,remote[id]),HttpStatusCode.Created);}
                     if(path.EndsWith("/routes"))
@@ -223,9 +225,10 @@ static class PerformanceScenarios
             await time.Drive(Read());Check(stamps.Count==61&&(stamps[^1]-stamps[0]).TotalSeconds>=60);Check(stamps.Zip(stamps.Skip(1)).All(p=>(p.Second-p.First).TotalSeconds>=1));
             using var ct=new CancellationTokenSource();var pending=a.GetAsync(new(OperationsAdapter.BaseUri,"fleet"),ct.Token);ct.Cancel();try{await pending;throw new Exception("Cancellation ignored");}catch(OperationCanceledException){}Check(stamps.Count==61);
         });
-        await test("Airport lookups stay exact across snapshot and cache changes while planning 1,000 routes over 3,000 airports",()=>
+        await test("Airport lookups stay exact across snapshot and cache changes while planning 1,000 routes over 3,000 airports",async()=>
         {
-            var w=new Workspace{AirlineId="7"};var a=Api(w,new AuditHttp(),new TestTime());
+            var w=new Workspace{AirlineId="7"};var clock=new TestTime();var h=new AuditHttp{Next=(r,ct)=>RouteApprovalFixture.Respond(r)??throw new Exception("Unexpected metadata request")};var a=Api(w,h,clock);
+            await clock.Drive(a.ReadParametersAsync(default));await clock.Drive(a.FindAsync(ResourceKind.Fleets,"4",default));
             static string Code(int n,int length){var c=new char[length];for(var i=length-1;i>=0;i--){c[i]=(char)('A'+n%26);n/=26;}return new string(c);}
             string AirportJson(int id,string icao,string iata)=>"{\"id\":"+id+",\"airline_id\":7,\"icao\":\""+icao+"\",\"iata\":\""+iata+"\"}";
             var airports=w.Resources[ResourceKind.Airports].Snapshot;
@@ -245,7 +248,6 @@ static class PerformanceScenarios
             a.Forget(ResourceKind.Airports,"9002");Check(Plans("NEW","AAA"),"Forgotten airport still indexed");
             w.Resources[ResourceKind.Airports].Snapshot=airports.Where(r=>r.Identity!.RemoteId!="1005").ToList();Check(!Plans("NEW","AAA"),"Replaced snapshot list not reindexed");
             w.AirlineId="8";Check(!Plans("AAB","AAA"),"Other VA airports resolved");
-            return Task.CompletedTask;
         });
         await test("Full refresh reads the fleet list once and stages without touching live rows or undo",async()=>
         {
@@ -338,6 +340,7 @@ static class PerformanceScenarios
             var time=new TestTime();var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var api=Api(w,h,time);Parse(api,ResourceKind.Airports,Airport);int pages=0;
             h.Next=(r,ct)=>
             {
+                if(RouteApprovalFixture.Respond(r) is {} approval)return approval;
                 if(r.Method==HttpMethod.Post)return Json(RouteJson(ResourceKind.Routes),HttpStatusCode.Created);
                 if(r.RequestUri!.AbsolutePath.EndsWith("/9"))return Json("{\"data\":"+RouteJson(ResourceKind.Routes)+"}");
                 pages++;return Json(Page(RouteJson(ResourceKind.Routes,"ZZ999"),pages<3?OperationsAdapter.BaseUri+"routes?cursor="+pages:null));
@@ -356,17 +359,18 @@ static class PerformanceScenarios
             run.Finish("Failed");Check(run.TryWrite(Path.Combine(folder,"reports"))&&run.SaveAttempts==2);return Task.CompletedTask;
         });
         await test("20,000 existing routes and 100 creates on one airport pair require one filtered GET",async()=>
-        {var report=await RouteBenchmark();Check(report.Gets==1&&report.Posts==100&&report.Readbacks==100,"GET "+report.Gets);Console.WriteLine($"  20k/100: duplicate GET={report.Gets}, POST={report.Posts}, read-back GET={report.Readbacks}, virtual seconds={report.Seconds}");});
+        {var report=await RouteBenchmark();Check(report.Gets==1&&report.Posts==100&&report.Readbacks==100&&report.ApprovalGets==2,"GET "+report.Gets);Console.WriteLine($"  20k/100: duplicate GET={report.Gets}, approval GET={report.ApprovalGets}, POST={report.Posts}, read-back GET={report.Readbacks}, virtual seconds={report.Seconds}");});
     }
-    public sealed record QueryBenchmark(int Existing,int New,int Gets,int Posts,int Readbacks,double Seconds);
+    public sealed record QueryBenchmark(int Existing,int New,int Gets,int Posts,int Readbacks,double Seconds,int ApprovalGets);
     static async Task<QueryBenchmark> RouteBenchmark()
     {
         var time=new TestTime();var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=Api(w,h,time);Parse(a,ResourceKind.Airports,Airport);
         // Existing routes belong to other airport pairs; the requested pair has sparse candidates.
         var existing=Enumerable.Range(0,20000).Select(i=>new {departure_id=1000+i,arrival_id=30000+i}).ToArray();
-        int gets=0,posts=0,readbacks=0;var created=new Dictionary<string,string>();
+        int gets=0,posts=0,readbacks=0,approvalGets=0;var created=new Dictionary<string,string>();
         h.Next=(r,ct)=>
         {
+            if(RouteApprovalFixture.Respond(r) is {} approval){approvalGets++;return approval;}
             if(r.Method==HttpMethod.Post)
             {
                 posts++;using var body=JsonDocument.Parse(r.Content!.ReadAsStringAsync().Result);var flight=body.RootElement.GetProperty("flight_number").GetString()!;
@@ -378,7 +382,7 @@ static class PerformanceScenarios
         };
         var job=new BatchJob{Items=Enumerable.Range(0,100).Select(i=>Route(ResourceKind.Routes,"AC"+i.ToString("000"))).ToList()};
         await time.Drive(new OperationsBatchExecutor(a,w).ExecuteAsync(job,()=>Task.CompletedTask,default));Check(job.Items.All(i=>i.State==ItemState.Succeeded));
-        return new(existing.Length,100,gets,posts,readbacks,(time.GetUtcNow()-DateTimeOffset.UnixEpoch).TotalSeconds);
+        return new(existing.Length,100,gets,posts,readbacks,(time.GetUtcNow()-DateTimeOffset.UnixEpoch).TotalSeconds,approvalGets);
     }
     public static async Task Benchmark(string directory)
     {

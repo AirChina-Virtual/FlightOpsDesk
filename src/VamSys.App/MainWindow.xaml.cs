@@ -141,6 +141,14 @@ public sealed partial class MainWindow : Window
         try { return await d.ShowAsync() == ContentDialogResult.Primary; }
         finally { ObserveDialog(d, false); dialogs--; }
     }
+    // A secondary action is shown only when its label is given.
+    async Task<ContentDialogResult> Choose(string title, UIElement content, string primary, string? secondary)
+    {
+        var d = new ContentDialog { XamlRoot = Content.XamlRoot, Title = title, Content = content, PrimaryButtonText = primary, SecondaryButtonText = secondary ?? "", CloseButtonText = L("Text_2CD0F3BE87"), DefaultButton = ContentDialogButton.Close };
+        dialogs++; ObserveDialog(d, true);
+        try { return await d.ShowAsync(); }
+        finally { ObserveDialog(d, false); dialogs--; }
+    }
     void Navigate(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         if (!ready || !closeState.IsOpen || localOperation) return; CancelDataQuery(); page = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString() ?? "workspace"; Render();
@@ -296,7 +304,7 @@ public sealed partial class MainWindow : Window
         });
     }
     UIElement ImportPage() => Stack(Text(() => L("Text_D030C51D78"), 16),
-        Text(() => L("Text_3618171B0A")),
+        Text(() => L("Text_3618171B0A")),Text(()=>L("WeightCsvHint")),
         Button(() => L("Text_5A2BBDEA04"), ImportCsv), Button(() => L("ApiRefresh"), RefreshApi));
     async Task ImportCsv()
     {
@@ -309,7 +317,7 @@ public sealed partial class MainWindow : Window
             var mapping = new StackPanel { Spacing = 8 }; var boxes = new Dictionary<string, TextBox>();
             foreach (var h in parsed.Headers) { var box = new TextBox { Header = h, Text = h }; boxes[h] = box; mapping.Children.Add(box); }
             var baseline = new CheckBox { IsChecked = workspace.Mode != RunMode.Online && Data.SnapshotAt is null, IsEnabled = workspace.Mode != RunMode.Online }.Localize(localization, "Content", () => L("Text_B91DE02936"));
-            var panel = Stack(Text(() => L("Text_42F0F930C9", ("arg0", parsed.Rows.Count))), baseline,
+            var panel = Stack(Text(() => L("Text_42F0F930C9", ("arg0", parsed.Rows.Count))),Text(()=>L("WeightCsvHint")), baseline,
                 new ScrollViewer { Content = mapping, MaxHeight = 280 }, Text(() => L("Text_793A76BFEA") + string.Join("\n", parsed.Rows.Take(3).Select(r => string.Join(" | ", r).Truncate(240)))));
             if (!await Confirm(L("Text_E0FDE3C5CB"), panel, L("Text_C9B2630A18"))) return;
             if (baseline.IsChecked == true && Data.Draft.Count > 0 && !await Confirm(L("Text_885B15B2F5"), Text(() => L("Text_5B5C523423")), L("Text_131B13AA26"))) return;
@@ -340,22 +348,11 @@ public sealed partial class MainWindow : Window
             workspace.Jobs.Add(new BatchJob { Mode = RunMode.Offline, Items = changes, Description = Messages.Define("Text_D964132351", ("arg0", parts.Count), ("arg1", folder.Path)), StatusCode = JobStatus.AwaitingImport, Status = Messages.Define("Text_D964132351", ("arg0", parts.Count), ("arg1", folder.Path)) });
             await Save(dataChanged: false); Status(() => L("Text_B680DD9FD1", ("arg0", parts.Count)));
     });
-    async Task StartDemo()
-    {
-        if (!CanEditData() || workspace.Mode != RunMode.Demo) return;
-        BatchJob? job = null;
-        await LocalOperation(async () =>
-        {
-            var changes = await ConfirmWorkspaceSubmission(RunMode.Demo);
-            if (changes is null) return;
-            job = new BatchJob { Mode = RunMode.Demo, Items = changes };
-            workspace.Jobs.Add(job); await Save(dataChanged: false);
-        });
-        if (job != null) await ExecuteDemo(job);
-    }
+    Task StartDemo() => SubmitWorkspace(RunMode.Demo);
     async Task ExecuteDemo(BatchJob job)
     {
-        if (!closeState.IsOpen || busy || workspace.Mode != RunMode.Demo || job.Mode != RunMode.Demo) return;
+        TaskSubmission.RequireExecution(workspace, job, RunMode.Demo,
+            closeState.IsOpen && !busy && !localOperation && !querying);
         await Work(async () =>
         {
             running = new CancellationTokenSource(); var demo = new DemoService(workspace);
@@ -412,8 +409,9 @@ public sealed partial class MainWindow : Window
                 if(apiSessions.Remove(workspace.Id,out var previous)) previous.Client.Dispose();
                 Status(()=>L("ApiCredentialsUpdated"));
             }, !busy), Text(()=>L("ApiCredentialsHelp")), Button(() => L("ApiConnect"), ConnectApi), Button(() => L("ApiRefresh"), RefreshApi),
-            Text(() => L("ApiCapability")), Text(() => L("ApiVerified", ("operations", string.Join(", ", workspace.VerifiedOperations)))),
-            Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?")))));
+            Text(() => L("ApiCapability")), Text(()=>L("ApiIndependentScope")),Text(() => L("ApiVerified", ("operations", string.Join(", ", workspace.VerifiedOperations)))),
+            Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"))),
+            Button(()=>L("ApiParametersLoad"),LoadParameters),Text(()=>L("MaintenanceTitle"),18),Button(()=>L("BackupClear"),BackupAndClearWorkspace)));
     }
     Workspace DemoWorkspace()
     {

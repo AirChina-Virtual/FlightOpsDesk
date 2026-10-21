@@ -12,7 +12,10 @@ static class TaskViewModelScenarios
             item.State=ItemState.Succeeded;item.Message="not committed";job.Status="not committed";
             vm.RefreshHeader();Check(list[0].Text==text&&vm.Title==title);
             notifications=0;vm.Update(item.Id,false);Check(notifications==0&&vm.Title.Contains("not committed"));
-            vm.Present(item.Id);vm.RefreshHeader();Check(list[0].Text.Contains("not committed")&&ReferenceEquals(list,vm.Items));return Task.CompletedTask;
+            vm.Present(item.Id);vm.RefreshHeader();Check(list[0].Text.Contains("not committed")&&ReferenceEquals(list,vm.Items));
+            item.DiagnosticDetails=new(){ErrorId="server-error-id",FieldErrors=new(){["first"]=[new string('x',9000)],["fleet_ids.0"]=["late complete validation message"]}};
+            Check(item.DiagnosticDetails.Summary.Contains("server-error-id"));vm.Update(item.Id);
+            Check(list[0].Text.Contains("fleet_ids.0: late complete validation message"));return Task.CompletedTask;
         });
         await test("Task counters remain correct for repeated updates, replacement candidates and rebasing",()=>{
             var l=new LocalizationService();var item=new ChangeItem{State=ItemState.Unknown,Resource=ResourceKind.Airports};var job=new BatchJob{Mode=RunMode.Online,Items=[item]};var vm=Model(job,l);

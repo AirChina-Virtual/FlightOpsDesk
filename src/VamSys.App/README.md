@@ -19,9 +19,13 @@
 | ViewModels.cs、ViewModels.Xaml.cs | 行和单元格模型；ViewModels.cs 不依赖 WinUI，测试项目也会编译它 |
 | DataTableViewModel.cs | 不依赖 WinUI 的完整结果 ID、查询、分页和已选 ID |
 | MainWindow.Review.cs、ReviewPlanBuilder.cs | 工作区审阅：后台构建计划、内容键（SHA-256）、提交前检查；ReviewPlanBuilder 不依赖 WinUI |
+| MainWindow.Submission.cs、TaskSubmission.cs | 在线／演示任务的持久化启动交接；解锁前选中任务中心，只启动本次明确提交的任务；TaskSubmission 链接进无窗口回归 |
 | MainWindow.Batch.cs、BatchEditPreview.cs | 已选记录范围、实际变化计数、本地操作锁 |
 | MainWindow.Fleets.cs | 机型单选、多选和批量分配预览 |
 | MainWindow.Api.cs | 连接服务器、刷新数据、提交、填写待核对的 ID 并恢复任务 |
+| MainWindow.Maintenance.cs | 只读参数加载、新机队选择一个参数、备份清理确认与会话注销 |
+| MainWindow.Diagnostics.cs | 导出已持久化的脱敏任务诊断与 SHA-256 |
+| MainWindow.DeleteVerification.cs | 显式只读核对 Unknown／人工确认删除项，不执行 Pending；失败重载本地状态 |
 | MainWindow.Tasks.cs、TaskViewModels.cs | 任务页只创建可见内容，进度变化只更新相关记录 |
 | MainWindow.Closing.cs | 关闭时冻结操作并保存；失败后恢复编辑并允许重试 |
 | MainWindow.Localization.cs、UiLocalization.cs | 即时切换中英文，为读屏软件提供控件名称 |
@@ -39,6 +43,8 @@
 **审阅。** 审阅计划在后台构建，期间用 `WhileLocked` 锁定编辑和导航。外层本地操作结束时，如果后台仍在读取工作区，要由后台任务负责解锁。提交前在后台重建计划，并与显示的计划比较内容键；有任何变化都要刷新清单，并要求重新审阅。
 
 **任务。** 进度必须先保存成功，再显示到页面。界面可以把 50 毫秒内的多次变化合并显示，但不能因此推迟保存，也不能提前显示还在处理中的下一步。
+
+**提交交接。** 在线与演示使用同一个 TaskSubmission：确认清单、保存 Pending 成功、在 LocalOperation 解锁前明确设置 tasks 页面，最后只启动本次保存的 job。不能只设置 Navigation.SelectedItem，因为 Navigate 在本地锁定时会忽略它；也不能在最终 Render 仍为 review 时启动执行。工作区对象、VA、模式或操作可用性变化时明确拒绝启动。重新加载、解锁或连接不得自动扫描历史 Pending。
 
 **语言。** 切换语言时只更新文字，不重新打开页面，所以选中的记录和滚动位置会保留。软件名称始终为 FlightOps Desk；服务器字段名和用户输入的数据保持原样。
 

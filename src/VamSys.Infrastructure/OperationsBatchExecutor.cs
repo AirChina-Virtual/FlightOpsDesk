@@ -23,6 +23,7 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
         }
         async Task Complete(ChangeItem item,DataRow? verified,CandidateQuerySession queries)
         {
+            if(item.Resource==ResourceKind.Fleets)api.InvalidateParameters();
             if(writer==null) { ApplyRebase(workspace,item,verified); api.ConfirmCandidate(item,verified,queries); if(verified==null && (item.RemoteId ?? item.Before?.Identity?.RemoteId) is string id)api.Forget(item.Resource,id); return; }
             var original=workspace.Resources[item.Resource];
             var current=original.FindDraftRow(item.After.LocalId);
@@ -33,7 +34,7 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
             var delta=new ResourceRebaseDelta(item.Resource,item.After.LocalId,
                 new(verified==null?RowMutationKind.Delete:RowMutationKind.Upsert,data.Snapshot.FirstOrDefault()),
                 new(current==null?RowMutationKind.Keep:data.Draft.Count==0?RowMutationKind.Delete:RowMutationKind.Upsert,data.Draft.FirstOrDefault()),
-                data.SnapshotAt!.Value,true,$"{item.Resource}:{item.Kind}");
+                data.SnapshotAt!.Value,true,ApiOperationPolicy.Key(item));
             try { await writer.WriteAsync(new(CheckpointKind.Rebase,job,stagedItem,Delta:delta),CancellationToken.None); }
             catch(Exception e) { throw new PersistenceException(e); }
             original.Snapshot.RemoveAll(r=>r.LocalId==delta.LocalId);
@@ -45,11 +46,18 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
             item.RemoteId=stagedItem.RemoteId;item.After=stagedItem.After;item.CreateCompleted=stagedItem.CreateCompleted;
             item.RecoveryCandidateId=stagedItem.RecoveryCandidateId;item.Rebased=stagedItem.Rebased;
             item.State=stagedItem.State;item.Message=stagedItem.Message;item.Description=stagedItem.Description;
+            item.DeletionVerification=stagedItem.DeletionVerification;
             api.ConfirmCandidate(item,verified,queries);
             if(verified==null && (item.RemoteId ?? item.Before?.Identity?.RemoteId) is string removed) api.Forget(item.Resource,removed);
             try { committed?.Invoke();progress?.Invoke(new(workspace.Id,job.Id,item.Id)); } catch(Exception e) { throw new PersistenceException(e); }
         }
+        // Every step is marked in flight and saved before it is sent, so an interrupted item whose
+        // saved steps are all still prepared never reached the server. Done before candidates are seeded.
+        foreach(var item in job.Items)
+            if(item.State is ItemState.Running or ItemState.Unknown && item.ApiSteps.Count>0 && item.ApiSteps.All(s=>s.State==BatchStepState.Prepared)
+                && !item.CreateCompleted && !item.WriteAccepted) item.State=ItemState.Pending;
         var queries=new CandidateQuerySession();
+        api.InvalidateParameters();
         api.SeedCandidates(job,queries);
         job.SetStatus(JobStatus.Running,Messages.Define("Text_5026A63B58"));
         foreach(var item in job.Items.OrderBy(i=>i.Kind==ChangeKind.Delete?10-(int)i.Resource:(int)i.Resource))
@@ -78,26 +86,42 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
                 if(recovering)
                 {
                     // An interrupted request is never automatically repeated.
-                    var found=id==null?null:await api.FindRow(item.Resource,item.After,id,ct);
+                    var found=id==null?null:await api.FindResult(item,id,ct);
                     if(item.Kind!=ChangeKind.Delete && found!=null && api.Matches(item,found,item.After,false)) await Complete(item,found,queries);
+                    else if(IndependentApiEvidence.IsSoftDelete(item) && api.RecordDeletionVerification(item,found))await Complete(item,null,queries);
                     else if(item.Kind==ChangeKind.Delete && found==null && id!=null && item.Resource is ResourceKind.Fleets or ResourceKind.Aircraft or ResourceKind.Routings) await Complete(item,null,queries);
-                    else { item.State=ItemState.Unknown; item.SetMessage(Messages.Define("ApiUnknown")); }
+                    else if(OperationsAdapter.CanResumeCreate(item) && found!=null && api.MatchesCreated(item,found))
+                    {
+                        // Only steps that never reached the server are sent; the POST is skipped.
+                        var remaining=api.ExecutionPlan(item);
+                        item.ApiExpectedValues=OperationsAdapter.ExpectedValues(remaining);
+                        phase=ExecutionPhase.Writing;
+                        item.State=ItemState.Running; item.SetMessage(Messages.Define("Text_DCC1A22D9E")); await Save();
+                        item.RemoteId=await api.WriteStepsAsync(item,remaining,()=>Save(CheckpointKind.Step),ct); await Save();
+                        phase=ExecutionPhase.Verifying;
+                        var resumed=await api.FindResult(item,item.RemoteId,ct);
+                        if(resumed!=null && api.Matches(item,resumed,item.After,false)) await Complete(item,resumed,queries);
+                        else { item.State=ItemState.Unknown;api.RecordReadback(item,resumed);item.SetMessage(Messages.Define("ApiReadbackMismatch")); }
+                    }
+                    else { item.State=ItemState.Unknown;api.RecordReadback(item,found);item.SetMessage(Messages.Define("ApiUnknown")); }
                     await Save(); continue;
                 }
-                var steps=api.Plan(item);
+                var steps=api.ExecutionPlan(item);
                 if(item.Kind==ChangeKind.Create)
                 {
                     if(api.CandidateBlock(item,queries) is string reason)
                     { item.State=ItemState.Pending; item.SetMessage(Messages.Define(reason)); await Save(); continue; }
                     if(PerformanceRun.Current is {} duplicateMetrics) duplicateMetrics.Phase="DuplicateCheck";
+                    if(ApiOperationPolicy.IsJumpseatCreate(item))item.PreCreateCandidateIds=[];
                     await foreach(var existing in api.ReadDuplicateCandidatesAsync(item,queries,ct))
-                    { PerformanceRun.Current?.Candidate(); if(api.IsDuplicate(item,existing)) throw OperationsAdapter.Block("ApiDuplicate"); }
+                    { PerformanceRun.Current?.Candidate();item.PreCreateCandidateIds?.Add(existing.Identity!.RemoteId);if(api.IsDuplicate(item,existing))throw OperationsAdapter.Block("ApiDuplicate"); }
                     if(api.SessionAirlineId==null) throw OperationsAdapter.Block("ApiConnectFirst");
                 }
                 if(item.Before!=null)
                 {
                     if(PerformanceRun.Current is {} conflictMetrics) conflictMetrics.Phase="ConflictCheck";
                     var current=await api.FindRow(item.Resource,item.Before,id,ct);
+                    api.RecordPreflight(item,current);
                     if(current==null || !api.Matches(item,current,item.Before,true))
                     { item.State=ItemState.Conflict; item.SetMessage(Messages.Define("ApiConflict")); await Save(); continue; }
                 }
@@ -106,6 +130,8 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
                     if(PerformanceRun.Current is {} dependencyMetrics) dependencyMetrics.Phase="DependencyCheck";
                     if(await api.HasDeletionDependenciesAsync(item,ct)) throw OperationsAdapter.Block("ApiDependencies");
                 }
+                await api.PreflightParametersAsync(item,ct);
+                await api.PreflightMoveAsync(item,ct);
                 item.ApiExpectedValues=OperationsAdapter.ExpectedValues(steps);
                 OperationsAdapter.PrepareSteps(item,steps);
                 phase=ExecutionPhase.Writing;
@@ -115,29 +141,59 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
                 item.RemoteId=await api.WriteStepsAsync(item,steps,()=>Save(CheckpointKind.Step),ct); await Save();
                 phase=ExecutionPhase.Verifying;
                 if(PerformanceRun.Current is {} verifyMetrics) verifyMetrics.Phase="Verifying";
-                var verified=await api.FindRow(item.Resource,item.After,item.RemoteId,ct);
+                var verified=await api.FindResult(item,item.RemoteId,ct);
                 if(item.Kind==ChangeKind.Delete)
                 {
-                    if(verified==null && item.Resource is ResourceKind.Fleets or ResourceKind.Aircraft or ResourceKind.Routings) await Complete(item,null,queries);
-                    else { item.State=ItemState.Unknown; item.SetMessage(Messages.Define("ApiSoftDelete")); }
+                    if(IndependentApiEvidence.IsSoftDelete(item) && api.RecordDeletionVerification(item,verified))await Complete(item,null,queries);
+                    else if(verified==null && item.Resource is ResourceKind.Fleets or ResourceKind.Aircraft or ResourceKind.Routings) await Complete(item,null,queries);
+                    else { item.State=ItemState.Unknown;api.RecordReadback(item,verified);item.SetMessage(Messages.Define("ApiSoftDeleteEvidence",("writeStatus",item.DiagnosticDetails?.Status.ToString()??"?"),("status",verified==null?404:200))); }
                 }
                 else if(verified!=null && api.Matches(item,verified,item.After,false)) await Complete(item,verified,queries);
-                else { item.State=ItemState.Unknown; item.SetMessage(Messages.Define("ApiUnknown")); }
+                else { item.State=ItemState.Unknown;api.RecordReadback(item,verified);item.SetMessage(Messages.Define("ApiReadbackMismatch")); }
             }
             catch(PersistenceException) { throw; }
-            catch(ApiAccessException)
-            { item.State=phase!=ExecutionPhase.Preflight?ItemState.Unknown:ItemState.Pending; item.SetMessage(Messages.Define("ApiAuth")); job.SetStatus(JobStatus.Paused,Messages.Define("ApiAuth")); await Save(); break; }
+            catch(RequestNotSentException error)
+            {
+                // Nothing reached the server, so the step is prepared again. Only a step after an
+                // answered POST keeps the item Unknown, to be resumed without re-creating.
+                PrepareUnsent(item);
+                var auth=error.InnerException is ApiAccessException;
+                item.State=item.CreateCompleted||item.WriteAccepted?ItemState.Unknown:ItemState.Pending;
+                item.SetMessage(Messages.Define(item.State==ItemState.Unknown?"ApiResumeCreate":auth?"ApiAuth":"ApiNotSent"));
+                if(auth)
+                {
+                    if(item.State==ItemState.Pending)queries.Release(item);
+                    job.SetStatus(JobStatus.Paused,Messages.Define("ApiAuth")); await Save(); break;
+                }
+            }
+            catch(ApiAccessException error)
+            {
+                var access=error.Details is {} evidence?evidence with{Phase=phase.ToString()}:null;
+                if(phase is ExecutionPhase.Recovering or ExecutionPhase.Verifying)item.ReadbackDetails=access;else item.DiagnosticDetails=access;
+                // Like a 429, an authentication rejection happens before the write is processed.
+                var rejected=phase==ExecutionPhase.Writing && error.Status is 401 or 403;
+                if(rejected)PrepareUnsent(item);
+                item.State=phase==ExecutionPhase.Preflight || rejected && !item.CreateCompleted && !item.WriteAccepted?ItemState.Pending:ItemState.Unknown;
+                if(rejected && item.State==ItemState.Pending)queries.Release(item);
+                item.SetMessage(Messages.Define(rejected && item.State==ItemState.Unknown?"ApiResumeCreate":"ApiAuth")); job.SetStatus(JobStatus.Paused,Messages.Define("ApiAuth")); await Save(); break;
+            }
             catch(ApiResponseException e)
             {
-                item.Diagnostic=e.Diagnostic;
+                var details=e.Details is {} evidence?evidence with{Phase=phase.ToString()}:null;
+                if(phase is ExecutionPhase.Recovering or ExecutionPhase.Verifying)item.ReadbackDetails=details;
+                else {item.Diagnostic=e.Diagnostic;item.DiagnosticDetails=details;}
+                if(e.Status==HttpStatusCode.UnprocessableEntity)api.InvalidateParameters();
                 // A 429 is rejected before processing, so an unaccepted write can safely return to Pending.
                 var throttled=e.Status==HttpStatusCode.TooManyRequests && phase is ExecutionPhase.Preflight or ExecutionPhase.Writing;
                 item.State=phase is ExecutionPhase.Recovering or ExecutionPhase.Verifying || item.CreateCompleted || item.WriteAccepted
                     || phase==ExecutionPhase.Writing && (int)e.Status>=500 ? ItemState.Unknown
                     : throttled || phase==ExecutionPhase.Preflight && (int)e.Status>=500 ? ItemState.Pending : ItemState.Failed;
-                if(item.State==ItemState.Pending && phase==ExecutionPhase.Writing)
-                    foreach(var step in item.ApiSteps.Where(s=>s.State==BatchStepState.InFlight)) step.State=BatchStepState.Prepared;
-                item.SetMessage(throttled && item.State==ItemState.Pending ? Messages.Define("ApiRateLimited") : Messages.Define("ApiHttp",("status",(int)e.Status)));
+                if(phase==ExecutionPhase.Writing && (throttled || item.State is ItemState.Pending or ItemState.Failed && !item.CreateCompleted && !item.WriteAccepted))
+                    PrepareUnsent(item);
+                item.SetMessage(throttled && item.State==ItemState.Pending ? Messages.Define("ApiRateLimited")
+                    :throttled && item.State==ItemState.Unknown ? Messages.Define("ApiResumeCreate")
+                    :e.Details!=null?Messages.Define(item.State==ItemState.Unknown?"ApiUnknownError":"ApiRejected",("status",(int)e.Status),("reason",e.Details.Summary))
+                    :Messages.Define("ApiHttp",("status",(int)e.Status)));
             }
             catch(Exception e) when(e is OperationCanceledException or HttpRequestException or TimeoutException or System.Text.Json.JsonException)
             { item.State=phase!=ExecutionPhase.Preflight?ItemState.Unknown:ItemState.Pending; item.SetMessage(Messages.Define(phase==ExecutionPhase.Preflight?"ApiPreflight":"ApiUnknown")); }
@@ -151,6 +207,18 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
         active=null;
         if(job.StatusCode==JobStatus.Running) job.SetStatus(job.Items.All(i=>i.State==ItemState.Succeeded)?JobStatus.Completed:JobStatus.NeedsAttention,Messages.Define(job.Items.All(i=>i.State==ItemState.Succeeded)?"Text_140197D868":"Text_E9008C53CF"));
         await Save();
+    }
+    // Steps that never reached the server, or that it rejected before processing, are prepared
+    // again; a later create step targets the created record when it is sent.
+    static void PrepareUnsent(ChangeItem item)
+    {
+        for(var n=0;n<item.ApiSteps.Count;n++)
+        {
+            var step=item.ApiSteps[n];
+            if(step.State!=BatchStepState.InFlight)continue;
+            step.State=BatchStepState.Prepared;
+            if(item.Kind==ChangeKind.Create && n>0)step.Path="{created}";
+        }
     }
     static void ApplyRebase(Workspace workspace,ChangeItem item,DataRow? verified)
     {
@@ -179,9 +247,9 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api,Workspace work
             }
             data.Snapshot.Add(verified.Copy());
         }
-        item.Rebased=true; item.State=ItemState.Succeeded; item.SetMessage(Messages.Define("Text_631F4DBEC2"));
+        item.Rebased=true; item.State=ItemState.Succeeded; item.SetMessage(Messages.Define(item.DeletionVerification?.Outcome=="ApiInvisible"?"ApiDeletedInvisible":"Text_631F4DBEC2"));
         data.ClearHistory(invalidateIndex:verified is null); data.SnapshotAt=DateTimeOffset.UtcNow;
-        var operation=$"{item.Resource}:{item.Kind}";
+        var operation=ApiOperationPolicy.Key(item);
         if(!workspace.VerifiedOperations.Contains(operation)) workspace.VerifiedOperations.Add(operation);
     }
 }

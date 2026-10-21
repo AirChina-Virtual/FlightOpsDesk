@@ -68,6 +68,9 @@ if(args.Length==2 && args[0]=="--benchmark-core"){CorePerformanceBenchmark.Run(a
 if(args.Length==2 && args[0]=="--benchmark-core-load"){CorePerformanceBenchmark.RunLoad(args[1]);return;}
 if(args.Length==1 && args[0]=="--core-optimization"){await CoreOptimizationScenarios.Run(Test);Summary("core optimization ");return;}
 if(args.Length==1 && args[0]=="--ui-interactions"){await UiInteractionScenarios.Run(Test);Summary("UI interactions ");return;}
+if(args.Length==1 && args[0]=="--task-submission"){await TaskSubmissionScenarios.Run(Test);Summary("task submission ");return;}
+if(args.Length==1 && args[0]=="--verified-scope"){await VerifiedScopeScenarios.Run(Test);Summary("verified scope ");return;}
+if(args.Length==1 && args[0]=="--unblock"){await UnblockScenarios.Run(Test);await UnblockScenarios.RunSoftDeletes(Test);await UnblockScenarios.RunRefresh(Test);Summary("unblock ");return;}
 if(args.Length==1 && args[0]=="--data-table"){await DataTableScenarios.Run(Test);Summary("data table ");return;}
 if(args.Length==3 && args[0]=="--seed-data-ui"){DataUiFixture.Seed(args[1],int.Parse(args[2]));return;}
 var csv = new CsvAdapter(); var planner = new ChangePlanner();
@@ -93,6 +96,8 @@ if (args.Length == 2 && args[0] == "--seed-ui")
 
 if(args.Length==1 && args[0]=="--performance") {await PerformanceScenarios.Run(Test); await CandidateIndexScenarios.Run(Test);Console.WriteLine($"{passed} performance scenarios passed.");return;}
 if(args.Length==1 && args[0]=="--indexes") {await CandidateIndexScenarios.Run(Test);Console.WriteLine($"{passed} index scenarios passed.");return;}
+if(args.Length==1 && args[0]=="--live-compatibility"){await LiveCompatibilityScenarios.Run(Test);Summary("live compatibility ");return;}
+if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await LiveCompatibilityScenarios.ExportDiagnostics(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-performance") {await PerformanceScenarios.Benchmark(args[1]);return;}
 
 await Test("CSV quoting, Unicode, embedded newline and leading zeros", () => Sync(() =>
@@ -401,6 +406,7 @@ await Test("Fleet labels translate generated annotations without translating nam
     Check(options[1].Describe(loc).Contains("Unresolved fleet") && options[1].Describe(loc).Contains("Reference needs verification"));
 }));
 await ApiScenarios.Run(Test);
+await LiveCompatibilityScenarios.Run(Test);
 await AuditScenarios.Run(Test);
 await ContractScenarios.Run(Test);
 await ReauditScenarios.Run(Test);
@@ -414,6 +420,9 @@ await HistoryScenarios.Run(Test);
 await CoreOptimizationScenarios.Run(Test);
 await DataTableScenarios.Run(Test);
 await UiInteractionScenarios.Run(Test);
+await TaskSubmissionScenarios.Run(Test);
+await VerifiedScopeScenarios.Run(Test);
+await UnblockScenarios.Run(Test);await UnblockScenarios.RunSoftDeletes(Test);await UnblockScenarios.RunRefresh(Test);
 Summary("scenarios ");
 
 sealed class CountingService(DemoService inner) : IResourceReader,IResourceWriter

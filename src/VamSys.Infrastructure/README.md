@@ -9,7 +9,11 @@
 | 文件 | 具体作用 |
 |---|---|
 | OperationsTransport.cs | 发送请求、管理登录令牌、控制请求频率，并处理服务器要求等待、报错和取消 |
+| ApiDiagnostics.cs | 结构化错误、脱敏、正文限制和诊断导出；OAuth 正文不进入证据 |
+| OperationsParameters.cs | 参数只读查询、会话缓存、批准前缀预检与字段差异证据 |
 | OperationsAdapter.cs | 把修改转换成 API 请求，读取返回数据，检查记录是否正确以及修改是否成功 |
+| OperationsMovement.cs | 单独 fleet_id PATCH、目标机队预检、目标父路径回读及旧步骤校验 |
+| OperationsDeletionVerification.cs | 软删除 204／404 证明、纯 GET 历史核对与提交后生效的人工确认；不执行 Pending 写入 |
 | OperationsQueries.cs | 按页读取数据，查找可能与准备新增的记录重复的内容 |
 | CandidateIndex.cs | 按 ID、名称或注册号等信息快速查找记录；同名的不同记录都保留 |
 | OperationsBatchExecutor.cs | 逐条提交修改，保存每一步的进度；中断后先核对结果，再更新本地数据 |
@@ -29,6 +33,7 @@
 | 文件 | 具体作用 |
 |---|---|
 | WorkspaceStore.cs | 提供读取工作区、任务、语言设置和连接密钥的入口 |
+| WorkspaceStore.Maintenance.cs | 未决写入保护、完整 SQLite 备份与清单、仅当前工作区的事务清理 |
 | WorkspaceStore.Schema.cs | 定义数据库格式；升级前备份，检查版本，并确保升级全部完成或全部撤回 |
 | WorkspaceStore.Persistence.cs | 处理完整保存和单步进度保存，防止较旧的数据覆盖较新的结果 |
 | WorkspaceStore.Resources.cs | 保存字段定义、原始数据、草稿和撤销／重做历史 |
@@ -54,6 +59,6 @@ v4 把工作区设置、任务、数据行、历史栈和每个历史步骤分�
 
 ## 已经测试什么，还有什么不能确定
 
-Tests 使用模拟服务器和单独的测试数据库，检查分批读取、请求限速、冲突、超时、ID 保存失败及程序被中断后的恢复。这些测试不能代替真实航空公司账号测试；文档没有说明清楚的更换机型、清空关联等操作仍然禁用。
+Tests 使用模拟服务器和单独的测试数据库，检查分批读取、请求限速、冲突、超时、ID 保存失败及程序被中断后的恢复。飞机移动和软删除按独立真实请求与回读证据开放，软件模拟回归另行登记，不替代本轮真实写入或窗口验收；未验证清空、单位和复杂对象仍受限制。
 
 [API 契约](../../docs/API-CONTRACTS.md) · [迁移说明](../../docs/STORAGE-MIGRATION.md) · [性能报告](../../docs/PERFORMANCE.md)

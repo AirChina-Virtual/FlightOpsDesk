@@ -28,7 +28,7 @@ public sealed partial class MainWindow
         {
             var blockers = new List<MessageDescriptor>();
             if (w.Resources.Values.Any(d => d.Conflicts.Count > 0)) blockers.Add(Messages.Define("ApiConflict"));
-            if (mode == RunMode.Online && w.Jobs.Any(j => j.Mode == RunMode.Online && j.Items.Any(i => i.State is ItemState.Pending or ItemState.Running or ItemState.Unknown)))
+            if (mode == RunMode.Online && ApiOperationPolicy.HasOpenOnlineItems(w))
                 blockers.Add(Messages.Define("ApiPendingJob"));
             if (mode == RunMode.Demo)
                 foreach (var (kind, data) in w.Resources.Where(p => p.Value.Draft.Count > 0))
@@ -38,7 +38,7 @@ public sealed partial class MainWindow
                         blockers.Add(Messages.Define("ReviewValidationIssue", ("resource", Schemas.All[kind].Name),
                             ("key", row is null ? issue.RowId.ToString()[..8] : Schemas.Key(kind, row)), ("field", issue.Field), ("reason", issue.Description)));
                     }
-            var plan = ReviewPlanBuilder.Build(planner.PlanWorkspace(w), mode, connected, verified, preview, blockers);
+            var plan = ReviewPlanBuilder.Build(planner.PlanWorkspace(w), mode, connected, verified, preview, blockers, w.ContractHash);
             _ = plan.ContentKey(); return plan;
         };
     }
@@ -66,7 +66,7 @@ public sealed partial class MainWindow
     }
 
     string ReviewChangeText(ChangeItem item) => $"{EnumText(item.Kind)} · {Schemas.Key(item.Resource, item.After)}\n" +
-        (item.Kind == ChangeKind.Delete ? L("Text_5ABD08A949") : string.Join("；", item.Fields.Select(f => $"{f.Key}: {item.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}")));
+        (item.Kind == ChangeKind.Delete ? L("Text_5ABD08A949") : string.Join("；", item.Fields.Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key,localization)}: {item.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}")));
 
     long reviewGeneration;
     Task reviewLoad = Task.CompletedTask;

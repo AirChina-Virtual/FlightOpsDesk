@@ -144,8 +144,8 @@ static class AuditScenarios
                 var parent=Create(ResourceKind.Airports,w.Resources[ResourceKind.Airports].Snapshot[0].Copy());parent.State=ItemState.Succeeded;parent.RemoteId="101";
                 var item=Route(kind,"local:"+parent.After.LocalId,"LGW");item.Dependencies.Add(parent.Id);
                 w.Resources[kind].Draft.Add(item.After.Copy());var job=new BatchJob{Items=[parent,item]};w.Jobs.Add(job);
-                h.Next=(r,ct)=>r.Method==HttpMethod.Post ? Json(RouteJson(kind),HttpStatusCode.Created)
-                    : Json(r.RequestUri!.AbsolutePath.EndsWith("/9")?Envelope(kind,RouteJson(kind)):List(""));
+                h.Next=(r,ct)=>(kind==ResourceKind.Routes?RouteApprovalFixture.Respond(r):null)??(r.Method==HttpMethod.Post ? Json(RouteJson(kind),HttpStatusCode.Created)
+                    : Json(r.RequestUri!.AbsolutePath.EndsWith("/9")?Envelope(kind,RouteJson(kind)):List("")));
                 string saved="";await new OperationsBatchExecutor(api,w).ExecuteAsync(job,()=>{saved=w.Serialize();return Task.CompletedTask;},default);
                 Check(item.State==ItemState.Succeeded && h.Methods.Count(m=>m==HttpMethod.Post)==1 && w.Resources[kind].Draft[0].Identity!.RemoteId=="9");
                 w=Workspace.Deserialize(saved);await new OperationsBatchExecutor(Api(w,h),w).ExecuteAsync(w.Jobs[0],()=>Task.CompletedTask,default);

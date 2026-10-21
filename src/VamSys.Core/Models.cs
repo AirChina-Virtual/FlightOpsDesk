@@ -141,6 +141,9 @@ public sealed class ChangeItem
     public string? RemoteId { get; set; }
     public Dictionary<string, JsonElement>? ApiExpectedValues { get; set; }
     public List<BatchStep> ApiSteps { get; set; } = [];
+    // Missing in old saved tasks: retain their original association semantics during recovery.
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool RequiresAirlineParameter { get; set; }
     public string? RecoveryCandidateId { get; set; }
     public List<RecoveryCandidateAttempt> RecoveryCandidates { get; set; } = [];
     [System.Text.Json.Serialization.JsonIgnore]
@@ -161,6 +164,15 @@ public sealed class ChangeItem
     public bool CreateCompleted { get; set; }
     public bool WriteAccepted { get; set; }
     public string? Diagnostic { get; set; }
+    public ApiDiagnostic? DiagnosticDetails { get; set; }
+    public ApiDiagnostic? ReadbackDetails { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ApiDeletionVerification? DeletionVerification { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ApiManualResolution? ManualResolution { get; set; }
+    public ApiSnapshotComparison? PreflightComparison { get; set; }
+    public List<ApiFieldDifference> VerificationDifferences { get; set; } = [];
+    public List<string>? PreCreateCandidateIds { get; set; }
     public string Message { get; set; } = Messages.Define("Text_637DA56123");
     public MessageDescriptor? Description { get; set; }
     public void SetMessage(MessageDescriptor description) { Description = description; Message = description.ToString(); }

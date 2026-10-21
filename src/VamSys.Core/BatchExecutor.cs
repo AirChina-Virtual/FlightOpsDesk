@@ -1,6 +1,10 @@
 namespace VamSys.Core;
 
-public sealed class ApiAccessException(string message) : Exception(message);
+public sealed class ApiAccessException(string message,int? status=null,ApiDiagnostic? details=null) : Exception(message)
+{
+    public int? Status { get; }=status;
+    public ApiDiagnostic? Details { get; }=details;
+}
 public sealed class PersistenceException(Exception inner) : Exception(Messages.Define("Text_8BEFA80716"), inner);
 public sealed class BatchExecutor(IResourceReader reader, IResourceWriter writer) : IBatchExecutor
 {

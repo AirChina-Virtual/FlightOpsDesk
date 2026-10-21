@@ -11,6 +11,7 @@ public sealed class ChangePlanner : IChangePlanner
         var known = workspace.Resources.SelectMany(p => p.Value.Snapshot.Select(r => (Token: "local:" + r.LocalId, Key: Schemas.Key(p.Key, r)))).ToDictionary(p => p.Token, p => p.Key, StringComparer.OrdinalIgnoreCase);
         foreach (var item in items)
         {
+            item.RequiresAirlineParameter=workspace.Mode==RunMode.Online && item.Resource==ResourceKind.Fleets && item.Kind==ChangeKind.Create;
             foreach (var field in Schemas.ReferenceFields(item.Resource))
             {
                 var original = item.After.Get(field);

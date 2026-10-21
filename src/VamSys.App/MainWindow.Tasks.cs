@@ -37,7 +37,7 @@ public sealed partial class MainWindow
                     var reset=job.Items.Where(i=>i.State==ItemState.Failed).ToList();foreach(var i in reset)i.State=ItemState.Pending;
                     await Save(dataChanged:false);foreach(var i in reset)vm!.Update(i.Id);
                     await ExecuteDemo(job);
-                }));
+                }),()=>UserAction(()=>ExportTaskDiagnostics(job.Id)),()=>UserAction(()=>VerifyTaskDeletions(job)),()=>UserAction(()=>DiscardUnsent(job)));
             taskIndex.Add(job.Id,vm);
             var at=0;while(at<taskModels.Count&&taskModels[at].Job.Created>job.Created)at++;
             taskModels.Insert(at,vm);
@@ -98,8 +98,11 @@ public sealed partial class MainWindow
                     <StackPanel Orientation="Horizontal" Spacing="10">
                       <Button Content="{Binding DetailsLabel}" Command="{Binding Details}"/>
                       <Button Content="{Binding ReviewLabel}" Command="{Binding Review}"/>
+                      <Button Content="{Binding VerifyDeletesLabel}" Command="{Binding VerifyDeletes}"/>
                       <Button Content="{Binding ResumeLabel}" Command="{Binding Resume}"/>
+                      <Button Content="{Binding DiscardLabel}" Command="{Binding Discard}"/>
                       <Button Content="{Binding RetryLabel}" Command="{Binding Retry}"/>
+                      <Button Content="{Binding ExportLabel}" Command="{Binding Export}"/>
                     </StackPanel>
                   </ScrollViewer>
                 </StackPanel>
@@ -110,6 +113,21 @@ public sealed partial class MainWindow
         var list=taskList;var owner=workspace.Id;
         list.Loaded+=(_,_)=>DispatcherQueue.TryEnqueue(()=>FindVisual<ScrollViewer>(list)?.ChangeView(null,taskScroll.GetValueOrDefault(owner),null,true));
         Grid.SetRow(list,1);grid.Children.Add(list);tasksPage=grid;return grid;
+    }
+    // Local only: never-sent items are saved as Failed before the task in memory changes.
+    async Task DiscardUnsent(BatchJob job)
+    {
+        if(busy||!closeState.IsOpen||job.Mode!=RunMode.Online)return;
+        var ids=job.Items.Where(ApiOperationPolicy.CanDiscardUnsent).Select(i=>i.Id).ToList();
+        if(ids.Count==0||!await Confirm(L("ApiDiscardPending"),Text(()=>L("ApiDiscardConfirm",("count",ids.Count))),L("ApiDiscardPending")))return;
+        var count=0;
+        await Work(async()=>
+        {
+            try{count=await VamSys.Infrastructure.OperationsPendingDiscard.DiscardAsync(workspace,job,new AppCheckpointWriter(this,store.CheckpointWriter(workspace)));}
+            catch(PersistenceException){ReloadAfterCheckpointFailure();throw;}
+        });
+        foreach(var id in ids)NotifyTask(new(workspace.Id,job.Id,id,id==ids[^1]));
+        Status(()=>L("ApiDiscarded",("count",count)));
     }
     void CaptureTaskState()
     {

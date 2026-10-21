@@ -1,18 +1,20 @@
-# Operations API 契约登记（2026-09-21）
+# Operations API 契约登记（2026-10-20）
 
 规范来源：[Operations](https://vamsys.io/api-docs/operations.json)、[Pilot](https://vamsys.io/api-docs/pilot.json)。原始 JSON 已固定在 `contracts/`，抓取时间、OpenAPI 3.1.0、API 3.0.0 与 SHA-256 见 `contracts/manifest.json`。适配器嵌入同一 Operations 规范，并校验所生成请求的属性、类型、必填项、枚举及已声明边界。
 
-不再将“缺少完整 OpenAPI”作为全局禁用理由。下表的本地测试是程序契约／行为测试，**没有真实实例联调**。运行时按当前工作区和契约哈希记录操作回读结果；首次操作最多 3 条样本，人工确认不计为自动验证。
+Operations 固定为本轮 10 月 20 日证据中的快照，SHA-256 为 `1EC1A869FC3C6F4D70A7A6ECD50170D5D915551794E796F9F34D5AFB944D78C2`。与 9 月版本同为 API 3.0.0、173 个操作；排除说明、示例、默认值和标题后，35 个组件 schema 存在结构差异（含请求、查询和响应）。运行时不自动替换契约，新增字段仍受客户端白名单与独立兼容性策略限制。Pilot 保留原有归档。
+
+已有独立真实 API 脚本测试；下表的本地测试指软件实际代码的模拟回归，不能推导软件真实写入或窗口验收。证据分级见 [能力验证矩阵](CAPABILITY-MATRIX.md)。已按用户确认开放固定契约下的独立实测范围，见 [字段与证据清单](VERIFIED-API-SCOPE.md)；这些请求不再受首次三条限制。未覆盖变体保留原有样本／兼容限制。外部基线不写工作区验证标记，只有软件实际成功回读才登记。
 
 ## 资源契约
 
-| 资源 | 方法与路径 | 响应与重要语义 | 文档确认 | 本地测试 | 实例联调 |
+| 资源 | 方法与路径 | 响应与重要语义 | 文档确认 | 本地测试 | 独立真实 API |
 |---|---|---|---|---|---|
-| 机场 | GET/POST `/airports`；GET/PUT/DELETE `/airports/{airport_id}` | 创建用 `icao_iata`，后续按远端 ID；POST 裸对象，GET/PUT `data` 包装；DELETE 204 软删除 | 是 | 通过 | 未进行 |
-| 机型 | GET/POST `/fleet`；GET/PUT/DELETE `/fleet/{fleet_id}` | 创建 name/code/type 后 PUT 容量等；POST 裸对象，单条 GET/PUT 包装；永久删除 | 是 | 通过 | 未进行 |
-| 飞机 | GET/POST `/fleet/{fleet_id}/aircraft`；GET/PUT/DELETE `/fleet/{fleet_id}/aircraft/{aircraft_id}` | 遍历机型读取；创建 name/registration 后补充属性；单条 GET/PUT 包装；永久删除 | 是 | 通过 | 未进行 |
-| 航路 | GET/POST `/routings`；GET/PUT/DELETE `/routings/{routing_id}` | 起降为机场 ID，更新不能改变；单条 GET/POST/PUT 裸对象；tag 需创建后 PUT；永久删除 | 是 | 通过 | 未进行 |
-| 航线 | GET/POST `/routes`；GET/PUT/DELETE `/routes/{route_id}` | RouteData 没有 `airline_id`，归属取当前连接的 VA；fleet_ids 为整数数组；UTC HH:MM:SS，日期按 `2025-01-01T00:00:00+00:00` 格式提交；callsign／flight_number 对所有类型必填；cost_index 为空、AUTO 或 0–999；起降不可更新；软删除 | 是，实验接口 | 通过 | 未进行 |
+| 机场 | GET/POST `/airports`；GET/PUT/DELETE `/airports/{airport_id}` | 创建用 `icao_iata`，后续按远端 ID；POST 裸对象，GET/PUT `data` 包装；DELETE 204 软删除 | 是 | 通过 | 外部脚本部分通过 |
+| 机型 | GET/POST `/fleet`；GET/PUT/DELETE `/fleet/{fleet_id}` | 容量、parameter_ids 等已支持字段可随首次 POST；POST 裸对象，单条 GET/PUT 包装；永久删除 | 是 | 通过 | 外部脚本部分通过 |
+| 飞机 | GET/POST `/fleet/{fleet_id}/aircraft`；GET/PUT/DELETE `/fleet/{fleet_id}/aircraft/{aircraft_id}` | 遍历机型读取；容量等已支持字段可随 POST；单条 GET/PUT 包装；永久删除 | 是 | 通过 | 外部脚本部分通过 |
+| 航路 | GET/POST `/routings`；GET/PUT/DELETE `/routings/{routing_id}` | 起降为机场 ID，更新不能改变；单条 GET/POST/PUT 裸对象；tag 可随 POST；永久删除 | 是 | 通过 | 按矩阵区分 |
+| 航线 | GET/POST `/routes`；GET/PUT/DELETE `/routes/{route_id}` | RouteData 没有 `airline_id`，归属取当前连接的 VA；fleet_ids 为整数数组；UTC HH:MM:SS，日期按 `2025-01-01T00:00:00+00:00` 格式提交；callsign／flight_number 对所有类型必填；cost_index 为空、AUTO 或 0–999；起降不可更新；软删除 | 是，实验接口 | 通过 | 自建 scheduled/jumpseat 样本通过 |
 
 集合读取处理 `data` 数组与 `meta.next_cursor_url`。每页请求 `page[size]=100`（文档默认 15 条，未写上限）；首页如果因此返回 400／422，改用服务器默认页长继续读取。分页限制 HTTPS、同源及 Operations 路径，拒绝循环页。
 
@@ -30,13 +32,15 @@ POST `https://vamsys.io/oauth/token`，form-urlencoded：grant_type=client_crede
 
 | 行为 | 原因 | 状态 |
 |---|---|---|
-| PATCH `/aircraft/{aircraft_id}` 更换机型 | MoveAircraftFleetData 是无 properties 的空对象，无法得知目标字段 | 禁用，待官方补齐 |
-| 已有航线 Fleet IDs 替换／追加／移除／清空 | 请求字段类型明确，但集合替换、空集合限制仍需核实 | 禁用，待实例语义验证 |
+| PATCH `/aircraft/{aircraft_id}` 跨机队移动 | 独立真实请求及目标父路径回读通过；只发整数 fleet_id，独立提交并核对目标归属 | 已开放；独立能力键，Unknown 只 GET |
+| 已有 scheduled 航线 Fleet IDs 替换／追加／移除 | 独立真实样本 A→AB→B→A 已通过；软件预检批准关系并完整回读集合 | 已按实测范围开放；独立能力键 |
+| 空航线机队集合、jumpseat 集合更新 | 不扩大已验证范围 | 继续禁用 |
 | 转换到／离开 Jumpseat | 文档说明清除机型与容器关联，处理顺序没有明确说明 | 本轮禁用 |
 | 未确认清空 | nullable 声明不替代具体更新语义 | 禁用；机场 container_ids:[] 例外，已有明确说明 |
 | Airport Pax/Cargo LF ID、Fleet Allowed Prefix IDs | CSV 与 API 对应关系／关联对象的部分更新方式未核实 | 保留 CSV，阻止这些字段在线提交 |
 | SimBrief／复杂对象编辑 | 保留原始 JSON，当前表格未提供相应编辑器；部分响应 schema 与例子矛盾 | 不生成此类请求 |
-| 软删除自动确认 | GET 可见性和最终停用状态缺少可依赖的统一判据 | 已接收后标未知，支持显式人工确认；不解锁批量删除 |
+| 飞机顶层 weight_unit、机队单位换算 | 飞机显式单位 PUT 可复现 500；机队 lbs 输入读回不换算 | kg 整数原样提交；均省略 weight_unit |
+| 软删除自动核对 | 限机场和已测 scheduled／jumpseat；要求原 DELETE 204、对应步骤和同 VA 同 ID 的后续 GET 404 | 已开放“API 已核对不可见”；不宣称物理删除，缺证据仍未知 |
 
 RouteData 中 fleet_ids/container_ids 声明 string 数组却有整数例子，部分对象属性声明数组却有对象例子。读取机型 ID 兼容 string／number 元素，保留完整原始 JSON；写入只按照请求 schema 生成整数数组。不会把请求中列出的“明确 prohibited”旧 SimBrief 字段生成为有效输入。
 
@@ -50,7 +54,18 @@ Pilot API 是个人授权的 Authorization Code + PKCE，涉及 profile、bookin
 
 ## 后续实例验收
 
-使用用户提供的 Operations 凭据，先验证五类资源分页和标识，再逐操作提交少量样本。检查字段、类型、返回 ID、分步创建、权限拒绝、远端冲突、软删除实际可见性与超时后的结果。只将实际回读通过的对应操作记录在工作区；文档缺口功能不因其他操作成功而自动解锁。
+本轮实施的真实服务回归仅执行 GET（OAuth 取令牌例外），不自动执行新的写入验收。以后软件真实写入验收须另行授权。只将软件实际回读通过的对应操作记录在工作区；其他能力的成功不自动解锁新能力。
+
+## 10 月兼容性处理
+
+- 货物容量只接收、显示并提交 kg 的非负整数；CSV 原列名、未知列与字节格式规则保留，离线小数不自动取整。在线审阅明确阻止小数、负值和溢出。空值仍表示省略／继承，未开放清空。
+- 新在线机队选择一个 approved、unrestricted 参数，以字符串数组 `parameter_ids` 提交。参数查询只有只读模型，不新增资源 CRUD；旧 `Allowed Prefix IDs` 不自动映射，既有机队改绑／解绑禁用。旧任务缺少新选择要求标志时保留保存时的语义。
+- scheduled 机队集合使用 `Routes:Update:FleetIds:Scheduled`，不继承旧 `Routes:Update` 标记；整数请求与 string/number 响应按规范化集合完整核对，拒绝重复、缺少或新增成员。参数与机队批准信息只在当前连接、当前执行会话缓存；机队变化、读取失败或相关 422 失效。
+- 已有 jumpseat 允许呼号／班号为空并显示“服务端未保留”，这两个字段在线只读。创建仍提交合法必填值，只有这两个字段的显式 JSON null 可作为回读例外。机场、类型、远端 ID 与其他持久字段仍严格比较；缺字段或非空差异不豁免。
+- jumpseat 候选按机场对、类型、起降时刻与有效日期比较。无 ID 的人工候选须不在提交前候选 ID 中，持久字段一致且创建时间在持久化请求窗口内（±60 秒）；缺证据保持 Unknown，不能重发。
+- `updated_at` 不作为业务版本号。预检诊断分别保存时间戳和业务字段差异；仅元数据变化不制造冲突。不自动扫描 booking／PIREP，不将既有时间相关性写成确定因果。
+- 诊断保留 HTTP、阶段、本地时间、服务器 Date、完整字段错误、error_id 和可用追踪头。先脱敏再按 1 MiB 限制正文，并保存截断标志和完整脱敏正文哈希；UI 摘要可缩短。OAuth 正文、凭据和 Cookie 不导出。原 Diagnostic 与新可选 JSON 字段兼容，数据库仍为 v4。
+- 新建优先使用单次 POST；旧任务恢复保持原步骤、期望值和检查点顺序，不补发或重排旧写入。Unknown 的 GET 读回旧值仍不允许重发。
 
 
 ## 审核修复后的本地核对规则（2026-09-21）
@@ -97,4 +112,4 @@ Pilot API 是个人授权的 Authorization Code + PKCE，涉及 profile、bookin
 
 同批创建、修改及永久删除只有完成原有回读核对后才更新确认索引。未知修改保留前后身份，未知删除保留原身份；机场创建尚未核对成功时暂停后续机场创建。受保护的新记录保持 Pending，未知记录仍保持 Unknown。输入候选 ID、空列表或恢复失败均不视为成功。恢复重建不确定预留，并重新读取确认数据；缺少原始 API 快照的历史成功记录不参与初始化，不重发其写入。
 
-上述规则为客户端保护，不引入新端点、字段、删除语义或实例验证标记。软删除仍遵循现有人工核对边界；限流和未确认能力保持原状。
+上述规则为客户端保护。现已另按独立实测证据开放软删除 204／404 核对和飞机 fleet_id 移动，范围见前文；不扩大到物理删除判定、未验证类型转换或复杂字段。共享限流、检查点和未知写入不重发保持原状。

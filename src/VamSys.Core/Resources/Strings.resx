@@ -772,13 +772,13 @@
     <value>演示航空公司 {time}</value>
   </data>
   <data name="ApiMoveFleet" xml:space="preserve">
-    <value>飞机更换机型已禁用：官方 MoveAircraftFleetData 未定义请求字段。</value>
+    <value>该修改不属于飞机独立跨机队移动；请仅修改飞机的 Fleet ID 后审阅提交。</value>
   </data>
   <data name="ApiSubmitScope" xml:space="preserve">
     <value>目标：{va}（VA {id}），共 {count} 条。未验证操作按小样本执行；成功回读后记录该操作验证结果。</value>
   </data>
   <data name="ApiCapability" xml:space="preserve">
-    <value>官方契约已接入；只读需连接验证，未验证写入每类每次最多 3 条。机型迁移、航线机型关联修改及未确认清空保持禁用。</value>
+    <value>已开放有独立真实 API 成功请求及回读证据的五类资源范围；未覆盖的写入保留样本与兼容限制。共享限流、冲突检查和未知结果只读恢复继续生效。</value>
   </data>
   <data name="ApiSettingsHelp" xml:space="preserve">
     <value>使用 Orwell 中配置的 Operations Client ID 与 Secret。连接后手动刷新；草稿不会自动提交。API 重量按 kg，日期与时刻按 UTC。</value>
@@ -965,4 +965,65 @@
   <data name="ReviewIssues" xml:space="preserve"><value>查看全部 {count} 项校验问题</value></data>
   <data name="BatchRestored" xml:space="preserve"><value>恢复为可编辑草稿</value></data>
   <data name="ReviewValidationIssue" xml:space="preserve"><value>{resource} · {key} · {field}：{reason}</value></data>
+  <data name="FreightKg" xml:space="preserve"><value>货物容量（kg）</value></data>
+  <data name="MaxFreightKg" xml:space="preserve"><value>最大货物容量（kg）</value></data>
+  <data name="WeightIntegerKg" xml:space="preserve"><value>在线货物容量必须是非负整数，单位为 kg；不会自动取整或换算。</value></data>
+  <data name="WeightCsvHint" xml:space="preserve"><value>Freight 和 Max Freight 均按 kg 解释；CSV 列名保持不变，在线提交仅接受非负整数。</value></data>
+  <data name="AirlineParameter" xml:space="preserve"><value>航司参数</value></data>
+  <data name="ParameterSelect" xml:space="preserve"><value>为新机队选择一个已批准且未受限的航司参数</value></data>
+  <data name="ApiParametersLoad" xml:space="preserve"><value>读取航司参数</value></data>
+  <data name="ApiParametersLoaded" xml:space="preserve"><value>已读取 {count} 条航司参数；仅用于批准校验和新机队关联。</value></data>
+  <data name="ApiParametersUnavailable" xml:space="preserve"><value>请先读取航司参数。权限或读取失败只会阻止依赖批准校验的操作。</value></data>
+  <data name="ApiParameterRequired" xml:space="preserve"><value>请选择一个当前航空公司已批准且未受限的航司参数。</value></data>
+  <data name="ApiParameterCreateOnly" xml:space="preserve"><value>仅支持为新建机队关联航司参数；现有机队改绑和解绑尚未开放。</value></data>
+  <data name="ApiPrefixDenied" xml:space="preserve"><value>机队“{fleet}”尚未获准使用呼号 {callsign} 和班号 {flight} 的前缀，请先检查航司参数关联。</value></data>
+  <data name="ApiKnownWeightRestriction" xml:space="preserve"><value>当前实例存在重量单位和 SimBrief 写入异常；本版仅提交 kg 数值，禁止附带 weight_unit 或 simbrief_overrides。</value></data>
+  <data name="ApiJumpseatIdentity" xml:space="preserve"><value>服务端不保留 jumpseat 呼号和班号，现有记录的这两个字段暂不支持在线修改。</value></data>
+  <data name="JumpseatNotPreserved" xml:space="preserve"><value>服务端未保留</value></data>
+  <data name="ApiRejected" xml:space="preserve"><value>请求返回 HTTP {status}：{reason}</value></data>
+  <data name="ApiUnknownError" xml:space="preserve"><value>结果未知（HTTP {status}），请只读核对，不要重复提交。{reason}</value></data>
+  <data name="ApiReadbackMismatch" xml:space="preserve"><value>请求可能已执行，但读回字段不匹配；保持结果未知，仅允许读取核对。</value></data>
+  <data name="ApiSoftDeleteEvidence" xml:space="preserve"><value>停用请求已接收（HTTP {writeStatus}），详情读取为 HTTP {status}；这不代表物理删除，需人工核对。</value></data>
+  <data name="ApiEvidenceExport" xml:space="preserve"><value>导出诊断</value></data>
+  <data name="MaintenanceTitle" xml:space="preserve"><value>本地工作区维护</value></data>
+  <data name="BackupClear" xml:space="preserve"><value>先备份，再清理当前工作区</value></data>
+  <data name="BackupClearPreview" xml:space="preserve"><value>工作区：{name}；数据目录：{path}。将清理 {snapshots} 条快照、{drafts} 条草稿、{jobs} 个任务、{conflicts} 个冲突和 {history} 个撤销／重做步骤。先备份整个本地数据库，仅清理当前工作区，保留连接配置和凭据，不调用远端 API。</value></data>
+  <data name="MaintenanceUnsafe" xml:space="preserve"><value>存在运行中或结果未知的远端写入，必须先完成只读核对；备份不能替代写入结果核对。</value></data>
+  <data name="MaintenanceDone" xml:space="preserve"><value>当前工作区已清理，凭据保留。备份：{path}。请重新连接并刷新。</value></data>
+  <data name="MaintenanceBackupFailed" xml:space="preserve"><value>备份未通过完整性验证，未清理工作区。</value></data>
+  <data name="ApiEvidenceSaved" xml:space="preserve"><value>已导出脱敏诊断和 SHA-256：{path}</value></data>
+  <data name="TaskStartBlocked" xml:space="preserve"><value>任务未启动：工作区、运行模式或操作锁已变化。请在任务中心核对后手动继续；程序不会自动启动或重新提交。</value></data>
+  <data name="ApiIndependentEvidence" xml:space="preserve"><value>已按独立真实 API 测试范围开放。</value></data>
+  <data name="ApiIndependentScope" xml:space="preserve"><value>五类资源中已通过独立真实 API 请求与回读的字段范围已开放；未覆盖变体仍保留样本限制。此依据与本工作区的软件回读验证分开记录。</value></data>
+  <data name="ApiMoveSeparate" xml:space="preserve"><value>飞机跨机队移动请单独提交，只修改 Fleet ID；其他字段修改请在移动完成后提交。</value></data>
+  <data name="ApiMoveTarget" xml:space="preserve"><value>目标机队必须是当前 VA 中可读取、未标记删除的机队，请先刷新。</value></data>
+  <data name="ApiDeletedInvisible" xml:space="preserve"><value>API 已核对不可见：原删除请求返回 204，本次详情读取为 404；不表示物理删除。</value></data>
+  <data name="ApiVerifyDeletes" xml:space="preserve"><value>API 只读核对删除</value></data>
+  <data name="ApiDeleteCheckDone" xml:space="preserve"><value>只读删除核对完成；未确认项保留原状态，没有重新提交删除。</value></data>
+  <data name="ApiTaskCounts" xml:space="preserve"><value>API 核对 {success}/{total} · 人工确认 {manual} · 未知 {unknown}</value></data>
+  <data name="ApiNotSent" xml:space="preserve"><value>请求尚未发送到服务器（在等待限流、刷新令牌或取消时中断），已放回待执行；继续任务即可重试。</value></data>
+  <data name="ApiResumeCreate" xml:space="preserve"><value>记录已创建，后续步骤尚未被服务器处理。继续任务时会先核对已创建的记录，再补发剩余步骤，不会重复创建。</value></data>
+  <data name="ApiVerifyNotApplied" xml:space="preserve"><value>API 核对未生效</value></data>
+  <data name="ApiNotAppliedHelp" xml:space="preserve"><value>如认为这次写入没有生效，可用 API 只读核对：新建项须查不到符合判重条件的记录，修改或删除项读回的当前值须仍与修改前一致。核对通过后标为失败，本地草稿保留，可重新审阅提交；不通过则保持原状态。</value></data>
+  <data name="ApiNotAppliedVerified" xml:space="preserve"><value>API 只读核对确认这次写入未生效，已标为失败；本地草稿保留，可重新审阅提交。</value></data>
+  <data name="ApiNotAppliedUnproven" xml:space="preserve"><value>API 只读核对无法证明这次写入未生效（可能已生效，或记录已被其他人修改），状态保持不变；请在 Orwell 核对。</value></data>
+  <data name="ApiDiscardedUnsent" xml:space="preserve"><value>已放弃，未发出：这一项从未发送到服务器，已标为失败，继续任务也不会再发送；本地草稿保留，可重新审阅提交。</value></data>
+  <data name="ItemStateDiscarded" xml:space="preserve"><value>已放弃</value></data>
+  <data name="ApiTaskDiscarded" xml:space="preserve"><value> · 已放弃 {count}</value></data>
+  <data name="ApiDiscardPending" xml:space="preserve"><value>放弃未发出的项</value></data>
+  <data name="ApiDiscardConfirm" xml:space="preserve"><value>放弃 {count} 个从未发送到服务器的待执行项？它们将标为失败并注明“已放弃，未发出”，以后继续任务也不会再发送；本地草稿保留，可重新审阅提交。已发出、已收到应答或已被接受的项不受影响。</value></data>
+  <data name="ApiDiscarded" xml:space="preserve"><value>已放弃 {count} 个未发出的项；草稿保留，刷新和提交不再被这些项阻止。</value></data>
+  <data name="ApiAcceptServerValue" xml:space="preserve"><value>接受服务器当前值</value></data>
+  <data name="ApiAcceptServerHelp" xml:space="preserve"><value>服务器已接受这次写入，但只读 GET 读回的值与发送值不一致（可能被服务器规范化，或被他人同时修改）。可以接受服务器当前值：标为人工确认，本地快照改为服务器当前值，草稿中尚未生效的值列为冲突，由你决定保留还是放弃。不会重新发送写入，也不计入已验证的操作。差异（发送值 → 服务器当前值）：</value></data>
+  <data name="ApiAcceptDeleteHelp" xml:space="preserve"><value>服务器已接受删除请求，但只读 GET 仍能读到记录 {id}。可以接受服务器当前值：标为人工确认，保留这条记录并撤销本地删除标记。不会重新发送删除，也不计入已验证的操作。</value></data>
+  <data name="ApiAcceptedServerValue" xml:space="preserve"><value>人工接受服务器当前值，未通过 API 回读核对；本地快照已改为服务器当前值，草稿中未生效的值列为冲突。</value></data>
+  <data name="ApiAcceptedServerRecord" xml:space="preserve"><value>人工接受服务器当前值：记录仍然存在，已保留并撤销删除标记；未通过 API 核对删除。</value></data>
+  <data name="ApiAcceptMissing" xml:space="preserve"><value>只读 GET 读不到这条记录（HTTP 404），不能接受当前值，状态保持不变。删除项请点“继续”完成只读核对；其他情况请在 Orwell 核对。</value></data>
+  <data name="ApiAcceptNowMatches" xml:space="preserve"><value>服务器当前值已与发送值一致，状态保持不变；请点“继续”完成回读核对。</value></data>
+  <data name="ApiManualDeleteNoReceipt" xml:space="preserve"><value>人工确认删除（无写入回执）：服务器没有应答删除请求，只读 GET 返回 404。这不是完整的 204／404 API 证明，不计入已验证的操作。</value></data>
+  <data name="ApiConfirmNoReceipt" xml:space="preserve"><value>服务器没有应答删除记录 {id} 的请求（超时或 5xx），没有写入回执；只读 GET 返回 404。请先在 Orwell 确认记录已按预期停用／删除。确认后标为人工确认（无写入回执），并归档本地删除草稿；不会重新发送删除。</value></data>
+  <data name="ApiNoReceiptStillReadable" xml:space="preserve"><value>服务器没有应答删除记录 {id} 的请求，只读 GET 仍能读到这条记录，但与修改前的数据不一致（可能被他人修改），不能确认删除或未生效，状态保持不变；请在 Orwell 核对。与修改前的差异（修改前 → 当前）：</value></data>
+  <data name="ApiSoftDeleteUnchangedHelp" xml:space="preserve"><value>提醒：服务器没有应答删除记录 {id} 的请求（超时或 5xx），没有写入回执；只读 GET 仍能读到这条记录，且与修改前的数据一致，删除看起来没有生效。请先在 Orwell 确认。确认后标为未生效：状态为失败，本地删除草稿保留，可重新审阅提交；不会重新发送删除，也不计入已验证的操作。</value></data>
+  <data name="ApiMarkNotApplied" xml:space="preserve"><value>标为未生效</value></data>
+  <data name="ApiSoftDeleteUnchanged" xml:space="preserve"><value>删除没有写入回执，只读 GET 读到的记录与修改前一致，经人工确认标为未生效；本地删除草稿保留，可重新审阅提交。</value></data>
 </root>

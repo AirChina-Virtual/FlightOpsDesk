@@ -9,7 +9,7 @@ public sealed partial class OperationsAdapter
     {
         CheckConnection(row);
         if(kind is ResourceKind.Routes or ResourceKind.Routings)
-            return new(kind,row.Get(kind==ResourceKind.Routes?"Flight Number":"Route String"),
+            return new(kind,kind==ResourceKind.Routes && row.Get("Type")=="jumpseat"?ApiOperationPolicy.JumpseatSignature(row):row.Get(kind==ResourceKind.Routes?"Flight Number":"Route String"),
                 EndpointId(kind,row,"Departure Airport (ICAO/IATA)",false),EndpointId(kind,row,"Arrival Airport (ICAO/IATA)",false));
         return new(kind,row.Get(kind==ResourceKind.Airports?"ICAO/IATA":kind==ResourceKind.Aircraft?"Registration":"Name"));
     }
@@ -25,7 +25,7 @@ public sealed partial class OperationsAdapter
                 .Select(k=>new CandidateSignature(kind,doc.RootElement.GetProperty(k).GetString()!)).ToArray();
         }
         if(kind is ResourceKind.Routes or ResourceKind.Routings)
-            return [new(kind,row.Get(kind==ResourceKind.Routes?"Flight Number":"Route String"),
+            return [new(kind,kind==ResourceKind.Routes && row.Get("Type")=="jumpseat"?ApiOperationPolicy.JumpseatSignature(row):row.Get(kind==ResourceKind.Routes?"Flight Number":"Route String"),
                 EndpointId(kind,row,"Departure Airport (ICAO/IATA)",true),EndpointId(kind,row,"Arrival Airport (ICAO/IATA)",true))];
         return [DraftSignature(kind,row)];
     }
