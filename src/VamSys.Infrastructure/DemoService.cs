@@ -13,10 +13,14 @@ public sealed class DemoService : IResourceReader, IResourceWriter
     { ct.ThrowIfCancellationRequested(); return Task.FromResult(data[kind].GetValueOrDefault(id.ToUpperInvariant())?.Copy()); }
     public async Task<string?> WriteAsync(ChangeItem change, CancellationToken ct)
     {
-        await Task.Delay(80, ct); var key = Schemas.Key(change.Resource, change.After);
-        if (key == "") key = (++sequence).ToString();
-        if (change.Kind == ChangeKind.Delete) data[change.Resource].Remove(key);
-        else { var row = change.After.Copy(); row.Fields[Schemas.All[change.Resource].Key] = key; data[change.Resource][key] = row; }
+        await Task.Delay(80, ct);
+        var key = Schemas.Key(change.Resource, change.After);
+        if (key == "")
+            key = (++sequence).ToString();
+        if (change.Kind == ChangeKind.Delete)
+            data[change.Resource].Remove(key);
+        else
+        { var row = change.After.Copy(); row.Fields[Schemas.All[change.Resource].Key] = key; data[change.Resource][key] = row; }
         return key;
     }
     public void RestoreSuccessful(BatchJob job)
@@ -24,9 +28,12 @@ public sealed class DemoService : IResourceReader, IResourceWriter
         foreach (var item in job.Items.Where(i => i.State == ItemState.Succeeded))
         {
             var key = item.RemoteId ?? Schemas.Key(item.Resource, item.After);
-            if (item.Kind == ChangeKind.Delete) data[item.Resource].Remove(key);
-            else { var row = item.After.Copy(); row.Fields[Schemas.All[item.Resource].Key] = key; data[item.Resource][key] = row; }
-            if (int.TryParse(key, out var n)) sequence = Math.Max(sequence, n);
+            if (item.Kind == ChangeKind.Delete)
+                data[item.Resource].Remove(key);
+            else
+            { var row = item.After.Copy(); row.Fields[Schemas.All[item.Resource].Key] = key; data[item.Resource][key] = row; }
+            if (int.TryParse(key, out var n))
+                sequence = Math.Max(sequence, n);
         }
     }
 }
