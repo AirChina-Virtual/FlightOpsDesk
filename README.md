@@ -78,12 +78,13 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:Restor
 artifacts、archive、`.tools`、bin 和 obj 都只保存在本机，不会提交到 GitHub。
 
 - **artifacts**
-  - flightops-app：当前正式包；2026-10-20 审阅修复版通过 255 项回归和包检查。
+  - flightops-app：当前正式包；2026-10-20 审阅修复版通过 255 项回归和包检查。该包构建于阶段 1（解除卡死）之前，不包含其修改；需要时用 `build.ps1 -Publish` 重新生成。
   - FlightOpsDesk-2026-10-20-review-fixes-win-x64.zip 及 .sha256：当前正式交付压缩包与校验文件；上一版 verified-scope ZIP 已归档到 archive/2026-10-20-review-fixes。
   - step5-v3-baseline：真实旧版程序的回归基线，测试会用到，不能当作普通旧包清理。
   - v3-qa、test-build 和各项目 bin/obj：可重建输出，本次整理已删除，后续发布或构建会重新生成。
 - **archive**：按日期存放已归档的内容。每个目录都有说明、逐文件 SHA-256 清单（*-files.csv）、ZIP 校验值及清理记录。2026-10-19-performance 保存此前测量、窗口结果和旧包；2026-10-20-cleanup 保存本次被替换的正式包，以及 core-performance（含修改前源码）、checkbox-theme、encoding-verification、cache-cleanup、repository-metadata、step5-performance、storage-v3-20260922 和 step5 日志。
-- **本次构建后整理**：archive/2026-10-20-startup-fix-cleanup 保存 152 个项目文件的清理前备份、未提交差异、重新生成的 6 份 step5-performance 结果、逐文件清单与删除记录。已删除重新构建产生的 test-build 及 src/tests 的 bin/obj；当前正式目录、ZIP、SDK 和旧版兼容性基线保留。
+- **阶段 1 提交后整理**：删除构建输出（src／tests 的 bin、obj，artifacts/test-build）和测试生成的 artifacts/step5-performance，共 1,503 个文件、约 601 MB，均可重新生成；逐文件清单在 archive/2026-10-20-phase1-cleanup。
+- **此前的构建后整理**：archive/2026-10-20-startup-fix-cleanup 保存 152 个项目文件的清理前备份、未提交差异、重新生成的 6 份 step5-performance 结果、逐文件清单与删除记录。已删除重新构建产生的 test-build 及 src/tests 的 bin/obj；当前正式目录、ZIP、SDK 和旧版兼容性基线保留。
 - **恢复**：先把 ZIP 解压到单独的目录，再按清单取回需要的文件。报告中提到的旧 artifacts 路径，都可以在清单中查到。
 
 可以重新生成的内容会直接删除，不归档，包括合成测试数据库、各轮 QA 构建，以及调试用的内存转储；删除记录保存在各归档目录的 cleanup.csv。
