@@ -39,7 +39,8 @@ public partial class EnumInventoryTests
                 foreach (var member in match.Groups["body"].Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 {
                     var parts = member.Split('=', 2, StringSplitOptions.TrimEntries);
-                    if (parts.Length == 2 && long.TryParse(parts[1], out var explicitValue)) next = explicitValue;
+                    if (parts.Length == 2 && long.TryParse(parts[1], out var explicitValue))
+                        next = explicitValue;
                     yield return $"VamSys.App(source):{name}.{parts[0]} => {next}";
                     next++;
                 }

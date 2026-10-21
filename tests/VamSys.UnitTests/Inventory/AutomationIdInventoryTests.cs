@@ -30,28 +30,35 @@ public partial class AutomationIdInventoryTests
         var app = Path.Combine(SourceScan.Src, "VamSys.App");
         foreach (var file in SourceScan.CsFiles(app))
         {
-            var text = SourceScan.Read(file); all.AppendLine(text);
+            var text = SourceScan.Read(file);
+            all.AppendLine(text);
             foreach (var line in text.Split('\n'))
             {
-                foreach (Match m in SetIdLiteral().Matches(line)) { ids.Add(m.Groups["id"].Value); lines.Add($"id:{m.Groups["id"].Value} => code {SourceScan.Relative(file)}"); }
-                foreach (Match m in ForwardedId().Matches(line)) { ids.Add(m.Groups["id"].Value); lines.Add($"id:{m.Groups["id"].Value} => code {SourceScan.Relative(file)}"); }
+                foreach (Match m in SetIdLiteral().Matches(line))
+                { ids.Add(m.Groups["id"].Value); lines.Add($"id:{m.Groups["id"].Value} => code {SourceScan.Relative(file)}"); }
+                foreach (Match m in ForwardedId().Matches(line))
+                { ids.Add(m.Groups["id"].Value); lines.Add($"id:{m.Groups["id"].Value} => code {SourceScan.Relative(file)}"); }
                 foreach (Match m in SetNameLiteral().Matches(line))
                     lines.Add(m.Groups["key"].Success ? $"name-key:{m.Groups["key"].Value} => code {SourceScan.Relative(file)}" : $"name:{m.Groups["text"].Value} => code {SourceScan.Relative(file)}");
             }
         }
         foreach (var file in SourceScan.XamlFiles(app))
         {
-            var text = SourceScan.Read(file); all.AppendLine(text);
+            var text = SourceScan.Read(file);
+            all.AppendLine(text);
             foreach (var element in XDocument.Parse(text).Descendants())
             {
                 // WinUI exposes x:Name as the AutomationId when none is set explicitly.
                 var xName = (string?)element.Attribute(X + "Name");
-                if (xName != null) { ids.Add(xName); lines.Add($"id:{xName} => xaml x:Name {SourceScan.Relative(file)}"); }
+                if (xName != null)
+                { ids.Add(xName); lines.Add($"id:{xName} => xaml x:Name {SourceScan.Relative(file)}"); }
                 foreach (var attribute in element.Attributes())
                 {
                     var local = attribute.Name.LocalName;
-                    if (local == "AutomationProperties.AutomationId" && !attribute.Value.StartsWith('{')) { ids.Add(attribute.Value); lines.Add($"id:{attribute.Value} => xaml AutomationId {SourceScan.Relative(file)}"); }
-                    if (local == "AutomationProperties.Name") lines.Add($"name:{attribute.Value} => xaml {SourceScan.Relative(file)}");
+                    if (local == "AutomationProperties.AutomationId" && !attribute.Value.StartsWith('{'))
+                    { ids.Add(attribute.Value); lines.Add($"id:{attribute.Value} => xaml AutomationId {SourceScan.Relative(file)}"); }
+                    if (local == "AutomationProperties.Name")
+                        lines.Add($"name:{attribute.Value} => xaml {SourceScan.Relative(file)}");
                 }
             }
         }
@@ -84,16 +91,24 @@ public partial class AutomationIdInventoryTests
         foreach (var file in sources.Order(StringComparer.Ordinal))
         {
             var text = SourceScan.Read(file);
-            foreach (Match m in ScriptIdEq().Matches(text)) ids.Add(m.Groups["id"].Value);
-            foreach (Match m in ScriptIdIn().Matches(text)) foreach (var literal in SourceScan.Literals(m.Groups["list"].Value.Replace('\'', '"'))) ids.Add(literal);
-            foreach (Match m in ScriptNameCall().Matches(text)) names.Add(m.Groups["name"].Value);
+            foreach (Match m in ScriptIdEq().Matches(text))
+                ids.Add(m.Groups["id"].Value);
+            foreach (Match m in ScriptIdIn().Matches(text))
+            foreach (var literal in SourceScan.Literals(m.Groups["list"].Value.Replace('\'', '"')))
+                ids.Add(literal);
+            foreach (Match m in ScriptNameCall().Matches(text))
+                names.Add(m.Groups["name"].Value);
             foreach (Match m in ScriptNameCompare().Matches(text))
-                foreach (var group in new[] { "name", "name2", "name3", "name4" }) if (m.Groups[group].Success) names.Add(m.Groups[group].Value);
+                foreach (var group in new[] { "name", "name2", "name3", "name4" })
+                if (m.Groups[group].Success)
+                    names.Add(m.Groups[group].Value);
             if (file.EndsWith(".cs", StringComparison.Ordinal))
             {
                 // C# verification code: AutomationId / Name lookups and the named pipe commands scripts send to it.
-                foreach (Match m in Regex.Matches(text, @"AutomationId\w*[^;\n]*?""(?<id>[^""]+)""")) ids.Add(m.Groups["id"].Value);
-                foreach (Match m in VerificationCommand().Matches(text)) commands.Add(m.Groups["command"].Value);
+                foreach (Match m in Regex.Matches(text, @"AutomationId\w*[^;\n]*?""(?<id>[^""]+)"""))
+                    ids.Add(m.Groups["id"].Value);
+                foreach (Match m in VerificationCommand().Matches(text))
+                    commands.Add(m.Groups["command"].Value);
             }
         }
         return (ids, names, commands);

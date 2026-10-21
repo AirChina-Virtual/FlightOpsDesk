@@ -29,6 +29,7 @@ internal static partial class SourceScan
     {
         foreach (var file in CsFiles(directory))
             foreach (var line in Read(file).Split('\n'))
-                foreach (var value in Literals(line)) yield return (Relative(file), line, value);
+                foreach (var value in Literals(line))
+                    yield return (Relative(file), line, value);
     }
 }

@@ -52,8 +52,10 @@ public partial class ResourceKeyInventoryTests
         var neutral = Load("Strings.resx");
         var english = Load("Strings.en-US.resx");
         var lines = new List<string>();
-        foreach (var key in neutral.Keys.Except(english.Keys)) lines.Add($"{key} => only in neutral(zh-CN)");
-        foreach (var key in english.Keys.Except(neutral.Keys)) lines.Add($"{key} => only in en-US");
+        foreach (var key in neutral.Keys.Except(english.Keys))
+            lines.Add($"{key} => only in neutral(zh-CN)");
+        foreach (var key in english.Keys.Except(neutral.Keys))
+            lines.Add($"{key} => only in en-US");
         foreach (var key in neutral.Keys.Intersect(english.Keys))
             if (!PlaceholderNames(neutral[key]).SequenceEqual(PlaceholderNames(english[key])))
                 lines.Add($"{key} => placeholders differ: neutral[{string.Join(",", PlaceholderNames(neutral[key]))}] en-US[{string.Join(",", PlaceholderNames(english[key]))}]");
@@ -68,8 +70,10 @@ public partial class ResourceKeyInventoryTests
         foreach (var file in SourceScan.CsFiles(SourceScan.Src))
             foreach (var line in SourceScan.Read(file).Split('\n'))
             {
-                foreach (Match m in DirectLookup().Matches(line)) direct.Add(m.Groups["key"].Value);
-                foreach (Match m in CodeComparison().Matches(line)) direct.Add(m.Groups["key"].Value);
+                foreach (Match m in DirectLookup().Matches(line))
+                    direct.Add(m.Groups["key"].Value);
+                foreach (Match m in CodeComparison().Matches(line))
+                    direct.Add(m.Groups["key"].Value);
             }
         // Keys that reach the lookup through a helper or a variable: any literal that is exactly a resource key.
         var indirect = SourceScan.AllLiterals(SourceScan.Src).Select(l => l.Value).Where(v => keys.Contains(v) && !direct.Contains(v)).ToHashSet(StringComparer.Ordinal);

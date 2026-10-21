@@ -22,8 +22,10 @@ public class PersistedJsonShapeTests
 
     static string Name(Type type)
     {
-        if (Nullable.GetUnderlyingType(type) is { } inner) return Name(inner) + "?";
-        if (!type.IsGenericType) return type.IsArray ? Name(type.GetElementType()!) + "[]" : type.FullName ?? type.Name;
+        if (Nullable.GetUnderlyingType(type) is { } inner)
+            return Name(inner) + "?";
+        if (!type.IsGenericType)
+            return type.IsArray ? Name(type.GetElementType()!) + "[]" : type.FullName ?? type.Name;
         var baseName = type.GetGenericTypeDefinition().FullName!;
         baseName = baseName[..baseName.IndexOf('`')];
         return baseName + "<" + string.Join(",", type.GetGenericArguments().Select(Name)) + ">";
@@ -31,14 +33,19 @@ public class PersistedJsonShapeTests
 
     static IEnumerable<Type> Referenced(Type type)
     {
-        if (Nullable.GetUnderlyingType(type) is { } inner) { foreach (var t in Referenced(inner)) yield return t; yield break; }
-        if (type.IsArray) { foreach (var t in Referenced(type.GetElementType()!)) yield return t; yield break; }
+        if (Nullable.GetUnderlyingType(type) is { } inner)
+        { foreach (var t in Referenced(inner)) yield return t; yield break; }
+        if (type.IsArray)
+        { foreach (var t in Referenced(type.GetElementType()!)) yield return t; yield break; }
         if (type.IsGenericType)
         {
-            foreach (var argument in type.GetGenericArguments()) foreach (var t in Referenced(argument)) yield return t;
+            foreach (var argument in type.GetGenericArguments())
+            foreach (var t in Referenced(argument))
+                yield return t;
             yield break;
         }
-        if (type.Assembly.GetName().Name is "VamSys.Core" or "VamSys.Infrastructure" && !type.IsEnum && !typeof(Delegate).IsAssignableFrom(type)) yield return type;
+        if (type.Assembly.GetName().Name is "VamSys.Core" or "VamSys.Infrastructure" && !type.IsEnum && !typeof(Delegate).IsAssignableFrom(type))
+            yield return type;
     }
 
     static List<Type> Reachable()
@@ -48,17 +55,20 @@ public class PersistedJsonShapeTests
         while (queue.Count > 0)
         {
             var type = queue.Dequeue();
-            if (seen.Contains(type)) continue;
+            if (seen.Contains(type))
+                continue;
             seen.Add(type);
             if (type.GetCustomAttribute<JsonConverterAttribute>() != null)
             {
                 // Custom converter: members written by the converter are listed from its sample output instead.
                 foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
-                    foreach (var next in Referenced(property.PropertyType)) queue.Enqueue(next);
+                    foreach (var next in Referenced(property.PropertyType))
+                        queue.Enqueue(next);
                 continue;
             }
             foreach (var property in JsonSerializerOptions.Default.GetTypeInfo(type).Properties)
-                foreach (var next in Referenced(property.PropertyType)) queue.Enqueue(next);
+                foreach (var next in Referenced(property.PropertyType))
+                    queue.Enqueue(next);
         }
         return seen;
     }
@@ -100,8 +110,10 @@ public class PersistedJsonShapeTests
         var lines = new List<string>();
         if (field?.GetValue(null) is JsonSerializerOptions options)
             foreach (var type in new[] { typeof(Workspace), typeof(BatchJob) })
-                foreach (var property in options.GetTypeInfo(type).Properties) lines.Add($"{Name(type)}.{property.Name} => header property");
-        else lines.Add("WorkspaceStore.withoutCollections => not found");
+                foreach (var property in options.GetTypeInfo(type).Properties)
+                    lines.Add($"{Name(type)}.{property.Name} => header property");
+        else
+            lines.Add("WorkspaceStore.withoutCollections => not found");
         Golden.Verify("JsonHeaderShape.txt", lines);
     }
 
@@ -111,13 +123,16 @@ public class PersistedJsonShapeTests
         {
             case JsonValueKind.Object:
                 paths.Add($"{path} : object");
-                foreach (var property in element.EnumerateObject()) Walk(property.Value, path + "." + property.Name, paths);
+                foreach (var property in element.EnumerateObject())
+                    Walk(property.Value, path + "." + property.Name, paths);
                 break;
             case JsonValueKind.Array:
                 paths.Add($"{path} : array");
-                foreach (var item in element.EnumerateArray()) Walk(item, path + "[]", paths);
+                foreach (var item in element.EnumerateArray())
+                    Walk(item, path + "[]", paths);
                 break;
-            case JsonValueKind.True: case JsonValueKind.False:
+            case JsonValueKind.True:
+            case JsonValueKind.False:
                 paths.Add($"{path} : bool");
                 break;
             default:
@@ -132,9 +147,16 @@ public class PersistedJsonShapeTests
         row.Fields["Name"] = "A";
         var item = new ChangeItem
         {
-            Resource = ResourceKind.Routes, Kind = ChangeKind.Update, Before = row.Copy(), After = row,
-            State = ItemState.Unknown, RemoteId = "7", RequiresAirlineParameter = true, RecoveryCandidateId = "9",
-            PreCreateCandidateIds = ["1"], Diagnostic = "d",
+            Resource = ResourceKind.Routes,
+            Kind = ChangeKind.Update,
+            Before = row.Copy(),
+            After = row,
+            State = ItemState.Unknown,
+            RemoteId = "7",
+            RequiresAirlineParameter = true,
+            RecoveryCandidateId = "9",
+            PreCreateCandidateIds = ["1"],
+            Diagnostic = "d",
             ApiExpectedValues = new() { ["name"] = JsonSerializer.SerializeToElement("A") },
             ApiSteps = [new BatchStep { Method = "PUT", Path = "p", Body = new() { ["name"] = JsonSerializer.SerializeToElement(1) }, State = BatchStepState.InFlight, StartedAt = DateTimeOffset.UnixEpoch, FinishedAt = DateTimeOffset.UnixEpoch, DeadlineAt = DateTimeOffset.UnixEpoch, RemoteId = "7" }],
             RecoveryCandidates = [new RecoveryCandidateAttempt("9", DateTimeOffset.UnixEpoch)],
@@ -158,8 +180,10 @@ public class PersistedJsonShapeTests
         job.SetStatus(JobStatus.NeedsAttention, Messages.Define("ApiUnknown"));
         var workspace = new Workspace { Mode = RunMode.Online, VerifiedOperations = ["Routes:Read"], Jobs = [job] };
         var resource = workspace.Resources[ResourceKind.Fleets];
-        resource.Snapshot.Add(item.After.Copy()); resource.Draft.Add(item.After.Copy());
-        resource.Columns.Add("Name"); resource.SnapshotAt = DateTimeOffset.UnixEpoch;
+        resource.Snapshot.Add(item.After.Copy());
+        resource.Draft.Add(item.After.Copy());
+        resource.Columns.Add("Name");
+        resource.SnapshotAt = DateTimeOffset.UnixEpoch;
         resource.Conflicts.Add(new MergeConflict(Guid.Empty, "Name", "a", "b", "c"));
 
         var paths = new SortedSet<string>(StringComparer.Ordinal);
