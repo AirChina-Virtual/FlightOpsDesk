@@ -1,0 +1,37 @@
+{
+  "scenario": "route_scheduled_update",
+  "requestCount": 3,
+  "outcomes": [
+    "job Completed",
+    "Routes Update Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/10",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "PUT",
+          "pathAndQuery": "/api/v3/operations/routes/10",
+          "body": "{\"remarks\":\"scheduled remarks changed\"}",
+          "bodyJson": {
+            "remarks": "scheduled remarks changed"
+          }
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/10",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

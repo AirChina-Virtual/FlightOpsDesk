@@ -1,0 +1,58 @@
+{
+  "scenario": "write_429_then_resume",
+  "requestCount": 5,
+  "outcomes": [
+    "job Completed",
+    "Fleets Update Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "first run",
+      "requestCount": 2,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "PUT",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": "{\"name\":\"Fleet 4 renamed\"}",
+          "bodyJson": {
+            "name": "Fleet 4 renamed"
+          }
+        }
+      ]
+    },
+    {
+      "label": "resume after 429",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": null
+        },
+        {
+          "order": 3,
+          "method": "PUT",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": "{\"name\":\"Fleet 4 renamed\"}",
+          "bodyJson": {
+            "name": "Fleet 4 renamed"
+          }
+        },
+        {
+          "order": 4,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

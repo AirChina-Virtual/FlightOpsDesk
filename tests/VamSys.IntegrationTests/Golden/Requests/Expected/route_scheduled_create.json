@@ -1,0 +1,72 @@
+{
+  "scenario": "route_scheduled_create",
+  "requestCount": 6,
+  "outcomes": [
+    "job Completed",
+    "Routes Create Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 6,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?filter%5Bdeparture_id%5D=101&filter%5Barrival_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/parameters?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": null
+        },
+        {
+          "order": 3,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/5",
+          "body": null
+        },
+        {
+          "order": 4,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/routes",
+          "body": "{\"type\":\"scheduled\",\"departure_id\":101,\"arrival_id\":103,\"callsign\":\"CAO200\",\"flight_number\":\"CA200\",\"fleet_ids\":[4,5],\"departure_time\":\"08:30:00\",\"arrival_time\":\"10:15:00\",\"altitude\":35000,\"tag\":[\"x\",\"y\"],\"remarks\":\"new scheduled\",\"hidden\":false}",
+          "bodyJson": {
+            "type": "scheduled",
+            "departure_id": 101,
+            "arrival_id": 103,
+            "callsign": "CAO200",
+            "flight_number": "CA200",
+            "fleet_ids": [
+              4,
+              5
+            ],
+            "departure_time": "08:30:00",
+            "arrival_time": "10:15:00",
+            "altitude": 35000,
+            "tag": [
+              "x",
+              "y"
+            ],
+            "remarks": "new scheduled",
+            "hidden": false
+          }
+        },
+        {
+          "order": 5,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/90",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

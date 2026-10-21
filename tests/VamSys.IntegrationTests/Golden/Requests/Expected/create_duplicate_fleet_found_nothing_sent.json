@@ -1,0 +1,22 @@
+{
+  "scenario": "create_duplicate_fleet_found_nothing_sent",
+  "requestCount": 1,
+  "outcomes": [
+    "job NeedsAttention",
+    "Fleets Create Failed ApiDuplicate"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 1,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet?page%5Bsize%5D=100",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

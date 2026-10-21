@@ -1,0 +1,38 @@
+{
+  "scenario": "airport_create",
+  "requestCount": 3,
+  "outcomes": [
+    "job Completed",
+    "Airports Create Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/airports",
+          "body": "{\"icao_iata\":\"EGSS\",\"name\":\"Stansted\"}",
+          "bodyJson": {
+            "icao_iata": "EGSS",
+            "name": "Stansted"
+          }
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports/90",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

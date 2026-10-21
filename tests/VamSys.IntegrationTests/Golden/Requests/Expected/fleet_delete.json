@@ -1,0 +1,46 @@
+{
+  "scenario": "fleet_delete",
+  "requestCount": 5,
+  "outcomes": [
+    "job Completed",
+    "Fleets Delete Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 5,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/6",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/6/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?filter%5Bfleet_id%5D=6&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 3,
+          "method": "DELETE",
+          "pathAndQuery": "/api/v3/operations/fleet/6",
+          "body": null
+        },
+        {
+          "order": 4,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/6",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

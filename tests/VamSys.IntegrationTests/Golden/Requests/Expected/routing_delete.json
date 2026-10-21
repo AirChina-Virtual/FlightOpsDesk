@@ -1,0 +1,34 @@
+{
+  "scenario": "routing_delete",
+  "requestCount": 3,
+  "outcomes": [
+    "job Completed",
+    "Routings Delete Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings/9",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "DELETE",
+          "pathAndQuery": "/api/v3/operations/routings/9",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings/9",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

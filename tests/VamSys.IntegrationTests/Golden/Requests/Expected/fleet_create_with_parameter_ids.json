@@ -1,0 +1,49 @@
+{
+  "scenario": "fleet_create_with_parameter_ids",
+  "requestCount": 4,
+  "outcomes": [
+    "job Completed",
+    "Fleets Create Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 4,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/parameters?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/fleet",
+          "body": "{\"name\":\"\\u673A\\u578B New\",\"code\":\"B738\",\"type\":\"pax\",\"max_pax\":189,\"parameter_ids\":[\"1\"]}",
+          "bodyJson": {
+            "name": "机型 New",
+            "code": "B738",
+            "type": "pax",
+            "max_pax": 189,
+            "parameter_ids": [
+              "1"
+            ]
+          }
+        },
+        {
+          "order": 3,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/90",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

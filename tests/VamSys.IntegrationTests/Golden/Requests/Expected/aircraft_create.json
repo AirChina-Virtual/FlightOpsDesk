@@ -1,0 +1,57 @@
+{
+  "scenario": "aircraft_create",
+  "requestCount": 6,
+  "outcomes": [
+    "job Completed",
+    "Aircraft Create Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 6,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/5/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 3,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/6/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 4,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/fleet/4/aircraft",
+          "body": "{\"name\":\"Plane Two\",\"registration\":\"QA-TEST\",\"cargo\":2205}",
+          "bodyJson": {
+            "name": "Plane Two",
+            "registration": "QA-TEST",
+            "cargo": 2205
+          }
+        },
+        {
+          "order": 5,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4/aircraft/90",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

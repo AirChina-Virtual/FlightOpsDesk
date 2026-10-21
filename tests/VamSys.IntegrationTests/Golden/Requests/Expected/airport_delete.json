@@ -1,0 +1,58 @@
+{
+  "scenario": "airport_delete",
+  "requestCount": 7,
+  "outcomes": [
+    "job Completed",
+    "Airports Delete Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 7,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports/103",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?filter%5Bdeparture_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?filter%5Barrival_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 3,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings?filter%5Bdeparture_airport_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 4,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings?filter%5Barrival_airport_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 5,
+          "method": "DELETE",
+          "pathAndQuery": "/api/v3/operations/airports/103",
+          "body": null
+        },
+        {
+          "order": 6,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports/103",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

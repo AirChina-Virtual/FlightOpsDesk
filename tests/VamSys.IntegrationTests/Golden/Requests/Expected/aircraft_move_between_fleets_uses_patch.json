@@ -1,0 +1,43 @@
+{
+  "scenario": "aircraft_move_between_fleets_uses_patch",
+  "requestCount": 4,
+  "outcomes": [
+    "job Completed",
+    "Aircraft Update Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 4,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4/aircraft/8",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/5",
+          "body": null
+        },
+        {
+          "order": 2,
+          "method": "PATCH",
+          "pathAndQuery": "/api/v3/operations/aircraft/8",
+          "body": "{\"fleet_id\":5}",
+          "bodyJson": {
+            "fleet_id": 5
+          }
+        },
+        {
+          "order": 3,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/5/aircraft/8",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

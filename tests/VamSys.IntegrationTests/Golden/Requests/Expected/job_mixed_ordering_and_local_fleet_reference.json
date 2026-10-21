@@ -1,0 +1,202 @@
+{
+  "scenario": "job_mixed_ordering_and_local_fleet_reference",
+  "requestCount": 27,
+  "outcomes": [
+    "job Completed",
+    "Airports Delete Succeeded",
+    "Airports Create Succeeded",
+    "Fleets Create Succeeded",
+    "Aircraft Create Succeeded",
+    "Routings Update Succeeded",
+    "Routes Delete Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 27,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/airports",
+          "body": "{\"icao_iata\":\"EGSS\",\"name\":\"Stansted\"}",
+          "bodyJson": {
+            "icao_iata": "EGSS",
+            "name": "Stansted"
+          }
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports/90",
+          "body": null
+        },
+        {
+          "order": 3,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 4,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/parameters?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 5,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/fleet",
+          "body": "{\"name\":\"\\u673A\\u578B New\",\"code\":\"B738\",\"type\":\"pax\",\"parameter_ids\":[\"1\"]}",
+          "bodyJson": {
+            "name": "机型 New",
+            "code": "B738",
+            "type": "pax",
+            "parameter_ids": [
+              "1"
+            ]
+          }
+        },
+        {
+          "order": 6,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/91",
+          "body": null
+        },
+        {
+          "order": 7,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 8,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 9,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/5/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 10,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/6/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 11,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/91/aircraft?page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 12,
+          "method": "POST",
+          "pathAndQuery": "/api/v3/operations/fleet/91/aircraft",
+          "body": "{\"name\":\"Plane Three\",\"registration\":\"QA-NEW\"}",
+          "bodyJson": {
+            "name": "Plane Three",
+            "registration": "QA-NEW"
+          }
+        },
+        {
+          "order": 13,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/91/aircraft/92",
+          "body": null
+        },
+        {
+          "order": 14,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings/9",
+          "body": null
+        },
+        {
+          "order": 15,
+          "method": "PUT",
+          "pathAndQuery": "/api/v3/operations/routings/9",
+          "body": "{\"remarks\":\"mixed job\"}",
+          "bodyJson": {
+            "remarks": "mixed job"
+          }
+        },
+        {
+          "order": 16,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings/9",
+          "body": null
+        },
+        {
+          "order": 17,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/10",
+          "body": null
+        },
+        {
+          "order": 18,
+          "method": "DELETE",
+          "pathAndQuery": "/api/v3/operations/routes/10",
+          "body": null
+        },
+        {
+          "order": 19,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes/10",
+          "body": null
+        },
+        {
+          "order": 20,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports/103",
+          "body": null
+        },
+        {
+          "order": 21,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?filter%5Bdeparture_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 22,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routes?filter%5Barrival_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 23,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings?filter%5Bdeparture_airport_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 24,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings?filter%5Barrival_airport_id%5D=103&page%5Bsize%5D=100",
+          "body": null
+        },
+        {
+          "order": 25,
+          "method": "DELETE",
+          "pathAndQuery": "/api/v3/operations/airports/103",
+          "body": null
+        },
+        {
+          "order": 26,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/airports/103",
+          "body": null
+        }
+      ]
+    }
+  ]
+}

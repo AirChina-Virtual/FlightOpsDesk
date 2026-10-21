@@ -1,0 +1,37 @@
+{
+  "scenario": "routing_update",
+  "requestCount": 3,
+  "outcomes": [
+    "job Completed",
+    "Routings Update Succeeded"
+  ],
+  "runs": [
+    {
+      "label": "run",
+      "requestCount": 3,
+      "requests": [
+        {
+          "order": 0,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings/9",
+          "body": null
+        },
+        {
+          "order": 1,
+          "method": "PUT",
+          "pathAndQuery": "/api/v3/operations/routings/9",
+          "body": "{\"remarks\":\"updated remarks\"}",
+          "bodyJson": {
+            "remarks": "updated remarks"
+          }
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/routings/9",
+          "body": null
+        }
+      ]
+    }
+  ]
+}
