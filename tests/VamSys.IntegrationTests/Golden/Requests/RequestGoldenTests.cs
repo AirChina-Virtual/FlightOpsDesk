@@ -269,7 +269,10 @@ public class RequestGoldenTests
         // Built by hand: the planner never produces Unspecified, but saved tasks and the review screen can.
         var item = new ChangeItem
         {
-            Resource = ResourceKind.Routings, Kind = ChangeKind.Update, Before = before, After = after,
+            Resource = ResourceKind.Routings,
+            Kind = ChangeKind.Update,
+            Before = before,
+            After = after,
             Fields = new() { ["Remarks"] = new(FieldIntent.Set, "changed"), ["Internal Remarks"] = new(FieldIntent.Unspecified, null) }
         };
         w.Begin("run");
@@ -334,7 +337,8 @@ public class RequestGoldenTests
         var limited = false;
         w.Remote.Intercept = r =>
         {
-            if (r.Method != "PUT" || limited) return null;
+            if (r.Method != "PUT" || limited)
+                return null;
             limited = true;
             return new FakeResponse((HttpStatusCode)429, "{}", new Dictionary<string, string> { ["Retry-After"] = "30" });
         };
@@ -368,7 +372,8 @@ public class RequestGoldenTests
         var w = new GoldenWorld();
         w.Remote.Intercept = r =>
         {
-            if (r.Method != "PUT") return null;
+            if (r.Method != "PUT")
+                return null;
             w.Remote.Respond(r);
             throw new TimeoutException("simulated lost response");
         };
@@ -422,7 +427,8 @@ public class RequestGoldenTests
         w.LoadRemote();
         w.Remote.AddRow("airports/104", """{"id":104,"airline_id":7,"icao":"EGLC","iata":"LHR","name":"London City (same IATA)"}""");
         w.Begin("refresh");
-        try { await w.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, default); w.Note("refresh completed"); }
+        try
+        { await w.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, default); w.Note("refresh completed"); }
         catch (Exception e) { w.Note("refresh threw " + e.GetType().Name); }
         w.Note("airport snapshot rows " + w.Workspace.Resources[ResourceKind.Airports].Snapshot.Count);
         w.Verify("refresh_two_airports_same_iata");
@@ -439,7 +445,8 @@ public class RequestGoldenTests
         w.Remote.PageSizes["routes"] = 2;             // 3 routes: 2 pages
         w.Begin("refresh");
         await w.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, default);
-        foreach (var kind in Enum.GetValues<ResourceKind>()) w.Note($"{kind} snapshot rows {w.Workspace.Resources[kind].Snapshot.Count}");
+        foreach (var kind in Enum.GetValues<ResourceKind>())
+            w.Note($"{kind} snapshot rows {w.Workspace.Resources[kind].Snapshot.Count}");
         w.Verify("refresh_all_resources_with_pagination");
     }
 }

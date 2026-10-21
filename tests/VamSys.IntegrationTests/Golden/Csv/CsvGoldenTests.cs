@@ -17,38 +17,48 @@ public class CsvGoldenTests
     // ---- data ---------------------------------------------------------------------------------------------------------
 
     /// <summary>Field order of rows that came from the API (_delete first), then the schema columns, then an unknown column.</summary>
-    static string[] FieldsOf(ResourceKind kind) => ["_delete", ..Schemas.All[kind].Columns.Where(c => c != "_delete").Take(kind == ResourceKind.Routes ? 9 : 6), Extra, CarriageReturn];
+    static string[] FieldsOf(ResourceKind kind) => ["_delete", .. Schemas.All[kind].Columns.Where(c => c != "_delete").Take(kind == ResourceKind.Routes ? 9 : 6), Extra, CarriageReturn];
 
     static string Value(ResourceKind kind, string field, string variant)
     {
-        if (field == "_delete") return variant == "delete" ? "TRUE" : "FALSE";
-        if (field == CarriageReturn) return variant == "special" ? "line\rbreak" : "";
-        if (field == Extra) return variant == "special" ? "红白,\"双\"线\r\n第二行" : variant == "update-new" ? "更新后" : "";
+        if (field == "_delete")
+            return variant == "delete" ? "TRUE" : "FALSE";
+        if (field == CarriageReturn)
+            return variant == "special" ? "line\rbreak" : "";
+        if (field == Extra)
+            return variant == "special" ? "红白,\"双\"线\r\n第二行" : variant == "update-new" ? "更新后" : "";
         var key = Schemas.All[kind].Key;
-        if (field == key) return variant.StartsWith("create") && key == "ID" ? "" : key == "ICAO/IATA" ? variant switch { "update-base" or "update-new" => "EGLL", "delete" => "EGKK", "create" => "EDDB", _ => "ZBAA" } : variant switch { "update-base" or "update-new" => "11", "delete" => "12", _ => "" };
+        if (field == key)
+            return variant.StartsWith("create") && key == "ID" ? "" : key == "ICAO/IATA" ? variant switch { "update-base" or "update-new" => "EGLL", "delete" => "EGKK", "create" => "EDDB", _ => "ZBAA" } : variant switch { "update-base" or "update-new" => "11", "delete" => "12", _ => "" };
         var plain = $"{field} {variant}";
         if (variant == "special" && field is "Name" or "Remarks" or "Route String" or "Internal Remarks")
             return "He said \"go\", then\nstop 中文,逗号";
-        if (variant == "update-new" && field is "Name" or "Remarks" or "Route String" or "Tags" or "Category") return plain + " changed";
+        if (variant == "update-new" && field is "Name" or "Remarks" or "Route String" or "Tags" or "Category")
+            return plain + " changed";
         return plain;
     }
 
     static DataRow Row(ResourceKind kind, string variant, bool identity)
     {
         var row = new DataRow { Fields = new(StringComparer.Ordinal) };
-        foreach (var f in FieldsOf(kind)) row.Fields[f] = Value(kind, f, variant);
-        if (identity) { row.Identity = new(variant.StartsWith("update") ? "11" : "12", "7"); row.RawApiJson = "{\"id\":" + row.Identity.RemoteId + "}"; }
+        foreach (var f in FieldsOf(kind))
+            row.Fields[f] = Value(kind, f, variant);
+        if (identity)
+        { row.Identity = new(variant.StartsWith("update") ? "11" : "12", "7"); row.RawApiJson = "{\"id\":" + row.Identity.RemoteId + "}"; }
         return row;
     }
 
     /// <summary>Update + delete (existing rows), then two creates, the second with quotes, commas, newlines and Chinese text.</summary>
     static List<ChangeItem> Changes(ResourceKind kind)
     {
-        var update = Row(kind, "update-base", true); var delete = Row(kind, "delete", true);
+        var update = Row(kind, "update-base", true);
+        var delete = Row(kind, "delete", true);
         delete.Fields["_delete"] = "FALSE";
         var data = new ResourceData { Snapshot = [update.Copy(), delete.Copy()] };
-        var updated = Row(kind, "update-new", true); updated.LocalId = update.LocalId;
-        var deleted = delete.Copy(); deleted.Fields["_delete"] = "TRUE";
+        var updated = Row(kind, "update-new", true);
+        updated.LocalId = update.LocalId;
+        var deleted = delete.Copy();
+        deleted.Fields["_delete"] = "TRUE";
         data.Draft = [updated, deleted, Row(kind, "create", false), Row(kind, "special", false)];
         var items = new ChangePlanner().Plan(kind, data);
         Xunit.Assert.Equal([ChangeKind.Update, ChangeKind.Delete, ChangeKind.Create, ChangeKind.Create], items.Select(i => i.Kind));
@@ -57,7 +67,8 @@ public class CsvGoldenTests
 
     static void Parts(GoldenSession golden, string name, IReadOnlyList<byte[]> parts)
     {
-        for (var i = 0; i < parts.Count; i++) golden.CheckBytes($"{name}.part{i + 1}.csv", parts[i]);
+        for (var i = 0; i < parts.Count; i++)
+            golden.CheckBytes($"{name}.part{i + 1}.csv", parts[i]);
         golden.CheckText($"{name}.parts.txt", $"parts: {parts.Count}\nbytes: {string.Join(", ", parts.Select(p => p.Length))}\n");
     }
 
@@ -123,7 +134,7 @@ public class CsvGoldenTests
         var row = Row(kind, "update-base", true);
         row.Fields["Local only"] = "kept";
         var data = new ResourceData { Snapshot = [row.Copy()], Draft = [row] };
-        data.Columns = [..row.Fields.Keys];
+        data.Columns = [.. row.Fields.Keys];
         return data;
     }
 
@@ -167,7 +178,8 @@ public class CsvGoldenTests
         void Case(string name, Action action)
         {
             var entry = new JsonObject { ["case"] = name };
-            try { action(); entry["error"] = null; }
+            try
+            { action(); entry["error"] = null; }
             catch (Exception e)
             {
                 var message = MessageErrors.Describe(e);

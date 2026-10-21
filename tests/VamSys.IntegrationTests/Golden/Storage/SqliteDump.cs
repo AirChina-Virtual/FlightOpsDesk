@@ -59,7 +59,8 @@ public sealed class SqliteDump(Masker masker)
         using var cmd = c.CreateCommand();
         cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name";
         using var r = cmd.ExecuteReader();
-        while (r.Read()) names.Add(r.GetString(0));
+        while (r.Read())
+            names.Add(r.GetString(0));
         return names;
     }
 
@@ -74,11 +75,13 @@ public sealed class SqliteDump(Masker masker)
             while (r.Read())
             {
                 var row = new JsonObject();
-                for (var i = 0; i < r.FieldCount; i++) row[r.GetName(i)] = Value(r, i, maskBlobs);
+                for (var i = 0; i < r.FieldCount; i++)
+                    row[r.GetName(i)] = Value(r, i, maskBlobs);
                 rows.Add(row);
             }
         }
-        if (table != "resource_history_steps") return new JsonArray(rows.Select(r => (JsonNode?)r).ToArray());
+        if (table != "resource_history_steps")
+            return new JsonArray(rows.Select(r => (JsonNode?)r).ToArray());
 
         // Step ids are random: list steps in the order of the undo/redo stacks that reference them.
         var position = new Dictionary<(string, int, string), int>();
@@ -90,7 +93,8 @@ public sealed class SqliteDump(Masker masker)
             {
                 var n = 0;
                 foreach (var json in new[] { r.GetString(2), r.GetString(3) })
-                    foreach (var id in JsonNode.Parse(json)!.AsArray()) position[(r.GetString(0), r.GetInt32(1), id!.GetValue<string>())] = n++;
+                    foreach (var id in JsonNode.Parse(json)!.AsArray())
+                        position[(r.GetString(0), r.GetInt32(1), id!.GetValue<string>())] = n++;
             }
         }
         // Original (unmasked) ids are needed for the lookup, so read them again in the same order.
@@ -99,7 +103,8 @@ public sealed class SqliteDump(Masker masker)
         {
             cmd.CommandText = $"SELECT workspace_id,resource,step_id FROM resource_history_steps ORDER BY {Order.GetValueOrDefault(table, "rowid")}";
             using var r = cmd.ExecuteReader();
-            while (r.Read()) ids.Add((r.GetString(0), r.GetInt32(1), r.GetString(2)));
+            while (r.Read())
+                ids.Add((r.GetString(0), r.GetInt32(1), r.GetString(2)));
         }
         return new JsonArray(rows.Zip(ids).Select(p => (Row: p.First, Key: p.Second))
             .OrderBy(p => p.Key.Item1, StringComparer.Ordinal).ThenBy(p => p.Key.Item2)
@@ -109,19 +114,24 @@ public sealed class SqliteDump(Masker masker)
 
     JsonNode? Value(SqliteDataReader r, int i, bool maskBlobs)
     {
-        if (r.IsDBNull(i)) return null;
+        if (r.IsDBNull(i))
+            return null;
         switch (r.GetFieldType(i).Name)
         {
             case "Byte[]":
                 return maskBlobs ? "<dpapi-ciphertext>" : "hex:" + Convert.ToHexString((byte[])r.GetValue(i));
-            case "Int64": return r.GetInt64(i);
-            case "Double": return r.GetDouble(i);
+            case "Int64":
+                return r.GetInt64(i);
+            case "Double":
+                return r.GetDouble(i);
         }
         var text = r.GetString(i);
         var trimmed = text.TrimStart();
         if (trimmed.StartsWith('{') || trimmed.StartsWith('['))
         {
-            try { return masker.Prepare(JsonNode.Parse(text)); } catch (System.Text.Json.JsonException) { }
+            try
+            { return masker.Prepare(JsonNode.Parse(text)); }
+            catch (System.Text.Json.JsonException) { }
         }
         return masker.Mask(text);
     }

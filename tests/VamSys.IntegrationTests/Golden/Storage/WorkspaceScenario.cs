@@ -62,7 +62,8 @@ sealed class WorkspaceScenario : IDisposable
     public async Task SaveAll()
     {
         var taken = Edits.Take();
-        try { await Store.SaveAsync(W); }
+        try
+        { await Store.SaveAsync(W); }
         catch { Edits.Restore(taken); throw; }
     }
 
@@ -100,15 +101,18 @@ sealed class WorkspaceScenario : IDisposable
         var data = Data(kind);
         var move = undo ? data.UndoEdit() : data.RedoEdit();
         Xunit.Assert.True(move.Moved);
-        if (move.ReplacedRows is { } rows) { Edits.Rows(W, kind, rows); await SaveRows(); }
-        else await SaveAll();
+        if (move.ReplacedRows is { } rows)
+        { Edits.Rows(W, kind, rows); await SaveRows(); }
+        else
+            await SaveAll();
     }
 
     public async Task<DataRow> AddRow(ResourceKind kind)
     {
         var data = Data(kind);
         var row = new DataRow();
-        foreach (var f in Schemas.All[kind].Columns) row.Fields[f] = f == "_delete" ? "FALSE" : "";
+        foreach (var f in Schemas.All[kind].Columns)
+            row.Fields[f] = f == "_delete" ? "FALSE" : "";
         data.Edit([row.LocalId], () => data.Draft.Add(row), structural: true);
         data.Columns = data.Columns.Concat(row.Fields.Keys).Distinct().ToList();
         await SaveAll();
@@ -139,7 +143,8 @@ sealed class WorkspaceScenario : IDisposable
         var changes = RuleEngine.Preview(eligible, rule).Where(r => r.Get(rule.Field) != before[r.LocalId].Get(rule.Field)).ToArray();
         Xunit.Assert.NotEmpty(changes);
         data.Edit(changes.Select(r => r.LocalId), () => data.ReplaceDraftRows(changes.Select(r => r.Copy())));
-        if (!data.Columns.Contains(rule.Field)) data.Columns.Add(rule.Field);
+        if (!data.Columns.Contains(rule.Field))
+            data.Columns.Add(rule.Field);
         await SaveAll();
     }
 
@@ -163,7 +168,8 @@ sealed class WorkspaceScenario : IDisposable
             foreach (var conflict in data.Conflicts.ToArray())
             {
                 var row = data.FindDraftRow(conflict.RowId);
-                if (row is null) { data.Conflicts.Remove(conflict); await SaveAll(); continue; }
+                if (row is null)
+                { data.Conflicts.Remove(conflict); await SaveAll(); continue; }
                 if (useRemote(kind, conflict))
                     data.Edit([row.LocalId], () => { if (conflict.Field == "*") data.Draft.Remove(row); else row.Fields[conflict.Field] = conflict.Remote ?? ""; }, newStep: false, structural: conflict.Field == "*");
                 data.Conflicts.Remove(conflict);
@@ -207,7 +213,7 @@ sealed class WorkspaceScenario : IDisposable
             .On(HttpMethod.Put, "fleet/51", _ => FakeResponse.Ok("{\"data\":" + created["51"] + "}"))
             .On(HttpMethod.Get, "fleet/50", _ => created.TryGetValue("50", out var r) ? FakeResponse.Ok("{\"data\":" + r + "}") : FakeResponse.WithStatus(404))
             .On(HttpMethod.Get, "fleet/51", _ => created.TryGetValue("51", out var r) ? FakeResponse.Ok("{\"data\":" + r + "}") : FakeResponse.WithStatus(404))
-            .On(HttpMethod.Get, "fleet", _ => FakeResponse.Ok(Page([FleetAlpha, FleetBeta, ..created.Values])));
+            .On(HttpMethod.Get, "fleet", _ => FakeResponse.Ok(Page([FleetAlpha, FleetBeta, .. created.Values])));
         var writer = new RecordingWriter(Store.CheckpointWriter(W), afterCheckpoint);
         await Clock.Drive(new OperationsBatchExecutor(Api(server), W).ExecuteAsync(job, writer, default));
         return server;

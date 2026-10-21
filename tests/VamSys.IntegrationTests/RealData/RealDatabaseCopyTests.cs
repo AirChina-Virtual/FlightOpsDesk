@@ -36,7 +36,8 @@ public class RealDatabaseCopyTests
         }
         Assert.True(File.Exists(expectedPath), "Expected summary not found; run once with " + UpdateVar + "=1.");
         var expected = File.ReadAllText(expectedPath!).ReplaceLineEndings("\n");
-        if (expected != actual) Assert.Fail("Real-data summary changed:\n" + Diff(expected, actual));
+        if (expected != actual)
+            Assert.Fail("Real-data summary changed:\n" + Diff(expected, actual));
     }
 
     static JsonObject BuildSummary(string dir)
@@ -50,12 +51,16 @@ public class RealDatabaseCopyTests
         foreach (var id in ids)
         {
             var w = store.Load(id);
-            var hash = Sha(w.Id.ToString()); var node = new JsonObject
+            var hash = Sha(w.Id.ToString());
+            var node = new JsonObject
             {
-                ["id"] = hash, ["name"] = Sha(w.Name), ["mode"] = w.Mode.ToString(),
+                ["id"] = hash,
+                ["name"] = Sha(w.Name),
+                ["mode"] = w.Mode.ToString(),
                 ["hasCredentials"] = raw.Secrets.Contains(w.Id.ToString()) || !string.IsNullOrEmpty(w.ClientId),
                 ["hasAirlineId"] = !string.IsNullOrEmpty(w.AirlineId),
-                ["contractHash"] = Sha(w.ContractHash ?? ""), ["verifiedOperations"] = w.VerifiedOperations.Count,
+                ["contractHash"] = Sha(w.ContractHash ?? ""),
+                ["verifiedOperations"] = w.VerifiedOperations.Count,
             };
             var resources = new JsonObject();
             foreach (var (kind, data) in w.Resources.OrderBy(p => (int)p.Key))
@@ -63,25 +68,34 @@ public class RealDatabaseCopyTests
                 raw.Rows.TryGetValue((w.Id.ToString(), (int)kind), out var rows);
                 resources[kind.ToString()] = new JsonObject
                 {
-                    ["snapshot"] = data.Snapshot.Count, ["draft"] = data.Draft.Count, ["columns"] = data.Columns.Count,
-                    ["conflicts"] = data.Conflicts.Count, ["undo"] = data.Undo.Count, ["redo"] = data.Redo.Count,
-                    ["snapshotRowsSha256"] = RowsHash(rows?.Snapshot), ["draftRowsSha256"] = RowsHash(rows?.Draft),
+                    ["snapshot"] = data.Snapshot.Count,
+                    ["draft"] = data.Draft.Count,
+                    ["columns"] = data.Columns.Count,
+                    ["conflicts"] = data.Conflicts.Count,
+                    ["undo"] = data.Undo.Count,
+                    ["redo"] = data.Redo.Count,
+                    ["snapshotRowsSha256"] = RowsHash(rows?.Snapshot),
+                    ["draftRowsSha256"] = RowsHash(rows?.Draft),
                 };
             }
             node["resources"] = resources;
 
-            var jobs = new JsonArray(); var open = new JsonArray();
+            var jobs = new JsonArray();
+            var open = new JsonArray();
             foreach (var job in w.Jobs)
             {
                 var jobHash = Sha(job.Id.ToString());
                 var states = new JsonObject();
-                foreach (var g in job.Items.GroupBy(i => i.State).OrderBy(g => (int)g.Key)) states[g.Key.ToString()] = g.Count();
+                foreach (var g in job.Items.GroupBy(i => i.State).OrderBy(g => (int)g.Key))
+                    states[g.Key.ToString()] = g.Count();
                 jobs.Add(new JsonObject { ["id"] = jobHash, ["status"] = job.StatusCode.ToString(), ["items"] = job.Items.Count, ["byState"] = states });
                 for (var n = 0; n < job.Items.Count; n++)
                     if (job.Items[n].State is ItemState.Pending or ItemState.Unknown or ItemState.Running)
                         open.Add(new JsonObject { ["job"] = jobHash, ["index"] = n, ["resource"] = job.Items[n].Resource.ToString(), ["kind"] = job.Items[n].Kind.ToString(), ["state"] = job.Items[n].State.ToString() });
             }
-            node["jobCount"] = w.Jobs.Count; node["jobs"] = jobs; node["openItems"] = open;
+            node["jobCount"] = w.Jobs.Count;
+            node["jobs"] = jobs;
+            node["openItems"] = open;
 
             // Local preview only: never connected, no preview callback, so ReviewPlanBuilder cannot send a request.
             var changes = planner.PlanWorkspace(w);
@@ -91,7 +105,8 @@ public class RealDatabaseCopyTests
             workspaces.Add((hash, node));
         }
         var array = new JsonArray();
-        foreach (var (_, node) in workspaces.OrderBy(x => x.Hash, StringComparer.Ordinal)) array.Add(node);
+        foreach (var (_, node) in workspaces.OrderBy(x => x.Hash, StringComparer.Ordinal))
+            array.Add(node);
         summary["workspaces"] = array;
         return summary;
     }
@@ -99,7 +114,8 @@ public class RealDatabaseCopyTests
     static List<MessageDescriptor> Blockers(Workspace w, bool validate)
     {
         var blockers = new List<MessageDescriptor>();
-        if (w.Resources.Values.Any(d => d.Conflicts.Count > 0)) blockers.Add(Messages.Define("ApiConflict"));
+        if (w.Resources.Values.Any(d => d.Conflicts.Count > 0))
+            blockers.Add(Messages.Define("ApiConflict"));
         if (validate)
             foreach (var (kind, data) in w.Resources.Where(p => p.Value.Draft.Count > 0))
                 foreach (var issue in Schemas.Validate(w, kind))
@@ -113,7 +129,9 @@ public class RealDatabaseCopyTests
 
     static JsonObject Plan(WorkspaceReviewPlan plan) => new()
     {
-        ["contentKey"] = plan.ContentKey(), ["entries"] = plan.Entries.Count, ["blockers"] = plan.Blockers.Count,
+        ["contentKey"] = plan.ContentKey(),
+        ["entries"] = plan.Entries.Count,
+        ["blockers"] = plan.Blockers.Count,
         ["submit"] = plan.SubmitItems.Count,
         ["ready"] = plan.Entries.Count(e => e.Disposition == ReviewDisposition.Ready),
         ["deferred"] = plan.Entries.Count(e => e.Disposition == ReviewDisposition.Deferred),
@@ -129,9 +147,11 @@ public class RealDatabaseCopyTests
     {
         using var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(dir, "workspaces.db"), Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
         c.Open();
-        long Scalar(string sql) { using var q = c.CreateCommand(); q.CommandText = sql; return Convert.ToInt64(q.ExecuteScalar()); }
+        long Scalar(string sql)
+        { using var q = c.CreateCommand(); q.CommandText = sql; return Convert.ToInt64(q.ExecuteScalar()); }
         var secrets = new HashSet<string>();
-        using (var q = c.CreateCommand()) { q.CommandText = "SELECT id FROM secrets"; using var r = q.ExecuteReader(); while (r.Read()) secrets.Add(r.GetString(0)); }
+        using (var q = c.CreateCommand())
+        { q.CommandText = "SELECT id FROM secrets"; using var r = q.ExecuteReader(); while (r.Read()) secrets.Add(r.GetString(0)); }
         var rows = new Dictionary<(string, int), RawRows>();
         using (var q = c.CreateCommand())
         {
@@ -140,7 +160,8 @@ public class RealDatabaseCopyTests
             while (r.Read())
             {
                 var key = (r.GetString(0), r.GetInt32(1));
-                if (!rows.TryGetValue(key, out var set)) rows[key] = set = new([], []);
+                if (!rows.TryGetValue(key, out var set))
+                    rows[key] = set = new([], []);
                 (r.GetInt32(2) == 0 ? set.Snapshot : set.Draft).Add(r.GetString(3));
             }
         }
@@ -150,7 +171,8 @@ public class RealDatabaseCopyTests
     static string RowsHash(List<string>? rows)
     {
         using var h = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        foreach (var json in rows ?? []) { var b = Encoding.UTF8.GetBytes(json); h.AppendData(BitConverter.GetBytes(b.Length)); h.AppendData(b); }
+        foreach (var json in rows ?? [])
+        { var b = Encoding.UTF8.GetBytes(json); h.AppendData(BitConverter.GetBytes(b.Length)); h.AppendData(b); }
         return Convert.ToHexString(h.GetHashAndReset());
     }
 
@@ -158,12 +180,18 @@ public class RealDatabaseCopyTests
 
     static string Diff(string expected, string actual)
     {
-        var a = expected.Split('\n'); var b = actual.Split('\n'); var sb = new StringBuilder(); var shown = 0;
+        var a = expected.Split('\n');
+        var b = actual.Split('\n');
+        var sb = new StringBuilder();
+        var shown = 0;
         for (var i = 0; i < Math.Max(a.Length, b.Length) && shown < 60; i++)
         {
-            var x = i < a.Length ? a[i] : "<missing>"; var y = i < b.Length ? b[i] : "<missing>";
-            if (x == y) continue;
-            sb.Append($"line {i + 1}\n  expected: {x.Trim()}\n  actual:   {y.Trim()}\n"); shown++;
+            var x = i < a.Length ? a[i] : "<missing>";
+            var y = i < b.Length ? b[i] : "<missing>";
+            if (x == y)
+                continue;
+            sb.Append($"line {i + 1}\n  expected: {x.Trim()}\n  actual:   {y.Trim()}\n");
+            shown++;
         }
         return sb.ToString();
     }

@@ -69,7 +69,10 @@ public class LegacyMigrationGoldenTests
         data.Edit([], () => { });
         w.Jobs.Add(new() { Mode = RunMode.Online, Items = new ChangePlanner().Plan(ResourceKind.Fleets, data) });
         var item = w.Jobs[0].Items[0];
-        item.State = ItemState.Unknown; item.RemoteId = "102"; item.ProposeRecoveryId("103"); item.Message = "历史原文";
+        item.State = ItemState.Unknown;
+        item.RemoteId = "102";
+        item.ProposeRecoveryId("103");
+        item.Message = "历史原文";
         w.Jobs[0].Status = "旧状态";
         w.Jobs.Add(new() { Items = [new() { Message = "second item" }, new() { Message = "third item" }] });
         return w;
@@ -82,7 +85,9 @@ public class LegacyMigrationGoldenTests
         Sql(c, "PRAGMA journal_mode=WAL; CREATE TABLE workspaces(id TEXT PRIMARY KEY,name TEXT NOT NULL,json TEXT NOT NULL); CREATE TABLE secrets(id TEXT PRIMARY KEY,value BLOB NOT NULL); CREATE TABLE app_settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);");
         var node = JsonNode.Parse(LegacyJson(w))!;
         node.AsObject().Remove("StorageRevision");
-        foreach (var j in node["Jobs"]!.AsArray()) foreach (var i in j!["Items"]!.AsArray()) i!.AsObject().Remove("ApiSteps");
+        foreach (var j in node["Jobs"]!.AsArray())
+        foreach (var i in j!["Items"]!.AsArray())
+            i!.AsObject().Remove("ApiSteps");
         Sql(c, "INSERT INTO workspaces VALUES($id,$name,$json)", ("$id", w.Id.ToString()), ("$name", w.Name), ("$json", node.ToJsonString()));
         Sql(c, "INSERT INTO secrets VALUES($id,$value)", ("$id", w.Id.ToString()), ("$value", new byte[] { 1, 2, 3 }));
         Sql(c, "INSERT INTO app_settings VALUES('language','en-US')");
@@ -93,12 +98,14 @@ public class LegacyMigrationGoldenTests
     {
         using var c = Legacy(dir, w);
         Sql(c, "ALTER TABLE workspaces ADD COLUMN format_version INTEGER DEFAULT 2; CREATE TABLE workspace_revisions(workspace_id TEXT PRIMARY KEY,revision INTEGER); CREATE TABLE batch_jobs(workspace_id TEXT,id TEXT,ordinal INTEGER,json TEXT,PRIMARY KEY(workspace_id,id)); CREATE TABLE batch_items(workspace_id TEXT,job_id TEXT,id TEXT,ordinal INTEGER,json TEXT,PRIMARY KEY(workspace_id,job_id,id)); PRAGMA user_version=2;");
-        var root = JsonNode.Parse(LegacyJson(w))!; root.AsObject().Remove("Jobs");
+        var root = JsonNode.Parse(LegacyJson(w))!;
+        root.AsObject().Remove("Jobs");
         Sql(c, "UPDATE workspaces SET json=$j", ("$j", root.ToJsonString()));
         Sql(c, "INSERT INTO workspace_revisions VALUES($w,7)", ("$w", w.Id.ToString()));
         foreach (var (j, n) in w.Jobs.Select((j, n) => (j, n)))
         {
-            var header = JsonNode.Parse(JsonSerializer.Serialize(j))!; header.AsObject().Remove("Items");
+            var header = JsonNode.Parse(JsonSerializer.Serialize(j))!;
+            header.AsObject().Remove("Items");
             Sql(c, "INSERT INTO batch_jobs VALUES($w,$id,$n,$j)", ("$w", w.Id.ToString()), ("$id", j.Id.ToString()), ("$n", n), ("$j", header.ToJsonString()));
             foreach (var (i, k) in j.Items.Select((i, k) => (i, k)))
                 Sql(c, "INSERT INTO batch_items VALUES($w,$job,$id,$n,$j)", ("$w", w.Id.ToString()), ("$job", j.Id.ToString()), ("$id", i.Id.ToString()), ("$n", k), ("$j", JsonSerializer.Serialize(i)));
@@ -111,11 +118,18 @@ public class LegacyMigrationGoldenTests
         var root = JsonNode.Parse(w.Serialize())!;
         foreach (var (kind, data) in w.Resources)
         {
-            var undo = new List<List<DataRow>>(); var redo = new List<List<DataRow>>();
-            var probe = data.ShallowCopy(); while (probe.Undo.Count > 0) { probe.UndoEdit(); undo.Insert(0, Clone(probe.Draft)); }
-            probe = data.ShallowCopy(); while (probe.Redo.Count > 0) { probe.RedoEdit(); redo.Insert(0, Clone(probe.Draft)); }
-            var node = root["Resources"]![kind.ToString()]!.AsObject(); node.Remove("History");
-            node["Undo"] = JsonSerializer.SerializeToNode(undo); node["Redo"] = JsonSerializer.SerializeToNode(redo);
+            var undo = new List<List<DataRow>>();
+            var redo = new List<List<DataRow>>();
+            var probe = data.ShallowCopy();
+            while (probe.Undo.Count > 0)
+            { probe.UndoEdit(); undo.Insert(0, Clone(probe.Draft)); }
+            probe = data.ShallowCopy();
+            while (probe.Redo.Count > 0)
+            { probe.RedoEdit(); redo.Insert(0, Clone(probe.Draft)); }
+            var node = root["Resources"]![kind.ToString()]!.AsObject();
+            node.Remove("History");
+            node["Undo"] = JsonSerializer.SerializeToNode(undo);
+            node["Redo"] = JsonSerializer.SerializeToNode(redo);
         }
         return root.ToJsonString();
     }

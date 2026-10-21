@@ -59,7 +59,8 @@ public static class GoldenFile
         };
         if (request.Body is { Length: > 0 })
         {
-            try { item["bodyJson"] = JsonNode.Parse(request.Body); }
+            try
+            { item["bodyJson"] = JsonNode.Parse(request.Body); }
             catch (JsonException) { /* not JSON: the exact text above is all there is */ }
         }
         return item;
@@ -79,7 +80,8 @@ public static class GoldenFile
             Assert.Fail($"Golden file missing: {path}\nRun with {UpdateVariable}=1 to create it, then review and commit it.");
         var expected = Normalize(File.ReadAllText(path, Encoding.UTF8));
         actual = Normalize(actual);
-        if (expected == actual) return;
+        if (expected == actual)
+            return;
         Assert.Fail($"Request golden '{name}' differs from {path}\n{Diff(expected, actual)}\nIf the change is intended, regenerate with {UpdateVariable}=1 and review the diff in git.");
     }
 
@@ -106,21 +108,28 @@ public static class GoldenFile
         var ops = new List<(char Op, int Line, string Text)>();
         for (int i = 0, j = 0; i < a.Length || j < b.Length;)
         {
-            if (i < a.Length && j < b.Length && a[i] == b[j]) { ops.Add((' ', i + 1, a[i])); i++; j++; }
-            else if (j >= b.Length || (i < a.Length && table[i + 1, j] >= table[i, j + 1])) { ops.Add(('-', i + 1, a[i])); i++; }
-            else { ops.Add(('+', j + 1, b[j])); j++; }
+            if (i < a.Length && j < b.Length && a[i] == b[j])
+            { ops.Add((' ', i + 1, a[i])); i++; j++; }
+            else if (j >= b.Length || (i < a.Length && table[i + 1, j] >= table[i, j + 1]))
+            { ops.Add(('-', i + 1, a[i])); i++; }
+            else
+            { ops.Add(('+', j + 1, b[j])); j++; }
         }
         var changed = ops.Select((o, n) => (o, n)).Where(p => p.o.Op != ' ').Select(p => p.n).ToList();
         var shown = new SortedSet<int>();
         foreach (var n in changed)
-            for (var k = Math.Max(0, n - 2); k <= Math.Min(ops.Count - 1, n + 2); k++) shown.Add(k);
+            for (var k = Math.Max(0, n - 2); k <= Math.Min(ops.Count - 1, n + 2); k++)
+                shown.Add(k);
         var text = new StringBuilder();
         text.AppendLine($"--- expected ({a.Length} lines)  +++ actual ({b.Length} lines)  changed lines: {changed.Count}");
-        var last = -2; var written = 0;
+        var last = -2;
+        var written = 0;
         foreach (var n in shown)
         {
-            if (written++ > 120) { text.AppendLine("... diff truncated ..."); break; }
-            if (n != last + 1) text.AppendLine("@@");
+            if (written++ > 120)
+            { text.AppendLine("... diff truncated ..."); break; }
+            if (n != last + 1)
+                text.AppendLine("@@");
             var (op, line, content) = ops[n];
             text.AppendLine($"{op} {line,4}: {content}");
             last = n;

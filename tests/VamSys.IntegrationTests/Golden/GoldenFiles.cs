@@ -22,7 +22,8 @@ public sealed class GoldenSession
         this.folder = Path.Combine(FindGoldenRoot(), area, "Expected", folder);
         if (Update)
         {
-            if (Directory.Exists(this.folder)) Directory.Delete(this.folder, true);
+            if (Directory.Exists(this.folder))
+                Directory.Delete(this.folder, true);
             Directory.CreateDirectory(this.folder);
         }
     }
@@ -39,12 +40,16 @@ public sealed class GoldenSession
 
     public void CheckBytes(string name, byte[] actual, string? _ = null)
     {
-        if (!produced.Add(name)) { failures.Add($"{name}: produced twice in one session"); return; }
+        if (!produced.Add(name))
+        { failures.Add($"{name}: produced twice in one session"); return; }
         var path = Path.Combine(folder, name);
-        if (Update) { Directory.CreateDirectory(Path.GetDirectoryName(path)!); File.WriteAllBytes(path, actual); return; }
-        if (!File.Exists(path)) { failures.Add($"{name}: expected file is missing (run with VAMSYS_UPDATE_GOLDEN=1 to create it)"); return; }
+        if (Update)
+        { Directory.CreateDirectory(Path.GetDirectoryName(path)!); File.WriteAllBytes(path, actual); return; }
+        if (!File.Exists(path))
+        { failures.Add($"{name}: expected file is missing (run with VAMSYS_UPDATE_GOLDEN=1 to create it)"); return; }
         var expected = File.ReadAllBytes(path);
-        if (expected.AsSpan().SequenceEqual(actual)) return;
+        if (expected.AsSpan().SequenceEqual(actual))
+            return;
         failures.Add($"{name}: differs from the committed golden ({expected.Length} bytes expected, {actual.Length} actual)\n{Diff(Visible(expected), Visible(actual))}");
     }
 
@@ -54,9 +59,11 @@ public sealed class GoldenSession
             foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
             {
                 var relative = Path.GetRelativePath(folder, file).Replace('\\', '/');
-                if (!produced.Contains(relative)) failures.Add($"{relative}: committed golden was not produced by the test (stale file)");
+                if (!produced.Contains(relative))
+                    failures.Add($"{relative}: committed golden was not produced by the test (stale file)");
             }
-        if (!Update && !Directory.Exists(folder) && produced.Count > 0) failures.Add($"golden folder {folder} does not exist");
+        if (!Update && !Directory.Exists(folder) && produced.Count > 0)
+            failures.Add($"golden folder {folder} does not exist");
         if (failures.Count > 0)
             Xunit.Assert.Fail($"{failures.Count} golden mismatch(es) in {folder}\n\n" + string.Join("\n\n", failures.Take(12)) + (failures.Count > 12 ? $"\n\n... and {failures.Count - 12} more" : ""));
     }
@@ -66,18 +73,27 @@ public sealed class GoldenSession
     // Line diff reduced to the changed middle block, with a little context.
     static string Diff(string expected, string actual)
     {
-        var a = expected.Split('\n'); var b = actual.Split('\n');
+        var a = expected.Split('\n');
+        var b = actual.Split('\n');
         var start = 0;
-        while (start < a.Length && start < b.Length && a[start] == b[start]) start++;
-        var endA = a.Length; var endB = b.Length;
-        while (endA > start && endB > start && a[endA - 1] == b[endB - 1]) { endA--; endB--; }
+        while (start < a.Length && start < b.Length && a[start] == b[start])
+            start++;
+        var endA = a.Length;
+        var endB = b.Length;
+        while (endA > start && endB > start && a[endA - 1] == b[endB - 1])
+        { endA--; endB--; }
         var sb = new StringBuilder();
         sb.AppendLine($"  first difference at line {start + 1}");
-        for (var i = Math.Max(0, start - 2); i < start; i++) sb.AppendLine("    " + Clip(a[i]));
-        foreach (var line in a.Skip(start).Take(Math.Min(endA - start, 25))) sb.AppendLine("  - " + Clip(line));
-        if (endA - start > 25) sb.AppendLine($"  - ... {endA - start - 25} more expected line(s)");
-        foreach (var line in b.Skip(start).Take(Math.Min(endB - start, 25))) sb.AppendLine("  + " + Clip(line));
-        if (endB - start > 25) sb.AppendLine($"  + ... {endB - start - 25} more actual line(s)");
+        for (var i = Math.Max(0, start - 2); i < start; i++)
+            sb.AppendLine("    " + Clip(a[i]));
+        foreach (var line in a.Skip(start).Take(Math.Min(endA - start, 25)))
+            sb.AppendLine("  - " + Clip(line));
+        if (endA - start > 25)
+            sb.AppendLine($"  - ... {endA - start - 25} more expected line(s)");
+        foreach (var line in b.Skip(start).Take(Math.Min(endB - start, 25)))
+            sb.AppendLine("  + " + Clip(line));
+        if (endB - start > 25)
+            sb.AppendLine($"  + ... {endB - start - 25} more actual line(s)");
         return sb.ToString().TrimEnd();
     }
     static string Clip(string line) => line.Length > 240 ? line[..240] + "..." : line;
@@ -128,18 +144,21 @@ public sealed partial class Masker
         switch (node)
         {
             case JsonObject o:
-                foreach (var key in o.Select(p => p.Key).ToList()) Normalize(o[key]);
+                foreach (var key in o.Select(p => p.Key).ToList())
+                    Normalize(o[key]);
                 if (o["Fields"] is JsonObject fields && o["FieldOrder"] is JsonArray order)
                 {
                     var ordered = order.Select(n => n!.GetValue<string>()).ToList();
                     var rest = fields.Select(p => p.Key).Except(ordered).Order(StringComparer.Ordinal);
                     var entries = ordered.Concat(rest).Where(k => fields.ContainsKey(k)).Select(k => (k, fields[k]!.DeepClone())).ToList();
                     fields.Clear();
-                    foreach (var (k, v) in entries) fields[k] = v;
+                    foreach (var (k, v) in entries)
+                        fields[k] = v;
                 }
                 return o;
             case JsonArray a:
-                foreach (var child in a) Normalize(child);
+                foreach (var child in a)
+                    Normalize(child);
                 return a;
             default:
                 return node;
@@ -153,11 +172,13 @@ public sealed partial class Masker
         {
             case JsonObject o:
                 foreach (var key in o.Select(p => p.Key).ToList())
-                    if (o[key] is { } child && MaskNode(child) is { } masked && !ReferenceEquals(child, masked)) o[key] = masked;
+                    if (o[key] is { } child && MaskNode(child) is { } masked && !ReferenceEquals(child, masked))
+                        o[key] = masked;
                 return o;
             case JsonArray a:
                 for (var i = 0; i < a.Count; i++)
-                    if (a[i] is { } child && MaskNode(child) is { } masked && !ReferenceEquals(child, masked)) a[i] = masked;
+                    if (a[i] is { } child && MaskNode(child) is { } masked && !ReferenceEquals(child, masked))
+                        a[i] = masked;
                 return a;
             case JsonValue v when v.TryGetValue<string>(out var s):
                 return JsonValue.Create(Mask(s));

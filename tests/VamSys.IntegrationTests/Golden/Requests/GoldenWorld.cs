@@ -28,22 +28,27 @@ public sealed class FakeRemote
 
     public FakeRemote()
     {
-        foreach (var collection in new[] { "airports", "fleet", "routings", "routes", "parameters" }) RegisterCollection(collection);
+        foreach (var collection in new[] { "airports", "fleet", "routings", "routes", "parameters" })
+            RegisterCollection(collection);
     }
 
     void RegisterCollection(string path)
     {
-        if (!registered.Add("C " + path)) return;
+        if (!registered.Add("C " + path))
+            return;
         Server.On(HttpMethod.Get, path, Handle).On(HttpMethod.Post, path, Handle);
     }
 
     void RegisterRow(string path)
     {
-        if (!registered.Add("R " + path)) return;
+        if (!registered.Add("R " + path))
+            return;
         Server.On(HttpMethod.Get, path, Handle).On(HttpMethod.Put, path, Handle).On(HttpMethod.Delete, path, Handle);
         var parts = path.Split('/');
-        if (parts[0] == "fleet" && parts.Length == 2) RegisterCollection($"fleet/{parts[1]}/aircraft");
-        if (parts[0] == "fleet" && parts.Length == 4) Server.On(HttpMethod.Patch, "aircraft/" + parts[3], Handle);
+        if (parts[0] == "fleet" && parts.Length == 2)
+            RegisterCollection($"fleet/{parts[1]}/aircraft");
+        if (parts[0] == "fleet" && parts.Length == 4)
+            Server.On(HttpMethod.Patch, "aircraft/" + parts[3], Handle);
     }
 
     /// <summary>Add an existing remote row, e.g. <c>AddRow("airports/101", """{"id":101,...}""")</c>.</summary>
@@ -57,7 +62,8 @@ public sealed class FakeRemote
 
     FakeResponse Handle(RecordedRequest request)
     {
-        if (Intercept?.Invoke(request) is { } forced) return forced;
+        if (Intercept?.Invoke(request) is { } forced)
+            return forced;
         return Respond(request);
     }
 
@@ -68,19 +74,25 @@ public sealed class FakeRemote
         var query = ParseQuery(request.PathAndQuery);
         var collection = path is "airports" or "fleet" or "routings" or "routes" or "parameters"
             || (path.StartsWith("fleet/", StringComparison.Ordinal) && path.EndsWith("/aircraft", StringComparison.Ordinal));
-        if (request.Method == "GET") return collection ? List(path, query) : Single(path);
-        if (request.Method == "POST") return Create(path, JsonNode.Parse(request.Body!)!.AsObject());
+        if (request.Method == "GET")
+            return collection ? List(path, query) : Single(path);
+        if (request.Method == "POST")
+            return Create(path, JsonNode.Parse(request.Body!)!.AsObject());
         if (request.Method == "PUT")
         {
-            if (!Rows.TryGetValue(path, out var row)) return FakeResponse.WithStatus(404);
-            foreach (var (key, value) in JsonNode.Parse(request.Body!)!.AsObject()) row[key] = value?.DeepClone();
+            if (!Rows.TryGetValue(path, out var row))
+                return FakeResponse.WithStatus(404);
+            foreach (var (key, value) in JsonNode.Parse(request.Body!)!.AsObject())
+                row[key] = value?.DeepClone();
             row["updated_at"] = Stamp;
             return Wrap(path, row);
         }
-        if (request.Method == "PATCH") return Move(path, JsonNode.Parse(request.Body!)!.AsObject());
+        if (request.Method == "PATCH")
+            return Move(path, JsonNode.Parse(request.Body!)!.AsObject());
         if (request.Method == "DELETE")
         {
-            if (!Rows.Remove(path)) return FakeResponse.WithStatus(404);
+            if (!Rows.Remove(path))
+                return FakeResponse.WithStatus(404);
             return new FakeResponse(HttpStatusCode.NoContent, null);
         }
         throw new InvalidOperationException("Unexpected method " + request.Method);
@@ -109,7 +121,8 @@ public sealed class FakeRemote
                 .OrderBy(p => p.Value["id"]!.GetValue<int>()).Select(p => p.Value);
             foreach (var (key, value) in query)
             {
-                if (!key.StartsWith("filter[", StringComparison.Ordinal)) continue;
+                if (!key.StartsWith("filter[", StringComparison.Ordinal))
+                    continue;
                 var name = key["filter[".Length..^1];
                 rows = name == "fleet_id"
                     ? rows.Where(r => r["fleet_ids"] is JsonArray ids && ids.Any(i => i!.ToString() == value))
@@ -137,7 +150,8 @@ public sealed class FakeRemote
     {
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
         var at = pathAndQuery.IndexOf('?');
-        if (at < 0) return result;
+        if (at < 0)
+            return result;
         foreach (var pair in pathAndQuery[(at + 1)..].Split('&', StringSplitOptions.RemoveEmptyEntries))
         {
             var eq = pair.IndexOf('=');
@@ -154,28 +168,39 @@ public sealed class FakeRemote
         if (collection == "airports")
         {
             var code = body["icao_iata"]!.GetValue<string>();
-            path = $"airports/{id}"; row["airline_id"] = 7; row[code.Length == 4 ? "icao" : "iata"] = code;
+            path = $"airports/{id}";
+            row["airline_id"] = 7;
+            row[code.Length == 4 ? "icao" : "iata"] = code;
         }
-        else if (collection == "fleet") { path = $"fleet/{id}"; row["airline_id"] = 7; }
+        else if (collection == "fleet")
+        { path = $"fleet/{id}"; row["airline_id"] = 7; }
         else if (collection.StartsWith("fleet/", StringComparison.Ordinal))
         {
             var fleet = int.Parse(collection.Split('/')[1]);
-            path = $"{collection}/{id}"; row["airline_id"] = 7; row["fleet_id"] = fleet;
+            path = $"{collection}/{id}";
+            row["airline_id"] = 7;
+            row["fleet_id"] = fleet;
         }
-        else if (collection == "routings") { path = $"routings/{id}"; row["airline_id"] = 7; }
-        else if (collection == "routes") path = $"routes/{id}";
-        else throw new InvalidOperationException("Cannot create in " + collection);
+        else if (collection == "routings")
+        { path = $"routings/{id}"; row["airline_id"] = 7; }
+        else if (collection == "routes")
+            path = $"routes/{id}";
+        else
+            throw new InvalidOperationException("Cannot create in " + collection);
         foreach (var (key, value) in body)
         {
-            if (key == "icao_iata") continue;
+            if (key == "icao_iata")
+                continue;
             // Requests carry parameter ids as strings; the API answers with numbers.
             row[key] = key == "parameter_ids" && value is JsonArray ids
                 ? new JsonArray(ids.Select(v => (JsonNode?)JsonValue.Create(int.Parse(v!.ToString()))).ToArray())
                 : value?.DeepClone();
         }
         // Live behaviour recorded in docs/API-CONTRACTS.md: a created jumpseat does not keep callsign / flight number.
-        if (collection == "routes" && body["type"]?.ToString() == "jumpseat") { row["callsign"] = null; row["flight_number"] = null; }
-        row["created_at"] = Stamp; row["updated_at"] = Stamp;
+        if (collection == "routes" && body["type"]?.ToString() == "jumpseat")
+        { row["callsign"] = null; row["flight_number"] = null; }
+        row["created_at"] = Stamp;
+        row["updated_at"] = Stamp;
         Rows[path] = row;
         RegisterRow(path);
         return FakeResponse.WithStatus(201, row.ToJsonString());
@@ -185,7 +210,8 @@ public sealed class FakeRemote
     {
         var id = path["aircraft/".Length..];
         var old = Rows.Keys.SingleOrDefault(k => k.EndsWith("/aircraft/" + id, StringComparison.Ordinal));
-        if (old == null) return FakeResponse.WithStatus(404);
+        if (old == null)
+            return FakeResponse.WithStatus(404);
         var row = Rows[old];
         Rows.Remove(old);
         row["fleet_id"] = body["fleet_id"]!.DeepClone();
@@ -214,7 +240,8 @@ public sealed class GoldenWorld
         var requests = InstantTime.Requests();
         var tokens = new TokenProvider(_ => Task.FromResult(new AccessToken("golden-token", requests.Clock.GetUtcNow().AddHours(1))), requests.Clock);
         Api = new OperationsAdapter(new OperationsTransport(Remote.Server.CreateClient(), OperationsAdapter.BaseUri, "golden-va", tokens, requests), Workspace);
-        if (standard) { StandardData(Remote); LoadRemote(); }
+        if (standard)
+        { StandardData(Remote); LoadRemote(); }
     }
 
     /// <summary>
@@ -270,7 +297,8 @@ public sealed class GoldenWorld
     public DataRow Edit(ResourceKind kind, string remoteId, params (string Field, string Value)[] edits)
     {
         var copy = Draft(kind, remoteId).Copy();
-        foreach (var (field, value) in edits) copy.Fields[field] = value;
+        foreach (var (field, value) in edits)
+            copy.Fields[field] = value;
         Workspace.Resources[kind].ReplaceDraftRows([copy]);
         return copy;
     }
@@ -323,7 +351,8 @@ public sealed class GoldenWorld
             foreach (var item in Job.Items)
                 yield return $"{item.Resource} {item.Kind} {item.State}" + (item.State == ItemState.Succeeded ? "" : " " + item.Description?.Code);
         }
-        foreach (var note in notes) yield return note;
+        foreach (var note in notes)
+            yield return note;
     }
 
     /// <summary>Compare with (or, with VAMSYS_UPDATE_GOLDEN=1, write) Expected/&lt;name&gt;.json.</summary>
