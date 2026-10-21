@@ -1,0 +1,152 @@
+VamSys.Core.ApiDeletionVerification => kind Object
+VamSys.Core.ApiDeletionVerification.CheckedAt => System.DateTimeOffset; get/set; ignore=Never
+VamSys.Core.ApiDeletionVerification.Outcome => System.String; get/set; ignore=Never
+VamSys.Core.ApiDeletionVerification.ReadStatus => System.Int32?; get/set; ignore=Never
+VamSys.Core.ApiDeletionVerification.WasManuallyConfirmed => System.Boolean; get/set; ignore=Never
+VamSys.Core.ApiDeletionVerification.WriteStatus => System.Int32?; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic => kind Object
+VamSys.Core.ApiDiagnostic.BodySha256 => System.String; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.BodyTruncated => System.Boolean; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.ErrorId => System.String; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.FieldErrors => System.Collections.Generic.Dictionary<System.String,System.String[]>; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.FinishedAt => System.DateTimeOffset; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.Method => System.String; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.Path => System.String; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.Phase => System.String; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.RequestBody => System.String; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.ResponseBody => System.String; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.ServerDate => System.DateTimeOffset?; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.ServerMessage => System.String; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.StartedAt => System.DateTimeOffset; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.Status => System.Int32; get/set; ignore=Never
+VamSys.Core.ApiDiagnostic.Summary => System.String; ; ignore=Always
+VamSys.Core.ApiDiagnostic.Summary => not serialized (JsonIgnore Always)
+VamSys.Core.ApiDiagnostic.TraceHeaders => System.Collections.Generic.Dictionary<System.String,System.String>; get/set; ignore=Never
+VamSys.Core.ApiFieldDifference => kind Object
+VamSys.Core.ApiFieldDifference.Actual => System.String; get/set; ignore=Never
+VamSys.Core.ApiFieldDifference.Expected => System.String; get/set; ignore=Never
+VamSys.Core.ApiFieldDifference.Field => System.String; get/set; ignore=Never
+VamSys.Core.ApiManualResolution => kind Object
+VamSys.Core.ApiManualResolution.ConfirmedAt => System.DateTimeOffset; get/set; ignore=Never
+VamSys.Core.ApiManualResolution.ReadStatus => System.Int32?; get/set; ignore=Never
+VamSys.Core.ApiManualResolution.Source => System.String; get/set; ignore=Never
+VamSys.Core.ApiManualResolution.WriteReceipt => System.Boolean; get/set; ignore=Never
+VamSys.Core.ApiSnapshotComparison => kind Object
+VamSys.Core.ApiSnapshotComparison.BusinessFields => System.Collections.Generic.IReadOnlyList<VamSys.Core.ApiFieldDifference>; get/set; ignore=Never
+VamSys.Core.ApiSnapshotComparison.CurrentUpdatedAt => System.String; get/set; ignore=Never
+VamSys.Core.ApiSnapshotComparison.PreviousUpdatedAt => System.String; get/set; ignore=Never
+VamSys.Core.BatchJob => kind Object
+VamSys.Core.BatchJob.Created => System.DateTimeOffset; get/set; ignore=Never
+VamSys.Core.BatchJob.Description => VamSys.Core.MessageDescriptor; get/set; ignore=Never
+VamSys.Core.BatchJob.Id => System.Guid; get/set; ignore=Never
+VamSys.Core.BatchJob.Items => System.Collections.Generic.List<VamSys.Core.ChangeItem>; get/set; ignore=Never
+VamSys.Core.BatchJob.Mode => VamSys.Core.RunMode; get/set; ignore=Never
+VamSys.Core.BatchJob.Status => System.String; get/set; ignore=Never
+VamSys.Core.BatchJob.StatusCode => VamSys.Core.JobStatus; get/set; ignore=Never
+VamSys.Core.BatchStep => kind Object
+VamSys.Core.BatchStep.Body => System.Collections.Generic.Dictionary<System.String,System.Text.Json.JsonElement>; get/set; ignore=Never
+VamSys.Core.BatchStep.DeadlineAt => System.DateTimeOffset?; get/set; ignore=Never
+VamSys.Core.BatchStep.FinishedAt => System.DateTimeOffset?; get/set; ignore=Never
+VamSys.Core.BatchStep.Method => System.String; get/set; ignore=Never
+VamSys.Core.BatchStep.Path => System.String; get/set; ignore=Never
+VamSys.Core.BatchStep.RemoteId => System.String; get/set; ignore=Never
+VamSys.Core.BatchStep.StartedAt => System.DateTimeOffset?; get/set; ignore=Never
+VamSys.Core.BatchStep.State => VamSys.Core.BatchStepState; get/set; ignore=Never
+VamSys.Core.ChangeItem => kind Object
+VamSys.Core.ChangeItem.After => VamSys.Core.DataRow; get/set; ignore=Never
+VamSys.Core.ChangeItem.ApiExpectedValues => System.Collections.Generic.Dictionary<System.String,System.Text.Json.JsonElement>; get/set; ignore=Never
+VamSys.Core.ChangeItem.ApiSteps => System.Collections.Generic.List<VamSys.Core.BatchStep>; get/set; ignore=Never
+VamSys.Core.ChangeItem.Before => VamSys.Core.DataRow; get/set; ignore=Never
+VamSys.Core.ChangeItem.CanProposeRecoveryId => System.Boolean; ; ignore=Always
+VamSys.Core.ChangeItem.CanProposeRecoveryId => not serialized (JsonIgnore Always)
+VamSys.Core.ChangeItem.CreateCompleted => System.Boolean; get/set; ignore=Never
+VamSys.Core.ChangeItem.DeletionVerification => VamSys.Core.ApiDeletionVerification; get/set; ignore=WhenWritingNull
+VamSys.Core.ChangeItem.Dependencies => System.Collections.Generic.List<System.Guid>; get/set; ignore=Never
+VamSys.Core.ChangeItem.Description => VamSys.Core.MessageDescriptor; get/set; ignore=Never
+VamSys.Core.ChangeItem.Diagnostic => System.String; get/set; ignore=Never
+VamSys.Core.ChangeItem.DiagnosticDetails => VamSys.Core.ApiDiagnostic; get/set; ignore=Never
+VamSys.Core.ChangeItem.EditableRecoveryId => System.String; ; ignore=Always
+VamSys.Core.ChangeItem.EditableRecoveryId => not serialized (JsonIgnore Always)
+VamSys.Core.ChangeItem.Fields => System.Collections.Generic.Dictionary<System.String,VamSys.Core.FieldChange>; get/set; ignore=Never
+VamSys.Core.ChangeItem.Id => System.Guid; get/set; ignore=Never
+VamSys.Core.ChangeItem.Kind => VamSys.Core.ChangeKind; get/set; ignore=Never
+VamSys.Core.ChangeItem.ManualResolution => VamSys.Core.ApiManualResolution; get/set; ignore=WhenWritingNull
+VamSys.Core.ChangeItem.Message => System.String; get/set; ignore=Never
+VamSys.Core.ChangeItem.PreCreateCandidateIds => System.Collections.Generic.List<System.String>; get/set; ignore=Never
+VamSys.Core.ChangeItem.PreflightComparison => VamSys.Core.ApiSnapshotComparison; get/set; ignore=Never
+VamSys.Core.ChangeItem.ReadbackDetails => VamSys.Core.ApiDiagnostic; get/set; ignore=Never
+VamSys.Core.ChangeItem.Rebased => System.Boolean; get/set; ignore=Never
+VamSys.Core.ChangeItem.RecoveryCandidateId => System.String; get/set; ignore=Never
+VamSys.Core.ChangeItem.RecoveryCandidates => System.Collections.Generic.List<VamSys.Core.RecoveryCandidateAttempt>; get/set; ignore=Never
+VamSys.Core.ChangeItem.RemoteId => System.String; get/set; ignore=Never
+VamSys.Core.ChangeItem.RequiresAirlineParameter => System.Boolean; get/set; ignore=WhenWritingDefault
+VamSys.Core.ChangeItem.Resource => VamSys.Core.ResourceKind; get/set; ignore=Never
+VamSys.Core.ChangeItem.State => VamSys.Core.ItemState; get/set; ignore=Never
+VamSys.Core.ChangeItem.VerificationDifferences => System.Collections.Generic.List<VamSys.Core.ApiFieldDifference>; get/set; ignore=Never
+VamSys.Core.ChangeItem.WriteAccepted => System.Boolean; get/set; ignore=Never
+VamSys.Core.DataRow => kind Object
+VamSys.Core.DataRow.Fields => System.Collections.Generic.Dictionary<System.String,System.String>; get/set; ignore=Never
+VamSys.Core.DataRow.Identity => VamSys.Core.ResourceIdentity; get/set; ignore=Never
+VamSys.Core.DataRow.LocalId => System.Guid; get/set; ignore=Never
+VamSys.Core.DataRow.RawApiJson => System.String; get/set; ignore=Never
+VamSys.Core.EditHistory => kind Object
+VamSys.Core.EditHistory.Redo => System.Collections.Generic.IReadOnlyList<VamSys.Core.HistoryStep>; get; ignore=Never
+VamSys.Core.EditHistory.Undo => System.Collections.Generic.IReadOnlyList<VamSys.Core.HistoryStep>; get; ignore=Never
+VamSys.Core.FieldChange => kind Object
+VamSys.Core.FieldChange.Intent => VamSys.Core.FieldIntent; get/set; ignore=Never
+VamSys.Core.FieldChange.Value => System.String; get/set; ignore=Never
+VamSys.Core.HistoryStep => kind Object
+VamSys.Core.HistoryStep.AfterOrder => System.Collections.Immutable.ImmutableArray<System.Guid>?; get/set; ignore=Never
+VamSys.Core.HistoryStep.BeforeOrder => System.Collections.Immutable.ImmutableArray<System.Guid>?; get/set; ignore=Never
+VamSys.Core.HistoryStep.Rows => System.Collections.Immutable.ImmutableArray<VamSys.Core.RowEdit>; get/set; ignore=Never
+VamSys.Core.HistoryStep.StepId => System.Guid; get/set; ignore=Never
+VamSys.Core.MergeConflict => kind Object
+VamSys.Core.MergeConflict.Field => System.String; get/set; ignore=Never
+VamSys.Core.MergeConflict.Local => System.String; get/set; ignore=Never
+VamSys.Core.MergeConflict.Original => System.String; get/set; ignore=Never
+VamSys.Core.MergeConflict.Remote => System.String; get/set; ignore=Never
+VamSys.Core.MergeConflict.RowId => System.Guid; get/set; ignore=Never
+VamSys.Core.MessageArgument => kind Object
+VamSys.Core.MessageArgument.Date => System.DateTimeOffset?; get/set; ignore=Never
+VamSys.Core.MessageArgument.Message => VamSys.Core.MessageDescriptor; get/set; ignore=Never
+VamSys.Core.MessageArgument.Number => System.Decimal?; get/set; ignore=Never
+VamSys.Core.MessageArgument.Text => System.String; get/set; ignore=Never
+VamSys.Core.MessageDescriptor => kind Object
+VamSys.Core.MessageDescriptor.Arguments => System.Collections.Generic.Dictionary<System.String,VamSys.Core.MessageArgument>; get/set; ignore=Never
+VamSys.Core.MessageDescriptor.Code => System.String; get/set; ignore=Never
+VamSys.Core.MessageDescriptor.Literal => System.String; get/set; ignore=Never
+VamSys.Core.RecoveryCandidateAttempt => kind Object
+VamSys.Core.RecoveryCandidateAttempt.ProposedAt => System.DateTimeOffset; get/set; ignore=Never
+VamSys.Core.RecoveryCandidateAttempt.RemoteId => System.String; get/set; ignore=Never
+VamSys.Core.ResourceData => custom converter VamSys.Core.ResourceDataConverter
+VamSys.Core.ResourceIdentity => kind Object
+VamSys.Core.ResourceIdentity.ConnectionId => System.String; get/set; ignore=Never
+VamSys.Core.ResourceIdentity.ParentFleetId => System.String; get/set; ignore=Never
+VamSys.Core.ResourceIdentity.RemoteId => System.String; get/set; ignore=Never
+VamSys.Core.RowEdit => kind Object
+VamSys.Core.RowEdit.After => VamSys.Core.RowImage; get/set; ignore=Never
+VamSys.Core.RowEdit.Before => VamSys.Core.RowImage; get/set; ignore=Never
+VamSys.Core.RowEdit.LocalId => System.Guid; get/set; ignore=Never
+VamSys.Core.RowImage => kind Object
+VamSys.Core.RowImage.FieldOrder => System.Collections.Immutable.ImmutableArray<System.String>; get/set; ignore=Never
+VamSys.Core.RowImage.Fields => System.Collections.Immutable.ImmutableDictionary<System.String,System.String>; get/set; ignore=Never
+VamSys.Core.RowImage.Identity => VamSys.Core.ResourceIdentity; get/set; ignore=Never
+VamSys.Core.RowImage.LocalId => System.Guid; get/set; ignore=Never
+VamSys.Core.RowImage.RawApiJson => System.String; get/set; ignore=Never
+VamSys.Core.Workspace => kind Object
+VamSys.Core.Workspace.AirlineId => System.String; get/set; ignore=Never
+VamSys.Core.Workspace.ClientId => System.String; get/set; ignore=Never
+VamSys.Core.Workspace.ConnectedAt => System.DateTimeOffset?; get/set; ignore=Never
+VamSys.Core.Workspace.ContractHash => System.String; get/set; ignore=Never
+VamSys.Core.Workspace.Id => System.Guid; get/set; ignore=Never
+VamSys.Core.Workspace.InstanceUrl => System.String; get/set; ignore=Never
+VamSys.Core.Workspace.Jobs => System.Collections.Generic.List<VamSys.Core.BatchJob>; get/set; ignore=Never
+VamSys.Core.Workspace.LocalRouteTimes => System.Boolean; get/set; ignore=Never
+VamSys.Core.Workspace.Mode => VamSys.Core.RunMode; get/set; ignore=Never
+VamSys.Core.Workspace.Name => System.String; get/set; ignore=Never
+VamSys.Core.Workspace.Resources => System.Collections.Generic.Dictionary<VamSys.Core.ResourceKind,VamSys.Core.ResourceData>; get/set; ignore=Never
+VamSys.Core.Workspace.StorageRevision => System.Int64; get/set; ignore=Never
+VamSys.Core.Workspace.VerifiedOperations => System.Collections.Generic.List<System.String>; get/set; ignore=Never
+VamSys.Infrastructure.OperationsCredentials => kind Object
+VamSys.Infrastructure.OperationsCredentials.ClientId => System.String; get/set; ignore=Never
+VamSys.Infrastructure.OperationsCredentials.Secret => System.String; get/set; ignore=Never

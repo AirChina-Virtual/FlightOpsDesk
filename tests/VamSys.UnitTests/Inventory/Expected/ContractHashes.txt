@@ -1,0 +1,10 @@
+ApiContracts.Sha256 => 1EC1A869FC3C6F4D70A7A6ECD50170D5D915551794E796F9F34D5AFB944D78C2
+ApiContracts.Version => 3.0.0
+IndependentApiEvidence.ContractHash => 1EC1A869FC3C6F4D70A7A6ECD50170D5D915551794E796F9F34D5AFB944D78C2
+IndependentApiEvidence.EvidenceId => vcca-isolated-20261020
+manifest:operations.sha256 => 1EC1A869FC3C6F4D70A7A6ECD50170D5D915551794E796F9F34D5AFB944D78C2
+manifest:operations.source => https://vamsys.io/api-docs/operations.json
+manifest:operations.version => 3.0.0
+manifest:pilot.sha256 => 765864DA9B0ABCDD0ECE546EE1B6AE41EE23134CB32EF2285959CD5FDFA30C30
+manifest:pilot.source => https://vamsys.io/api-docs/pilot.json
+manifest:pilot.version => 3.0.0

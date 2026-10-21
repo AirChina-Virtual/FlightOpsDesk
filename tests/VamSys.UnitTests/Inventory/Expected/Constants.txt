@@ -1,0 +1,16 @@
+OperationsAdapter.BaseUri => https://vamsys.io/api/v3/operations/
+VamSys.App.csproj:ApplicationIcon => Assets\FlightOpsDesk.ico
+VamSys.App.csproj:AssemblyName => FlightOpsDesk
+VamSys.App.csproj:AssemblyTitle => FlightOps Desk
+VamSys.App.csproj:OutputType => WinExe
+VamSys.App.csproj:Product => FlightOps Desk
+VamSys.App.csproj:RootNamespace => VamSys.App
+icon:src/VamSys.App/Assets/FlightOpsDesk.ico => exists
+literal:VAMSYS_DATA_DIR@src/VamSys.App/App.xaml.cs => 2 occurrence(s)
+literal:VAMSYS_DATA_DIR@src/VamSys.App/MainWindow.Api.cs => 1 occurrence(s)
+literal:VAMSYS_DATA_DIR@src/VamSys.App/MainWindow.Localization.cs => 1 occurrence(s)
+literal:VAMSYS_DATA_DIR@src/VamSys.App/MainWindow.xaml.cs => 1 occurrence(s)
+literal:VamSysBatch@src/VamSys.App/App.xaml.cs => 2 occurrence(s)
+literal:VamSysBatch@src/VamSys.App/MainWindow.Api.cs => 1 occurrence(s)
+literal:VamSysBatch@src/VamSys.App/MainWindow.Localization.cs => 1 occurrence(s)
+literal:VamSysBatch@src/VamSys.App/MainWindow.xaml.cs => 1 occurrence(s)
