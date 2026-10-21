@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Media;
 using VamSys.Core;
 
 namespace VamSys.App;
+
 public sealed partial class MainWindow
 {
     sealed class DataPageState
@@ -32,14 +33,17 @@ public sealed partial class MainWindow
         for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
         {
             var child = VisualTreeHelper.GetChild(parent, i);
-            if (child is T match) return match;
-            if (FindVisual<T>(child) is { } found) return found;
+            if (child is T match)
+                return match;
+            if (FindVisual<T>(child) is { } found)
+                return found;
         }
         return null;
     }
     void CapturePageState()
     {
-        if (shownState is null || !ReferenceEquals(PageHost.Content, shownDataPage) || table is null) return;
+        if (shownState is null || !ReferenceEquals(PageHost.Content, shownDataPage) || table is null)
+            return;
         shownState.Search = searchBox?.Text ?? "";
         shownState.Filter = filterBox?.SelectedIndex ?? 0;
         shownState.Sort = sortBox?.SelectedItem as string;
@@ -49,7 +53,8 @@ public sealed partial class MainWindow
     }
     void RestoreTableState(ListView target, ScrollViewer horizontal, DataPageState state)
     {
-        foreach (var row in visible.Where(r => state.Selected.Contains(r.Row.LocalId))) target.SelectedItems.Add(row);
+        foreach (var row in visible.Where(r => state.Selected.Contains(r.Row.LocalId)))
+            target.SelectedItems.Add(row);
         target.Loaded += (_, _) => DispatcherQueue.TryEnqueue(() =>
         {
             FindVisual<ScrollViewer>(target)?.ChangeView(null, state.Vertical, null, true);
@@ -62,20 +67,35 @@ public sealed partial class MainWindow
     Workspace? viewsWorkspace;
     void ReleaseWorkspaceViews()
     {
-        var previous = viewsWorkspace; viewsWorkspace = workspace;
-        if (previous is null || ReferenceEquals(previous, workspace)) return;
+        var previous = viewsWorkspace;
+        viewsWorkspace = workspace;
+        if (previous is null || ReferenceEquals(previous, workspace))
+            return;
         // The data page and its row pool are kept and rebound when shown again; only the rows go.
         CancelDataQuery();
-        shownState = null; dataPageOwner = null; ClearDataRows();
-        pooledLink?.Detach(); pooledData = null; changeCounts.Clear();
-        tableBaseline = []; tableConflicts = []; tableFleetLabels = new(StringComparer.OrdinalIgnoreCase);
-        tasksOwner = null; tasksPage = null; taskList = null; taskModels.Clear(); taskIndex.Clear(); pendingTaskItems.Clear();
+        shownState = null;
+        dataPageOwner = null;
+        ClearDataRows();
+        pooledLink?.Detach();
+        pooledData = null;
+        changeCounts.Clear();
+        tableBaseline = [];
+        tableConflicts = [];
+        tableFleetLabels = new(StringComparer.OrdinalIgnoreCase);
+        tasksOwner = null;
+        tasksPage = null;
+        taskList = null;
+        taskModels.Clear();
+        taskIndex.Clear();
+        pendingTaskItems.Clear();
         // Each session's adapter holds the instance it was created for; a reload gets a new one anyway.
-        if (apiSessions.Remove(previous.Id, out var session)) session.Client.Dispose();
+        if (apiSessions.Remove(previous.Id, out var session))
+            session.Client.Dispose();
     }
     UIElement GetSettingsPage()
     {
-        if (!settingsPages.TryGetValue(workspace.Id, out var content)) settingsPages[workspace.Id] = content = SettingsPage();
+        if (!settingsPages.TryGetValue(workspace.Id, out var content))
+            settingsPages[workspace.Id] = content = SettingsPage();
         return content;
     }
 }

@@ -34,8 +34,10 @@ public sealed record BatchEditPreview(BatchSelection Selection, string Field, IR
     }
     public void Apply(ResourceData data)
     {
-        if (Changes.Count == 0) return;
+        if (Changes.Count == 0)
+            return;
         data.Edit(Changes.Select(r => r.LocalId), () => data.ReplaceDraftRows(Changes.Select(r => r.Copy())));
-        if (!data.Columns.Contains(Field)) data.Columns.Add(Field);
+        if (!data.Columns.Contains(Field))
+            data.Columns.Add(Field);
     }
 }

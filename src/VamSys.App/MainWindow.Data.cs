@@ -47,21 +47,30 @@ public sealed partial class MainWindow
         if (ReferenceEquals(dataPageOwner, workspace) && dataPageResource == resource && shownDataPage != null)
         {
             RefreshDataAvailability();
-            if (CurrentDataState.Model.IsDirty && !busy && !querying) StartDataQuery();
+            if (CurrentDataState.Model.IsDirty && !busy && !querying)
+                StartDataQuery();
             return shownDataPage;
         }
-        CancelDataQuery(); dataPageOwner = workspace; dataPageResource = resource;
+        CancelDataQuery();
+        dataPageOwner = workspace;
+        dataPageResource = resource;
         visible = [];
         UIElement content;
-        if (shownDataPage is null) { dataPageBuilds++; content = BuildDataPage(); }
-        else { content = shownDataPage; RebindDataPage(); }
+        if (shownDataPage is null)
+        { dataPageBuilds++; content = BuildDataPage(); }
+        else
+        { content = shownDataPage; RebindDataPage(); }
         var state = CurrentDataState;
         if (!state.Model.IsDirty && state.Baseline != null)
         {
-            tableBaseline = state.Baseline; tableConflicts = state.Conflicts; tableFleetLabels = state.FleetLabels;
-            ShowDataPageRows(false); RestoreDataOffsets(state);
+            tableBaseline = state.Baseline;
+            tableConflicts = state.Conflicts;
+            tableFleetLabels = state.FleetLabels;
+            ShowDataPageRows(false);
+            RestoreDataOffsets(state);
         }
-        else if (!busy) StartDataQuery();
+        else if (!busy)
+            StartDataQuery();
         RefreshDataAvailability();
         return content;
     }
@@ -71,23 +80,32 @@ public sealed partial class MainWindow
     void RebindDataPage()
     {
         var state = CurrentDataState;
-        ClearDataRows(); shownState = state;
-        if (searchBox != null) searchBox.Text = state.Search;
-        if (filterBox != null) filterBox.SelectedIndex = state.Filter;
+        ClearDataRows();
+        shownState = state;
+        if (searchBox != null)
+            searchBox.Text = state.Search;
+        if (filterBox != null)
+            filterBox.SelectedIndex = state.Filter;
         SyncSortColumns(state.Sort);
         EnsureDataHeaders(DisplayColumns());
-        if (fleetCommand != null) fleetCommand.Visibility = resource is ResourceKind.Aircraft or ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
-        if (retireCommand != null) retireCommand.Visibility = resource == ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
-        if (pageSize != null) pageSize.SelectedItem = state.Model.PageSize;
-        if (pageJump != null) { pageJump.Text = state.Model.Page.ToString(); pageJump.Tag = state.Model.Page; }
+        if (fleetCommand != null)
+            fleetCommand.Visibility = resource is ResourceKind.Aircraft or ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
+        if (retireCommand != null)
+            retireCommand.Visibility = resource == ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
+        if (pageSize != null)
+            pageSize.SelectedItem = state.Model.PageSize;
+        if (pageJump != null)
+        { pageJump.Text = state.Model.Page.ToString(); pageJump.Tag = state.Model.Page; }
     }
     // Removing the rows must not read as the user deselecting them.
     void ClearDataRows()
     {
         visible = [];
-        if (table is null) return;
+        if (table is null)
+            return;
         restoringDataSelection = true;
-        try { table.SelectedItems.Clear(); SyncShownRows([]); }
+        try
+        { table.SelectedItems.Clear(); SyncShownRows([]); }
         finally { restoringDataSelection = false; }
     }
     // A new ItemsSource makes WinUI create every row's controls again and keep native memory for the
@@ -96,20 +114,28 @@ public sealed partial class MainWindow
     // source doubled the layout time of paging and language changes (P95 10 → 20 ms, 25 → 56 ms).
     void SyncShownRows(List<RowViewModel> rows)
     {
-        if (table is null) return;
-        if (table.ItemsSource is not List<RowViewModel> old || old.Count != rows.Count || rows.Count > 0 && !ReferenceEquals(old[0], rows[0])) table.ItemsSource = rows;
+        if (table is null)
+            return;
+        if (table.ItemsSource is not List<RowViewModel> old || old.Count != rows.Count || rows.Count > 0 && !ReferenceEquals(old[0], rows[0]))
+            table.ItemsSource = rows;
     }
     List<string> headerColumns = [];
     void EnsureDataHeaders(List<string> columns)
     {
-        if (table is null || table.Header != null && headerColumns.SequenceEqual(columns)) return;
-        headerColumns = columns; table.Header = BuildDataHeaders(columns);
+        if (table is null || table.Header != null && headerColumns.SequenceEqual(columns))
+            return;
+        headerColumns = columns;
+        table.Header = BuildDataHeaders(columns);
     }
     void SyncSortColumns(string? selected)
     {
-        if (sortBox is null) return;
+        if (sortBox is null)
+            return;
         sortBox.ItemsSource = Data.Columns.Count > 0 ? Data.Columns : Schemas.All[resource].Columns.ToList();
-        if (selected != null && sortBox.Items.Contains(selected)) sortBox.SelectedItem = selected; else sortBox.SelectedIndex = -1;
+        if (selected != null && sortBox.Items.Contains(selected))
+            sortBox.SelectedItem = selected;
+        else
+            sortBox.SelectedIndex = -1;
     }
     void StartDataQuery()
     {
@@ -121,7 +147,11 @@ public sealed partial class MainWindow
         changeCounts.Clear();
         foreach (var state in dataStates.Values)
         {
-            state.SelectionCountsDirty = true; state.Model.Invalidate(); state.Baseline = null; state.Conflicts = []; state.FleetLabels = new(StringComparer.OrdinalIgnoreCase);
+            state.SelectionCountsDirty = true;
+            state.Model.Invalidate();
+            state.Baseline = null;
+            state.Conflicts = [];
+            state.FleetLabels = new(StringComparer.OrdinalIgnoreCase);
         }
     }
     // The shown page's applied result and baseline still describe the current resource.
@@ -133,39 +163,56 @@ public sealed partial class MainWindow
     // and adjust the counts; result membership and order are re-evaluated at the next applied query.
     void RefreshReplacedRows(ResourceData source, IReadOnlyCollection<Guid> ids, int changedBefore)
     {
-        if (changeCounts.TryGetValue(source, out var count)) changeCounts[source] = count - changedBefore + CountChanged(source, ids);
+        if (changeCounts.TryGetValue(source, out var count))
+            changeCounts[source] = count - changedBefore + CountChanged(source, ids);
         shownState!.SelectionCountsDirty = true;
         var replaced = ids.ToHashSet();
         foreach (var view in visible)
-            if (replaced.Contains(view.Row.LocalId) && source.FindDraftRow(view.Row.LocalId) is { } row) view.Rebind(row);
+            if (replaced.Contains(view.Row.LocalId) && source.FindDraftRow(view.Row.LocalId) is { } row)
+                view.Rebind(row);
         lastEditedCell = null;
     }
     int CountChanges(ResourceData data)
     {
-        if (changeCounts.TryGetValue(data, out var count)) return count;
-        var baseline = data.Snapshot.ToDictionary(r => r.LocalId); count = 0;
+        if (changeCounts.TryGetValue(data, out var count))
+            return count;
+        var baseline = data.Snapshot.ToDictionary(r => r.LocalId);
+        count = 0;
         foreach (var row in data.Draft)
-            if (ChangePlanner.GetChangeKind(row, baseline.GetValueOrDefault(row.LocalId)) != null) count++;
+            if (ChangePlanner.GetChangeKind(row, baseline.GetValueOrDefault(row.LocalId)) != null)
+                count++;
         return changeCounts[data] = count;
     }
     void CancelDataQuery()
     {
-        dataQueryGeneration++; dataQueryCancellation?.Cancel(); dataQueryCancellation = null;
-        querying = false; BusyRing.IsActive = busy;
+        dataQueryGeneration++;
+        dataQueryCancellation?.Cancel();
+        dataQueryCancellation = null;
+        querying = false;
+        BusyRing.IsActive = busy;
         RefreshDataAvailability();
     }
     async Task LoadRowsAsync(string search, int filter, string? sort)
     {
-        if (!closeState.IsOpen || busy || localOperation || table is null) return;
+        if (!closeState.IsOpen || busy || localOperation || table is null)
+            return;
         CancelDataQuery();
-        var cancellation = new CancellationTokenSource(); dataQueryCancellation = cancellation;
-        var token = cancellation.Token; var generation = dataQueryGeneration;
-        var owner = workspace; var kind = resource; var source = Data; var state = CurrentDataState;
-        querying = true; BusyRing.IsActive = true; RefreshDataAvailability();
+        var cancellation = new CancellationTokenSource();
+        dataQueryCancellation = cancellation;
+        var token = cancellation.Token;
+        var generation = dataQueryGeneration;
+        var owner = workspace;
+        var kind = resource;
+        var source = Data;
+        var state = CurrentDataState;
+        querying = true;
+        BusyRing.IsActive = true;
+        RefreshDataAvailability();
         try
         {
             // Always yield so page construction and the progress indicator can finish.
-            await Task.Yield(); token.ThrowIfCancellationRequested();
+            await Task.Yield();
+            token.ThrowIfCancellationRequested();
             var baseline = source.Snapshot.ToDictionary(r => r.LocalId);
             var inputs = new List<DataQueryRow>(source.Draft.Count);
             var slice = Stopwatch.StartNew();
@@ -177,19 +224,29 @@ public sealed partial class MainWindow
                     ChangePlanner.GetChangeKind(row, baseline.GetValueOrDefault(row.LocalId)) != null, Schemas.Deleted(row)));
                 if (slice.ElapsedMilliseconds >= 8)
                 {
-                    Status(() => L("TableLoading")); await Task.Yield(); slice.Restart();
+                    Status(() => L("TableLoading"));
+                    await Task.Yield();
+                    slice.Restart();
                 }
             }
             var result = await Task.Run(() => DataTableViewModel.Query(inputs, search, filter, sort != null, token), token);
             token.ThrowIfCancellationRequested();
-            if (generation != dataQueryGeneration || !ReferenceEquals(owner, workspace) || kind != resource || page != "data") return;
-            tableBaseline = baseline; tableConflicts = source.Conflicts.Select(c => c.RowId).ToHashSet();
+            if (generation != dataQueryGeneration || !ReferenceEquals(owner, workspace) || kind != resource || page != "data")
+                return;
+            tableBaseline = baseline;
+            tableConflicts = source.Conflicts.Select(c => c.RowId).ToHashSet();
             tableFleetLabels = fleets.Options(owner).ToDictionary(o => o.Token, StringComparer.OrdinalIgnoreCase);
-            state.Baseline = tableBaseline; state.Conflicts = tableConflicts; state.FleetLabels = tableFleetLabels;
-            state.Model.Apply(result, search, filter, sort); state.SelectionCountsDirty = true;
-            state.AppliedSearch = search; state.AppliedFilter = filter; state.AppliedSort = sort;
+            state.Baseline = tableBaseline;
+            state.Conflicts = tableConflicts;
+            state.FleetLabels = tableFleetLabels;
+            state.Model.Apply(result, search, filter, sort);
+            state.SelectionCountsDirty = true;
+            state.AppliedSearch = search;
+            state.AppliedFilter = filter;
+            state.AppliedSort = sort;
             changeCounts[source] = result.ModifiedCount;
-            ShowDataPageRows(false); RestoreDataOffsets(state);
+            ShowDataPageRows(false);
+            RestoreDataOffsets(state);
             Status(() => L("TableReady", ("count", result.RowIds.Length)));
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
@@ -198,85 +255,126 @@ public sealed partial class MainWindow
             cancellation.Dispose();
             if (generation == dataQueryGeneration)
             {
-                dataQueryCancellation = null; querying = false; BusyRing.IsActive = busy; RefreshDataAvailability();
+                dataQueryCancellation = null;
+                querying = false;
+                BusyRing.IsActive = busy;
+                RefreshDataAvailability();
             }
         }
     }
     bool CanEditData() => closeState.IsOpen && !busy && !localOperation && !querying && !storageBlocked;
     void ShowDataPageRows(bool resetVertical)
     {
-        if (table is null || shownState is null) return;
-        var source = Data; var columns = DisplayColumns();
+        if (table is null || shownState is null)
+            return;
+        var source = Data;
+        var columns = DisplayColumns();
         if (!pooledColumns.SequenceEqual(columns) || pooledDensity != tableDensity || pooledLink is null)
         {
-            pooledLink?.Detach(); pageRowPool.Clear(); pooledColumns = columns; pooledDensity = tableDensity; pooledLink = new();
+            pooledLink?.Detach();
+            pageRowPool.Clear();
+            pooledColumns = columns;
+            pooledDensity = tableDensity;
+            pooledLink = new();
         }
         // Rows with the same columns are rebound in place, also for another workspace or resource.
         if (!ReferenceEquals(pooledData, source))
         {
-            pooledData = source; pooledLink.Owner = workspace; pooledLink.Data = source; pooledLink.Kind = resource;
-            EnsureDataHeaders(columns); SyncSortColumns(sortBox?.SelectedItem as string);
+            pooledData = source;
+            pooledLink.Owner = workspace;
+            pooledLink.Data = source;
+            pooledLink.Kind = resource;
+            EnsureDataHeaders(columns);
+            SyncSortColumns(sortBox?.SelectedItem as string);
         }
         var rows = new List<RowViewModel>(shownState.Model.PageSize);
         restoringDataSelection = true;
         try
         {
-        table.SelectedItems.Clear();
-        foreach (var id in shownState.Model.PageIds())
-        {
-            var row = source.FindDraftRow(id); if (row is null) continue;
-            if (rows.Count < pageRowPool.Count)
+            table.SelectedItems.Clear();
+            foreach (var id in shownState.Model.PageIds())
             {
-                var reused = pageRowPool[rows.Count]; reused.Rebind(row); rows.Add(reused); continue;
+                var row = source.FindDraftRow(id);
+                if (row is null)
+                    continue;
+                if (rows.Count < pageRowPool.Count)
+                {
+                    var reused = pageRowPool[rows.Count];
+                    reused.Rebind(row);
+                    rows.Add(reused);
+                    continue;
+                }
+                RowViewModel? view = null;
+                var link = pooledLink!;
+                bool Editable() => CanEditData() && !restoringDataSelection && ReferenceEquals(link.Owner, workspace) && link.Kind == resource
+                    && view != null && ReferenceEquals(link.Data, Data) && ReferenceEquals(Data.FindDraftRow(view.Row.LocalId), view.Row) && !Schemas.Deleted(view.Row);
+                var cells = columns.Select(field => new CellViewModel(field, row.Get(field), value =>
+                {
+                    if (!Editable() || field == "_delete")
+                        return;
+                    var owner = link.Owner!;
+                    var data = link.Data!;
+                    var current = view!.Row;
+                    var currentId = current.LocalId;
+                    var before = ChangePlanner.GetChangeKind(current, tableBaseline.GetValueOrDefault(currentId));
+                    var key = currentId + ":" + field;
+                    var newStep = lastEditedCell != key;
+                    data.Edit([currentId], () => current.Fields[field] = value, newStep: newStep);
+                    lastEditedCell = key;
+                    var after = ChangePlanner.GetChangeKind(current, tableBaseline.GetValueOrDefault(currentId));
+                    if (changeCounts.TryGetValue(data, out var count))
+                        changeCounts[data] = count + (after != null ? 1 : 0) - (before != null ? 1 : 0);
+                    view?.Cells.FirstOrDefault(c => c.Field == "_delete")?.RefreshLanguage();
+                    edits.Cell(owner, link.Kind, currentId, newStep);
+                    SaveSoon();
+                    Status(() => L("Text_75141EDE81"));
+                })
+                {
+                    CanEdit = Editable,
+                    IsReadOnly = CellReadOnly(row, field),
+                    ReadOnlyForRow = r => CellReadOnly(r, field),
+                    FleetName = () => field == "Parameter IDs" ? L("AirlineParameter") : L("ChooseFleet"),
+                    ShowServerNull = () => view?.Row.Identity != null && view.Row.Get("Type") == "jumpseat" && (field is "Callsign" or "Flight Number"),
+                    ServerNullLabel = () => L("JumpseatNotPreserved"),
+                    Compact = tableDensity == "compact",
+                    Height = tableDensity == "compact" ? 28 : 32,
+                    DisplayText = () => field == "_delete" ? RowStatus(view!.Row, tableBaseline, tableConflicts)
+                        : field == "Parameter IDs" ? view!.Row.Get(field) : field is "Fleet ID" or "Fleet IDs" ? FleetLabel(view!.Row.Get(field), tableFleetLabels) : "",
+                    ChooseFleet = field == "Parameter IDs" ? new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Guard(() => ChooseParameter(view!.Row)))
+                        : field is "Fleet ID" or "Fleet IDs" ? new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Guard(() => ChooseFleets(view!.Row))) : null
+                }).ToList();
+                view = new(row, cells) { CellTemplates = cellTemplates };
+                rows.Add(view);
+                pageRowPool.Add(view);
             }
-            RowViewModel? view = null; var link = pooledLink!;
-            bool Editable() => CanEditData() && !restoringDataSelection && ReferenceEquals(link.Owner, workspace) && link.Kind == resource
-                && view != null && ReferenceEquals(link.Data, Data) && ReferenceEquals(Data.FindDraftRow(view.Row.LocalId), view.Row) && !Schemas.Deleted(view.Row);
-            var cells = columns.Select(field => new CellViewModel(field, row.Get(field), value =>
-            {
-                if (!Editable() || field == "_delete") return;
-                var owner = link.Owner!; var data = link.Data!;
-                var current = view!.Row; var currentId=current.LocalId;
-                var before = ChangePlanner.GetChangeKind(current, tableBaseline.GetValueOrDefault(currentId));
-                var key = currentId + ":" + field; var newStep = lastEditedCell != key;
-                data.Edit([currentId], () => current.Fields[field] = value, newStep:newStep); lastEditedCell = key;
-                var after = ChangePlanner.GetChangeKind(current, tableBaseline.GetValueOrDefault(currentId));
-                if (changeCounts.TryGetValue(data, out var count)) changeCounts[data] = count + (after != null ? 1 : 0) - (before != null ? 1 : 0);
-                view?.Cells.FirstOrDefault(c => c.Field == "_delete")?.RefreshLanguage();
-                edits.Cell(owner, link.Kind, currentId, newStep); SaveSoon(); Status(() => L("Text_75141EDE81"));
-            })
-            {
-                CanEdit = Editable, IsReadOnly = CellReadOnly(row,field),ReadOnlyForRow=r=>CellReadOnly(r,field),
-                FleetName = () => field=="Parameter IDs"?L("AirlineParameter"):L("ChooseFleet"),
-                ShowServerNull=()=>view?.Row.Identity!=null && view.Row.Get("Type")=="jumpseat" && (field is "Callsign" or "Flight Number"),
-                ServerNullLabel=()=>L("JumpseatNotPreserved"),
-                Compact = tableDensity == "compact", Height = tableDensity == "compact" ? 28 : 32,
-                DisplayText = () => field == "_delete" ? RowStatus(view!.Row, tableBaseline, tableConflicts)
-                    : field=="Parameter IDs"?view!.Row.Get(field):field is "Fleet ID" or "Fleet IDs" ? FleetLabel(view!.Row.Get(field), tableFleetLabels) : "",
-                ChooseFleet = field=="Parameter IDs"?new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(()=>Guard(()=>ChooseParameter(view!.Row)))
-                    :field is "Fleet ID" or "Fleet IDs" ? new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Guard(() => ChooseFleets(view!.Row))) : null
-            }).ToList();
-            view = new(row, cells) { CellTemplates = cellTemplates }; rows.Add(view); pageRowPool.Add(view);
-        }
-        // Kept beyond a short page (or an empty workspace), up to one full page.
-        var keep = Math.Max(rows.Count, shownState.Model.PageSize);
-        if (pageRowPool.Count > keep) pageRowPool.RemoveRange(keep, pageRowPool.Count - keep);
-        lastEditedCell = null; visible = rows; dataRowBuilds++;
-        SyncShownRows(rows);
-        foreach (var row in rows) if (shownState.Model.Selected.Contains(row.Row.LocalId)) table.SelectedItems.Add(row);
-        RootGrid.UpdateLayout();
+            // Kept beyond a short page (or an empty workspace), up to one full page.
+            var keep = Math.Max(rows.Count, shownState.Model.PageSize);
+            if (pageRowPool.Count > keep)
+                pageRowPool.RemoveRange(keep, pageRowPool.Count - keep);
+            lastEditedCell = null;
+            visible = rows;
+            dataRowBuilds++;
+            SyncShownRows(rows);
+            foreach (var row in rows)
+            if (shownState.Model.Selected.Contains(row.Row.LocalId))
+                table.SelectedItems.Add(row);
+            RootGrid.UpdateLayout();
         }
         finally { restoringDataSelection = false; }
-        if (resetVertical) { shownState.Vertical = 0; FindVisual<ScrollViewer>(table)?.ChangeView(null, 0, null, true); }
+        if (resetVertical)
+        { shownState.Vertical = 0; FindVisual<ScrollViewer>(table)?.ChangeView(null, 0, null, true); }
         RefreshDataAvailability();
     }
-    bool CellReadOnly(DataRow row,string field)=>Schemas.Deleted(row) || workspace.Mode==RunMode.Online && row.Identity!=null
-        && (field=="Parameter IDs" || row.Get("Type")=="jumpseat" && (field is "Callsign" or "Flight Number"));
+    bool CellReadOnly(DataRow row, string field) => Schemas.Deleted(row) || workspace.Mode == RunMode.Online && row.Identity != null
+        && (field == "Parameter IDs" || row.Get("Type") == "jumpseat" && (field is "Callsign" or "Flight Number"));
     string RowStatus(DataRow row, Dictionary<Guid, DataRow> baseline, HashSet<Guid> conflicts)
     {
-        if (Schemas.Deleted(row)) return L("Text_EE96DC1EBE");
-        if (conflicts.Contains(row.LocalId)) return L("ApiRowConflict");
-        if (!baseline.TryGetValue(row.LocalId, out var before)) return L("Text_4EF7F62706");
+        if (Schemas.Deleted(row))
+            return L("Text_EE96DC1EBE");
+        if (conflicts.Contains(row.LocalId))
+            return L("ApiRowConflict");
+        if (!baseline.TryGetValue(row.LocalId, out var before))
+            return L("Text_4EF7F62706");
         return L(ChangePlanner.GetChangeKind(row, before) != null ? "ApiRowDraft" : "Text_20D2382F10");
     }
     string FleetLabel(string value, Dictionary<string, FleetOption> labels)
@@ -286,8 +384,10 @@ public sealed partial class MainWindow
     }
     void ChangeDataPage(int target)
     {
-        if (!CanEditData() || shownState is null) return;
-        shownState.Model.SetPage(target); ShowDataPageRows(true);
+        if (!CanEditData() || shownState is null)
+            return;
+        shownState.Model.SetPage(target);
+        ShowDataPageRows(true);
     }
     FrameworkElement DataPager()
     {
@@ -300,38 +400,53 @@ public sealed partial class MainWindow
         pageJump = new TextBox { Width = 48, Text = Model().Page.ToString() };
         AutomationProperties.SetAutomationId(pageJump, "DataPageJump");
         AutomationProperties.SetName(pageJump, L("TableGo"));
-        void Go() { if (int.TryParse(pageJump.Text, out var n) && n >= 1 && n <= Model().PageCount) ChangeDataPage(n); else Status(() => L("TableInvalidPage")); }
+        void Go()
+        { if (int.TryParse(pageJump.Text, out var n) && n >= 1 && n <= Model().PageCount) ChangeDataPage(n); else Status(() => L("TableInvalidPage")); }
         pageGo = DataButton("TableGo", Go, "DataGoPage", Symbol.Go);
         pageJump.KeyDown += async (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter && CanEditData()) { e.Handled = true; await UserAction(() => { Go(); return Task.CompletedTask; }); } };
-        pageSize = new ComboBox { Width = 78, ItemsSource = new[] {100,200,500}, SelectedItem = Model().PageSize };
-        AutomationProperties.SetAutomationId(pageSize, "DataPageSize"); AutomationProperties.SetName(pageSize, L("TablePageSize"));
+        pageSize = new ComboBox { Width = 78, ItemsSource = new[] { 100, 200, 500 }, SelectedItem = Model().PageSize };
+        AutomationProperties.SetAutomationId(pageSize, "DataPageSize");
+        AutomationProperties.SetName(pageSize, L("TablePageSize"));
         // Showing another state's size is not a change of size.
         pageSize.SelectionChanged += (_, _) => { if (CanEditData() && pageSize.SelectedItem is int size && size != Model().PageSize) { Model().SetPageSize(size); ShowDataPageRows(true); } };
-        pageSummary = Text(() => PageSummary()); selectionSummary = Text(() => SelectionSummary());
+        pageSummary = Text(() => PageSummary());
+        selectionSummary = Text(() => SelectionSummary());
         selectPage = SelectionItem("TableSelectPage", () => { restoringDataSelection = true; try { foreach (var row in visible) { Model().Selected.Add(row.Row.LocalId); if (!table!.SelectedItems.Contains(row)) table.SelectedItems.Add(row); } } finally { restoringDataSelection = false; } shownState!.SelectionCountsDirty = true; RefreshDataAvailability(); }, "DataSelectPage");
         selectAll = SelectionItem("TableSelectAll", () => { Model().SelectAll(); RestoreDataSelection(); }, "DataSelectAll");
         clearSelection = SelectionItem("TableClearSelection", () => { Model().Selected.Clear(); RestoreDataSelection(); }, "DataClearSelection");
-        var menu = new MenuFlyout(); menu.Items.Add(selectPage); menu.Items.Add(selectAll); menu.Items.Add(clearSelection);
+        var menu = new MenuFlyout();
+        menu.Items.Add(selectPage);
+        menu.Items.Add(selectAll);
+        menu.Items.Add(clearSelection);
         selectionButton = new Button { Flyout = menu }.Localize(localization, "Content", () => L("TableSelection"));
         queryCancel = new Button().Localize(localization, "Content", () => L("TableCancelQuery"));
         AutomationProperties.SetAutomationId(queryCancel, "DataQueryCancel");
         queryCancel.Click += (_, _) => { CancelDataQuery(); Status(() => L("TableQueryCanceled")); };
-        var selected = Row(selectionButton, selectionSummary, queryCancel); selected.Spacing = 8;
+        var selected = Row(selectionButton, selectionSummary, queryCancel);
+        selected.Spacing = 8;
         ToolTipService.SetToolTip(selectionSummary, new ToolTip().Localize(localization, "Content", () => L("BatchOnlySelected")));
-        var navigation = Row(firstPage,previousPage,nextPage,lastPage,pageJump,pageGo,pageSize,pageSummary); navigation.Spacing = 6;
-        var selectionHost = Actions(selected); var navigationHost = Actions(navigation);
+        var navigation = Row(firstPage, previousPage, nextPage, lastPage, pageJump, pageGo, pageSize, pageSummary);
+        navigation.Spacing = 6;
+        var selectionHost = Actions(selected);
+        var navigationHost = Actions(navigation);
         var footer = new Grid { RowSpacing = 4, ColumnSpacing = 8 };
-        footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto }); footer.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
-        footer.RowDefinitions.Add(new() { Height = GridLength.Auto }); footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        footer.Children.Add(selectionHost); footer.Children.Add(navigationHost);
+        footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        footer.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
+        footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        footer.Children.Add(selectionHost);
+        footer.Children.Add(navigationHost);
         void Arrange()
         {
             var wide = footer.ActualWidth >= Math.Max(800, selected.DesiredSize.Width + navigation.DesiredSize.Width + 8);
-            Grid.SetColumn(navigationHost, wide ? 1 : 0); Grid.SetRow(navigationHost, wide ? 0 : 1);
-            Grid.SetColumnSpan(navigationHost, wide ? 1 : 2); Grid.SetColumnSpan(selectionHost, wide ? 1 : 2);
+            Grid.SetColumn(navigationHost, wide ? 1 : 0);
+            Grid.SetRow(navigationHost, wide ? 0 : 1);
+            Grid.SetColumnSpan(navigationHost, wide ? 1 : 2);
+            Grid.SetColumnSpan(selectionHost, wide ? 1 : 2);
             navigationHost.HorizontalAlignment = wide ? HorizontalAlignment.Right : HorizontalAlignment.Stretch;
         }
-        footer.SizeChanged += (_, _) => Arrange(); Arrange();
+        footer.SizeChanged += (_, _) => Arrange();
+        Arrange();
         return footer;
     }
     MenuFlyoutItem SelectionItem(string key, Action action, string id)
@@ -344,46 +459,66 @@ public sealed partial class MainWindow
     Button DataButton(string key, Action action, string id, Symbol icon)
     {
         var button = new Button { Content = new SymbolIcon(icon), Padding = new Thickness(7), Tag = key };
-        AutomationProperties.SetAutomationId(button, id); AutomationProperties.SetName(button, L(key));
+        AutomationProperties.SetAutomationId(button, id);
+        AutomationProperties.SetName(button, L(key));
         ToolTipService.SetToolTip(button, new ToolTip().Localize(localization, "Content", () => L(key)));
-        button.Click += async (_,_) => { if (CanEditData()) await UserAction(()=> { action(); return Task.CompletedTask; }); };
+        button.Click += async (_, _) => { if (CanEditData()) await UserAction(() => { action(); return Task.CompletedTask; }); };
         return button;
     }
-    string PageSummary() => shownState is null ? "" : L("TablePageSummary",("page",shownState.Model.Page),("pages",shownState.Model.PageCount),("first",shownState.Model.First),("last",shownState.Model.Last),("total",shownState.Model.Total));
-    string SelectionSummary() => shownState is null ? "" : L("TableSelectionSummary",("total",shownState.Model.Selected.Count),("page",visible.Count(r=>shownState.Model.Selected.Contains(r.Row.LocalId)))) + " · " + L("BatchSelectionHint");
+    string PageSummary() => shownState is null ? "" : L("TablePageSummary", ("page", shownState.Model.Page), ("pages", shownState.Model.PageCount), ("first", shownState.Model.First), ("last", shownState.Model.Last), ("total", shownState.Model.Total));
+    string SelectionSummary() => shownState is null ? "" : L("TableSelectionSummary", ("total", shownState.Model.Selected.Count), ("page", visible.Count(r => shownState.Model.Selected.Contains(r.Row.LocalId)))) + " · " + L("BatchSelectionHint");
     void RefreshDataAvailability()
     {
-        if (shownState is null) return;
-        var enabled = CanEditData(); var model = shownState.Model;
+        if (shownState is null)
+            return;
+        var enabled = CanEditData();
+        var model = shownState.Model;
         var counts = SelectionCounts();
         LockDataTable(!enabled);
         if (dataActions != null)
             foreach (var command in dataActions.PrimaryCommands.Concat(dataActions.SecondaryCommands).OfType<AppBarButton>())
             {
                 command.IsEnabled = enabled && ((command.Tag as string) switch { "active" => counts.Active > 0, "deleted" => counts.Deleted > 0, "delete" => counts.Deletable > 0, _ => true }) && (command.Icon is not SymbolIcon { Symbol: Symbol.Important } || Data.Conflicts.Count > 0);
-                if(command.Icon is SymbolIcon { Symbol: Symbol.Important })command.Label=L("ApiConflicts",("count",Data.Conflicts.Count));
+                if (command.Icon is SymbolIcon { Symbol: Symbol.Important })
+                    command.Label = L("ApiConflicts", ("count", Data.Conflicts.Count));
             }
-        if (firstPage != null) firstPage.IsEnabled = enabled && model.Page > 1;
-        if (previousPage != null) previousPage.IsEnabled = enabled && model.Page > 1;
-        if (nextPage != null) nextPage.IsEnabled = enabled && model.Page < model.PageCount;
-        if (lastPage != null) lastPage.IsEnabled = enabled && model.Page < model.PageCount;
-        if (pageGo != null) pageGo.IsEnabled = enabled && model.Total > 0;
-        if (pageJump != null) { pageJump.IsEnabled = enabled; if (pageJump.Tag is not int oldPage || oldPage != model.Page) { pageJump.Text = model.Page.ToString(); pageJump.Tag = model.Page; } }
-        if (pageSize != null) pageSize.IsEnabled = enabled;
-        if (selectionButton != null) selectionButton.IsEnabled = enabled;
-        if (densityPicker != null) { densityPicker.IsEnabled = enabled; AutomationProperties.SetName(densityPicker, L("TableDensity")); }
-        if (selectPage != null) selectPage.IsEnabled = enabled && visible.Count > 0;
-        if (selectAll != null) selectAll.IsEnabled = enabled && model.Total > 0;
-        if (clearSelection != null) clearSelection.IsEnabled = enabled && model.Selected.Count > 0;
-        if (queryCancel != null) queryCancel.Visibility = querying ? Visibility.Visible : Visibility.Collapsed;
+        if (firstPage != null)
+            firstPage.IsEnabled = enabled && model.Page > 1;
+        if (previousPage != null)
+            previousPage.IsEnabled = enabled && model.Page > 1;
+        if (nextPage != null)
+            nextPage.IsEnabled = enabled && model.Page < model.PageCount;
+        if (lastPage != null)
+            lastPage.IsEnabled = enabled && model.Page < model.PageCount;
+        if (pageGo != null)
+            pageGo.IsEnabled = enabled && model.Total > 0;
+        if (pageJump != null)
+        { pageJump.IsEnabled = enabled; if (pageJump.Tag is not int oldPage || oldPage != model.Page) { pageJump.Text = model.Page.ToString(); pageJump.Tag = model.Page; } }
+        if (pageSize != null)
+            pageSize.IsEnabled = enabled;
+        if (selectionButton != null)
+            selectionButton.IsEnabled = enabled;
+        if (densityPicker != null)
+        { densityPicker.IsEnabled = enabled; AutomationProperties.SetName(densityPicker, L("TableDensity")); }
+        if (selectPage != null)
+            selectPage.IsEnabled = enabled && visible.Count > 0;
+        if (selectAll != null)
+            selectAll.IsEnabled = enabled && model.Total > 0;
+        if (clearSelection != null)
+            clearSelection.IsEnabled = enabled && model.Selected.Count > 0;
+        if (queryCancel != null)
+            queryCancel.Visibility = querying ? Visibility.Visible : Visibility.Collapsed;
         if (pageSummary != null)
         {
             pageSummary.Text = $"{model.Page} / {model.PageCount}";
-            ToolTipService.SetToolTip(pageSummary, PageSummary()); AutomationProperties.SetName(pageSummary, PageSummary());
+            ToolTipService.SetToolTip(pageSummary, PageSummary());
+            AutomationProperties.SetName(pageSummary, PageSummary());
         }
-        if (selectionSummary != null) selectionSummary.Text = SelectionSummary();
+        if (selectionSummary != null)
+            selectionSummary.Text = SelectionSummary();
         foreach (var button in new[] { firstPage, previousPage, nextPage, lastPage, pageGo })
-            if (button?.Tag is string key) AutomationProperties.SetName(button, L(key));
+            if (button?.Tag is string key)
+                AutomationProperties.SetName(button, L(key));
         RefreshQueryNotice();
     }
     // Not IsEnabled: it cascades to every realized cell, and WinUI queues one IsEnabledChanged
@@ -391,35 +526,45 @@ public sealed partial class MainWindow
     // only grew, and closing the window then spent minutes draining it before the process exited.
     void LockDataTable(bool locked)
     {
-        if (table is null || table.IsHitTestVisible != locked) return;
-        table.IsHitTestVisible = !locked; table.Opacity = locked ? 0.6 : 1;
-        if (!locked || table.XamlRoot is null) return;
+        if (table is null || table.IsHitTestVisible != locked)
+            return;
+        table.IsHitTestVisible = !locked;
+        table.Opacity = locked ? 0.6 : 1;
+        if (!locked || table.XamlRoot is null)
+            return;
         for (var focused = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(table.XamlRoot) as DependencyObject; focused != null; focused = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(focused))
-            if (ReferenceEquals(focused, table)) { if (searchBox?.Focus(FocusState.Programmatic) != true) dataActions?.Focus(FocusState.Programmatic); return; }
+            if (ReferenceEquals(focused, table))
+            { if (searchBox?.Focus(FocusState.Programmatic) != true) dataActions?.Focus(FocusState.Programmatic); return; }
     }
     void RestoreDataSelection()
     {
-        if (table is null || shownState is null) return;
+        if (table is null || shownState is null)
+            return;
         shownState.SelectionCountsDirty = true;
         restoringDataSelection = true;
-        try { table.SelectedItems.Clear(); foreach (var row in visible) if (shownState.Model.Selected.Contains(row.Row.LocalId)) table.SelectedItems.Add(row); }
+        try
+        { table.SelectedItems.Clear(); foreach (var row in visible) if (shownState.Model.Selected.Contains(row.Row.LocalId)) table.SelectedItems.Add(row); }
         finally { restoringDataSelection = false; }
         RefreshDataAvailability();
     }
     void DataSelectionChanged(object sender, SelectionChangedEventArgs args)
     {
-        if (restoringDataSelection || shownState is null) return;
+        if (restoringDataSelection || shownState is null)
+            return;
         foreach (var row in args.RemovedItems.Cast<RowViewModel>())
-            if (shownState.Model.Selected.Remove(row.Row.LocalId) && !shownState.SelectionCountsDirty) { if (Schemas.Deleted(row.Row)) shownState.SelectedDeleted--; else shownState.SelectedActive--; if (!Schemas.Deleted(row.Row) || !tableBaseline.ContainsKey(row.Row.LocalId)) shownState.SelectedDeletable--; }
+            if (shownState.Model.Selected.Remove(row.Row.LocalId) && !shownState.SelectionCountsDirty)
+            { if (Schemas.Deleted(row.Row)) shownState.SelectedDeleted--; else shownState.SelectedActive--; if (!Schemas.Deleted(row.Row) || !tableBaseline.ContainsKey(row.Row.LocalId)) shownState.SelectedDeletable--; }
         foreach (var row in args.AddedItems.Cast<RowViewModel>())
-            if (shownState.Model.Selected.Add(row.Row.LocalId) && !shownState.SelectionCountsDirty) { if (Schemas.Deleted(row.Row)) shownState.SelectedDeleted++; else shownState.SelectedActive++; if (!Schemas.Deleted(row.Row) || !tableBaseline.ContainsKey(row.Row.LocalId)) shownState.SelectedDeletable++; }
+            if (shownState.Model.Selected.Add(row.Row.LocalId) && !shownState.SelectionCountsDirty)
+            { if (Schemas.Deleted(row.Row)) shownState.SelectedDeleted++; else shownState.SelectedActive++; if (!Schemas.Deleted(row.Row) || !tableBaseline.ContainsKey(row.Row.LocalId)) shownState.SelectedDeletable++; }
         RefreshDataAvailability();
     }
     void RestoreDataOffsets(DataPageState state)
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (!ReferenceEquals(shownState, state) || table is null) return;
+            if (!ReferenceEquals(shownState, state) || table is null)
+                return;
             FindVisual<ScrollViewer>(table)?.ChangeView(null, state.Vertical, null, true);
             horizontalTable?.ChangeView(state.Horizontal, null, null, true);
         });

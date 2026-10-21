@@ -16,7 +16,8 @@ internal static class UiLocalization
             var member = target.GetType().GetProperty(property) ?? throw new InvalidOperationException(property);
             var index = target is ComboBox combo && property == "ItemsSource" ? combo.SelectedIndex : -1;
             member.SetValue(target, value());
-            if (target is ComboBox picker && property == "ItemsSource" && index >= 0) picker.SelectedIndex = index;
+            if (target is ComboBox picker && property == "ItemsSource" && index >= 0)
+                picker.SelectedIndex = index;
         }
     }
     static readonly ConditionalWeakTable<object, Dictionary<string, Binding>> Targets = new();
@@ -36,12 +37,16 @@ internal static class UiLocalization
         if (target is DependencyObject dependency)
         {
             var map = dependency.GetValue(BindingsProperty) as Dictionary<string, Binding>;
-            if (map is null) { map = []; dependency.SetValue(BindingsProperty, map); }
+            if (map is null)
+            { map = []; dependency.SetValue(BindingsProperty, map); }
             map[property] = binding;
         }
-        else Targets.GetOrCreateValue(target)[property] = binding;
+        else
+            Targets.GetOrCreateValue(target)[property] = binding;
         registrations.Add(new(binding));
-        if (registrations.Count % 256 == 0) registrations.RemoveAll(w => !w.TryGetTarget(out _));
-        binding.Refresh(); return target;
+        if (registrations.Count % 256 == 0)
+            registrations.RemoveAll(w => !w.TryGetTarget(out _));
+        binding.Refresh();
+        return target;
     }
 }

@@ -12,9 +12,11 @@ public static class UnknownReview
         var recovery = false;
         foreach (var id in job.Items.Where(i => i.State == ItemState.Unknown).Select(i => i.Id).ToList())
         {
-            if (job.Items.FirstOrDefault(i => i.Id == id) is not { State: ItemState.Unknown } item) continue;
+            if (job.Items.FirstOrDefault(i => i.Id == id) is not { State: ItemState.Unknown } item)
+                continue;
             recovery |= await review(item);
         }
-        if (recovery) await recover();
+        if (recovery)
+            await recover();
     }
 }

@@ -16,16 +16,22 @@ public sealed partial class DataRowPresenter : StackPanel
     public DataRowPresenter() => Orientation = Orientation.Horizontal;
     void Present(RowViewModel? row)
     {
-        if (row?.Selector is not { } selector) { Children.Clear(); templates.Clear(); return; }
+        if (row?.Selector is not { } selector)
+        { Children.Clear(); templates.Clear(); return; }
         var cells = row.Cells;
         for (var n = 0; n < cells.Count; n++)
         {
             var template = selector.SelectTemplate(cells[n]);
-            if (n < Children.Count && ReferenceEquals(templates[n], template)) { ((FrameworkElement)Children[n]).DataContext = cells[n]; continue; }
-            var element = (FrameworkElement)template.LoadContent(); element.DataContext = cells[n];
-            if (n < Children.Count) { Children[n] = element; templates[n] = template; }
-            else { Children.Add(element); templates.Add(template); }
+            if (n < Children.Count && ReferenceEquals(templates[n], template))
+            { ((FrameworkElement)Children[n]).DataContext = cells[n]; continue; }
+            var element = (FrameworkElement)template.LoadContent();
+            element.DataContext = cells[n];
+            if (n < Children.Count)
+            { Children[n] = element; templates[n] = template; }
+            else
+            { Children.Add(element); templates.Add(template); }
         }
-        while (Children.Count > cells.Count) { Children.RemoveAt(Children.Count - 1); templates.RemoveAt(templates.Count - 1); }
+        while (Children.Count > cells.Count)
+        { Children.RemoveAt(Children.Count - 1); templates.RemoveAt(templates.Count - 1); }
     }
 }

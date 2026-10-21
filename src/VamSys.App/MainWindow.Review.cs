@@ -21,13 +21,16 @@ public sealed partial class MainWindow
     // may run on a worker while the UI is locked (no edits, jobs or navigation). It also computes the content key.
     Func<WorkspaceReviewPlan> CaptureReviewPlan()
     {
-        var w = workspace; var mode = w.Mode; var verified = w.VerifiedOperations.ToHashSet(StringComparer.Ordinal);
+        var w = workspace;
+        var mode = w.Mode;
+        var verified = w.VerifiedOperations.ToHashSet(StringComparer.Ordinal);
         var connected = apiSessions.TryGetValue(w.Id, out var session) && session.Api.SessionAirlineId != null;
         Action<ChangeItem>? preview = connected ? c => session.Api.PreviewPlan(c) : null;
         return () =>
         {
             var blockers = new List<MessageDescriptor>();
-            if (w.Resources.Values.Any(d => d.Conflicts.Count > 0)) blockers.Add(Messages.Define("ApiConflict"));
+            if (w.Resources.Values.Any(d => d.Conflicts.Count > 0))
+                blockers.Add(Messages.Define("ApiConflict"));
             if (mode == RunMode.Online && ApiOperationPolicy.HasOpenOnlineItems(w))
                 blockers.Add(Messages.Define("ApiPendingJob"));
             if (mode == RunMode.Demo)
@@ -39,7 +42,8 @@ public sealed partial class MainWindow
                             ("key", row is null ? issue.RowId.ToString()[..8] : Schemas.Key(kind, row)), ("field", issue.Field), ("reason", issue.Description)));
                     }
             var plan = ReviewPlanBuilder.Build(planner.PlanWorkspace(w), mode, connected, verified, preview, blockers, w.ContractHash);
-            _ = plan.ContentKey(); return plan;
+            _ = plan.ContentKey();
+            return plan;
         };
     }
     // Locks edits and navigation while a worker reads the workspace. Nested locks keep the outermost
@@ -49,24 +53,29 @@ public sealed partial class MainWindow
     {
         if (reviewLocks++ == 0 && !localOperation)
         {
-            reviewLockOwnsState = true; localOperation = true;
+            reviewLockOwnsState = true;
+            localOperation = true;
             Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = PageHost.IsEnabled = false;
-            BusyRing.IsActive = true; RefreshDataAvailability();
+            BusyRing.IsActive = true;
+            RefreshDataAvailability();
         }
-        try { return await Task.Run(work); }
+        try
+        { return await Task.Run(work); }
         finally
         {
             if (--reviewLocks == 0 && reviewLockOwnsState)
             {
-                reviewLockOwnsState = false; localOperation = false;
+                reviewLockOwnsState = false;
+                localOperation = false;
                 Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = PageHost.IsEnabled = closeState.IsOpen;
-                BusyRing.IsActive = busy || querying; RefreshDataAvailability();
+                BusyRing.IsActive = busy || querying;
+                RefreshDataAvailability();
             }
         }
     }
 
     string ReviewChangeText(ChangeItem item) => $"{EnumText(item.Kind)} · {Schemas.Key(item.Resource, item.After)}\n" +
-        (item.Kind == ChangeKind.Delete ? L("Text_5ABD08A949") : string.Join("；", item.Fields.Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key,localization)}: {item.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}")));
+        (item.Kind == ChangeKind.Delete ? L("Text_5ABD08A949") : string.Join("；", item.Fields.Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key, localization)}: {item.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}")));
 
     long reviewGeneration;
     Task reviewLoad = Task.CompletedTask;
@@ -76,13 +85,21 @@ public sealed partial class MainWindow
         var host = new Grid();
         var waiting = Row(new ProgressRing { IsActive = true, Width = 20, Height = 20 }, Text(() => L("ReviewPreparing")));
         host.Children.Add(waiting);
-        var generation = ++reviewGeneration; var owner = workspace; var airline = workspace.AirlineId; var mode = workspace.Mode;
+        var generation = ++reviewGeneration;
+        var owner = workspace;
+        var airline = workspace.AirlineId;
+        var mode = workspace.Mode;
         reviewLoad = UserAction(async () =>
         {
             var plan = await WhileLocked(CaptureReviewPlan());
-            if (generation != reviewGeneration || !ReferenceEquals(owner, workspace) || !ReferenceEquals(PageHost.Content, host)) return;
-            reviewPlan = plan; reviewWorkspace = owner.Id; reviewAirline = airline; reviewMode = mode;
-            host.Children.Clear(); host.Children.Add(ReviewContent(plan));
+            if (generation != reviewGeneration || !ReferenceEquals(owner, workspace) || !ReferenceEquals(PageHost.Content, host))
+                return;
+            reviewPlan = plan;
+            reviewWorkspace = owner.Id;
+            reviewAirline = airline;
+            reviewMode = mode;
+            host.Children.Clear();
+            host.Children.Add(ReviewContent(plan));
         });
         return host;
     }
@@ -94,8 +111,10 @@ public sealed partial class MainWindow
                 ("deferred", plan.Entries.Count(e => e.Disposition == ReviewDisposition.Deferred)),
                 ("blocked", plan.Entries.Count(e => e.Disposition == ReviewDisposition.Blocked)))),
             Text(() => L("ReviewMode", ("mode", EnumText(workspace.Mode)))));
-        if (workspace.Mode == RunMode.Offline) header.Children.Add(Text(() => L("ReviewConnect")));
-        foreach (var blocker in plan.Blockers.Take(3)) header.Children.Add(Text(() => L(blocker)));
+        if (workspace.Mode == RunMode.Offline)
+            header.Children.Add(Text(() => L("ReviewConnect")));
+        foreach (var blocker in plan.Blockers.Take(3))
+            header.Children.Add(Text(() => L(blocker)));
         if (plan.Blockers.Count > 3)
             header.Children.Add(Button(() => L("ReviewIssues", ("count", plan.Blockers.Count)), async () =>
                 { await Confirm(L("ReviewIssues", ("count", plan.Blockers.Count)), new ListView { MaxHeight = 350, ItemsSource = plan.Blockers.Select(L).ToArray() }, L("Text_3FD47EDCE4")); }));
@@ -107,18 +126,28 @@ public sealed partial class MainWindow
         foreach (var kind in Enum.GetValues<ResourceKind>())
         {
             var entries = plan.Entries.Where(e => e.Change.Resource == kind).ToArray();
-            if (entries.Length == 0) continue;
+            if (entries.Length == 0)
+                continue;
             rows.Add(new(this, kind, null));
             rows.AddRange(entries.Select(e => new ReviewDisplayRow(this, kind, e)));
         }
-        if (rows.Count == 0) header.Children.Add(Text(() => L("Text_90484F47B3")));
+        if (rows.Count == 0)
+            header.Children.Add(Text(() => L("Text_90484F47B3")));
         reviewRows = rows;
-        var list = new ListView { SelectionMode = ListViewSelectionMode.None, ItemsSource = rows,
-            ItemTemplateSelector = new ReviewTemplateSelector(), HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        var list = new ListView
+        {
+            SelectionMode = ListViewSelectionMode.None,
+            ItemsSource = rows,
+            ItemTemplateSelector = new ReviewTemplateSelector(),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch
+        };
         AutomationProperties.SetAutomationId(list, "WorkspaceReview");
         var grid = new Grid { RowSpacing = 10 };
-        grid.RowDefinitions.Add(new() { Height = GridLength.Auto }); grid.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
-        grid.Children.Add(header); Grid.SetRow(list, 1); grid.Children.Add(list);
+        grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
+        grid.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
+        grid.Children.Add(header);
+        Grid.SetRow(list, 1);
+        grid.Children.Add(list);
         return grid;
     }
     sealed class ReviewDisplayRow(MainWindow owner, ResourceKind resource, ReviewEntry? entry) : ObservableObject
@@ -132,7 +161,8 @@ public sealed partial class MainWindow
         public IAsyncRelayCommand? ExportCommand { get; } = entry is null ? new AsyncRelayCommand(() => owner.UserAction(() => owner.ExportCsv(resource))) : null;
         public void RefreshLanguage()
         {
-            foreach (var name in new[] { nameof(Heading), nameof(ExportLabel), nameof(State), nameof(Body), nameof(Reason) }) OnPropertyChanged(name);
+            foreach (var name in new[] { nameof(Heading), nameof(ExportLabel), nameof(State), nameof(Body), nameof(Reason) })
+                OnPropertyChanged(name);
         }
     }
     sealed class ReviewTemplateSelector : DataTemplateSelector
@@ -162,24 +192,37 @@ public sealed partial class MainWindow
         var current = await WhileLocked(CaptureReviewPlan());
         if (reviewPlan is null || reviewWorkspace != workspace.Id || reviewAirline != workspace.AirlineId || reviewMode != mode || reviewPlan.ContentKey() != current.ContentKey())
         {
-            Render(); Status(() => L("ReviewChanged")); return null;
+            Render();
+            Status(() => L("ReviewChanged"));
+            return null;
         }
-        if (current.Blockers.Count > 0 || current.SubmitItems.Count == 0) { Render(); return null; }
+        if (current.Blockers.Count > 0 || current.SubmitItems.Count == 0)
+        { Render(); return null; }
         return reviewPlan;
     }
     async Task<List<ChangeItem>?> ConfirmWorkspaceSubmission(RunMode mode)
     {
-        if (await CurrentReviewPlan(mode) is not { } shown) return null;
+        if (await CurrentReviewPlan(mode) is not { } shown)
+            return null;
         // Use the exact objects shown on the page, including their dependency IDs.
         var items = shown.SubmitItems;
-        var content = new ListView { MaxHeight = 400, SelectionMode = ListViewSelectionMode.None,
+        var content = new ListView
+        {
+            MaxHeight = 400,
+            SelectionMode = ListViewSelectionMode.None,
             Header = Text(() => L("ApiSubmitScope", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"), ("count", items.Count))),
-            ItemsSource = items.Select(i => $"{L(Schemas.All[i.Resource].Name)} · {ReviewChangeText(i)}").ToArray() };
-        if (!await Confirm(L(mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit"), content, L(mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit"))) return null;
+            ItemsSource = items.Select(i => $"{L(Schemas.All[i.Resource].Name)} · {ReviewChangeText(i)}").ToArray()
+        };
+        if (!await Confirm(L(mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit"), content, L(mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit")))
+            return null;
         var deletes = items.Where(i => i.Kind == ChangeKind.Delete).ToArray();
-        if (deletes.Length > 0 && !await Confirm(L("Text_5D6042B30E"), new ListView { MaxHeight = 350,
+        if (deletes.Length > 0 && !await Confirm(L("Text_5D6042B30E"), new ListView
+        {
+            MaxHeight = 350,
             Header = Text(() => L("ApiDeleteConfirm", ("count", deletes.Length))),
-            ItemsSource = deletes.Select(i => $"{L(Schemas.All[i.Resource].Name)}: {Schemas.Key(i.Resource, i.After)}").ToArray() }, L("Confirm"))) return null;
+            ItemsSource = deletes.Select(i => $"{L(Schemas.All[i.Resource].Name)}: {Schemas.Key(i.Resource, i.After)}").ToArray()
+        }, L("Confirm")))
+            return null;
         return items;
     }
 }

@@ -22,8 +22,10 @@ public sealed partial class EditableCell : ContentControl
 
     public EditableCell()
     {
-        IsTabStop = true; UseSystemFocusVisuals = true;
-        HorizontalContentAlignment = HorizontalAlignment.Stretch; VerticalContentAlignment = VerticalAlignment.Stretch;
+        IsTabStop = true;
+        UseSystemFocusVisuals = true;
+        HorizontalContentAlignment = HorizontalAlignment.Stretch;
+        VerticalContentAlignment = VerticalAlignment.Stretch;
     }
     // Recycled for another row: an open editor belongs to the previous cell.
     void CellChanged(CellViewModel? old, CellViewModel? next) => EndEdit(false);
@@ -31,18 +33,24 @@ public sealed partial class EditableCell : ContentControl
     CellViewModel? watched;
     void CellPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (Editor is null || Cell is null) return;
-        if (e.PropertyName == nameof(CellViewModel.IsReadOnly) && Cell.IsReadOnly) EndEdit(false);
-        else if (e.PropertyName == nameof(CellViewModel.Value) && Editor.Text != Cell.Value) { syncing = true; try { Editor.Text = Cell.Value; } finally { syncing = false; } }
+        if (Editor is null || Cell is null)
+            return;
+        if (e.PropertyName == nameof(CellViewModel.IsReadOnly) && Cell.IsReadOnly)
+            EndEdit(false);
+        else if (e.PropertyName == nameof(CellViewModel.Value) && Editor.Text != Cell.Value)
+        { syncing = true; try { Editor.Text = Cell.Value; } finally { syncing = false; } }
     }
     protected override void OnGotFocus(RoutedEventArgs e)
     {
         base.OnGotFocus(e);
         // Only tabbing into a cell edits it; focus restored on window activation or after Enter/Escape does not.
-        if (!ReferenceEquals(e.OriginalSource, this)) return;
+        if (!ReferenceEquals(e.OriginalSource, this))
+            return;
         // GotFocus is raised asynchronously, so the returned focus is consumed here.
-        if (returningFocus) { returningFocus = false; return; }
-        if (FocusState == FocusState.Keyboard) BeginEdit(FocusState.Keyboard);
+        if (returningFocus)
+        { returningFocus = false; return; }
+        if (FocusState == FocusState.Keyboard)
+            BeginEdit(FocusState.Keyboard);
     }
     bool returningFocus;
     // A click edits the cell, as clicking the former TextBox did, and does not toggle row selection.
@@ -51,20 +59,25 @@ public sealed partial class EditableCell : ContentControl
     protected override void OnPointerPressed(PointerRoutedEventArgs e)
     {
         base.OnPointerPressed(e);
-        if (Editor != null || Cell is null || Cell.IsReadOnly) return;
-        e.Handled = true; pressed = CapturePointer(e.Pointer);
+        if (Editor != null || Cell is null || Cell.IsReadOnly)
+            return;
+        e.Handled = true;
+        pressed = CapturePointer(e.Pointer);
     }
     protected override void OnPointerReleased(PointerRoutedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (pressed) { pressed = false; ReleasePointerCapture(e.Pointer); e.Handled = true; BeginEdit(FocusState.Pointer); }
-        else if (Editor != null) e.Handled = true;
+        if (pressed)
+        { pressed = false; ReleasePointerCapture(e.Pointer); e.Handled = true; BeginEdit(FocusState.Pointer); }
+        else if (Editor != null)
+            e.Handled = true;
     }
     protected override void OnPointerCaptureLost(PointerRoutedEventArgs e) { base.OnPointerCaptureLost(e); pressed = false; }
     protected override void OnTapped(TappedRoutedEventArgs e) { base.OnTapped(e); if (Editor != null) e.Handled = true; }
     internal void BeginEdit(FocusState focus = FocusState.Programmatic)
     {
-        if (Editor != null || Cell is not { IsReadOnly: false } cell) return;
+        if (Editor != null || Cell is not { IsReadOnly: false } cell)
+            return;
         display = Content as UIElement;
         var editor = new TextBox { Text = cell.Value, FontSize = 14, Padding = new Thickness(8, 2, 8, 2), MinHeight = 0, VerticalAlignment = VerticalAlignment.Stretch };
         AutomationProperties.SetName(editor, cell.Field);
@@ -72,27 +85,39 @@ public sealed partial class EditableCell : ContentControl
         editor.RegisterPropertyChangedCallback(TextBox.TextProperty, (_, _) => Commit(editor.Text));
         editor.LostFocus += (_, _) => EndEdit(false);
         editor.KeyDown += (_, e) => { if (e.Key is Windows.System.VirtualKey.Enter or Windows.System.VirtualKey.Escape) { e.Handled = true; EndEdit(true); } };
-        Editor = editor; IsTabStop = false; Content = editor;
-        watched = cell; cell.PropertyChanged += CellPropertyChanged;
+        Editor = editor;
+        IsTabStop = false;
+        Content = editor;
+        watched = cell;
+        cell.PropertyChanged += CellPropertyChanged;
         // Focus once loaded; pointer edits start on release, after the list item has handled the press.
         var state = focus == FocusState.Unfocused ? FocusState.Programmatic : focus;
         editor.Loaded += (_, _) => { if (ReferenceEquals(Editor, editor) && editor.Focus(state)) editor.SelectionStart = editor.Text.Length; };
     }
     void EndEdit(bool keepFocus)
     {
-        if (Editor is null) return;
-        if (watched != null) { watched.PropertyChanged -= CellPropertyChanged; watched = null; }
-        Editor = null; Content = display; display = null; IsTabStop = true;
-        if (!keepFocus) return;
+        if (Editor is null)
+            return;
+        if (watched != null)
+        { watched.PropertyChanged -= CellPropertyChanged; watched = null; }
+        Editor = null;
+        Content = display;
+        display = null;
+        IsTabStop = true;
+        if (!keepFocus)
+            return;
         returningFocus = true;
-        if (!Focus(FocusState.Keyboard)) returningFocus = false;
+        if (!Focus(FocusState.Keyboard))
+            returningFocus = false;
     }
     internal void Commit(string text)
     {
-        if (syncing || Cell is not { } cell || cell.Value == text) return;
+        if (syncing || Cell is not { } cell || cell.Value == text)
+            return;
         cell.Value = text;
         // Rejected (locked table, deleted row): show the value that was kept.
-        if (Editor != null && cell.Value != text) { syncing = true; try { Editor.Text = cell.Value; } finally { syncing = false; } }
+        if (Editor != null && cell.Value != text)
+        { syncing = true; try { Editor.Text = cell.Value; } finally { syncing = false; } }
     }
     protected override AutomationPeer OnCreateAutomationPeer() => new EditableCellAutomationPeer(this);
 }
@@ -108,7 +133,8 @@ sealed partial class EditableCellAutomationPeer(EditableCell owner) : FrameworkE
     public string Value => owner.Cell?.Value ?? "";
     public void SetValue(string value)
     {
-        if (IsReadOnly) throw new ElementNotEnabledException();
+        if (IsReadOnly)
+            throw new ElementNotEnabledException();
         owner.Commit(value);
     }
 }

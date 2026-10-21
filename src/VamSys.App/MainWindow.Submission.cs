@@ -6,7 +6,8 @@ public sealed partial class MainWindow
 {
     async Task SubmitWorkspace(RunMode mode)
     {
-        if (!CanEditData() || workspace.Mode != mode) return;
+        if (!CanEditData() || workspace.Mode != mode)
+            return;
         await TaskSubmission.SubmitAsync(workspace, mode, LocalOperation,
             () => ConfirmWorkspaceSubmission(mode), () => Save(dataChanged: false), SavedJobIsDurable, SelectTasksForSubmission,
             () => workspace, job => mode == RunMode.Online ? ExecuteApi(job) : ExecuteDemo(job));
@@ -15,7 +16,8 @@ public sealed partial class MainWindow
     bool SavedJobIsDurable(BatchJob job)
     {
         // If storage cannot be read, keep the job and block further saves until reload.
-        try { return store.Load(workspace.Id).Jobs.Any(j => j.Id == job.Id); }
+        try
+        { return store.Load(workspace.Id).Jobs.Any(j => j.Id == job.Id); }
         catch { storageBlocked = true; return true; }
     }
 
