@@ -489,7 +489,7 @@ public sealed partial class MainWindow : Window
                         var current = data.Draft[index];
                         current.Fields[Schemas.All[item.Resource].Key] = updated.Get(Schemas.All[item.Resource].Key);
                         foreach (var field in Schemas.ReferenceFields(item.Resource))
-                            if (current.Get(field).Contains("local:", StringComparison.OrdinalIgnoreCase))
+                            if (LocalReference.ContainsLocal(current.Get(field)))
                                 current.Fields[field] = updated.Get(field);
                     }
                 }

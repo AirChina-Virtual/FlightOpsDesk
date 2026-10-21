@@ -27,14 +27,14 @@ public sealed class FleetAssignmentService
         {
             var id = r.Get("ID").Trim();
             var problem = Schemas.Deleted(r) ? Messages.Define("Text_EE96DC1EBE") : duplicateIds.Contains(id) ? Messages.Define("Text_95BA634DEA") : null;
-            return new FleetOption(id.Length > 0 ? id : "local:" + r.LocalId, r.Get("Name"), r.Get("Type Code"), id.Length > 0 ? id : Messages.Define("Text_0772B8422B", ("arg0", r.LocalId.ToString()[..8])), problem is null, problem);
+            return new FleetOption(id.Length > 0 ? id : LocalReference.Format(r.LocalId), r.Get("Name"), r.Get("Type Code"), id.Length > 0 ? id : Messages.Define("Text_0772B8422B", ("arg0", r.LocalId.ToString()[..8])), problem is null, problem);
         }).GroupBy(o => o.Token, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).OrderBy(o => o.Name.ToString(), StringComparer.OrdinalIgnoreCase).ToList();
         foreach (var token in (existing ?? []).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (options.Any(o => o.Token.Equals(token, StringComparison.OrdinalIgnoreCase)))
                 continue;
             // Legacy local aliases for already-identified rows remain representable and resolvable.
-            var alias = rows.FirstOrDefault(r => ("local:" + r.LocalId).Equals(token, StringComparison.OrdinalIgnoreCase));
+            var alias = rows.FirstOrDefault(r => LocalReference.TryParse(token, out var localId) && r.LocalId == localId);
             options.Add(alias is null
                 ? new(token, Messages.Define("Text_63524EC09F"), "?", token, false, Messages.Define("Text_F6036A3E65"))
                 : new(token, alias.Get("Name"), alias.Get("Type Code"), Messages.Define("Text_18371681C3"), !Schemas.Deleted(alias), Schemas.Deleted(alias) ? Messages.Define("Text_EE96DC1EBE") : null));

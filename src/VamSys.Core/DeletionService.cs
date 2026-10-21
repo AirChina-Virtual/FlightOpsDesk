@@ -20,7 +20,7 @@ public sealed class DeletionService
         var aliases = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in workspace.Resources[kind].Draft.Where(r => targets.Contains(r.LocalId)))
         {
-            aliases["local:" + row.LocalId] = row.LocalId;
+            aliases[LocalReference.Format(row.LocalId)] = row.LocalId;
             var key = Schemas.Key(kind, row);
             if (key != "")
                 aliases[key] = row.LocalId;

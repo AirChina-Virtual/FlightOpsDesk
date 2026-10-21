@@ -7,15 +7,15 @@ public sealed class ChangePlanner : IChangePlanner
     public List<ChangeItem> PlanWorkspace(Workspace workspace)
     {
         var items = workspace.Resources.SelectMany(p => Plan(p.Key, p.Value)).ToList();
-        var creates = items.Where(i => i.Kind == ChangeKind.Create).ToDictionary(i => "local:" + i.After.LocalId, StringComparer.OrdinalIgnoreCase);
-        var known = workspace.Resources.SelectMany(p => p.Value.Snapshot.Select(r => (Token: "local:" + r.LocalId, Key: Schemas.Key(p.Key, r)))).ToDictionary(p => p.Token, p => p.Key, StringComparer.OrdinalIgnoreCase);
+        var creates = items.Where(i => i.Kind == ChangeKind.Create).ToDictionary(i => LocalReference.Format(i.After.LocalId), StringComparer.OrdinalIgnoreCase);
+        var known = workspace.Resources.SelectMany(p => p.Value.Snapshot.Select(r => (Token: LocalReference.Format(r.LocalId), Key: Schemas.Key(p.Key, r)))).ToDictionary(p => p.Token, p => p.Key, StringComparer.OrdinalIgnoreCase);
         foreach (var item in items)
         {
             item.RequiresAirlineParameter = workspace.Mode == RunMode.Online && item.Resource == ResourceKind.Fleets && item.Kind == ChangeKind.Create;
             foreach (var field in Schemas.ReferenceFields(item.Resource))
             {
                 var original = item.After.Get(field);
-                if (!original.Contains("local:", StringComparison.OrdinalIgnoreCase))
+                if (!LocalReference.ContainsLocal(original))
                     continue;
                 var tokens = original.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
                 for (int i = 0; i < tokens.Length; i++)
