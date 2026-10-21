@@ -1026,4 +1026,7 @@
   <data name="ApiSoftDeleteUnchangedHelp" xml:space="preserve"><value>提醒：服务器没有应答删除记录 {id} 的请求（超时或 5xx），没有写入回执；只读 GET 仍能读到这条记录，且与修改前的数据一致，删除看起来没有生效。请先在 Orwell 确认。确认后标为未生效：状态为失败，本地删除草稿保留，可重新审阅提交；不会重新发送删除，也不计入已验证的操作。</value></data>
   <data name="ApiMarkNotApplied" xml:space="preserve"><value>标为未生效</value></data>
   <data name="ApiSoftDeleteUnchanged" xml:space="preserve"><value>删除没有写入回执，只读 GET 读到的记录与修改前一致，经人工确认标为未生效；本地删除草稿保留，可重新审阅提交。</value></data>
+  <data name="BatchShiftInvalidMinutes" xml:space="preserve"><value>平移分钟必须是 -{max} 到 {max} 之间的整数，未做任何修改。</value></data>
+  <data name="BatchShiftSkippedInvalidTime" xml:space="preserve"><value>{count} 条记录的时间为空或格式无效，已跳过。</value></data>
+  <data name="BatchShiftSkippedCrossesMidnight" xml:space="preserve"><value>{count} 条记录平移后会跨越午夜（超出 00:00–23:59），已跳过。</value></data>
 </root>

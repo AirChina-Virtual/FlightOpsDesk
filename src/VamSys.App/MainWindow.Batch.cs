@@ -66,18 +66,21 @@ public sealed partial class MainWindow
         }
     }
 
-    string BatchScope(BatchSelection selection, int changed) => L("BatchCounts", ("selected", selection.Selected.Count),
-        ("skipped", selection.Skipped), ("unchanged", selection.Eligible.Count - changed), ("changed", changed));
+    string BatchScope(BatchSelection selection, int changed, int ruleSkipped = 0) => L("BatchCounts", ("selected", selection.Selected.Count),
+        ("skipped", selection.Skipped + ruleSkipped), ("unchanged", selection.Eligible.Count - changed - ruleSkipped), ("changed", changed));
+    string BatchScope(BatchEditPreview preview) => BatchScope(preview.Selection, preview.Changes.Count, preview.RuleSkips.Count);
     TextBlock BatchTargets(BatchSelection selection, bool single = false) => Text(() => L(single ? "BatchSingle" : "BatchTargets",
         ("selected", selection.Selected.Count), ("skipped", selection.Skipped), ("eligible", selection.Eligible.Count)));
-    ListView BatchPreview(BatchSelection selection, string field, IReadOnlyList<DataRow> changes)
+    ListView BatchPreview(BatchSelection selection, string field, IReadOnlyList<DataRow> changes, IReadOnlyList<MessageDescriptor>? skipReasons = null, int ruleSkipped = 0)
     {
         var before = selection.Eligible.ToDictionary(r => r.LocalId);
         return new ListView
         {
             MaxHeight = 360,
             SelectionMode = ListViewSelectionMode.None,
-            Header = Text(() => BatchScope(selection, changes.Count)),
+            Header = skipReasons is { Count: > 0 }
+                ? Stack([Text(() => BatchScope(selection, changes.Count, ruleSkipped)), .. skipReasons.Select(reason => Text(() => L(reason)))])
+                : Text(() => BatchScope(selection, changes.Count)),
             ItemsSource = changes.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n" +
                 (field == "_delete" ? $"{L("ColumnStatus")}: {L("Text_EE96DC1EBE")} → {L("BatchRestored")}" : $"{field}: {before[r.LocalId].Get(field)} → {r.Get(field)}")).ToArray()
         };
@@ -143,12 +146,14 @@ public sealed partial class MainWindow
         var rule = new EditRule(kinds[kind.SelectedIndex], field.SelectedItem!.ToString()!, value.Text, find.Text);
         // UI mutation remains locked while the copies are processed off-thread.
         var preview = await Task.Run(() => BatchEditPreview.Rule(selection, rule));
+        if (preview.Validation is { } invalid)
+        { Status(() => L(invalid)); return; }
         if (preview.Changes.Count == 0)
-        { Status(() => BatchScope(selection, 0)); return; }
-        if (!await Confirm(L("Text_AD86791376"), BatchPreview(selection, preview.Field, preview.Changes), L("Text_2354C137CE")))
+        { Status(() => string.Join(" ", new[] { BatchScope(preview) }.Concat(preview.SkipReasons.Select(r => L(r))))); return; }
+        if (!await Confirm(L("Text_AD86791376"), BatchPreview(selection, preview.Field, preview.Changes, preview.SkipReasons, preview.RuleSkips.Count), L("Text_2354C137CE")))
             return;
         preview.Apply(Data);
         await Save();
-        Status(() => BatchScope(selection, preview.Changes.Count));
+        Status(() => BatchScope(preview));
     });
 }
