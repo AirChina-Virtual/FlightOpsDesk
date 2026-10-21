@@ -101,3 +101,9 @@ dotnet_naming_style.pascal_case.capitalization = pascal_case
 dotnet_naming_style.i_prefix.capitalization = pascal_case
 dotnet_naming_style.i_prefix.required_prefix = I
 dotnet_naming_style.camel_case_underscore_optional.capitalization = camel_case
+
+# Analyzers (R1): existing violations are recorded in docs/analyzer-baseline.txt; new ones must not appear.
+dotnet_diagnostic.CA1307.severity = warning
+dotnet_diagnostic.CA1309.severity = warning
+dotnet_diagnostic.CA1310.severity = warning
+dotnet_diagnostic.CA2000.severity = warning

@@ -1,0 +1,15 @@
+# Analyzer warning baseline: <project>|<rule>|<count>. Regenerate with scripts/check-analyzer-baseline.ps1 -Update.
+src/VamSys.Core/VamSys.Core.csproj|CA1307|3
+src/VamSys.Core/VamSys.Core.csproj|CA1310|1
+src/VamSys.Infrastructure/VamSys.Infrastructure.csproj|CA1307|6
+src/VamSys.Infrastructure/VamSys.Infrastructure.csproj|CA1310|10
+src/VamSys.Infrastructure/VamSys.Infrastructure.csproj|CA2000|1
+tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|CA1307|5
+tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|CA1310|2
+tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|CA2000|5
+tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|xUnit1051|3
+tests/VamSys.Tests/VamSys.Tests.csproj|CA1307|93
+tests/VamSys.Tests/VamSys.Tests.csproj|CA1310|54
+tests/VamSys.Tests/VamSys.Tests.csproj|CA2000|16
+tests/VamSys.UnitTests/VamSys.UnitTests.csproj|CA1307|6
+tests/VamSys.UnitTests/VamSys.UnitTests.csproj|CA1310|2

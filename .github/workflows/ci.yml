@@ -12,6 +12,8 @@ jobs:
           global-json-file: global.json
       - name: Restore (locked)
         run: dotnet restore VamSys.slnx --locked-mode
+      - name: Analyzer baseline
+        run: pwsh -File scripts/check-analyzer-baseline.ps1
       - name: Legacy suite
         run: dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
       - name: Unit tests
