@@ -78,8 +78,8 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:Restor
 artifacts、archive、`.tools`、bin 和 obj 都只保存在本机，不会提交到 GitHub。
 
 - **artifacts**
-  - flightops-app：当前正式包；2026-10-20 审阅修复版通过 255 项回归和包检查。该包构建于阶段 1（解除卡死）之前，不包含其修改；需要时用 `build.ps1 -Publish` 重新生成。
-  - FlightOpsDesk-2026-10-20-review-fixes-win-x64.zip 及 .sha256：当前正式交付压缩包与校验文件；上一版 verified-scope ZIP 已归档到 archive/2026-10-20-review-fixes。
+  - flightops-app：当前正式包；2026-10-20 阶段 1 版，由提交 6f52a7c 构建，通过 271 项回归和包检查。阶段 1 新增的界面尚未做窗口验收。
+  - FlightOpsDesk-2026-10-20-phase1-win-x64.zip 及 .sha256：当前正式交付压缩包与校验文件；上一版（审阅修复版）的正式目录和 ZIP 已归档到 archive/2026-10-20-phase1-release。
   - step5-v3-baseline：真实旧版程序的回归基线，测试会用到，不能当作普通旧包清理。
   - v3-qa、test-build 和各项目 bin/obj：可重建输出，本次整理已删除，后续发布或构建会重新生成。
 - **archive**：按日期存放已归档的内容。每个目录都有说明、逐文件 SHA-256 清单（*-files.csv）、ZIP 校验值及清理记录。2026-10-19-performance 保存此前测量、窗口结果和旧包；2026-10-20-cleanup 保存本次被替换的正式包，以及 core-performance（含修改前源码）、checkbox-theme、encoding-verification、cache-cleanup、repository-metadata、step5-performance、storage-v3-20260922 和 step5 日志。
