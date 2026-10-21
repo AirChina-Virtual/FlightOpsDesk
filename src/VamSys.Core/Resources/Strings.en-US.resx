@@ -1026,4 +1026,7 @@ Remote: {remote}</value>
   <data name="ApiSoftDeleteUnchangedHelp" xml:space="preserve"><value>Note: the server never answered the request to delete record {id} (timeout or 5xx), so there is no write receipt. A read-only GET still returns the record and it matches the data before the change, so the deletion appears not to have taken effect. Check it in Orwell first. Confirming marks the item not applied: it becomes failed and the local deletion draft is kept for review and resubmission. The delete is never resent and this is not counted as a verified operation.</value></data>
   <data name="ApiMarkNotApplied" xml:space="preserve"><value>Mark not applied</value></data>
   <data name="ApiSoftDeleteUnchanged" xml:space="preserve"><value>The delete had no write receipt and a read-only GET matched the data before the change; marked not applied after manual confirmation. The local deletion draft is kept for review and resubmission.</value></data>
+  <data name="BatchShiftInvalidMinutes" xml:space="preserve"><value>Shift minutes must be a whole number between -{max} and {max}. Nothing was changed.</value></data>
+  <data name="BatchShiftSkippedInvalidTime" xml:space="preserve"><value>{count} record(s) skipped: the time is empty or invalid.</value></data>
+  <data name="BatchShiftSkippedCrossesMidnight" xml:space="preserve"><value>{count} record(s) skipped: the shift would cross midnight (outside 00:00-23:59).</value></data>
 </root>

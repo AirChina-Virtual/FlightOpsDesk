@@ -20,17 +20,23 @@ public sealed record BatchSelection(IReadOnlyList<DataRow> Selected, IReadOnlyLi
     }
 }
 
-public sealed record BatchEditPreview(BatchSelection Selection, string Field, IReadOnlyList<DataRow> Changes)
+public sealed record BatchEditPreview(BatchSelection Selection, string Field, IReadOnlyList<DataRow> Changes, IReadOnlyList<RuleSkip>? RuleSkipsOrNull = null, MessageDescriptor? Validation = null)
 {
-    public int Unchanged => Selection.Eligible.Count - Changes.Count;
+    public IReadOnlyList<RuleSkip> RuleSkips => RuleSkipsOrNull ?? [];
+    /// <summary>One message per skip reason with its row count, in first-seen order.</summary>
+    public IReadOnlyList<MessageDescriptor> SkipReasons => RuleSkips.GroupBy(s => s.ReasonCode).Select(g => Messages.Define(g.Key, ("count", g.Count()))).ToArray();
+    public int Unchanged => Selection.Eligible.Count - Changes.Count - RuleSkips.Count;
+    /// <summary>Rows dropped before the rule (not eligible) plus rows the rule itself could not process.</summary>
+    public int TotalSkipped => Selection.Skipped + RuleSkips.Count;
     public static BatchEditPreview Rule(BatchSelection selection, EditRule rule)
     {
         // Capture the date once so preview and apply use the identical value for every row.
         if (rule.Kind == RuleKind.Retire)
             rule = new(RuleKind.Set, "End Date", DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
         var before = selection.Eligible.ToDictionary(r => r.LocalId);
-        var changes = RuleEngine.Preview(selection.Eligible, rule).Where(r => r.Get(rule.Field) != before[r.LocalId].Get(rule.Field)).ToArray();
-        return new(selection, rule.Field, changes);
+        var outcome = RuleEngine.Evaluate(selection.Eligible, rule);
+        var changes = outcome.Rows.Where(r => r.Get(rule.Field) != before[r.LocalId].Get(rule.Field)).ToArray();
+        return new(selection, rule.Field, changes, outcome.Skips, outcome.Validation);
     }
     public void Apply(ResourceData data)
     {

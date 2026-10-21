@@ -70,9 +70,46 @@ public sealed class ChangePlanner : IChangePlanner
 }
 public enum RuleKind { Set, Replace, AddTags, RemoveTags, ShiftMinutes, ShiftDays, Retire }
 public record EditRule(RuleKind Kind, string Field, string Value, string Search = "");
+public sealed record RuleSkip(Guid LocalId, string ReasonCode);
+/// <summary>Rows (skipped rows come back unchanged), the per-row skips, or a validation message when the rule input itself is unusable.</summary>
+public sealed record RuleOutcome(List<DataRow> Rows, List<RuleSkip> Skips, MessageDescriptor? Validation = null);
 public static class RuleEngine
 {
+    public const int MaxShiftMinutes = 1439;
     public static List<DataRow> Preview(IEnumerable<DataRow> rows, EditRule rule)
+    {
+        var outcome = Evaluate(rows, rule);
+        if (outcome.Validation is { } validation)
+            throw MessageErrors.Attach(new ArgumentException(validation.ToString()), validation);
+        return outcome.Rows;
+    }
+    public static RuleOutcome Evaluate(IEnumerable<DataRow> rows, EditRule rule)
+        => rule.Kind == RuleKind.ShiftMinutes ? ShiftMinutes(rows, rule) : new(Apply(rows, rule), []);
+
+    static RuleOutcome ShiftMinutes(IEnumerable<DataRow> rows, EditRule rule)
+    {
+        if (!int.TryParse(rule.Value.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var minutes) || Math.Abs(minutes) > MaxShiftMinutes)
+            return new([], [], Messages.Define("BatchShiftInvalidMinutes", ("max", MaxShiftMinutes)));
+        var result = new List<DataRow>();
+        var skips = new List<RuleSkip>();
+        foreach (var row in rows)
+        {
+            var copy = row.Copy();
+            result.Add(copy);
+            var old = row.Get(rule.Field);
+            if (!TimeOnly.TryParseExact(old, ["HH:mm", "HH:mm:ss"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+            { skips.Add(new(row.LocalId, "BatchShiftSkippedInvalidTime")); continue; }
+            // Whole-day arithmetic: the date and the other time are never adjusted, so leaving 00:00-23:59 skips the row.
+            var seconds = (long)time.ToTimeSpan().TotalSeconds + minutes * 60L;
+            if (seconds is < 0 or >= 86400)
+            { skips.Add(new(row.LocalId, "BatchShiftSkippedCrossesMidnight")); continue; }
+            // Seconds in API times are kept; the original HH:mm / HH:mm:ss shape is kept too.
+            copy.Fields[rule.Field] = TimeOnly.FromTimeSpan(TimeSpan.FromSeconds(seconds)).ToString(old.Length == 8 ? "HH:mm:ss" : "HH:mm", CultureInfo.InvariantCulture);
+        }
+        return new(result, skips);
+    }
+
+    static List<DataRow> Apply(IEnumerable<DataRow> rows, EditRule rule)
     {
         return rows.Select(row =>
         {
@@ -85,7 +122,6 @@ public static class RuleEngine
                 RuleKind.Replace => throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_6216D1C3A0")), Messages.Define("Text_6216D1C3A0")),
                 RuleKind.AddTags => string.Join(',', old.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Concat(rule.Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Distinct()),
                 RuleKind.RemoveTags => string.Join(',', old.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Except(rule.Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))),
-                RuleKind.ShiftMinutes => TimeOnly.ParseExact(old, "HH:mm", CultureInfo.InvariantCulture).AddMinutes(int.Parse(rule.Value, CultureInfo.InvariantCulture)).ToString("HH:mm", CultureInfo.InvariantCulture),
                 RuleKind.ShiftDays => DateTime.ParseExact(old, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture).AddDays(int.Parse(rule.Value, CultureInfo.InvariantCulture)).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                 RuleKind.Retire => DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                 _ => throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_5CBDBA3063")), Messages.Define("Text_5CBDBA3063"))
