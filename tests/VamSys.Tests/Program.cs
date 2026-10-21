@@ -134,10 +134,10 @@ await Test("File splitting respects UTF-8 byte limits", () => Sync(() =>
     var files = csv.Export(ResourceKind.Airports, planner.Plan(ResourceKind.Airports,data), 300);
     Check(files.Count > 1 && files.All(f => f.Length <= 300)); Check(files.Sum(f => csv.Parse(Encoding.UTF8.GetString(f)).Rows.Count) == 40);
 }));
-await Test("Rule preview is nonmutating; midnight and date shifts", () => Sync(() =>
+await Test("Rule preview is nonmutating; a minute shift across midnight is skipped (A4); date shifts", () => Sync(() =>
 {
     var row = Row(("Time","23:45"),("Date","2026-12-31 12:00:00"));
-    Check(RuleEngine.Preview([row], new(RuleKind.ShiftMinutes,"Time","30"))[0].Get("Time") == "00:15"); Check(row.Get("Time") == "23:45");
+    Check(RuleEngine.Preview([row], new(RuleKind.ShiftMinutes,"Time","30"))[0].Get("Time") == "23:45"); Check(row.Get("Time") == "23:45");
     Check(RuleEngine.Preview([row], new(RuleKind.ShiftDays,"Date","1"))[0].Get("Date") == "2027-01-01 12:00:00");
 }));
 await Test("Validation detects references, duplicate IDs and immutable routing endpoints", () => Sync(() =>
