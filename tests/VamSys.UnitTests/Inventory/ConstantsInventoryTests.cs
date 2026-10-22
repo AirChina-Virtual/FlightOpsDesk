@@ -22,6 +22,7 @@ public partial class ConstantsInventoryTests
     public void Capability_keys_are_locked()
     {
         var lines = new List<string>();
+        // SourceScan retains R0 logical paths for explicitly mapped moves; all literals are still scanned.
         foreach (var group in SourceScan.AllLiterals(SourceScan.Src).Where(l => CapabilityKey().IsMatch(l.Value) || CapabilitySuffix().IsMatch(l.Value))
                      .GroupBy(l => l.Value))
             lines.Add($"literal:{group.Key} => {string.Join(",", group.Select(l => l.File).Distinct().Order(StringComparer.Ordinal))}");
@@ -65,7 +66,8 @@ public partial class ConstantsInventoryTests
     {
         var lines = new List<string> { $"OperationsAdapter.BaseUri => {OperationsAdapter.BaseUri.AbsoluteUri}" };
 
-        // Data directory name and environment variable: every source file that hard-codes them.
+        // Data directory name and environment variable: every source file that hard-codes them,
+        // using SourceScan's explicit R0 logical paths for known R2 moves.
         foreach (var token in new[] { "VamSysBatch", "VAMSYS_DATA_DIR" })
             foreach (var group in SourceScan.AllLiterals(SourceScan.Src).Where(l => l.Value == token).GroupBy(l => l.File).OrderBy(g => g.Key, StringComparer.Ordinal))
                 lines.Add($"literal:{token}@{group.Key} => {group.Count()} occurrence(s)");

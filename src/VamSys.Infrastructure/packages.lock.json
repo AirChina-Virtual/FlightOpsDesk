@@ -54,7 +54,13 @@
           "SQLitePCLRaw.core": "2.1.12"
         }
       },
-      "vamsys.core": {
+      "vamsys.application": {
+        "type": "Project",
+        "dependencies": {
+          "VamSys.Domain": "[1.0.0, )"
+        }
+      },
+      "vamsys.domain": {
         "type": "Project"
       }
     }

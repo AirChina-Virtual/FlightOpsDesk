@@ -13,14 +13,18 @@ public partial class EnumInventoryTests
 {
     static IEnumerable<string> Describe(Assembly assembly)
     {
+        // This inventory locks persisted enum names/numbers, not physical assembly placement.
+        // ArchitectureBoundaryTests locks the real Domain/Application owners separately.
+        var source = assembly == typeof(Workspace).Assembly || assembly == typeof(BatchExecutor).Assembly
+            ? "VamSys.Core" : assembly.GetName().Name;
         foreach (var type in assembly.GetTypes().Where(t => t.IsEnum))
         {
             var underlying = Enum.GetUnderlyingType(type).Name;
             var flags = type.GetCustomAttribute<FlagsAttribute>() != null ? " [Flags]" : "";
             var visibility = type.IsVisible ? "public" : "non-public";
-            yield return $"{assembly.GetName().Name}:{type.FullName} => {visibility} {underlying}{flags}";
+            yield return $"{source}:{type.FullName} => {visibility} {underlying}{flags}";
             foreach (var name in Enum.GetNames(type))
-                yield return $"{assembly.GetName().Name}:{type.FullName}.{name} => {Convert.ToDecimal(Enum.Parse(type, name), System.Globalization.CultureInfo.InvariantCulture)}";
+                yield return $"{source}:{type.FullName}.{name} => {Convert.ToDecimal(Enum.Parse(type, name), System.Globalization.CultureInfo.InvariantCulture)}";
         }
     }
 
@@ -50,7 +54,8 @@ public partial class EnumInventoryTests
     [Fact]
     public void Enum_member_names_and_numeric_values_are_locked()
     {
-        var lines = Describe(typeof(Workspace).Assembly).Concat(Describe(typeof(WorkspaceStore).Assembly)).Concat(DescribeApp()).ToList();
+        var assemblies = new[] { typeof(Workspace).Assembly, typeof(BatchExecutor).Assembly, typeof(WorkspaceStore).Assembly };
+        var lines = assemblies.Distinct().SelectMany(Describe).Concat(DescribeApp()).ToList();
         Assert.Contains(lines, l => l.StartsWith("VamSys.Core:VamSys.Core.ItemState.ManuallyConfirmed => 7"));
         Golden.Verify("Enums.txt", lines);
     }

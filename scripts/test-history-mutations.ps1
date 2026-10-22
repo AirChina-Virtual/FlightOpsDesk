@@ -15,20 +15,22 @@ foreach($name in @('missing-after','missing-redo-delete')) {
         Copy-Item -LiteralPath (Join-Path $repo $relative) -Destination $target
     }
     if($name -eq 'missing-after'){
-        $path=Join-Path $dir 'src/VamSys.Core/EditHistory.cs'
-        $old='if(undo.Count>0)undo[^1]=Change(undo[^1],true);'
+        $path=Join-Path $dir 'src/VamSys.Domain/EditHistory.cs'
+        $old="if (undo.Count > 0)`n            undo[^1] = Change(undo[^1], true);"
         $new='// MUTATION: omit same-step After update'
     }else{
         $path=Join-Path $dir 'src/VamSys.Infrastructure/WorkspaceStore.History.cs'
-        $old='foreach(var step in h.Deletes)Execute(c,tx,"DELETE FROM resource_history_steps WHERE workspace_id=$w AND resource=$r AND step_id=$id",[..args,("$id",step.ToString())]);'
+        $old='foreach (var step in h.Deletes)' + "`n            " + 'Execute(c, tx, "DELETE FROM resource_history_steps WHERE workspace_id=$w AND resource=$r AND step_id=$id", [.. args, ("$id", step.ToString())]);'
         $new='// MUTATION: retain discarded redo and evicted steps'
     }
-    $source=[IO.File]::ReadAllText($path)
+    $source=[IO.File]::ReadAllText($path).Replace("`r`n","`n")
     if(!$source.Contains($old)){throw "Mutation anchor missing: $name"}
     [IO.File]::WriteAllText($path,$source.Replace($old,$new))
     Push-Location $dir
     try{
-        & "$repo/.tools/dotnet/dotnet.exe" run --project tests/VamSys.Tests -c Release -p:RestoreLockedMode=true -- --history *> (Join-Path $root "$name.log")
+        & "$repo/.tools/dotnet/dotnet.exe" build tests/VamSys.Tests -c Release -p:RestoreLockedMode=true -p:UseSharedCompilation=false -m:1 -nr:false *> (Join-Path $root "$name-build.log")
+        if($LASTEXITCODE -ne 0){throw "Mutation build failed: $name"}
+        & "$repo/.tools/dotnet/dotnet.exe" tests/VamSys.Tests/bin/Release/net10.0/VamSys.Tests.dll --history *> (Join-Path $root "$name.log")
         $code=$LASTEXITCODE
     }finally{Pop-Location}
     $log=[IO.File]::ReadAllText((Join-Path $root "$name.log"))

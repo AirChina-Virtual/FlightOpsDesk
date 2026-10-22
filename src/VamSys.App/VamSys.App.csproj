@@ -23,6 +23,8 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <ProjectReference Include="../VamSys.Domain/VamSys.Domain.csproj" />
+    <ProjectReference Include="../VamSys.Application/VamSys.Application.csproj" />
     <ProjectReference Include="../VamSys.Infrastructure/VamSys.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(UiVerification)' == 'true'">

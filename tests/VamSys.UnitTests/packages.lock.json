@@ -179,7 +179,13 @@
           "xunit.v3.runner.common": "[4.0.1]"
         }
       },
-      "vamsys.core": {
+      "vamsys.application": {
+        "type": "Project",
+        "dependencies": {
+          "VamSys.Domain": "[1.0.0, )"
+        }
+      },
+      "vamsys.domain": {
         "type": "Project"
       },
       "vamsys.infrastructure": {
@@ -187,7 +193,8 @@
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, )",
           "System.Security.Cryptography.ProtectedData": "[10.0.12, )",
-          "VamSys.Core": "[1.0.0, )"
+          "VamSys.Application": "[1.0.0, )",
+          "VamSys.Domain": "[1.0.0, )"
         }
       },
       "vamsys.testsupport": {

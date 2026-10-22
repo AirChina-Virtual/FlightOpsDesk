@@ -8,6 +8,7 @@ public partial class App : Application
     VamSys.Infrastructure.DataDirectoryLease? dataLease;
     public App()
     {
+        VamSys.Infrastructure.LocalizationDiagnostics.EnableTrace();
         InitializeComponent();
         UnhandledException += (_, e) => RecordFailure(e.Exception);
     }

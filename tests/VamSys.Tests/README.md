@@ -2,7 +2,7 @@
 
 这个项目按顺序执行一组自动检查，例如导入 CSV、修改记录或模拟请求超时。每项通过后输出 PASS；结果不符合预期时报错并停止。它是 net10.0 控制台程序，用下面的 `dotnet run` 命令运行，不使用 `dotnet test`。
 
-测试直接调用 Infrastructure 和 Core 中的实际代码。不依赖 WinUI 的界面逻辑直接链接 App 中的原文件，包括任务页模型、数据页查询与分页、行／单元格模型、审阅计划和批量预览。这样测试的就是程序真正使用的逻辑。
+测试直接调用 Domain、Application 和 Infrastructure 中的实际代码。不依赖 WinUI 的界面逻辑直接链接 App 中的原文件，包括任务页模型、数据页查询与分页、行／单元格模型、审阅计划和批量预览。这样测试的就是程序真正使用的逻辑。
 
 测试启用 `VamSysTestSupport=true` 引用 Infrastructure，并从 tests/TestSupport 链接存储故障注入和内部访问授权。这些依赖编译到 artifacts/test-build，正式构建不会复用；测试运行器本身仍在本项目的 bin/Release。
 
@@ -11,7 +11,7 @@
 从仓库根目录执行：
 
 ~~~powershell
-# 全部自动检查（当前 260 项；没有 artifacts/step5-v3-baseline 时为 259 项）
+# 旧运行器全部自动检查（当前 271 项；没有 artifacts/step5-v3-baseline 时为 270 项）
 dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
 
 # 只运行其中一部分
@@ -35,6 +35,17 @@ dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-v3 artifacts/v
 ~~~
 
 部分检查会调用 Windows 的密钥保护或启动额外进程，因此完整测试要在 Windows 上运行。测试数据都放在单独目录，不使用用户的真实数据。
+
+R0 起新增的 xUnit 项目独立运行，不计入旧运行器的 271 项：`VamSys.UnitTests` 当前 74 项，`VamSys.IntegrationTests` 当前 50 项。单元测试应分别用 Release、Debug 运行，以覆盖行守卫的两种编译配置。
+
+~~~powershell
+dotnet run --project tests/VamSys.UnitTests -c Release -p:RestoreLockedMode=true
+dotnet run --project tests/VamSys.UnitTests -c Debug -p:RestoreLockedMode=true
+dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMode=true
+./scripts/check-analyzer-baseline.ps1
+~~~
+
+真实数据库回归只读取隔离副本，需设置 `VAMSYS_REAL_DB_DIR` 和 `VAMSYS_REAL_DB_EXPECTED`，否则该项跳过。2026-10-22 的运行使用 R0 已保存副本的再复制目录，50 项集成测试没有跳过。旧清单保留 R0 的逻辑名称与源码路径，测试仅对明确搬迁的文件做路径映射；新增架构测试另查真实程序集，防止逻辑名称掩盖依赖变化。
 
 ## 测试文件分工
 

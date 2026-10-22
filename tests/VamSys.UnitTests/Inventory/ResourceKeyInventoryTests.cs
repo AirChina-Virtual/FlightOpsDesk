@@ -12,14 +12,14 @@ public partial class ResourceKeyInventoryTests
     [GeneratedRegex(@"\{(?<name>\w+)(?::(?<format>[^}]+))?\}")]
     private static partial Regex Placeholder();
 
-    // Same direct lookup helpers as src/VamSys.Core/Localization.cs and the app: Messages.Define, L(...), localization.Get(...), Block(...).
+    // Same direct lookup helpers as src/VamSys.Domain/Localization.cs and the app: Messages.Define, L(...), localization.Get(...), Block(...).
     [GeneratedRegex(@"(?:\bDefine|\bL|\b(?:localization|language|Localization|Chinese)\s*\.\s*Get|\bBlock)\(\s*""(?<key>[^""\\]+)""")]
     private static partial Regex DirectLookup();
 
     [GeneratedRegex(@"\bCode\s*(?:==|!=)\s*""(?<key>[^""\\]+)""")]
     private static partial Regex CodeComparison();
 
-    static string ResourceFile(string name) => Path.Combine(SourceScan.Src, "VamSys.Core", "Resources", name);
+    static string ResourceFile(string name) => Path.Combine(SourceScan.Src, "VamSys.Domain", "Resources", name);
 
     public static Dictionary<string, string> Load(string file)
     {

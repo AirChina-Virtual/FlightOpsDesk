@@ -44,6 +44,7 @@ public sealed class LocalizationService : ILocalizationService
     public CultureInfo DisplayCulture => CultureInfo.GetCultureInfo(Language);
     public event EventHandler? LanguageChanged;
     public event Action<string>? MissingResource;
+    public static event Action<string, string>? ResourceMissing;
     public void SetLanguage(string language)
     {
         var target = language == "en-US" ? language : "zh-CN";
@@ -62,7 +63,7 @@ public sealed class LocalizationService : ILocalizationService
         if (template is null)
         {
             MissingResource?.Invoke(message.Code);
-            System.Diagnostics.Trace.TraceWarning("Missing localization resource: {0}/{1}", Language, message.Code);
+            ResourceMissing?.Invoke(Language, message.Code);
             template = Resources.GetString(message.Code, CultureInfo.InvariantCulture) ?? message.Literal ?? $"[{message.Code}]";
         }
         // Single pass: parameter values (including user data with braces) are never reinterpreted.

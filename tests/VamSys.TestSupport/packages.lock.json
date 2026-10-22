@@ -52,7 +52,13 @@
         "resolved": "10.0.12",
         "contentHash": "wO0W8VDMeRJZakRySOmemAnrBZMwEFRlbfBtATxUiLf2I3IhSRnCp1Vt157NWptdE4IJ7eftd5n8q9LtaKHFTQ=="
       },
-      "vamsys.core": {
+      "vamsys.application": {
+        "type": "Project",
+        "dependencies": {
+          "VamSys.Domain": "[1.0.0, )"
+        }
+      },
+      "vamsys.domain": {
         "type": "Project"
       },
       "vamsys.infrastructure": {
@@ -60,7 +66,8 @@
         "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, )",
           "System.Security.Cryptography.ProtectedData": "[10.0.12, )",
-          "VamSys.Core": "[1.0.0, )"
+          "VamSys.Application": "[1.0.0, )",
+          "VamSys.Domain": "[1.0.0, )"
         }
       }
     }

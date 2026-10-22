@@ -11,7 +11,7 @@ $baselinePath = Join-Path $root 'docs/analyzer-baseline.txt'
 $dotnet = Join-Path $root '.tools/dotnet/dotnet.exe'
 if (-not (Test-Path $dotnet)) { $dotnet = 'dotnet' }
 
-$log = & $dotnet build (Join-Path $root 'VamSys.slnx') -c Release --no-incremental '-p:RestoreLockedMode=true' -nologo -v:m '-clp:NoSummary' 2>&1 | ForEach-Object { "$_" }
+$log = & $dotnet build (Join-Path $root 'VamSys.slnx') -c Release --no-incremental '-p:RestoreLockedMode=true' '-p:UseSharedCompilation=false' -m:1 -nr:false -nologo -v:m '-clp:NoSummary' 2>&1 | ForEach-Object { "$_" }
 if ($LASTEXITCODE -ne 0) { $log | Select-Object -Last 40 | Write-Host; throw 'Build failed.' }
 
 # One warning is often printed once per target framework / project instance; count each distinct location once.

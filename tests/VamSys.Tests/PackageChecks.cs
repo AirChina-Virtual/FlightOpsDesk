@@ -10,7 +10,7 @@ static class PackageChecks
         directory = Path.GetFullPath(directory);
         void Require(bool condition, string message)
         { if (!condition) throw new InvalidOperationException(message); }
-        foreach (var name in new[] { "FlightOpsDesk.exe", "FlightOpsDesk.dll", "VamSys.Core.dll", "VamSys.Infrastructure.dll",
+        foreach (var name in new[] { "FlightOpsDesk.exe", "FlightOpsDesk.dll", "VamSys.Domain.dll", "VamSys.Application.dll", "VamSys.Infrastructure.dll",
             "FlightOpsDesk.deps.json", "FlightOpsDesk.runtimeconfig.json", "FlightOpsDesk.pri", "MainWindow.xbf",
             "Assets/FlightOpsDesk.ico", "Assets/FlightOpsDesk.png", "README.md", "docs/USER-GUIDE.md", "docs/STORAGE-MIGRATION.md" })
             Require(File.Exists(Path.Combine(directory, name)), $"Missing package file: {name}");
@@ -27,7 +27,7 @@ static class PackageChecks
                 Require(relative is "docs/USER-GUIDE.md" or "docs/STORAGE-MIGRATION.md", $"Developer document in package: {relative}");
         }
 
-        foreach (var name in new[] { "FlightOpsDesk", "VamSys.Core", "VamSys.Infrastructure" })
+        foreach (var name in new[] { "FlightOpsDesk", "VamSys.Domain", "VamSys.Application", "VamSys.Infrastructure" })
         {
             using var stream = File.OpenRead(Path.Combine(directory, name + ".dll"));
             using var pe = new PEReader(stream);

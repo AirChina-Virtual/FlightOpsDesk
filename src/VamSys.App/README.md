@@ -2,7 +2,7 @@
 
 这个项目负责窗口和交互，编译后生成 `FlightOpsDesk.exe`。文件夹和命名空间仍使用 VamSys.App 这个旧名字，避免只为改名而影响其他代码。
 
-使用 C#、WinUI 3 和 CommunityToolkit.Mvvm，目标框架为 net10.0-windows10.0.22621.0，发布为 Windows 11 x64 自包含目录，直接引用 Infrastructure，再由它接入 Core。界面负责点击、编辑表格、选择文件和显示进度；发送请求、判断服务器结果和保存数据库都交给其他项目。用户的修改必须经过检查和审阅，不能从页面直接绕过这些步骤提交。
+使用 C#、WinUI 3 和 CommunityToolkit.Mvvm，目标框架为 net10.0-windows10.0.22621.0，发布为 Windows 11 x64 自包含目录，明确引用 Domain、Application 和 Infrastructure。界面负责点击、编辑表格、选择文件和显示进度；发送请求、判断服务器结果和保存数据库都交给其他项目。用户的修改必须经过检查和审阅，不能从页面直接绕过这些步骤提交。
 
 ## 文件分工
 

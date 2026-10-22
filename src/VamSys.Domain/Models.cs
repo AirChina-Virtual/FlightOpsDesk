@@ -47,7 +47,7 @@ public sealed class DataRow
     public string Get(string key) => fields.GetValueOrDefault(key, "");
     public DataRow Copy() => new(this);
 
-    /// <summary>True when the debug guard is compiled into this build (Debug configuration of VamSys.Core).</summary>
+    /// <summary>True when the debug guard is compiled into this build (Debug configuration of VamSys.Domain).</summary>
     public static bool GuardEnabled =>
 #if DEBUG
         true;
@@ -78,6 +78,7 @@ public sealed class DataRow
             throw new InvalidOperationException($"DataRow {localId} was modified in place after it was placed in a ResourceData list; replace the row with a Copy() instead.");
 #endif
     }
+    [System.Diagnostics.Conditional("DEBUG")]
     void GuardWrite()
     {
 #if DEBUG
@@ -281,15 +282,6 @@ public sealed class BatchJob
     public void SetStatus(JobStatus code, MessageDescriptor description) { StatusCode = code; Description = description; Status = description.ToString(); }
 }
 public record ResourceCapability(ResourceKind Resource, bool CanRead, bool CanWrite, MessageDescriptor Reason);
-public interface IResourceReader
-{
-    IAsyncEnumerable<DataRow> ReadAllAsync(ResourceKind kind, CancellationToken ct);
-    Task<DataRow?> FindAsync(ResourceKind kind, string id, CancellationToken ct);
-}
-public interface IResourceWriter
-{
-    Task<string?> WriteAsync(ChangeItem change, CancellationToken ct);
-}
 public interface ICsvResourceAdapter
 {
     CsvTable Parse(string text);
@@ -297,7 +289,3 @@ public interface ICsvResourceAdapter
     IReadOnlyList<byte[]> Export(ResourceKind kind, IEnumerable<ChangeItem> changes, int maxBytes = 10 * 1024 * 1024);
 }
 public interface IChangePlanner { List<ChangeItem> Plan(ResourceKind kind, ResourceData data); }
-public interface IBatchExecutor
-{
-    Task ExecuteAsync(BatchJob job, Func<Task> persist, CancellationToken ct);
-}

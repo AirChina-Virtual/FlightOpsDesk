@@ -14,6 +14,11 @@ namespace VamSys.UnitTests.Inventory;
 /// </summary>
 public class PersistedJsonShapeTests
 {
+    static readonly HashSet<Assembly> SourceAssemblies =
+    [
+        typeof(Workspace).Assembly, typeof(BatchExecutor).Assembly, typeof(WorkspaceStore).Assembly
+    ];
+
     static readonly Type[] Roots =
     [
         typeof(Workspace), typeof(ResourceData), typeof(DataRow), typeof(ChangeItem), typeof(BatchJob), typeof(BatchStep),
@@ -44,7 +49,7 @@ public class PersistedJsonShapeTests
                 yield return t;
             yield break;
         }
-        if (type.Assembly.GetName().Name is "VamSys.Core" or "VamSys.Infrastructure" && !type.IsEnum && !typeof(Delegate).IsAssignableFrom(type))
+        if (SourceAssemblies.Contains(type.Assembly) && !type.IsEnum && !typeof(Delegate).IsAssignableFrom(type))
             yield return type;
     }
 

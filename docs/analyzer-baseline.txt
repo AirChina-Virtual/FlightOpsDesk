@@ -1,6 +1,6 @@
 # Analyzer warning baseline: <project>|<rule>|<count>. Regenerate with scripts/check-analyzer-baseline.ps1 -Update.
-src/VamSys.Core/VamSys.Core.csproj|CA1307|3
-src/VamSys.Core/VamSys.Core.csproj|CA1310|1
+src/VamSys.Domain/VamSys.Domain.csproj|CA1307|3
+src/VamSys.Domain/VamSys.Domain.csproj|CA1310|1
 src/VamSys.Infrastructure/VamSys.Infrastructure.csproj|CA1307|5
 src/VamSys.Infrastructure/VamSys.Infrastructure.csproj|CA1310|2
 src/VamSys.Infrastructure/VamSys.Infrastructure.csproj|CA2000|1
