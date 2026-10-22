@@ -56,8 +56,10 @@ public sealed partial class MainWindow
         }
     }
 
-    string ReviewChangeText(ChangeItem item) => $"{EnumText(item.Kind)} · {Schemas.Key(item.Resource, item.After)}\n" +
-        (item.Kind == ChangeKind.Delete ? L("Text_5ABD08A949") : string.Join("；", item.Fields.Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key, localization)}: {item.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}")));
+    string ReviewChangeText(ChangeItem item) => ReviewChangeText(PlannedChange.Wrap(item));
+    // Reads the reviewed rows directly: showing the page does not build the full items.
+    string ReviewChangeText(PlannedChange item) => $"{EnumText(item.Kind)} · {Schemas.Key(item.Resource, item.After)}\n" +
+        (item.Kind == ChangeKind.Delete ? L("Text_5ABD08A949") : string.Join("；", item.Fields().Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key, localization)}: {item.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}")));
 
     long reviewGeneration;
     Task reviewLoad = Task.CompletedTask;
@@ -89,7 +91,7 @@ public sealed partial class MainWindow
     {
         var conflicts = workspace.Resources.Sum(p => p.Value.Conflicts.Count);
         var header = Stack(Text(() => L("ReviewWorkspace"), 18), Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"))),
-            Text(() => L("ReviewCounts", ("total", plan.Entries.Count), ("ready", plan.SubmitItems.Count),
+            Text(() => L("ReviewCounts", ("total", plan.Entries.Count), ("ready", plan.SubmitCount),
                 ("deferred", plan.Entries.Count(e => e.Disposition == ReviewDisposition.Deferred)),
                 ("blocked", plan.Entries.Count(e => e.Disposition == ReviewDisposition.Blocked)))),
             Text(() => L("ReviewMode", ("mode", EnumText(workspace.Mode)))));
@@ -102,12 +104,12 @@ public sealed partial class MainWindow
                 { await Confirm(L("ReviewIssues", ("count", plan.Blockers.Count)), new ListView { MaxHeight = 350, ItemsSource = plan.Blockers.Select(L).ToArray() }, L("Text_3FD47EDCE4")); }));
         header.Children.Add(Actions(
             Button(() => L(workspace.Mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit"), workspace.Mode == RunMode.Demo ? StartDemo : StartApi,
-                CanEditData() && plan.SubmitItems.Count > 0 && workspace.Mode != RunMode.Offline),
+                CanEditData() && plan.SubmitCount > 0 && workspace.Mode != RunMode.Offline),
             Button(() => L("ApiConflicts", ("count", conflicts)), ResolveWorkspaceConflicts, !busy && !localOperation && conflicts > 0)));
         var rows = new List<ReviewDisplayRow>();
         foreach (var kind in Enum.GetValues<ResourceKind>())
         {
-            var entries = plan.Entries.Where(e => e.Change.Resource == kind).ToArray();
+            var entries = plan.Entries.Where(e => e.Planned.Resource == kind).ToArray();
             if (entries.Length == 0)
                 continue;
             rows.Add(new(this, kind, null));
@@ -138,7 +140,7 @@ public sealed partial class MainWindow
         public string Heading => owner.L(Schemas.All[resource].Name);
         public string ExportLabel => owner.L("ReviewExport", ("resource", Heading));
         public string State => Entry is null ? "" : owner.L("ReviewState_" + Entry.Disposition);
-        public string Body => Entry is null ? "" : owner.ReviewChangeText(Entry.Change);
+        public string Body => Entry is null ? "" : owner.ReviewChangeText(Entry.Planned);
         public string Reason => Entry?.Reason is null ? "" : owner.L(Entry.Reason);
         public IAsyncRelayCommand? ExportCommand { get; } = entry is null ? new AsyncRelayCommand(() => owner.UserAction(() => owner.ExportCsv(resource))) : null;
         public void RefreshLanguage()
@@ -171,14 +173,23 @@ public sealed partial class MainWindow
     // The live plan is rebuilt on a worker; the shown plan's key was computed when it was built.
     async Task<WorkspaceReviewPlan?> CurrentReviewPlan(RunMode mode)
     {
-        var current = await WhileLocked(CaptureReviewPlan());
+        // The worker also builds the shown plan's submission items, so the UI thread never has to.
+        var build = CaptureReviewPlan();
+        var shown = reviewPlan;
+        var current = await WhileLocked(() =>
+        {
+            var plan = build();
+            if (shown is not null && shown.Blockers.Count == 0 && plan.Blockers.Count == 0 && shown.ContentKey() == plan.ContentKey())
+                _ = shown.SubmitItems;
+            return plan;
+        });
         if (reviewPlan is null || reviewWorkspace != workspace.Id || reviewAirline != workspace.AirlineId || reviewMode != mode || reviewPlan.ContentKey() != current.ContentKey())
         {
             Render();
             Status(() => L("ReviewChanged"));
             return null;
         }
-        if (current.Blockers.Count > 0 || current.SubmitItems.Count == 0)
+        if (current.Blockers.Count > 0 || current.SubmitCount == 0)
         { Render(); return null; }
         return reviewPlan;
     }

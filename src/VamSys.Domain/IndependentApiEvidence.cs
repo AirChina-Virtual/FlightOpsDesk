@@ -27,8 +27,11 @@ public static class IndependentApiEvidence
             return false;
         // Which fields were exercised per operation is the Evidence column of the field table.
         var move = IsMove(item);
-        return item.Fields.Where(p => p.Value.Intent != FieldIntent.Unspecified && p.Key != "_delete" && !(item.Kind == ChangeKind.Create && string.IsNullOrEmpty(p.Value.Value)))
-            .All(p => FieldSpecs.InEvidence(item.Resource, p.Key, item.Kind, move, type));
+        foreach (var p in item.Fields)
+            if (p.Value.Intent != FieldIntent.Unspecified && p.Key != "_delete" && !(item.Kind == ChangeKind.Create && string.IsNullOrEmpty(p.Value.Value))
+                && !FieldSpecs.InEvidence(item.Resource, p.Key, item.Kind, move, type))
+                return false;
+        return true;
     }
 }
 

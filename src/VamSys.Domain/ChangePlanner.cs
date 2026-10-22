@@ -6,52 +6,82 @@ public sealed class ChangePlanner : IChangePlanner
 {
     public List<ChangeItem> PlanWorkspace(Workspace workspace)
     {
-        var items = workspace.Resources.SelectMany(p => Plan(p.Key, p.Value)).ToList();
-        var creates = items.Where(i => i.Kind == ChangeKind.Create).ToDictionary(i => LocalReference.Format(i.After.LocalId), StringComparer.OrdinalIgnoreCase);
-        var known = workspace.Resources.SelectMany(p => p.Value.Snapshot.Select(r => (Token: LocalReference.Format(r.LocalId), Key: Schemas.Key(p.Key, r)))).ToDictionary(p => p.Token, p => p.Key, StringComparer.OrdinalIgnoreCase);
+        var planned = ScanWorkspace(workspace);
+        var items = new List<ChangeItem>(planned.Count);
+        foreach (var change in planned)
+            items.Add(change.ToItem());
+        return items;
+    }
+
+    /// <summary>
+    /// The same plan as <see cref="PlanWorkspace"/> without building the items: no row or field copies, only references to the
+    /// workspace's rows and the names of the changed fields. Use it when the plan is only shown or compared.
+    /// </summary>
+    public List<PlannedChange> ScanWorkspace(Workspace workspace)
+    {
+        var items = new List<PlannedChange>();
+        foreach (var (kind, data) in workspace.Resources)
+            Scan(kind, data, items);
+        // The lookups below are needed only when a row points at a local row, which is rare: build them on first use.
+        Dictionary<string, PlannedChange>? creates = null;
+        Dictionary<string, string>? known = null;
+        var referenceFields = new string[(int)Enum.GetValues<ResourceKind>().Max() + 1][];
         foreach (var item in items)
         {
             item.RequiresAirlineParameter = workspace.Mode == RunMode.Online && item.Resource == ResourceKind.Fleets && item.Kind == ChangeKind.Create;
-            foreach (var field in Schemas.ReferenceFields(item.Resource))
+            var fieldsOfResource = referenceFields[(int)item.Resource] ??= Schemas.ReferenceFields(item.Resource);
+            List<Guid>? dependencies = null;
+            foreach (var field in fieldsOfResource)
             {
                 var original = item.After.Get(field);
                 if (!LocalReference.ContainsLocal(original))
                     continue;
+                creates ??= items.Where(i => i.Kind == ChangeKind.Create).ToDictionary(i => LocalReference.Format(i.After.LocalId), StringComparer.OrdinalIgnoreCase);
+                known ??= workspace.Resources.SelectMany(p => p.Value.Snapshot.Select(r => (Token: LocalReference.Format(r.LocalId), Key: Schemas.Key(p.Key, r)))).ToDictionary(p => p.Token, p => p.Key, StringComparer.OrdinalIgnoreCase);
                 var tokens = original.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
                 for (int i = 0; i < tokens.Length; i++)
                 {
                     if (creates.TryGetValue(tokens[i], out var dependency))
-                        item.Dependencies.Add(dependency.Id);
+                        (dependencies ??= []).Add(dependency.Id);
                     else if (known.TryGetValue(tokens[i], out var key))
                         tokens[i] = key;
                 }
-                item.After.Fields[field] = string.Join(',', tokens);
-                item.Fields[field] = new(FieldIntent.Set, item.After.Fields[field]);
+                item.Resolve(field, string.Join(',', tokens));
             }
-            item.Dependencies = item.Dependencies.Distinct().ToList();
+            if (dependencies != null)
+                item.SetDependencies([.. dependencies.Distinct()]);
         }
         return items;
     }
     public List<ChangeItem> Plan(ResourceKind kind, ResourceData data)
     {
-        var baseline = data.Snapshot.ToDictionary(r => r.LocalId);
-        var result = new List<ChangeItem>();
+        var planned = new List<PlannedChange>();
+        Scan(kind, data, planned);
+        var result = new List<ChangeItem>(planned.Count);
+        foreach (var change in planned)
+            result.Add(change.ToItem());
+        return result;
+    }
+    static void Scan(ResourceKind kind, ResourceData data, List<PlannedChange> result)
+    {
+        var baseline = new Dictionary<Guid, DataRow>(data.Snapshot.Count);
+        foreach (var snapshot in data.Snapshot)
+            baseline.Add(snapshot.LocalId, snapshot);
+        var changed = new List<string>();
         foreach (var row in data.Draft)
         {
             baseline.TryGetValue(row.LocalId, out var before);
-            Dictionary<string, FieldChange>? fields = null;
+            changed.Clear();
             foreach (var field in row.Fields)
                 if (Changed(field, before))
-                    (fields ??= new(StringComparer.Ordinal)).Add(field.Key,
-                        new(field.Value == "" ? FieldIntent.Clear : FieldIntent.Set, field.Value));
+                    changed.Add(field.Key);
             var delete = Schemas.Deleted(row);
-            if (before != null && !delete && fields is null)
+            if (before != null && !delete && changed.Count == 0)
                 continue;
             if (before is null && delete)
                 continue;
-            result.Add(new(row.Copy(), fields ?? new(StringComparer.Ordinal)) { Resource = kind, Kind = delete ? ChangeKind.Delete : before is null ? ChangeKind.Create : ChangeKind.Update, Before = before?.Copy() });
+            result.Add(new(kind, delete ? ChangeKind.Delete : before is null ? ChangeKind.Create : ChangeKind.Update, row, before, changed.Count == 0 ? [] : [.. changed]));
         }
-        return result;
     }
     static bool Changed(KeyValuePair<string, string> field, DataRow? baseline)
         => field.Key != "_delete" && (baseline is null || !baseline.Fields.TryGetValue(field.Key, out var old) || old != field.Value);
