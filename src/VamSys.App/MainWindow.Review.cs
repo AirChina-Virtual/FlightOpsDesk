@@ -26,28 +26,7 @@ public sealed partial class MainWindow
         var verified = w.VerifiedOperations.ToHashSet(StringComparer.Ordinal);
         var connected = apiSessions.TryGetValue(w.Id, out var session) && session.Api.SessionAirlineId != null;
         Action<ChangeItem>? preview = connected ? c => session.Api.PreviewPlan(c) : null;
-        return () =>
-        {
-            var blockers = new List<MessageDescriptor>();
-            if (w.Resources.Values.Any(d => d.Conflicts.Count > 0))
-                blockers.Add(Messages.Define("ApiConflict"));
-            if (mode == RunMode.Online && ApiOperationPolicy.HasOpenOnlineItems(w))
-                blockers.Add(Messages.Define("ApiPendingJob"));
-            if (mode == RunMode.Demo)
-            {
-                var pass = new ValidationPass(w);
-                foreach (var (kind, data) in w.Resources.Where(p => p.Value.Draft.Count > 0))
-                    foreach (var issue in Schemas.Validate(w, kind, pass))
-                    {
-                        var row = data.FindDraftRow(issue.RowId);
-                        blockers.Add(Messages.Define("ReviewValidationIssue", ("resource", Schemas.All[kind].Name),
-                            ("key", row is null ? issue.RowId.ToString()[..8] : Schemas.Key(kind, row)), ("field", issue.Field), ("reason", issue.Description)));
-                    }
-            }
-            var plan = ReviewPlanBuilder.Build(planner.PlanWorkspace(w), mode, connected, verified, preview, blockers, w.ContractHash);
-            _ = plan.ContentKey();
-            return plan;
-        };
+        return () => ReviewPlanBuilder.BuildForWorkspace(planner, w, mode, connected, verified, preview);
     }
     // Locks edits and navigation while a worker reads the workspace. Nested locks keep the outermost
     // state: an enclosing LocalOperation stays locked when this one ends.

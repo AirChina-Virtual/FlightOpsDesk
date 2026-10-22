@@ -115,6 +115,31 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
 /// <summary>Local preview only. The supplied API preview must not send requests.</summary>
 public static class ReviewPlanBuilder
 {
+    /// <summary>The whole background build of the review page (blockers, plan, content key), free of any window state.</summary>
+    public static WorkspaceReviewPlan BuildForWorkspace(ChangePlanner planner, Workspace w, RunMode mode, bool connected,
+        ISet<string> verified, Action<ChangeItem>? preview)
+    {
+        var blockers = new List<MessageDescriptor>();
+        if (w.Resources.Values.Any(d => d.Conflicts.Count > 0))
+            blockers.Add(Messages.Define("ApiConflict"));
+        if (mode == RunMode.Online && ApiOperationPolicy.HasOpenOnlineItems(w))
+            blockers.Add(Messages.Define("ApiPendingJob"));
+        if (mode == RunMode.Demo)
+        {
+            var pass = new ValidationPass(w);
+            foreach (var (kind, data) in w.Resources.Where(p => p.Value.Draft.Count > 0))
+                foreach (var issue in Schemas.Validate(w, kind, pass))
+                {
+                    var row = data.FindDraftRow(issue.RowId);
+                    blockers.Add(Messages.Define("ReviewValidationIssue", ("resource", Schemas.All[kind].Name),
+                        ("key", row is null ? issue.RowId.ToString()[..8] : Schemas.Key(kind, row)), ("field", issue.Field), ("reason", issue.Description)));
+                }
+        }
+        var plan = Build(planner.PlanWorkspace(w), mode, connected, verified, preview, blockers, w.ContractHash);
+        _ = plan.ContentKey();
+        return plan;
+    }
+
     public static WorkspaceReviewPlan Build(IReadOnlyList<ChangeItem> changes, RunMode mode, bool connected,
         ISet<string> verified, Action<ChangeItem>? preview = null, IReadOnlyList<MessageDescriptor>? blockers = null, string? externalEvidenceContractHash = null)
     {
