@@ -8,13 +8,19 @@ public sealed record ResourceSchema(MessageDescriptor Name, string Key, string[]
 }
 public static class Schemas
 {
+    // Columns come from the field table (FieldSpecs); only the localised resource names live here.
+    static ResourceSchema Schema(ResourceKind kind, MessageDescriptor name)
+    {
+        var spec = FieldSpecs.Get(kind);
+        return new(name, spec.Key, [.. spec.Required], [.. spec.Optional]);
+    }
     public static readonly Dictionary<ResourceKind, ResourceSchema> All = new()
     {
-        [ResourceKind.Airports] = new(Messages.Define("Text_6A5347AC5F"), "ICAO/IATA", ["ICAO/IATA", "Name"], ["Category", "Container IDs", "Pax LF ID", "Cargo LF ID"]),
-        [ResourceKind.Fleets] = new(Messages.Define("Text_D082D02D37"), "ID", ["Name", "Type Code", "Type (pax/cargo/...)"], ["Max Passengers", "Max Freight", "Container Units", "Hide in Phoenix", "Allowed Prefix IDs", "Parameter IDs"]),
-        [ResourceKind.Aircraft] = new(Messages.Define("Text_C05F7CD6ED"), "ID", ["Name", "Registration", "Fleet ID"], ["SELCAL", "Fin Number", "Hex Code", "Passengers", "Freight", "Internal Remarks"]),
-        [ResourceKind.Routings] = new(Messages.Define("Text_ABF79C546F"), "ID", ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Route String"], ["Remarks", "Internal Remarks", "Tags", "Days of Operation"]),
-        [ResourceKind.Routes] = new(Messages.Define("Text_486B1DF063"), "ID", ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Type"], ["Callsign", "Flight Number", "Fleet IDs", "Start Date", "End Date", "Departure Time (HH:MM)", "Arrival Time (HH:MM)", "Service Days", "Routing", "Remarks", "Internal Remarks", "Tags", "Is Hidden", "Altitude", "Cost Index"])
+        [ResourceKind.Airports] = Schema(ResourceKind.Airports, Messages.Define("Text_6A5347AC5F")),
+        [ResourceKind.Fleets] = Schema(ResourceKind.Fleets, Messages.Define("Text_D082D02D37")),
+        [ResourceKind.Aircraft] = Schema(ResourceKind.Aircraft, Messages.Define("Text_C05F7CD6ED")),
+        [ResourceKind.Routings] = Schema(ResourceKind.Routings, Messages.Define("Text_ABF79C546F")),
+        [ResourceKind.Routes] = Schema(ResourceKind.Routes, Messages.Define("Text_486B1DF063"))
     };
     public static string Key(ResourceKind kind, DataRow row) => row.Get(All[kind].Key).Trim().ToUpperInvariant();
     public static IEnumerable<string> MatchKeys(ResourceKind kind, DataRow row)
@@ -28,13 +34,7 @@ public static class Schemas
                     yield return value.GetString()!.Trim().ToUpperInvariant();
         }
     }
-    public static string[] ReferenceFields(ResourceKind kind) => kind switch
-    {
-        ResourceKind.Aircraft => ["Fleet ID"],
-        ResourceKind.Routes => ["Fleet IDs", "Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)"],
-        ResourceKind.Routings => ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)"],
-        _ => []
-    };
+    public static string[] ReferenceFields(ResourceKind kind) => [.. FieldSpecs.Get(kind).References.Select(f => f.Csv)];
     // Documented values: empty, AUTO or an integer from 0 to 999.
     public static bool ValidCostIndex(string value) => value is "" or "AUTO"
         || int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n <= 999;
@@ -43,6 +43,7 @@ public static class Schemas
     {
         var data = workspace.Resources[kind];
         var schema = All[kind];
+        var spec = FieldSpecs.Get(kind);
         var issues = new List<Issue>();
         var snapshot = data.Snapshot.ToDictionary(r => r.LocalId);
         var referenceKeys = workspace.Resources.ToDictionary(p => p.Key, p => p.Value.Draft.Where(r => !Deleted(r)).Select(r => Key(p.Key, r)).ToHashSet());
@@ -74,19 +75,19 @@ public static class Schemas
             {
                 if (v == "")
                     continue;
-                if (workspace.Mode == RunMode.Online && (f is "Freight" or "Max Freight")
+                if (workspace.Mode == RunMode.Online && FieldSpecs.Is(f, FieldType.KgInteger)
                     && (!long.TryParse(v, NumberStyles.None, CultureInfo.InvariantCulture, out var kg) || kg < 0))
                     Add(r, f, Messages.Define("WeightIntegerKg"));
-                if (f is "_delete" or "Is Hidden" or "Hide in Phoenix")
+                if (FieldSpecs.Is(f, FieldType.Bool))
                     if (v is not "TRUE" and not "FALSE")
                         Add(r, f, Messages.Define("Text_1B7AB7E0F1"));
-                if (f is "Start Date" or "End Date")
+                if (FieldSpecs.Is(f, FieldType.Date))
                     if (!DateTime.TryParseExact(v, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
                         Add(r, f, Messages.Define("Text_F59EB79050"));
-                if (f is "Departure Time (HH:MM)" or "Arrival Time (HH:MM)")
+                if (FieldSpecs.Is(f, FieldType.Time))
                     if (!TimeOnly.TryParseExact(v, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
                         Add(r, f, Messages.Define("Text_C8CF0D677E"));
-                if (f is "Service Days" or "Days of Operation")
+                if (FieldSpecs.Is(f, FieldType.DayList))
                     if (v.Split(',').Any(d => !new[] { "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" }.Contains(d.Trim())))
                         Add(r, f, Messages.Define("Text_C4946548B5"));
             }
@@ -123,29 +124,22 @@ public static class Schemas
                 if (!ValidCostIndex(r.Get("Cost Index")))
                     Add(r, "Cost Index", Messages.Define("CostIndexInvalid"));
             }
+            // Route endpoints are immutable online too (Plan blocks them), but only routing edits are flagged here.
             if (kind == ResourceKind.Routings && before != null)
-                foreach (var f in new[] { "Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)" })
-                    if (r.Get(f) != before.Get(f))
-                        Add(r, f, Messages.Define("Text_31E5AEFD06"));
+                foreach (var endpoint in spec.Endpoints)
+                    if (r.Get(endpoint.Csv) != before.Get(endpoint.Csv))
+                        Add(r, endpoint.Csv, Messages.Define("Text_31E5AEFD06"));
             void Reference(string field, ResourceKind target)
             {
                 foreach (var id in r.Get(field).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                     if (!referenceKeys[target].Contains(id.ToUpperInvariant()) && !localKeys[target].Contains(id))
                         Add(r, field, Messages.Define("Text_5CDAFFB468", ("arg0", id), ("arg1", All[target].Name)));
             }
-            if (kind == ResourceKind.Aircraft)
-            {
-                if (FleetAssignmentService.Tokens(r.Get("Fleet ID")).Count != 1)
-                    Add(r, "Fleet ID", Messages.Define("Text_06FE405F2A"));
-                Reference("Fleet ID", ResourceKind.Fleets);
-            }
-            if (kind == ResourceKind.Routes)
-                Reference("Fleet IDs", ResourceKind.Fleets);
-            if (kind is ResourceKind.Routes or ResourceKind.Routings)
-            {
-                Reference("Departure Airport (ICAO/IATA)", ResourceKind.Airports);
-                Reference("Arrival Airport (ICAO/IATA)", ResourceKind.Airports);
-            }
+            // A single fleet is required before the aircraft fleet reference is resolved.
+            if (kind == ResourceKind.Aircraft && FleetAssignmentService.Tokens(r.Get("Fleet ID")).Count != 1)
+                Add(r, "Fleet ID", Messages.Define("Text_06FE405F2A"));
+            foreach (var reference in spec.References)
+                Reference(reference.Csv, reference.Reference!.Value);
         }
         // Flag possible duplicate creates without silently treating flight numbers as identities.
         var signatureFields = kind switch
