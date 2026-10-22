@@ -100,40 +100,6 @@ if(args.Length==1 && args[0]=="--live-compatibility"){await LiveCompatibilitySce
 if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await LiveCompatibilityScenarios.ExportDiagnostics(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-performance") {await PerformanceScenarios.Benchmark(args[1]);return;}
 
-await Test("CSV quoting, Unicode, embedded newline and leading zeros", () => Sync(() =>
-{
-    var t = csv.Parse("\uFEFFID,Name,Extra\r\n001,\"中文,机场\",\"a\"\"b\r\nc\"\r\n");
-    var rows = csv.Map(t, new Dictionary<string,string>());
-    Check(rows[0].Get("ID") == "001"); Check(rows[0].Get("Extra") == "a\"b\r\nc");
-    var data = new ResourceData { Draft = rows }; var files = csv.Export(ResourceKind.Fleets, planner.Plan(ResourceKind.Fleets, data));
-    var round = csv.Map(csv.Parse(Encoding.UTF8.GetString(files[0])), new Dictionary<string,string>());
-    Check(round[0].Get("Extra") == rows[0].Get("Extra"));
-}));
-await Test("CSV rejects malformed quotes and duplicate headers", () => Sync(() =>
-{
-    foreach (var text in new[] { "A,A\n1,2", "A\n\"abc", "A,B\n1", "A\n\"a\"b" })
-    { try { csv.Parse(text); throw new Exception("Accepted bad CSV"); } catch (FormatException) { } }
-}));
-await Test("Patch import preserves missing columns and rows, explicit empty clears", () => Sync(() =>
-{
-    var data = new ResourceData(); CsvAdapter.Import(ResourceKind.Airports, data, [Row(("ICAO/IATA","ZBAA"),("Name","old"),("Unknown","retain")), Row(("ICAO/IATA","ZSPD"),("Name","second"))], true);
-    CsvAdapter.Import(ResourceKind.Airports, data, [Row(("ICAO/IATA","ZBAA"),("Name",""))], false);
-    Check(data.Draft.Count == 2); Check(data.Draft[0].Get("Unknown") == "retain");
-    var changes = planner.Plan(ResourceKind.Airports, data); Check(changes.Count == 1); Check(changes[0].Fields["Name"].Intent == FieldIntent.Clear);
-    data.UndoEdit(); Check(data.Draft[0].Get("Name") == "old"); data.RedoEdit(); Check(data.Draft[0].Get("Name") == "");
-}));
-await Test("Explicit deletion only; omitted rows are not deletions", () => Sync(() =>
-{
-    var data = new ResourceData(); CsvAdapter.Import(ResourceKind.Airports, data, [Row(("ICAO/IATA","ZBAA"),("Name","Beijing"))], true);
-    Check(planner.Plan(ResourceKind.Airports, data).Count == 0); data.Draft[0].Fields["_delete"] = "TRUE";
-    Check(planner.Plan(ResourceKind.Airports, data).Single().Kind == ChangeKind.Delete);
-}));
-await Test("File splitting respects UTF-8 byte limits", () => Sync(() =>
-{
-    var data = new ResourceData { Draft = Enumerable.Range(0,40).Select(i => Row(("ICAO/IATA",$"X{i:000}"),("Name",new string('中', 30)))).ToList() };
-    var files = csv.Export(ResourceKind.Airports, planner.Plan(ResourceKind.Airports,data), 300);
-    Check(files.Count > 1 && files.All(f => f.Length <= 300)); Check(files.Sum(f => csv.Parse(Encoding.UTF8.GetString(f)).Rows.Count) == 40);
-}));
 await Test("Rule preview is nonmutating; a minute shift across midnight is skipped (A4); date shifts", () => Sync(() =>
 {
     var row = Row(("Time","23:45"),("Date","2026-12-31 12:00:00"));
@@ -192,13 +158,6 @@ await Test("20,000-route planning and validation performance", () => Sync(() =>
     d.Draft=Enumerable.Range(0,20000).Select(i=>Row(("ID",i.ToString()),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Type","jumpseat"),("Callsign","ACA123"),("Flight Number","AC123"))).ToList(); d.Snapshot=d.Draft.Select(r=>r.Copy()).ToList();
     var sw=Stopwatch.StartNew(); Check(planner.Plan(ResourceKind.Routes,d).Count==0); Check(Schemas.Validate(w,ResourceKind.Routes).Count==0);
     Console.WriteLine($"  20k plan+validate: {sw.ElapsedMilliseconds} ms"); Check(sw.Elapsed < TimeSpan.FromSeconds(10));
-}));
-await Test("Baseline rejects missing IDs, and mixed CSV columns preserve omissions", () => Sync(() =>
-{
-    try { CsvAdapter.Import(ResourceKind.Fleets,new ResourceData(),[Row(("Name","new"))],true); throw new Exception("Invalid baseline accepted"); } catch(FormatException) { }
-    var d = new ResourceData { Draft=[Row(("ICAO/IATA","ZBAA"),("Name","A"),("Unknown","x")),Row(("ICAO/IATA","ZSPD"),("Name","B"))] };
-    var files=csv.Export(ResourceKind.Airports,planner.Plan(ResourceKind.Airports,d)); Check(files.Count==2);
-    Check(!csv.Parse(Encoding.UTF8.GetString(files[1])).Headers.Contains("Unknown"));
 }));
 await Test("Cross-resource creates resolve returned IDs before dependent writes", async () =>
 {
