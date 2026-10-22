@@ -7,7 +7,14 @@ Add-Type -Namespace QaInput -Name Native -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
 [DllImport("user32.dll")] public static extern void mouse_event(uint flags,uint dx,uint dy,uint data,UIntPtr extra);
 [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hwnd);
+[DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+[DllImport("user32.dll")] public static extern bool IsProcessDPIAware();
+[DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
 '@
+# UI Automation bounding rectangles use physical pixels, including at 150% scaling.
+if(![QaInput.Native]::IsProcessDPIAware() -and ![QaInput.Native]::SetProcessDPIAware()){
+    throw 'Cannot enable DPI awareness for physical mouse coordinates'
+}
 $repo=Split-Path $PSScriptRoot -Parent
 if(!$Executable){$Executable=Join-Path $repo 'artifacts/v3-qa/FlightOpsDesk.exe'}
 if(!$OutputDirectory){$OutputDirectory=Join-Path $repo 'artifacts/ui-cells/editing'}
@@ -35,7 +42,9 @@ try{
     # Pointer: click the second row's Departure cell, type, then Tab into the next cell and type there.
     # Digits only: an active Chinese IME composes letters and converts punctuation. The editor opens with the caret
     # at the end; End would reach the list there and move focus to the last row, as with any single-line TextBox.
+    $process.Refresh()
     [QaInput.Native]::SetForegroundWindow($process.MainWindowHandle)|Out-Null;Start-Sleep -Milliseconds 300
+    Assert ([QaInput.Native]::GetForegroundWindow() -eq $process.MainWindowHandle) 'QA window is not foreground; keep it active before retrying pointer input'
     # A column inside the window; Remarks is scrolled out of view horizontally.
     $departures=Wait {$c=Cells 'Departure Airport (ICAO/IATA)';if($c.Count -gt 1 -and !$c[1].Current.BoundingRectangle.IsEmpty){,$c}}
     $target=$departures[1].Current.BoundingRectangle;$x=[int]($target.X+$target.Width/2);$y=[int]($target.Y+$target.Height/2)

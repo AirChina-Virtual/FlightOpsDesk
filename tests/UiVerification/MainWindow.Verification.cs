@@ -93,7 +93,10 @@ public sealed partial class MainWindow
                 ChangeDataPage(2);RootGrid.UpdateLayout();var current=visible[0].Row;
                 var editor=FindDataEditor(table!,"Remarks")??throw new InvalidOperationException("Remarks editor not rendered");
                 editor.Text="native rebound editor";RootGrid.UpdateLayout();
-                return new{correct=current.Get("Remarks")=="native rebound editor"&&previous.Get("Remarks")==before,current=current.Get("ID"),previous=previous.Get("ID"),state=DataVerificationState()};
+                // Edits replace rows. Read both identities from the current draft, including the row
+                // on the previous page, so an incorrect callback cannot pass by leaving an old object unchanged.
+                var updated=Data.FindDraftRow(current.LocalId)!;var untouched=Data.FindDraftRow(previous.LocalId)!;
+                return new{correct=updated.Get("Remarks")=="native rebound editor"&&untouched.Get("Remarks")==before,current=updated.Get("ID"),previous=untouched.Get("ID"),state=DataVerificationState()};
             }
             case "data-undo-save":
             {
