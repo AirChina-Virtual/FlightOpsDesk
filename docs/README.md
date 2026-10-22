@@ -35,5 +35,6 @@ contracts 目录保存官方 API 文档的副本。报告中的“本地测试�
 - [App：程序界面](../src/VamSys.App/README.md)：窗口、数据表格、审阅、任务进度、关闭保存和图标。
 - [Domain：数据处理规则](../src/VamSys.Domain/README.md)：字段规格、判断修改、撤销历史、CSV、分配机型和检查删除。
 - [Application：端口与应用编排](../src/VamSys.Application/README.md)：通用执行、检查点、待保存编辑和安全关闭；R4 的会话与用例服务仍待实现。
-- [Infrastructure：服务器与本地保存](../src/VamSys.Infrastructure/README.md)：发送 API 请求、查重、保存数据和中断后恢复。
+- [Infrastructure：服务器通信](../src/VamSys.Infrastructure/README.md)：发送 API 请求、查重和中断后恢复。
+- [Storage：本地数据库](../src/VamSys.Storage/README.md)：保存数据、读取、旧格式升级和备份。
 - [Tests：自动检查](../tests/VamSys.Tests/README.md)：运行命令、各类测试的用途、窗口脚本和测量方法。

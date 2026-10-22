@@ -1,6 +1,6 @@
-# VamSys.Infrastructure — 连接服务器与保存本地数据
+# VamSys.Infrastructure — 连接服务器
 
-这个项目负责和 vaMSYS 通信，并把工作区、草稿和任务进度保存到本机。它还会检查重复记录，在请求超时或程序中断后判断服务器是否已经完成操作。项目使用 net10.0，引用 Domain、Application 和 Storage。`AppPaths` 在这里解析环境变量与默认数据目录；`LocalizationDiagnostics` 订阅领域的缺键事件并写入 Trace，宿主启动时启用一次。
+这个项目负责和 vaMSYS 通信。它会检查重复记录，在请求超时或程序中断后判断服务器是否已经完成操作。项目使用 net10.0，引用 Domain、Application 和 Storage。`AppPaths` 在这里解析环境变量与默认数据目录；`LocalizationDiagnostics` 订阅领域的缺键事件并写入 Trace，宿主启动时启用一次。
 
 程序使用的 Operations API 文档副本放在 docs/contracts/operations.json，编译时会以 Operations.OpenApi.json 的名称打包进去。Pilot API 文档仅供参考，目前没有接入。
 

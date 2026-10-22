@@ -66,7 +66,8 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:Restor
 | [src/VamSys.App](src/VamSys.App/README.md) | 窗口、数据表格、审阅、任务、多语言和图标 |
 | [src/VamSys.Domain](src/VamSys.Domain/README.md) | 字段规格、数据检查、撤销历史、生成修改清单；不依赖其他产品项目 |
 | [src/VamSys.Application](src/VamSys.Application/README.md) | I/O 端口、批次编排、待保存编辑和关闭流程；仅依赖 Domain |
-| [src/VamSys.Infrastructure](src/VamSys.Infrastructure/README.md) | 连接 vaMSYS、查找重复记录、在本机保存数据 |
+| [src/VamSys.Infrastructure](src/VamSys.Infrastructure/README.md) | 连接 vaMSYS、查找重复记录 |
+| [src/VamSys.Storage](src/VamSys.Storage/README.md) | 本机数据库：保存、读取、升级和备份 |
 | [tests/VamSys.Tests](tests/VamSys.Tests/README.md) | 自动测试、窗口脚本和测量方法 |
 | tests/VamSys.UnitTests、tests/VamSys.IntegrationTests | xUnit 单元测试、架构与兼容性清单、请求／存储／CSV 金样和真实库副本回归 |
 | scripts | 生成程序和图标、自动操作窗口、测量性能 |
