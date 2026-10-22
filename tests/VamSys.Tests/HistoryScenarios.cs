@@ -93,14 +93,14 @@ static class HistoryScenarios
             foreach(var next in new[]{"same","other","undo","close","failure"})
             {
                 var dir=Temp();var store=new WorkspaceStore(dir);var w=Fixture();var d=w.Resources[ResourceKind.Fleets];var row=d.Draft[0];var initial=row.Get("Name");store.Save(w);
-                d.Edit([row.LocalId],()=>row.Fields["Name"]="first");var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId,true);var taken=edits.Take();
+                d.Edit([row.LocalId],()=>row.Fields["Name"]="first");var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);var taken=edits.Take();
                 using var entered=new ManualResetEventSlim();using var release=new ManualResetEventSlim();
                 store.Barrier=p=>{if(p=="Draft:BeforeCommit"){entered.Set();if(!release.Wait(10000))throw new TimeoutException();if(next=="failure")throw new IOException("injected");}};
                 var saving=store.TrySaveDraftRowsAsync(w,taken.Changes);Check(entered.Wait(10000));
                 try
                 {
                     if(next=="undo")d.UndoEdit();
-                    else {d.Edit([row.LocalId],()=>row.Fields[next=="other"?"extra":"Name"]="second",newStep:next=="other");edits.Cell(w,ResourceKind.Fleets,row.LocalId,next=="other");}
+                    else {d.Edit([row.LocalId],()=>row.Fields[next=="other"?"extra":"Name"]="second",newStep:next=="other");edits.Cell(w,ResourceKind.Fleets,row.LocalId);}
                 }
                 finally{release.Set();}
                 if(next=="failure")
@@ -250,7 +250,7 @@ static class HistoryScenarios
             {
                 Sql(c,"DELETE FROM touched");var before=GC.GetTotalAllocatedBytes(true);using var metrics=PerformanceRun.Begin(w.Id,Guid.NewGuid());var watch=Stopwatch.StartNew();
                 var row=d.Draft[n%count];var evicted=d.Undo.Count==20?d.Undo[0].StepId:(Guid?)null;
-                d.Edit([row.LocalId],()=>row.Fields["Name"]="edit"+n);var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId,true);Check(await store.TrySaveDraftRowsAsync(w,edits.Changes));
+                d.Edit([row.LocalId],()=>row.Fields["Name"]="edit"+n);var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);Check(await store.TrySaveDraftRowsAsync(w,edits.Changes));
                 var ms=watch.Elapsed.TotalMilliseconds;var allocation=GC.GetTotalAllocatedBytes(true)-before;
                 Check(metrics.JsonBytes<=8192,"history payload grew with draft size");
                 Check(Convert.ToInt32(Sql(c,"SELECT count(*) FROM touched"))==(evicted==null?4:5),"wrong write scope");
@@ -261,7 +261,7 @@ static class HistoryScenarios
             }
             var expected=d.Draft[0].Get("Name");var disk=store.Load(w.Id);Check(disk.Serialize()==w.Serialize());
             d.UndoEdit();d.UndoEdit();store.Save(w);var discarded=d.Redo.Select(s=>s.StepId).ToArray();
-            var current=d.Draft[0];d.Edit([current.LocalId],()=>current.Fields["Name"]="branch");var pending=new DraftEdits();pending.Cell(w,ResourceKind.Fleets,current.LocalId,true);Check(await store.TrySaveDraftRowsAsync(w,pending.Changes));
+            var current=d.Draft[0];d.Edit([current.LocalId],()=>current.Fields["Name"]="branch");var pending=new DraftEdits();pending.Cell(w,ResourceKind.Fleets,current.LocalId);Check(await store.TrySaveDraftRowsAsync(w,pending.Changes));
             foreach(var id in discarded)Check(Convert.ToInt32(Sql(c,"SELECT count(*) FROM resource_history_steps WHERE step_id=$id",("$id",id.ToString())))==0,"discarded redo still stored");
             Check(store.Load(w.Id).Resources[ResourceKind.Fleets].Redo.Count==0);
             samples.Sort();var p95=samples[(int)Math.Ceiling(samples.Count*.95)-1];var median=(samples[9]+samples[10])/2;

@@ -183,6 +183,7 @@ public sealed class Workspace
     public string Name { get; set; } = Messages.Define("Text_707DBE0213");
     public RunMode Mode { get; set; }
     public bool LocalRouteTimes { get; set; }
+    // Persisted but unused: the API address is fixed (OperationsAdapter.BaseUri). Kept for the saved format.
     public string InstanceUrl { get; set; } = "";
     public string? AirlineId { get; set; }
     public string? ClientId { get; set; }

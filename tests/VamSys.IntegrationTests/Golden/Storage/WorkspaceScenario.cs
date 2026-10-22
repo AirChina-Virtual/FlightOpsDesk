@@ -95,7 +95,7 @@ sealed class WorkspaceScenario : IDisposable
         var replacement = (data.FindDraftRow(row.LocalId) ?? row).Copy();
         replacement.Fields[field] = value;
         data.Edit([row.LocalId], () => data.ReplaceDraftRows([replacement]), newStep: newStep);
-        Edits.Cell(W, kind, row.LocalId, newStep);
+        Edits.Cell(W, kind, row.LocalId);
     }
 
     /// <summary>Undo or redo; row-level save when the step replaced rows in place, otherwise a full save.</summary>

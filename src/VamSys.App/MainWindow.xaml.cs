@@ -232,14 +232,14 @@ public sealed partial class MainWindow : Window
         return Scroll(Stack(Text(() => L("Text_2C33D5F7DE")),
             Row(Button(() => L("Text_946897D107"), async () =>
             {
-                if (!closeState.IsOpen || busy || !closeState.IsOpen)
+                if (!closeState.IsOpen || busy)
                     return;
                 var name = new TextBox { Text = L("Text_A818AFCD80"), MaxLength = 80 }.Localize(localization, "Header", () => L("Text_8DCC576817"));
                 if (await Confirm(L("Text_CDD0362664"), name) && !string.IsNullOrWhiteSpace(name.Text))
                 { await Save(); workspace = new Workspace { Name = name.Text.Trim() }; await Save(); ReloadWorkspaces(); Render(); }
             }), Button(() => L("Text_57D4E0340D"), async () =>
             {
-                if (!closeState.IsOpen || busy || !closeState.IsOpen)
+                if (!closeState.IsOpen || busy)
                     return;
                 await Save();
                 workspace = DemoWorkspace();
@@ -288,7 +288,7 @@ public sealed partial class MainWindow : Window
         actions.PrimaryCommands.Add(BatchCommand(() => L("Text_E306752B35"), Symbol.Edit, EditRules, "active"));
         actions.PrimaryCommands.Add(Command(() => L("Text_48A195CA7E"), Symbol.View, () => { Navigation.SelectedItem = Navigation.MenuItems[3]; return Task.CompletedTask; }));
         actions.PrimaryCommands.Add(Command(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts, !busy && Data.Conflicts.Count > 0));
-        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!closeState.IsOpen || busy || !closeState.IsOpen) return; var r = new DataRow(); foreach (var f in Schemas.All[resource].Columns) r.Fields[f] = f == "_delete" ? "FALSE" : ""; Data.Edit([r.LocalId], () => Data.Draft.Add(r), structural: true); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
+        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!closeState.IsOpen || busy) return; var r = new DataRow(); foreach (var f in Schemas.All[resource].Columns) r.Fields[f] = f == "_delete" ? "FALSE" : ""; Data.Edit([r.LocalId], () => Data.Draft.Add(r), structural: true); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
         // Kept for every resource and shown only where it applies, since the page outlives a resource switch.
         fleetCommand = BatchCommand(() => L("Text_95DD1FDDFE"), Symbol.Edit, () => resource is ResourceKind.Aircraft or ResourceKind.Routes ? ChooseFleets(null) : Task.CompletedTask, "active");
         fleetCommand.Visibility = resource is ResourceKind.Aircraft or ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
@@ -389,7 +389,7 @@ public sealed partial class MainWindow : Window
         Button(() => L("Text_5A2BBDEA04"), ImportCsv), Button(() => L("ApiRefresh"), RefreshApi));
     async Task ImportCsv()
     {
-        if (!closeState.IsOpen || busy || !closeState.IsOpen)
+        if (!closeState.IsOpen || busy)
             return;
         var picker = new FileOpenPicker();
         picker.FileTypeFilter.Add(".csv");
@@ -432,7 +432,7 @@ public sealed partial class MainWindow : Window
     }
     Task ExportCsv(ResourceKind kind) => LocalOperation(async () =>
     {
-        if (!closeState.IsOpen || busy || !closeState.IsOpen)
+        if (!closeState.IsOpen || busy)
             return;
         if (!await ValidateForSubmit(kind))
             return;
@@ -517,7 +517,7 @@ public sealed partial class MainWindow : Window
         return Scroll(Stack(LanguagePicker(), Text(() => L("ApiSettings"), 20), Text(() => L("ApiSettingsHelp")), url, clientId, secret, local,
             Button(() => L("Text_760143E568"), async () =>
             {
-                if (!closeState.IsOpen || busy || !closeState.IsOpen)
+                if (!closeState.IsOpen || busy)
                     return;
                 await saveGate.WaitAsync();
                 try
