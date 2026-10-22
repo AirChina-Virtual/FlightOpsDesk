@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>VamSys.Storage</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../VamSys.Domain/VamSys.Domain.csproj" />
+    <ProjectReference Include="../VamSys.Application/VamSys.Application.csproj" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(VamSysTestSupport)' == 'true'">
+    <Compile Include="../../tests/TestSupport/WorkspaceStore.TestHooks.cs" Link="TestSupport/WorkspaceStore.TestHooks.cs" />
+    <Compile Include="../../tests/TestSupport/AssemblyInfo.cs" Link="TestSupport/AssemblyInfo.cs" />
+  </ItemGroup>
+</Project>

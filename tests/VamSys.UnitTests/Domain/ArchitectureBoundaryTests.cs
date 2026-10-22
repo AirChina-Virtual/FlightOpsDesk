@@ -1,6 +1,7 @@
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using VamSys.Core;
+using VamSys.Infrastructure;
 
 namespace VamSys.UnitTests.Domain;
 
@@ -26,6 +27,24 @@ public class ArchitectureBoundaryTests
         Assert.Equal("VamSys.Infrastructure", typeof(AppPaths).Assembly.GetName().Name);
         Assert.DoesNotContain(typeof(BatchExecutor).Assembly.GetReferencedAssemblies(), a =>
             a.Name is "VamSys.Infrastructure" or "VamSys.Api" or "VamSys.Storage" or "FlightOpsDesk" or "Microsoft.Data.Sqlite");
+    }
+
+    [Fact]
+    public void Storage_owns_sqlite_and_dpapi_and_references_only_domain_and_application()
+    {
+        var storage = typeof(WorkspaceStore).Assembly;
+        Assert.Equal("VamSys.Storage", storage.GetName().Name);
+        foreach (var type in new[] { typeof(WorkspaceStore), typeof(DataDirectoryLease), typeof(PerformanceRun), typeof(OperationsCredentials), typeof(WorkspaceMaintenanceResult) })
+            Assert.Same(storage, type.Assembly);
+        // Layering: Storage sits above Domain/Application and below Infrastructure and the app.
+        Assert.DoesNotContain(storage.GetReferencedAssemblies(), a => a.Name is "VamSys.Infrastructure" or "VamSys.Api" or "FlightOpsDesk");
+        Assert.Contains(storage.GetReferencedAssemblies(), a => a.Name == "Microsoft.Data.Sqlite");
+        // Nothing but Storage opens the database or touches DPAPI, and only Infrastructure builds on Storage.
+        foreach (var other in new[] { typeof(Workspace).Assembly, typeof(BatchExecutor).Assembly, typeof(OperationsAdapter).Assembly })
+            Assert.DoesNotContain(other.GetReferencedAssemblies(), a => a.Name is "Microsoft.Data.Sqlite" or "Microsoft.Data.Sqlite.Core" or "System.Security.Cryptography.ProtectedData");
+        foreach (var lower in new[] { typeof(Workspace).Assembly, typeof(BatchExecutor).Assembly })
+            Assert.DoesNotContain(lower.GetReferencedAssemblies(), a => a.Name == "VamSys.Storage");
+        Assert.Contains(typeof(OperationsAdapter).Assembly.GetReferencedAssemblies(), a => a.Name == "VamSys.Storage");
     }
 
     [Fact]

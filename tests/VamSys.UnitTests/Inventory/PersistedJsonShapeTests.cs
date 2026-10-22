@@ -110,15 +110,15 @@ public class PersistedJsonShapeTests
     [Fact]
     public void Header_options_without_collections_are_locked()
     {
-        // WorkspaceStore stores Workspace and BatchJob headers without Jobs/Resources/Items.
-        var field = typeof(WorkspaceStore).GetField("withoutCollections", BindingFlags.NonPublic | BindingFlags.Static);
+        // RowSerializer stores Workspace and BatchJob headers without Jobs/Resources/Items.
+        var field = typeof(RowSerializer).GetField("withoutCollections", BindingFlags.NonPublic | BindingFlags.Static);
         var lines = new List<string>();
         if (field?.GetValue(null) is JsonSerializerOptions options)
             foreach (var type in new[] { typeof(Workspace), typeof(BatchJob) })
                 foreach (var property in options.GetTypeInfo(type).Properties)
                     lines.Add($"{Name(type)}.{property.Name} => header property");
         else
-            lines.Add("WorkspaceStore.withoutCollections => not found");
+            lines.Add("RowSerializer.withoutCollections => not found");
         Golden.Verify("JsonHeaderShape.txt", lines);
     }
 

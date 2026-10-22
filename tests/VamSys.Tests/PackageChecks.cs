@@ -10,7 +10,7 @@ static class PackageChecks
         directory = Path.GetFullPath(directory);
         void Require(bool condition, string message)
         { if (!condition) throw new InvalidOperationException(message); }
-        foreach (var name in new[] { "FlightOpsDesk.exe", "FlightOpsDesk.dll", "VamSys.Domain.dll", "VamSys.Application.dll", "VamSys.Infrastructure.dll",
+        foreach (var name in new[] { "FlightOpsDesk.exe", "FlightOpsDesk.dll", "VamSys.Domain.dll", "VamSys.Application.dll", "VamSys.Storage.dll", "VamSys.Infrastructure.dll",
             "FlightOpsDesk.deps.json", "FlightOpsDesk.runtimeconfig.json", "FlightOpsDesk.pri", "MainWindow.xbf",
             "Assets/FlightOpsDesk.ico", "Assets/FlightOpsDesk.png", "README.md", "docs/USER-GUIDE.md", "docs/STORAGE-MIGRATION.md" })
             Require(File.Exists(Path.Combine(directory, name)), $"Missing package file: {name}");
@@ -27,7 +27,7 @@ static class PackageChecks
                 Require(relative is "docs/USER-GUIDE.md" or "docs/STORAGE-MIGRATION.md", $"Developer document in package: {relative}");
         }
 
-        foreach (var name in new[] { "FlightOpsDesk", "VamSys.Domain", "VamSys.Application", "VamSys.Infrastructure" })
+        foreach (var name in new[] { "FlightOpsDesk", "VamSys.Domain", "VamSys.Application", "VamSys.Storage", "VamSys.Infrastructure" })
         {
             using var stream = File.OpenRead(Path.Combine(directory, name + ".dll"));
             using var pe = new PEReader(stream);
@@ -38,10 +38,13 @@ static class PackageChecks
             if (name == "FlightOpsDesk")
                 foreach (var method in new[] { "InitializeVerification", "ConfigureVerificationTheme", "VerificationCommand" })
                     Require(methods.Contains(method) == qa, $"Unexpected QA entry point {method} in {name} (QA={qa})");
-            if (name == "VamSys.Infrastructure")
+            if (name is "VamSys.Storage" or "VamSys.Infrastructure")
             {
-                foreach (var method in new[] { "get_Barrier", "set_Barrier", "OnStorageBarrier" })
+                foreach (var method in name == "VamSys.Storage" ? new[] { "get_Barrier", "set_Barrier", "get_Faults", "set_Faults" } : [])
                     Require(methods.Contains(method) == qa, $"Unexpected storage test hook {method} (QA={qa})");
+                if (name == "VamSys.Storage")
+                    Require(metadata.TypeDefinitions.Any(handle => metadata.GetString(metadata.GetTypeDefinition(handle).Name) == "ActionStorageFaults") == qa,
+                        $"Unexpected storage fault implementation (QA={qa})");
                 var friends = metadata.GetAssemblyDefinition().GetCustomAttributes().Any(handle =>
                 {
                     var constructor = metadata.GetCustomAttribute(handle).Constructor;
@@ -51,7 +54,7 @@ static class PackageChecks
                         metadata.GetString(metadata.GetTypeReference((TypeReferenceHandle)parent).Name) == "InternalsVisibleToAttribute";
                 });
                 Require(friends == qa, $"Unexpected test friend assembly access (QA={qa})");
-                Require(metadata.ManifestResources.Any(handle => metadata.GetString(metadata.GetManifestResource(handle).Name) == "Operations.OpenApi.json"),
+                Require(name != "VamSys.Infrastructure" || metadata.ManifestResources.Any(handle => metadata.GetString(metadata.GetManifestResource(handle).Name) == "Operations.OpenApi.json"),
                     "Runtime API contract missing");
             }
         }

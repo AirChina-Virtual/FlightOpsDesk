@@ -8,7 +8,6 @@ using VamSys.Core;
 namespace VamSys.Infrastructure;
 
 public record AccessToken(string Value, DateTimeOffset ExpiresAt);
-public sealed record OperationsCredentials(string ClientId, string Secret);
 public sealed class TokenProvider(Func<CancellationToken, Task<AccessToken>> acquire, TimeProvider? timeProvider = null)
 {
     internal string[] CredentialValues { get; private init; } = [];

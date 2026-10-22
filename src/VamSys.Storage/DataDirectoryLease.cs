@@ -11,7 +11,7 @@ public sealed class DataDirectoryLease : IDisposable
         Directory.CreateDirectory(directory);
         try
         { stream = new FileStream(Path.Combine(directory, "application.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
-        catch (IOException) { throw OperationsAdapter.Block("StorageInUse"); }
+        catch (IOException) { throw StorageErrors.Block("StorageInUse"); }
     }
     public void Dispose() => stream.Dispose();
 }
