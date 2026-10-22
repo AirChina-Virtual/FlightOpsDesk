@@ -434,7 +434,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         {
             if (body.ContainsKey("fleet_ids") && c.After.Get("Type") == "scheduled" && ((long[])body["fleet_ids"]!).Length == 0)
                 throw Block("ApiInvalid", "Fleet IDs");
-            if (!new[] { "scheduled", "cargo", "charter", "training", "vfr", "repositioning", "jumpseat" }.Contains(c.After.Get("Type")))
+            if (!Schemas.RouteTypes.Contains(c.After.Get("Type")))
                 throw Block("ApiInvalid", "Type");
             foreach (var (field, min, max) in new[] { ("Callsign", 4, 7), ("Flight Number", 3, 6) })
                 if ((create || c.Fields.ContainsKey(field)) && c.After.Get(field).Length is var length && (length < min || length > max))

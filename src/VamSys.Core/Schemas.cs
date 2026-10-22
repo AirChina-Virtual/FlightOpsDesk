@@ -39,15 +39,25 @@ public static class Schemas
     public static bool ValidCostIndex(string value) => value is "" or "AUTO"
         || int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n <= 999;
     public static bool Deleted(DataRow row) => row.Get("_delete").Equals("TRUE", StringComparison.OrdinalIgnoreCase);
-    public static List<Issue> Validate(Workspace workspace, ResourceKind kind)
+    // Sets the validation rules test membership against; built once for the process.
+    static readonly HashSet<string> Weekdays = new(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"], StringComparer.Ordinal);
+    static readonly HashSet<string> FleetTypes = new(["pax", "pax-cargo", "pax-containers", "cargo", "cargo-containers"], StringComparer.Ordinal);
+    public static readonly IReadOnlySet<string> RouteTypes = new HashSet<string>(["scheduled", "cargo", "charter", "training", "vfr", "repositioning", "jumpseat"], StringComparer.Ordinal);
+    static readonly string[] RouteSignature = ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Flight Number"];
+    static readonly string[] RoutingSignature = ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Route String"];
+    static readonly string[] RegistrationSignature = ["Registration"];
+    static readonly string[] NameSignature = ["Name"];
+    static readonly string[] RouteIdentityFields = ["Callsign", "Flight Number"];
+    public static List<Issue> Validate(Workspace workspace, ResourceKind kind) => Validate(workspace, kind, new ValidationPass(workspace));
+    // One pass shares the row keys and reference-key sets between resources. Use a new pass after any row changed.
+    public static List<Issue> Validate(Workspace workspace, ResourceKind kind, ValidationPass pass)
     {
+        string Key(ResourceKind k, DataRow row) => pass.Key(k, row);
         var data = workspace.Resources[kind];
         var schema = All[kind];
         var spec = FieldSpecs.Get(kind);
         var issues = new List<Issue>();
         var snapshot = data.Snapshot.ToDictionary(r => r.LocalId);
-        var referenceKeys = workspace.Resources.ToDictionary(p => p.Key, p => p.Value.Draft.Where(r => !Deleted(r)).Select(r => Key(p.Key, r)).ToHashSet());
-        var localKeys = workspace.Resources.ToDictionary(p => p.Key, p => p.Value.Draft.Where(r => !Deleted(r)).Select(r => LocalReference.Format(r.LocalId)).ToHashSet(StringComparer.OrdinalIgnoreCase));
         void Add(DataRow r, string f, MessageDescriptor m) => issues.Add(new(r.LocalId, f, m));
         var duplicates = data.Draft.Where(r => Key(kind, r) != "").GroupBy(r => Key(kind, r)).Where(g => g.Count() > 1);
         foreach (var group in duplicates)
@@ -88,13 +98,13 @@ public static class Schemas
                     if (!TimeOnly.TryParseExact(v, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
                         Add(r, f, Messages.Define("Text_C8CF0D677E"));
                 if (FieldSpecs.Is(f, FieldType.DayList))
-                    if (v.Split(',').Any(d => !new[] { "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday" }.Contains(d.Trim())))
+                    if (v.Split(',').Any(d => !Weekdays.Contains(d.Trim())))
                         Add(r, f, Messages.Define("Text_C4946548B5"));
             }
             if (kind == ResourceKind.Fleets)
             {
                 var type = r.Get("Type (pax/cargo/...)");
-                if (!new[] { "pax", "pax-cargo", "pax-containers", "cargo", "cargo-containers" }.Contains(type))
+                if (!FleetTypes.Contains(type))
                     Add(r, "Type (pax/cargo/...)", Messages.Define("Text_50DDC19E1F"));
                 var required = new List<string>();
                 if (type.StartsWith("pax"))
@@ -109,10 +119,10 @@ public static class Schemas
             }
             if (kind == ResourceKind.Routes)
             {
-                if (!new[] { "scheduled", "cargo", "charter", "training", "vfr", "repositioning", "jumpseat" }.Contains(r.Get("Type")))
+                if (!RouteTypes.Contains(r.Get("Type")))
                     Add(r, "Type", Messages.Define("Text_EFB86BD704"));
                 // StoreRouteRequest requires callsign and flight_number for every type, jumpseat included.
-                foreach (var f in new[] { "Callsign", "Flight Number" })
+                foreach (var f in RouteIdentityFields)
                     if (r.Get(f) == "" && !(r.Get("Type") == "jumpseat" && before?.Identity != null))
                         Add(r, f, Messages.Define("Text_B283E8E5F2"));
                 if (r.Get("Type") != "jumpseat" && r.Get("Fleet IDs") == "")
@@ -132,7 +142,7 @@ public static class Schemas
             void Reference(string field, ResourceKind target)
             {
                 foreach (var id in r.Get(field).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                    if (!referenceKeys[target].Contains(id.ToUpperInvariant()) && !localKeys[target].Contains(id))
+                    if (!pass.ReferenceKeys(target).Contains(id.ToUpperInvariant()) && !pass.LocalKeys(target).Contains(id))
                         Add(r, field, Messages.Define("Text_5CDAFFB468", ("arg0", id), ("arg1", All[target].Name)));
             }
             // A single fleet is required before the aircraft fleet reference is resolved.
@@ -144,10 +154,10 @@ public static class Schemas
         // Flag possible duplicate creates without silently treating flight numbers as identities.
         var signatureFields = kind switch
         {
-            ResourceKind.Routes => new[] { "Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Flight Number" },
-            ResourceKind.Routings => ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Route String"],
-            ResourceKind.Aircraft => ["Registration"],
-            _ => new[] { "Name" }
+            ResourceKind.Routes => RouteSignature,
+            ResourceKind.Routings => RoutingSignature,
+            ResourceKind.Aircraft => RegistrationSignature,
+            _ => NameSignature
         };
         foreach (var group in data.Draft.Where(r => !Deleted(r)).GroupBy(r => kind == ResourceKind.Routes && r.Get("Type") == "jumpseat"
             ? string.Join("\u001f", r.Get("Departure Airport (ICAO/IATA)"), r.Get("Arrival Airport (ICAO/IATA)"), ApiOperationPolicy.JumpseatSignature(r))
@@ -159,5 +169,32 @@ public static class Schemas
         if (deletedIds.Count > 0)
             issues.AddRange(new DeletionService().CheckReferences(workspace, kind, deletedIds));
         return issues;
+    }
+}
+
+// Per-validation caches: a row's key (Trim + ToUpper) is computed once, and the reference sets of a resource are built
+// when a rule first needs them. Rows must not change while a pass is in use.
+public sealed class ValidationPass(Workspace workspace)
+{
+    readonly Dictionary<DataRow, string> keys = new(ReferenceEqualityComparer.Instance);
+    readonly Dictionary<ResourceKind, HashSet<string>> referenceKeys = [];
+    readonly Dictionary<ResourceKind, HashSet<string>> localKeys = [];
+    public string Key(ResourceKind kind, DataRow row)
+    {
+        if (!keys.TryGetValue(row, out var key))
+            keys[row] = key = Schemas.Key(kind, row);
+        return key;
+    }
+    public HashSet<string> ReferenceKeys(ResourceKind kind)
+    {
+        if (!referenceKeys.TryGetValue(kind, out var set))
+            referenceKeys[kind] = set = workspace.Resources[kind].Draft.Where(r => !Schemas.Deleted(r)).Select(r => Key(kind, r)).ToHashSet();
+        return set;
+    }
+    public HashSet<string> LocalKeys(ResourceKind kind)
+    {
+        if (!localKeys.TryGetValue(kind, out var set))
+            localKeys[kind] = set = workspace.Resources[kind].Draft.Where(r => !Schemas.Deleted(r)).Select(r => LocalReference.Format(r.LocalId)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return set;
     }
 }
