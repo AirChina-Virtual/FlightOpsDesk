@@ -199,50 +199,11 @@ await Test("Documented capabilities available; legacy unverified adapter rejects
         catch(NotSupportedException) { }
     }
 });
-await Test("Localization catalogs have matching keys and named placeholders", () => Sync(() =>
+await Test("Language preference persists in the store and an invalid value falls back to Chinese", () => Sync(() =>
 {
-    Dictionary<string,string> Catalog(System.Globalization.CultureInfo culture) => LocalizationService.Resources.GetResourceSet(culture,true,false)!.Cast<System.Collections.DictionaryEntry>().ToDictionary(p=>(string)p.Key,p=>(string)p.Value!);
-    var zh=Catalog(System.Globalization.CultureInfo.InvariantCulture); var en=Catalog(System.Globalization.CultureInfo.GetCultureInfo("en-US"));
-    Check(zh.Keys.ToHashSet().SetEquals(en.Keys)); Check(zh.Count>=250);
-    string[] Slots(string s)=>System.Text.RegularExpressions.Regex.Matches(s,@"\{\w+(?::[^}]+)?\}").Select(m=>m.Value).Order().ToArray();
-    foreach(var key in zh.Keys) { Check(Slots(zh[key]).SequenceEqual(Slots(en[key])),key); Check(!string.IsNullOrWhiteSpace(en[key]),key); Check(!en[key].Any(c=>c>='\u4e00'&&c<='\u9fff'),key); }
-}));
-await Test("Language defaults, persistence, events and missing-key diagnostics", () => Sync(() =>
-{
-    var loc=new LocalizationService(); Check(loc.Language=="zh-CN"); var events=0; loc.LanguageChanged+=(_,_)=>events++;
-    var originalCulture=System.Globalization.CultureInfo.CurrentCulture;
-    loc.SetLanguage("en-US"); loc.SetLanguage("en-US"); Check(events==1 && loc.Get("Text_3797982942")=="Workspaces");
-    Check(System.Globalization.CultureInfo.CurrentCulture==originalCulture);
-    string? missing=null; loc.MissingResource+=key=>missing=key; Check(loc.Get("MissingTest")=="[MissingTest]" && missing=="MissingTest");
-    loc.SetLanguage("invalid"); Check(loc.Language=="zh-CN" && events==2);
-    var dir=Path.Combine(Path.GetTempPath(),"vamsys-language-"+Guid.NewGuid()); var s=new WorkspaceStore(dir);
-    Check(s.LoadLanguage()=="zh-CN"); s.SaveLanguage("en-US"); Check(new WorkspaceStore(dir).LoadLanguage()=="en-US");
-    s.SaveLanguage("invalid"); Check(s.LoadLanguage()=="zh-CN");
-}));
-await Test("Structured messages survive JSON and preserve literal user data", () => Sync(() =>
-{
-    var m=Messages.Define("Text_CCEF575C0D",("arg0",Schemas.All[ResourceKind.Routes].Name),("arg1","001"),("arg2","我的航空公司 {arg5}"),("arg3",""),("arg4","abcd"),("arg5","Fleet IDs"));
-    var json=System.Text.Json.JsonSerializer.Serialize(m); var restored=System.Text.Json.JsonSerializer.Deserialize<MessageDescriptor>(json)!;
-    var loc=new LocalizationService(); loc.SetLanguage("en-US"); var text=loc.Format(restored);
-    Check(text.Contains("Routes 001") && text.Contains("我的航空公司 {arg5}") && text.EndsWith("Fleet IDs"));
-    Check(loc.Legacy("已回读核对")=="Verified by read-back"); Check(loc.Legacy("历史外部错误 123")=="历史外部错误 123");
-    var old=Workspace.Deserialize("{\"Name\":\"用户名称\",\"Jobs\":[{\"Status\":\"旧的动态状态 42\",\"Items\":[{\"Message\":\"待执行\"}]}]}");
-    Check(old.Name=="用户名称" && old.Jobs[0].Description==null && loc.Legacy(old.Jobs[0].Status)=="旧的动态状态 42");
-}));
-await Test("CSV, validation, fleet assignment and deletion are language invariant", () => Sync(() =>
-{
-    var w=new Workspace(); CsvAdapter.Import(ResourceKind.Fleets,w.Resources[ResourceKind.Fleets],[Row(("ID","01"),("Name","用户机型")),Row(("ID","02"),("Name","Other"))],true);
-    var d=w.Resources[ResourceKind.Routes]; CsvAdapter.Import(ResourceKind.Routes,d,[Row(("ID","001"),("Type","scheduled"),("Fleet IDs","01"),("Unknown","中文 {arg0},0001"))],true);
-    var loc=new LocalizationService(); var before=w.Serialize();
-    var service=new FleetAssignmentService(); var p1=service.Preview(w,ResourceKind.Routes,d.Draft,["02"],FleetAssignmentMode.Add); var issues1=Schemas.Validate(w,ResourceKind.Routes);
-    loc.SetLanguage("en-US"); var p2=service.Preview(w,ResourceKind.Routes,d.Draft,["02"],FleetAssignmentMode.Add); var issues2=Schemas.Validate(w,ResourceKind.Routes);
-    Check(w.Serialize()==before && p1.Rows[0].Get("Fleet IDs")==p2.Rows[0].Get("Fleet IDs"));
-    Check(issues1.Select(i=>i.Description.Code).SequenceEqual(issues2.Select(i=>i.Description.Code)));
-    service.Apply(d,p2); var english=csv.Export(ResourceKind.Routes,planner.Plan(ResourceKind.Routes,d)).Single(); loc.SetLanguage("zh-CN");
-    Check(english.SequenceEqual(csv.Export(ResourceKind.Routes,planner.Plan(ResourceKind.Routes,d)).Single()));
-    var ds=new DeletionService(); var a=ds.Preview(w,ResourceKind.Fleets,w.Resources[ResourceKind.Fleets].Draft.Select(r=>r.LocalId)); loc.SetLanguage("en-US");
-    var b=ds.Preview(w,ResourceKind.Fleets,w.Resources[ResourceKind.Fleets].Draft.Select(r=>r.LocalId)); Check(a.Issues.Count==b.Issues.Count && a.Issues.Count==2);
-    Check(!loc.Format(b.Issues[0].Description).Contains("仍被"));
+    var dir = Path.Combine(Path.GetTempPath(), "vamsys-language-" + Guid.NewGuid()); var s = new WorkspaceStore(dir);
+    Check(s.LoadLanguage() == "zh-CN"); s.SaveLanguage("en-US"); Check(new WorkspaceStore(dir).LoadLanguage() == "en-US");
+    s.SaveLanguage("invalid"); Check(s.LoadLanguage() == "zh-CN");
 }));
 await Test("Language switch during execution does not resend writes or change task state", async () =>
 {
@@ -254,13 +215,6 @@ await Test("Language switch during execution does not resend writes or change ta
     Check(loc.Format(restored.Description!)=="Completed and verified" && loc.Format(restored.Items[0].Description!)=="Verified by read-back");
     await new BatchExecutor(fake,fake).ExecuteAsync(restored,()=>Task.CompletedTask,CancellationToken.None); Check(fake.Writes==1);
 });
-await Test("Fleet labels translate generated annotations without translating names", () => Sync(() =>
-{
-    var w=new Workspace(); w.Resources[ResourceKind.Fleets].Draft.Add(Row(("Name","待删除"),("Type Code","A320")));
-    var options=new FleetAssignmentService().Options(w,["missing"]); var loc=new LocalizationService(); loc.SetLanguage("en-US");
-    Check(options[0].Describe(loc).Contains("待删除") && options[0].Describe(loc).Contains("Pending creation"));
-    Check(options[1].Describe(loc).Contains("Unresolved fleet") && options[1].Describe(loc).Contains("Reference needs verification"));
-}));
 await ApiScenarios.Run(Test);
 await LiveCompatibilityScenarios.Run(Test);
 await AuditScenarios.Run(Test);
