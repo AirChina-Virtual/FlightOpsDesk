@@ -5,42 +5,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using VamSys.Core;
 using static VamSys.Infrastructure.Sql;
+using static VamSys.Infrastructure.RowSerializer;
 
 namespace VamSys.Infrastructure;
 
 public sealed partial class WorkspaceStore
 {
-    static readonly JsonSerializerOptions withoutCollections = CreateOptions();
-    static JsonSerializerOptions CreateOptions()
-    {
-        var resolver = new DefaultJsonTypeInfoResolver();
-        resolver.Modifiers.Add(info =>
-        {
-            if (info.Type != typeof(Workspace) && info.Type != typeof(BatchJob))
-                return;
-            var property = info.Properties.Single(p => p.Name == (info.Type == typeof(Workspace) ? "Jobs" : "Items"));
-            info.Properties.Remove(property);
-            if (info.Type == typeof(Workspace))
-                info.Properties.Remove(info.Properties.Single(p => p.Name == "Resources"));
-        });
-        return new() { TypeInfoResolver = resolver };
-    }
-    internal sealed record StoredItem(Guid Id, int Ordinal, string Json);
-    internal sealed record StoredJob(Guid Id, int Ordinal, string Json, List<StoredItem> Items);
-    internal sealed record FullPayload(Guid Id, string Name, long Revision, string Json, List<StoredJob> Jobs, List<StoredResource> Resources);
-    static string Encode<T>(T value, bool header = false) => JsonSerializer.Serialize(value, header ? withoutCollections : null);
-    static void Measured(long started, params string?[] json)
-        => PerformanceRun.Current?.Serialized(json.Where(j => j != null).Sum(j => (long)Encoding.UTF8.GetByteCount(j!)), Stopwatch.GetElapsedTime(started));
-    internal static FullPayload Capture(Workspace w, bool measure = true)
-    {
-        var start = Stopwatch.GetTimestamp();
-        var jobs = w.Jobs.Select((j, n) => new StoredJob(j.Id, n, Encode(j, true), j.Items.Select((i, k) => new StoredItem(i.Id, k, Encode(i))).ToList())).ToList();
-        var resources = CaptureResources(w);
-        var json = Encode(w, true);
-        if (measure)
-            Measured(start, [json, .. jobs.SelectMany(j => new[] { j.Json }.Concat(j.Items.Select(i => i.Json))), .. resources.SelectMany(r => new[] { r.Columns, r.Conflicts }.Concat(HistoryJson(r.History)).Concat(r.Rows.Select(row => row.Json)))]);
-        return new(w.Id, w.Name, w.StorageRevision, json, jobs, resources);
-    }
     static void WriteJobs(SqliteConnection c, SqliteTransaction tx, FullPayload p)
     {
         Execute(c, tx, "DELETE FROM batch_jobs WHERE workspace_id=$w", ("$w", p.Id.ToString()));
@@ -90,9 +60,9 @@ public sealed partial class WorkspaceStore
             if (secret != null)
                 Execute(c, tx, "INSERT INTO secrets(id,value) VALUES($id,$s) ON CONFLICT(id) DO UPDATE SET value=$s", ("$id", p.Id.ToString()), ("$s", secret));
         }, true);
-    public void Save(Workspace w) { var p = Capture(w); w.StorageRevision = SavePayload(p); Acknowledge(p); }
+    public void Save(Workspace w) { var p = Capture(w); w.StorageRevision = SavePayload(p); p.Acknowledge(); }
     public async Task SaveAsync(Workspace w)
-    { var p = Capture(w); w.StorageRevision = await Task.Run(() => SavePayload(p)); Acknowledge(p); }
+    { var p = Capture(w); w.StorageRevision = await Task.Run(() => SavePayload(p)); p.Acknowledge(); }
     // Compatibility entry point for callers exchanging a complete workspace JSON.
     public void SaveJson(Guid id, string name, string json)
     {
@@ -125,7 +95,7 @@ public sealed partial class WorkspaceStore
             }
             history.Add((change.Resource, CaptureHistory(data.History, changes: change.History)));
         }
-        Measured(start, [.. rows.Select(r => r.Json), .. history.SelectMany(h => HistoryJson(h.Payload))]);
+        StorageMetrics.Measured(start, [.. rows.Select(r => r.Json), .. history.SelectMany(h => HistoryJson(h.Payload))]);
         var workspace = w.Id.ToString();
         var expected = w.StorageRevision;
         w.StorageRevision = await Task.Run(() => Commit(w.Id, expected, "Draft", (c, tx) =>
@@ -175,7 +145,7 @@ public sealed partial class WorkspaceStore
                     staged.VerifiedOperations.Add(delta.VerifiedOperation);
                 root = Encode(staged, true);
             }
-            Measured(start, [header, item, root, snapshot, draft, .. items.Select(i => i.Json)]);
+            StorageMetrics.Measured(start, [header, item, root, snapshot, draft, .. items.Select(i => i.Json)]);
             var w = workspace.Id.ToString();
             var j = checkpoint.Job.Id.ToString();
             var i = checkpoint.Item?.Id.ToString();
@@ -195,7 +165,7 @@ public sealed partial class WorkspaceStore
             }));
             workspace.StorageRevision = next;
             if (full != null)
-                Acknowledge(full);
+                full.Acknowledge();
         }
     }
 }

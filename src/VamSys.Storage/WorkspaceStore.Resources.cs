@@ -3,14 +3,11 @@ using System.Globalization;
 using System.Text.Json;
 using VamSys.Core;
 using static VamSys.Infrastructure.Sql;
+using static VamSys.Infrastructure.RowSerializer;
 namespace VamSys.Infrastructure;
 
 public sealed partial class WorkspaceStore
 {
-    internal sealed record StoredRow(int Collection, Guid Id, int Ordinal, string Json);
-    internal sealed record StoredResource(ResourceKind Kind, string Columns, string Conflicts, string? SnapshotAt, StoredHistory History, List<StoredRow> Rows);
-    static List<StoredResource> CaptureResources(Workspace w) => w.Resources.Select(p => new StoredResource(p.Key, Encode(p.Value.Columns), Encode(p.Value.Conflicts), p.Value.SnapshotAt?.ToString("O"), CaptureHistory(p.Value.History, full: true),
-        p.Value.Snapshot.Select((r, n) => new StoredRow(0, r.LocalId, n, Encode(r))).Concat(p.Value.Draft.Select((r, n) => new StoredRow(1, r.LocalId, n, Encode(r)))).ToList())).ToList();
     static void WriteResources(SqliteConnection c, SqliteTransaction tx, FullPayload p)
     {
         Execute(c, tx, "DELETE FROM resource_metadata WHERE workspace_id=$w", ("$w", p.Id.ToString()));

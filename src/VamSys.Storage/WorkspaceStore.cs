@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using VamSys.Core;
 using static VamSys.Infrastructure.Sql;
+using static VamSys.Infrastructure.RowSerializer;
 using System.Security.Cryptography;
 using System.Text;
 

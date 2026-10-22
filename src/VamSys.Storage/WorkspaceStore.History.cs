@@ -3,19 +3,11 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using VamSys.Core;
 using static VamSys.Infrastructure.Sql;
+using static VamSys.Infrastructure.RowSerializer;
 namespace VamSys.Infrastructure;
 
 public sealed partial class WorkspaceStore
 {
-    internal sealed record StoredHistory(EditHistory Owner, HistorySnapshot Captured, string Undo, string Redo, List<(Guid Id, string Json)> Steps, ImmutableArray<Guid> Deletes, bool OrderChanged);
-    static StoredHistory CaptureHistory(EditHistory history, bool full = false, HistoryChanges? changes = null)
-    {
-        var delta = changes ?? history.Changes();
-        var state = delta.Captured;
-        return new(history, state, Encode(state.Undo.Select(s => s.StepId)), Encode(state.Redo.Select(s => s.StepId)),
-            (full ? state.Undo.Concat(state.Redo) : delta.Upserts).Select(s => (s.StepId, Encode(s))).ToList(), delta.Deletes, full || delta.OrderChanged);
-    }
-    static IEnumerable<string> HistoryJson(StoredHistory h) => h.Steps.Select(s => s.Json).Concat(h.OrderChanged ? [h.Undo, h.Redo] : []);
     static void WriteHistory(SqliteConnection c, SqliteTransaction tx, Guid id, ResourceKind kind, StoredHistory h, bool full = false)
     {
         var args = new (string, object?)[] { ("$w", id.ToString()), ("$r", (int)kind) };
@@ -59,6 +51,4 @@ public sealed partial class WorkspaceStore
         if (data.Draft.Count > 0)
             data.FindDraftRow(data.Draft[0].LocalId);
     }
-    static void Acknowledge(FullPayload payload)
-    { foreach (var resource in payload.Resources) resource.History.Owner.Acknowledge(resource.History.Captured); }
 }

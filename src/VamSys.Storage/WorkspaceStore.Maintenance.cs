@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using VamSys.Core;
 using static VamSys.Infrastructure.Sql;
+using static VamSys.Infrastructure.RowSerializer;
 
 namespace VamSys.Infrastructure;
 
