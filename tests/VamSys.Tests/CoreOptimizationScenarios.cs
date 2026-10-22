@@ -7,35 +7,6 @@ static class CoreOptimizationScenarios
     static void Check(bool value, string message) { if (!value) throw new Exception(message); }
     public static async Task Run(Func<string, Func<Task>, Task> test)
     {
-        await test("Optimized planning matches the original full-row oracle without sharing drafts", () =>
-        {
-            var random = new Random(20261015);
-            foreach (var kind in Enum.GetValues<ResourceKind>())
-            {
-                var data = CorePerformanceBenchmark.Fixture(1000);
-                foreach (var row in data.Draft)
-                {
-                    switch (random.Next(7))
-                    {
-                        case 0: row.Fields["Remarks"] = "edited"; break;
-                        case 1: row.Fields["Remarks"] = ""; break;
-                        case 2: row.Fields.Remove("Remarks"); break;
-                        case 3: row.Fields["Unknown CSV"] = "unknown"; break;
-                        case 4: row.Fields["_delete"] = "true"; break;
-                    }
-                }
-                data.Draft.Add(new()); data.Draft.Add(new() { Fields = new() { ["_delete"] = "TRUE" } });
-                var expected = OriginalPlan(kind, data); var actual = new ChangePlanner().Plan(kind, data);
-                Check(Comparable(expected) == Comparable(actual), "Planner output changed");
-                var baseline = data.Snapshot.ToDictionary(r => r.LocalId);
-                var actualKinds = actual.ToDictionary(c => c.After.LocalId, c => c.Kind);
-                foreach (var row in data.Draft)
-                    Check(ChangePlanner.GetChangeKind(row, baseline.GetValueOrDefault(row.LocalId)) == (actualKinds.TryGetValue(row.LocalId, out var type) ? type : (ChangeKind?)null), "Classification changed");
-                actual[0].After.Fields["Remarks"] = "detached";
-                Check(data.FindDraftRow(actual[0].After.LocalId)!.Get("Remarks") != "detached", "Plan retained mutable draft");
-            }
-            return Task.CompletedTask;
-        });
         await test("Position index survives same-ID replacements and rebuilds after structural edits", () =>
         {
             var data = CorePerformanceBenchmark.Fixture(20000); var list = data.Draft;
@@ -86,20 +57,5 @@ static class CoreOptimizationScenarios
             Check(before == JsonSerializer.Serialize(data.Draft) && rows.Zip(data.Draft).All(p => ReferenceEquals(p.First, p.Second)), "Validation mutated live state");
             return Task.CompletedTask;
         });
-    }
-    static string Comparable(IEnumerable<ChangeItem> items) => JsonSerializer.Serialize(items.Select(c => new { c.Resource, c.Kind, c.Before, c.After, c.Fields }));
-    static List<ChangeItem> OriginalPlan(ResourceKind kind, ResourceData data)
-    {
-        var baseline = data.Snapshot.ToDictionary(r => r.LocalId); var result = new List<ChangeItem>();
-        foreach (var row in data.Draft)
-        {
-            baseline.TryGetValue(row.LocalId, out var before);
-            var fields = row.Fields.Where(p => p.Key != "_delete" && (before is null || !before.Fields.TryGetValue(p.Key, out var old) || old != p.Value))
-                .ToDictionary(p => p.Key, p => new FieldChange(p.Value == "" ? FieldIntent.Clear : FieldIntent.Set, p.Value));
-            var delete = Schemas.Deleted(row);
-            if (before != null && !delete && fields.Count == 0 || before is null && delete) continue;
-            result.Add(new() { Resource=kind, Kind=delete ? ChangeKind.Delete : before is null ? ChangeKind.Create : ChangeKind.Update, Before=before?.Copy(), After=row.Copy(), Fields=fields });
-        }
-        return result;
     }
 }

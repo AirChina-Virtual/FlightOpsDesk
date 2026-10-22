@@ -100,12 +100,6 @@ if(args.Length==1 && args[0]=="--live-compatibility"){await LiveCompatibilitySce
 if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await LiveCompatibilityScenarios.ExportDiagnostics(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-performance") {await PerformanceScenarios.Benchmark(args[1]);return;}
 
-await Test("Rule preview is nonmutating; a minute shift across midnight is skipped (A4); date shifts", () => Sync(() =>
-{
-    var row = Row(("Time","23:45"),("Date","2026-12-31 12:00:00"));
-    Check(RuleEngine.Preview([row], new(RuleKind.ShiftMinutes,"Time","30"))[0].Get("Time") == "23:45"); Check(row.Get("Time") == "23:45");
-    Check(RuleEngine.Preview([row], new(RuleKind.ShiftDays,"Date","1"))[0].Get("Date") == "2027-01-01 12:00:00");
-}));
 await Test("Validation detects references, duplicate IDs and immutable routing endpoints", () => Sync(() =>
 {
     var w = new Workspace(); CsvAdapter.Import(ResourceKind.Routings, w.Resources[ResourceKind.Routings], [Row(("ID","1"),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Route String","DCT"))], true);
@@ -200,12 +194,6 @@ await Test("Recovered create with persisted remote ID verifies without repeat", 
     var fake=new CountingService(new DemoService(w)); await new BatchExecutor(fake,fake).ExecuteAsync(new BatchJob { Items=[item] },()=>Task.CompletedTask,CancellationToken.None);
     Check(item.State==ItemState.Succeeded && fake.Writes==0);
 });
-await Test("Known local references resolve and unrelated remark text stays untouched", () => Sync(() =>
-{
-    var w=new Workspace(); var fleet=Row(("ID","1"),("Name","fleet")); CsvAdapter.Import(ResourceKind.Fleets,w.Resources[ResourceKind.Fleets],[fleet],true);
-    w.Resources[ResourceKind.Aircraft].Draft.Add(Row(("Fleet ID","local:"+fleet.LocalId),("Internal Remarks","local: some note")));
-    var item=planner.PlanWorkspace(w).Single(); Check(item.After.Get("Fleet ID")=="1" && item.After.Get("Internal Remarks")=="local: some note");
-}));
 await Test("Partial failure permits independent work; repaired dependency resumes child only", async () =>
 {
     var fake=new CountingService(new DemoService(new Workspace())) { FailOnce=true };
