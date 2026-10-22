@@ -65,8 +65,8 @@ public sealed class DeletionService
         data.Edit(remove.Concat(mark), () =>
         {
             data.Draft.RemoveAll(r => remove.Contains(r.LocalId));
-            foreach (var row in data.Draft.Where(r => mark.Contains(r.LocalId)))
-                row.Fields["_delete"] = "TRUE";
+            data.InvalidateDraftIndex();
+            data.ReplaceDraftRows(data.Draft.Where(r => mark.Contains(r.LocalId)).Select(r => WithDeleteFlag(r, "TRUE")).ToList());
         }, structural: remove.Count > 0);
     }
     public void Restore(ResourceData data, IEnumerable<Guid> selected)
@@ -75,6 +75,13 @@ public sealed class DeletionService
         var rows = data.Draft.Where(r => ids.Contains(r.LocalId) && Schemas.Deleted(r)).ToList();
         if (rows.Count == 0)
             return;
-        data.Edit(rows.Select(r => r.LocalId), () => { foreach (var row in rows) row.Fields["_delete"] = "FALSE"; });
+        data.Edit(rows.Select(r => r.LocalId), () => data.ReplaceDraftRows(rows.Select(r => WithDeleteFlag(r, "FALSE")).ToList()));
+    }
+    // Rows are replaced, never edited in place.
+    static DataRow WithDeleteFlag(DataRow row, string value)
+    {
+        var copy = row.Copy();
+        copy.Fields["_delete"] = value;
+        return copy;
     }
 }

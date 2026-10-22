@@ -486,11 +486,12 @@ public sealed partial class MainWindow : Window
                     if (index >= 0)
                     {
                         // Preserve edits made after a recovered job was submitted; only rebase identity/references.
-                        var current = data.Draft[index];
+                        var current = data.Draft[index].Copy();
                         current.Fields[Schemas.All[item.Resource].Key] = updated.Get(Schemas.All[item.Resource].Key);
                         foreach (var field in Schemas.ReferenceFields(item.Resource))
                             if (LocalReference.ContainsLocal(current.Get(field)))
                                 current.Fields[field] = updated.Get(field);
+                        data.ReplaceDraftRows([current]);
                     }
                 }
                 item.Rebased = true;

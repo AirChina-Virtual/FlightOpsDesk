@@ -60,6 +60,8 @@ public sealed partial class RowViewModel(DataRow row, List<CellViewModel> cells)
     public DataRow Row { get; private set; } = row;
     public List<CellViewModel> Cells { get; } = cells;
     public object? CellTemplates { get; init; }
+    // The row object was replaced by an edit; the cells already show its values.
+    public void ReplaceRow(DataRow row) => Row = row;
     public void Rebind(DataRow row)
     {
         Row = row;

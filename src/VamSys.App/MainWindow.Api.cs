@@ -106,7 +106,12 @@ public sealed partial class MainWindow
                 if (choice == ContentDialogResult.None)
                     return;
                 if (choice == ContentDialogResult.Secondary)
-                    data.Edit([row.LocalId], () => { if (conflict.Field == "*") data.Draft.Remove(row); else row.Fields[conflict.Field] = conflict.Remote ?? ""; }, newStep: false, structural: conflict.Field == "*");
+                {
+                    var replacement = row.Copy();
+                    if (conflict.Field != "*")
+                        replacement.Fields[conflict.Field] = conflict.Remote ?? "";
+                    data.Edit([row.LocalId], () => { if (conflict.Field == "*") data.Draft.Remove(row); else data.ReplaceDraftRows([replacement]); }, newStep: false, structural: conflict.Field == "*");
+                }
                 data.Conflicts.Remove(conflict);
                 await Save();
             }

@@ -313,7 +313,6 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api, Workspace wor
             if (current != null)
             {
                 current = current.Copy();
-                data.ReplaceDraftRows([current]);
                 foreach (var field in verified.Fields.Keys)
                     if (field == "ID" || current.Get(field) == item.After.Get(field) || LocalReference.ContainsLocal(current.Get(field)))
                         current.Fields[field] = verified.Get(field);
@@ -321,6 +320,7 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api, Workspace wor
                 current.RawApiJson = verified.RawApiJson;
                 foreach (var p in current.Fields.Where(p => !verified.Fields.ContainsKey(p.Key)))
                     verified.Fields[p.Key] = p.Value;
+                data.ReplaceDraftRows([current]);
             }
             data.Snapshot.Add(verified.Copy());
         }
