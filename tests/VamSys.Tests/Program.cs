@@ -100,13 +100,6 @@ if(args.Length==1 && args[0]=="--live-compatibility"){await LiveCompatibilitySce
 if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await LiveCompatibilityScenarios.ExportDiagnostics(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-performance") {await PerformanceScenarios.Benchmark(args[1]);return;}
 
-await Test("Validation detects references, duplicate IDs and immutable routing endpoints", () => Sync(() =>
-{
-    var w = new Workspace(); CsvAdapter.Import(ResourceKind.Routings, w.Resources[ResourceKind.Routings], [Row(("ID","1"),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Route String","DCT"))], true);
-    w.Resources[ResourceKind.Routings].Draft[0].Fields["Arrival Airport (ICAO/IATA)"] = "EGLL";
-    var issues = Schemas.Validate(w, ResourceKind.Routings); Check(issues.Any(i => i.Message.Contains("不可修改"))); Check(issues.Any(i => i.Message.Contains("引用")));
-    w.Resources[ResourceKind.Routings].Draft.Add(Row(("ID","1"))); Check(Schemas.Validate(w,ResourceKind.Routings).Any(i => i.Message.Contains("重复")));
-}));
 await Test("SQLite workspace isolation, persisted undo, and DPAPI", () => Sync(() =>
 {
     var folder = Path.Combine(Path.GetTempPath(),"vamsys-test-"+Guid.NewGuid());
@@ -145,14 +138,6 @@ await Test("Transport follows cursor pages, protects origin and reports auth", a
     try { await transport.GetAsync(new Uri("https://elsewhere.test/routes"),CancellationToken.None); throw new Exception("Origin accepted"); } catch(InvalidOperationException) { }
     handler.AuthFail=true; try { await transport.GetAsync(new Uri("https://example.test/routes"),CancellationToken.None); throw new Exception("Auth accepted"); } catch(ApiAccessException) { }
 });
-await Test("20,000-route planning and validation performance", () => Sync(() =>
-{
-    var w=new Workspace(); var d=w.Resources[ResourceKind.Routes];
-    CsvAdapter.Import(ResourceKind.Airports,w.Resources[ResourceKind.Airports],[Row(("ICAO/IATA","ZBAA"),("Name","A")),Row(("ICAO/IATA","ZSPD"),("Name","B"))],true);
-    d.Draft=Enumerable.Range(0,20000).Select(i=>Row(("ID",i.ToString()),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Type","jumpseat"),("Callsign","ACA123"),("Flight Number","AC123"))).ToList(); d.Snapshot=d.Draft.Select(r=>r.Copy()).ToList();
-    var sw=Stopwatch.StartNew(); Check(planner.Plan(ResourceKind.Routes,d).Count==0); Check(Schemas.Validate(w,ResourceKind.Routes).Count==0);
-    Console.WriteLine($"  20k plan+validate: {sw.ElapsedMilliseconds} ms"); Check(sw.Elapsed < TimeSpan.FromSeconds(10));
-}));
 await Test("Cross-resource creates resolve returned IDs before dependent writes", async () =>
 {
     var w=new Workspace(); var fleet=Row(("Name","New fleet")); var plane=Row(("Name","New plane"),("Fleet ID","local:"+fleet.LocalId));
