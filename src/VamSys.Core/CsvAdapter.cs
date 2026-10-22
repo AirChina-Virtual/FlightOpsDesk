@@ -141,9 +141,9 @@ public sealed class CsvAdapter : ICsvResourceAdapter
         var groups = items.GroupBy(i => string.Join("\u001f", i.After.Fields.Keys.Order(StringComparer.Ordinal))).ToList();
         if (groups.Count > 1)
             return groups.SelectMany(g => Export(kind, g, maxBytes)).ToList();
-        var schema = Schemas.All[kind];
+        var spec = FieldSpecs.Get(kind);
         // Include full materialized rows to preserve unknown fields and required values.
-        var headers = new[] { schema.Key }.Concat(schema.Required).Concat(items.SelectMany(i => i.After.Fields.Keys)).Append("_delete").Distinct().ToArray();
+        var headers = new[] { spec.Key }.Concat(spec.Required).Concat(items.SelectMany(i => i.After.Fields.Keys)).Append("_delete").Distinct().ToArray();
         byte[] header = Encoding.UTF8.GetBytes(string.Join(',', headers.Select(Encode)) + "\r\n");
         var parts = new List<byte[]>();
         using var stream = new MemoryStream();
