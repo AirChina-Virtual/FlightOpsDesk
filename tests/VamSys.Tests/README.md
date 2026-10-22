@@ -22,7 +22,6 @@ dotnet run --project tests/VamSys.Tests -c Release -- --ui-interactions    # 审
 dotnet run --project tests/VamSys.Tests -c Release -- --storage            # 数据保存与行级保存
 dotnet run --project tests/VamSys.Tests -c Release -- --history            # v4 历史随机对照、迁移、并发
 dotnet run --project tests/VamSys.Tests -c Release -- --v3                 # v3 保存方式与任务页更新
-dotnet run --project tests/VamSys.Tests -c Release -- --core-optimization  # 核心规划与索引
 dotnet run --project tests/VamSys.Tests -c Release -- --data-table         # 数据页模型
 
 # 基准，写入 JSON
@@ -63,13 +62,13 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 | StorageScenarios.cs、StorageV3Scenarios.cs | 任务单独保存、旧数据库升级、单条保存完整性、关闭时不丢草稿 |
 | StorageProcessScenarios.cs | 强制结束正在执行的测试进程再重启，检查是否重复提交；也检查行级保存中途被结束 |
 | DraftSaveScenarios.cs | 单元格编辑和撤销／重做只写对应行：写入范围、重新读取与内存一致、旧版本号、缺失行、保存失败后的交接 |
-| HistoryScenarios.cs | 旧全快照对照、历史迁移、异步载荷、写入范围、淘汰分支、字段顺序 |
+| HistoryScenarios.cs | 旧全快照对照（含存储重载）、历史迁移、异步载荷、写入范围、淘汰分支；纯领域的撤销／重做规则已改由 `VamSys.UnitTests` 覆盖 |
 | UiInteractionScenarios.cs | 工作区审阅、样本与依赖、内容键（防碰撞与缓存）、无网络预览、批量范围、密度偏好 |
 | TaskViewModelScenarios.cs | 页面只显示已保存的结果，更新时计数和列表正确 |
 | TaskSubmissionScenarios.cs | 链接真实 TaskSubmission，模拟最终 Render 的慢审阅锁；真实 SQLite 与执行器验证只启动本次任务、各写一次和 Unknown 只读恢复 |
 | VerifiedScopeScenarios.cs | 15 项证据基线与字段／类型范围、真实适配器和执行器的飞机 PATCH、204／404、历史任务只读补核对、原子人工确认与旧 JSON 回归 |
 | PerformanceScenarios.cs | 请求次数，以及大量记录下的查重和处理速度 |
-| CoreOptimizationScenarios.cs、CorePerformanceBenchmark.cs | 原规划对照、位置索引、局部回放的失败原子性、1 千／2 万／5 万行基准 |
+| CorePerformanceBenchmark.cs | 1 千／2 万／5 万行基准（规划对照、位置索引、局部回放的失败原子性已改由 `VamSys.UnitTests` 的领域测试覆盖） |
 | DataTableScenarios.cs、DataUiFixture.cs | 分页、跨页选择、完整查询、模型重新绑定；窗口测试用的合成数据 |
 | TestTime.cs | 两种虚拟时钟（见下节） |
 | PackageChecks.cs | 正式／QA 包的测试入口、依赖、文件清单和文档链接 |

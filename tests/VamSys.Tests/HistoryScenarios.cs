@@ -116,57 +116,8 @@ static class HistoryScenarios
                 if(next=="same"){var dd=disk.Resources[ResourceKind.Fleets];dd.UndoEdit();Check(dd.Draft[0].Get("Name")==initial);dd.RedoEdit();Check(dd.Draft[0].Get("Name")=="second");}
             }
         });
-        await test("v4 validates complete patches atomically and keeps shallow history copies independent",()=>{
-            var d=new ResourceData{Draft=[new(){Fields=new(){["Name"]="old"}},new(){Fields=new(){["Name"]="second"}}]};
-            var ids=d.Draft.Select(r=>r.LocalId).ToArray();d.Edit(ids,()=>{foreach(var row in d.Draft)row.Fields["Name"]="new";});
-            var copy=d.ShallowCopy();d.Edit([ids[0]],()=>d.Draft[0].Fields["Name"]="later",newStep:false);
-            Check(copy.Undo[0].Rows[0].After!.Fields["Name"]=="new","shared step mutated");
-            var before=Rows(d.Draft);d.Draft[1].Fields["Name"]="unexpected";before=Rows(d.Draft);
-            try{d.UndoEdit();throw new Exception("invalid patch accepted");}catch(InvalidDataException){}
-            Check(Rows(d.Draft)==before&&d.Undo.Count==1&&d.Redo.Count==0,"partial patch applied");return Task.CompletedTask;
-        });
-        await test("v4 conflict deletion amends both undo and redo boundaries without a new step",()=>{
-            var d=new ResourceData {Draft=[new(){Fields=new(){["Name"]="A"}},new(){Fields=new(){["Name"]="B"}}]};var oracle=new Oracle{Draft=Clone(d.Draft)};
-            foreach(var value in new[]{"first","second"}){oracle.Checkpoint();d.Edit([d.Draft[0].LocalId],()=>d.Draft[0].Fields["Name"]=value);oracle.Draft[0].Fields["Name"]=value;}
-            d.UndoEdit();oracle.Back();var id=d.Draft[1].LocalId;d.Edit([id],()=>d.Draft.RemoveAt(1),newStep:false,structural:true);oracle.Draft.RemoveAt(1);
-            Match(d,oracle,"conflict delete");d.RedoEdit();oracle.Forward();Match(d,oracle,"redo after conflict delete");return Task.CompletedTask;
-        });
-        await test("v4 undo and redo retain captured unknown CSV field order",()=>{
-            var row=new DataRow{Fields=new(){["Name"]="old",["Z unknown"]="z",["A unknown"]="a",["empty"]=""}};var d=new ResourceData{Draft=[row]};
-            var before=JsonSerializer.Serialize(row);d.Edit([row.LocalId],()=>{row.Fields["Name"]="new";row.Fields.Remove("empty");row.Fields["B unknown"]="b";});var after=JsonSerializer.Serialize(row);
-            d.UndoEdit();Check(JsonSerializer.Serialize(d.Draft[0])==before,"undo changed field order");d.RedoEdit();Check(JsonSerializer.Serialize(d.Draft[0])==after,"redo changed field order");return Task.CompletedTask;
-        });
-        await test("v4 JSON accepts legacy histories and rejects unknown or ambiguous versions",()=>{
-            var w=Fixture();var d=w.Resources[ResourceKind.Fleets];var r=d.Draft[0];
-            d.Edit([r.LocalId],()=>r.Fields["Name"]="A");d.Edit([r.LocalId],()=>r.Fields["Name"]="B");d.UndoEdit();
-            var old=LegacyJson(w);var converted=Workspace.Deserialize(old);Check(!converted.Serialize().Contains("\"Undo\":[["));
-            var oracle=new Oracle{Draft=Clone(d.Draft),Undo=JsonNode.Parse(old)!["Resources"]!["Fleets"]!["Undo"]!.Deserialize<List<List<DataRow>>>()!,Redo=JsonNode.Parse(old)!["Resources"]!["Fleets"]!["Redo"]!.Deserialize<List<List<DataRow>>>()!};
-            Match(converted.Resources[ResourceKind.Fleets],oracle,"legacy JSON");
-            foreach(var ambiguous in new[]{false,true})
-            {
-                var node=JsonNode.Parse(w.Serialize())!;var resource=node["Resources"]!["Fleets"]!;
-                if(ambiguous)resource["Undo"]=new JsonArray();else resource["History"]!["Version"]=99;
-                try{Workspace.Deserialize(node.ToJsonString());throw new Exception("unknown history accepted");}catch(JsonException){}
-            }
-            return Task.CompletedTask;
-        });
         await MigrationTests(test);
         await test("v4 real cell edit history bounds, touched rows, eviction and redo deletion",()=>Benchmark("artifacts/step5-performance"));
-        await test("v4 batch history retains only K changed rows and reports structural order cost",()=>{
-            var results=new List<object>();
-            foreach(var k in new[]{1,10,100})
-            {
-                var d=new ResourceData{Draft=Enumerable.Range(0,20000).Select(n=>new DataRow{Fields=new(){["Name"]="row"}}).ToList()};
-                var chosen=d.Draft.Take(k).ToArray();d.FindDraftRow(chosen[0].LocalId);var memory=GC.GetTotalMemory(true);
-                d.Edit(chosen.Select(r=>r.LocalId),()=>{foreach(var row in chosen)row.Fields["Name"]="changed";});
-                var retained=GC.GetTotalMemory(true)-memory;var step=d.Undo.Single();var json=JsonSerializer.Serialize(step);
-                Check(step.Rows.Length==k&&step.BeforeOrder==null&&step.AfterOrder==null);results.Add(new{k,jsonBytes=System.Text.Encoding.UTF8.GetByteCount(json),retainedManagedDeltaBytes=retained,rowSnapshots=2*k});
-                var added=new DataRow();d.Edit([added.LocalId],()=>d.Draft.Insert(1,added),structural:true);step=d.Undo.Last();
-                Check(step.Rows.Length==1&&step.BeforeOrder!.Value.Length==20000&&step.AfterOrder!.Value.Length==20001);
-                results.Add(new{k=0,structural=true,orderGuids=40001,rowSnapshots=1,jsonBytes=System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(step))});
-            }
-            File.WriteAllText("artifacts/step5-performance/batch.json",JsonSerializer.Serialize(results,new JsonSerializerOptions{WriteIndented=true}));return Task.CompletedTask;
-        });
     }
 
     // Fixed old DDL and old full-snapshot JSON; no v4 store or history serializer creates these fixtures.
