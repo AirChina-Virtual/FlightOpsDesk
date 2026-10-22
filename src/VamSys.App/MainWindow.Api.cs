@@ -156,7 +156,7 @@ public sealed partial class MainWindow
             finally
             {
                 performance.Finish(outcome);
-                var directory = Environment.GetEnvironmentVariable("VAMSYS_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VamSysBatch");
+                var directory = AppPaths.DataDirectory;
                 performance.TryWrite(Path.Combine(directory, "performance"));
                 running.Dispose();
                 running = null;

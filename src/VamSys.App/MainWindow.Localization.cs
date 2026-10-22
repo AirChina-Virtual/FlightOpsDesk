@@ -22,7 +22,7 @@ public sealed partial class MainWindow
         {
             try
             {
-                var directory = Environment.GetEnvironmentVariable("VAMSYS_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VamSysBatch");
+                var directory = AppPaths.DataDirectory;
                 File.AppendAllText(Path.Combine(directory, "localization.log"), $"{DateTimeOffset.UtcNow:O} {localization.Language} {key}\n");
             }
             catch (IOException) { }

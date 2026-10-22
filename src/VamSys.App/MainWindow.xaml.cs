@@ -11,7 +11,7 @@ namespace VamSys.App;
 
 public sealed partial class MainWindow : Window
 {
-    readonly WorkspaceStore store = new(Environment.GetEnvironmentVariable("VAMSYS_DATA_DIR") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VamSysBatch"));
+    readonly WorkspaceStore store = new(AppPaths.DataDirectory);
     readonly CsvAdapter csv = new(); readonly ChangePlanner planner = new();
     readonly FleetAssignmentService fleets = new(); readonly DeletionService deletions = new();
     Workspace workspace = new(); ResourceKind resource = ResourceKind.Routes;
