@@ -1,20 +1,21 @@
 using Microsoft.Data.Sqlite;
 using System.Globalization;
-using System.Text.Json;
 using VamSys.Core;
-using static VamSys.Infrastructure.Sql;
 using static VamSys.Infrastructure.RowSerializer;
+using static VamSys.Infrastructure.Sql;
+
 namespace VamSys.Infrastructure;
 
-public sealed partial class WorkspaceStore
+// resource_metadata / resource_rows: column definitions, conflicts, snapshot and draft rows (history is HistoryRepository).
+internal static class ResourceRowRepository
 {
-    static void WriteResources(SqliteConnection c, SqliteTransaction tx, FullPayload p)
+    public static void Write(SqliteConnection c, SqliteTransaction tx, FullPayload p)
     {
         Execute(c, tx, "DELETE FROM resource_metadata WHERE workspace_id=$w", ("$w", p.Id.ToString()));
         foreach (var r in p.Resources)
         {
             Execute(c, tx, "INSERT INTO resource_metadata VALUES($w,$r,$cols,$conflicts,$at)", ("$w", p.Id.ToString()), ("$r", (int)r.Kind), ("$cols", r.Columns), ("$conflicts", r.Conflicts), ("$at", r.SnapshotAt));
-            WriteHistory(c, tx, p.Id, r.Kind, r.History, full: true);
+            HistoryRepository.Write(c, tx, p.Id, r.Kind, r.History, full: true);
             using var cmd = Command(c, tx, "INSERT INTO resource_rows VALUES($w,$r,$collection,$id,$n,$json)", ("$w", p.Id.ToString()), ("$r", (int)r.Kind), ("$collection", 0), ("$id", ""), ("$n", 0), ("$json", ""));
             cmd.Prepare();
             foreach (var row in r.Rows)
@@ -27,7 +28,8 @@ public sealed partial class WorkspaceStore
             }
         }
     }
-    static void ReadResources(SqliteConnection c, SqliteTransaction tx, Workspace w)
+
+    public static void Read(SqliteConnection c, SqliteTransaction tx, Workspace w)
     {
         w.Resources = Enum.GetValues<ResourceKind>().ToDictionary(k => k, _ => new ResourceData());
         using (var cmd = Command(c, tx, "SELECT resource,columns_json,conflicts_json,snapshot_at FROM resource_metadata WHERE workspace_id=$w", ("$w", w.Id.ToString())))
@@ -35,8 +37,8 @@ public sealed partial class WorkspaceStore
         while (r.Read())
         {
             var data = w.Resources[(ResourceKind)r.GetInt32(0)];
-            data.Columns = JsonSerializer.Deserialize<List<string>>(r.GetString(1))!;
-            data.Conflicts = JsonSerializer.Deserialize<List<MergeConflict>>(r.GetString(2))!;
+            data.Columns = Decode<List<string>>(r.GetString(1))!;
+            data.Conflicts = Decode<List<MergeConflict>>(r.GetString(2))!;
             data.SnapshotAt = r.IsDBNull(3) ? null : DateTimeOffset.Parse(r.GetString(3), CultureInfo.InvariantCulture);
         }
         using (var cmd = Command(c, tx, "SELECT resource,collection,json FROM resource_rows WHERE workspace_id=$w ORDER BY resource,collection,ordinal", ("$w", w.Id.ToString())))
@@ -45,12 +47,29 @@ public sealed partial class WorkspaceStore
         {
             var data = w.Resources[(ResourceKind)r.GetInt32(0)];
             var rows = r.GetInt32(1) == 0 ? data.Snapshot : data.Draft;
-            rows.Add(JsonSerializer.Deserialize<DataRow>(r.GetString(2))!);
+            rows.Add(Decode<DataRow>(r.GetString(2))!);
         }
         foreach (var (kind, data) in w.Resources)
-            ReadHistory(c, tx, w.Id, kind, data);
+            HistoryRepository.Read(c, tx, w.Id, kind, data);
     }
-    static void WriteDelta(SqliteConnection c, SqliteTransaction tx, Guid workspaceId, ResourceRebaseDelta delta, string? snapshot, string? draft)
+
+    // Rewrites the JSON of draft rows that keep their position; every row must exist exactly once.
+    public static void UpdateDraftRows(SqliteConnection c, SqliteTransaction tx, string workspace, IEnumerable<(int Kind, string Id, string Json)> rows)
+    {
+        using var update = Command(c, tx, "UPDATE resource_rows SET json=$json WHERE workspace_id=$w AND resource=$r AND collection=1 AND local_id=$id", ("$w", workspace), ("$r", 0), ("$id", ""), ("$json", ""));
+        update.Prepare();
+        foreach (var row in rows)
+        {
+            update.Parameters["$r"].Value = row.Kind;
+            update.Parameters["$id"].Value = row.Id;
+            update.Parameters["$json"].Value = row.Json;
+            if (update.ExecuteNonQuery() != 1)
+                throw StorageErrors.Block("StorageInvalid");
+        }
+    }
+
+    // One rebase: snapshot/draft row mutations, snapshot time, conflicts and optional history clearing for a single record.
+    public static void WriteDelta(SqliteConnection c, SqliteTransaction tx, Guid workspaceId, ResourceRebaseDelta delta, string? snapshot, string? draft)
     {
         var w = workspaceId.ToString();
         var kind = (int)delta.Resource;
@@ -74,9 +93,6 @@ public sealed partial class WorkspaceStore
         Row(0, delta.Snapshot, snapshot);
         Row(1, delta.Draft, draft);
         if (delta.ClearHistory)
-        {
-            Execute(c, tx, "DELETE FROM resource_history_steps WHERE workspace_id=$w AND resource=$r", ("$w", w), ("$r", kind));
-            Execute(c, tx, "UPDATE resource_history_state SET undo_json='[]',redo_json='[]' WHERE workspace_id=$w AND resource=$r", ("$w", w), ("$r", kind));
-        }
+            HistoryRepository.ClearSteps(c, tx, w, kind);
     }
 }

@@ -70,17 +70,17 @@ public sealed partial class WorkspaceStore
                 continue;
             }
             if (version == 2)
-                ReadJobs(c, tx, w);
+                JobRepository.Read(c, tx, w);
             var payload = Capture(w, false);
             Execute(c, tx, "UPDATE workspaces SET json=$json,format_version=4 WHERE id=$id", ("$json", payload.Json), ("$id", id));
             if (version < 2)
                 Execute(c, tx, "INSERT INTO workspace_revisions VALUES($id,0)", ("$id", id));
             if (version < 2)
             {
-                WriteJobs(c, tx, payload);
+                JobRepository.Write(c, tx, payload);
             }
             // Always runs, whatever the previous version.
-            WriteResources(c, tx, payload);
+            ResourceRowRepository.Write(c, tx, payload);
         }
         Execute(c, tx, """
             DROP TABLE IF EXISTS resource_history;
@@ -103,7 +103,7 @@ public sealed partial class WorkspaceStore
             using (var reader = cmd.ExecuteReader())
             while (reader.Read())
             {
-                var row = JsonSerializer.Deserialize<DataRow>(reader.GetString(1)) ?? throw StorageErrors.Block("StorageInvalid");
+                var row = Decode<DataRow>(reader.GetString(1)) ?? throw StorageErrors.Block("StorageInvalid");
                 if (row.LocalId.ToString() != reader.GetString(0))
                     throw StorageErrors.Block("StorageInvalid");
                 data.Draft.Add(row);
@@ -113,9 +113,9 @@ public sealed partial class WorkspaceStore
             {
                 if (!reader.Read())
                     throw StorageErrors.Block("StorageInvalid");
-                data.History = EditHistory.ConvertLegacy(data.Draft, JsonSerializer.Deserialize<List<List<DataRow>>>(reader.GetString(0)) ?? throw StorageErrors.Block("StorageInvalid"), JsonSerializer.Deserialize<List<List<DataRow>>>(reader.GetString(1)) ?? throw StorageErrors.Block("StorageInvalid"));
+                data.History = EditHistory.ConvertLegacy(data.Draft, Decode<List<List<DataRow>>>(reader.GetString(0)) ?? throw StorageErrors.Block("StorageInvalid"), Decode<List<List<DataRow>>>(reader.GetString(1)) ?? throw StorageErrors.Block("StorageInvalid"));
             }
-            WriteHistory(c, tx, workspace, kind, CaptureHistory(data.History, full: true), full: true);
+            HistoryRepository.Write(c, tx, workspace, kind, CaptureHistory(data.History, full: true), full: true);
         }
     }
 }

@@ -78,10 +78,10 @@ public sealed partial class WorkspaceStore
             current.StorageRevision = Commit(id, expectedRevision, "Maintenance", (c, tx) =>
             {
                 // Keep the workspace identity/settings and encrypted secrets. Never delete the workspace row.
-                if (Execute(c, tx, "UPDATE workspaces SET json=$json WHERE id=$id", ("$json", payload.Json), ("$id", id.ToString())) != 1)
+                if (WorkspaceRepository.UpdateJson(c, tx, id, payload.Json) != 1)
                     throw StorageErrors.Block("StorageInvalid");
-                WriteJobs(c, tx, payload);
-                WriteResources(c, tx, payload);
+                JobRepository.Write(c, tx, payload);
+                ResourceRowRepository.Write(c, tx, payload);
             });
             return new(current, new(path, manifest, hash, id, expectedRevision));
         }

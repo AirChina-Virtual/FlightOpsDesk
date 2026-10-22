@@ -1,14 +1,14 @@
-using System.Collections.Immutable;
-using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using VamSys.Core;
-using static VamSys.Infrastructure.Sql;
 using static VamSys.Infrastructure.RowSerializer;
+using static VamSys.Infrastructure.Sql;
+
 namespace VamSys.Infrastructure;
 
-public sealed partial class WorkspaceStore
+// resource_history_state / resource_history_steps: undo and redo stacks, one row per step.
+internal static class HistoryRepository
 {
-    static void WriteHistory(SqliteConnection c, SqliteTransaction tx, Guid id, ResourceKind kind, StoredHistory h, bool full = false)
+    public static void Write(SqliteConnection c, SqliteTransaction tx, Guid id, ResourceKind kind, StoredHistory h, bool full = false)
     {
         var args = new (string, object?)[] { ("$w", id.ToString()), ("$r", (int)kind) };
         foreach (var step in h.Deletes)
@@ -20,7 +20,14 @@ public sealed partial class WorkspaceStore
         else if (h.OrderChanged && Execute(c, tx, "UPDATE resource_history_state SET undo_json=$u,redo_json=$d WHERE workspace_id=$w AND resource=$r", [.. args, ("$u", h.Undo), ("$d", h.Redo)]) != 1)
             throw StorageErrors.Block("StorageInvalid");
     }
-    static void ReadHistory(SqliteConnection c, SqliteTransaction tx, Guid id, ResourceKind kind, ResourceData data)
+
+    public static void ClearSteps(SqliteConnection c, SqliteTransaction tx, string workspace, int kind)
+    {
+        Execute(c, tx, "DELETE FROM resource_history_steps WHERE workspace_id=$w AND resource=$r", ("$w", workspace), ("$r", kind));
+        Execute(c, tx, "UPDATE resource_history_state SET undo_json='[]',redo_json='[]' WHERE workspace_id=$w AND resource=$r", ("$w", workspace), ("$r", kind));
+    }
+
+    public static void Read(SqliteConnection c, SqliteTransaction tx, Guid id, ResourceKind kind, ResourceData data)
     {
         var args = new (string, object?)[] { ("$w", id.ToString()), ("$r", (int)kind) };
         Guid[] undo, redo;
@@ -29,15 +36,15 @@ public sealed partial class WorkspaceStore
         {
             if (!r.Read())
                 throw StorageErrors.Block("StorageInvalid");
-            undo = JsonSerializer.Deserialize<Guid[]>(r.GetString(0))!;
-            redo = JsonSerializer.Deserialize<Guid[]>(r.GetString(1))!;
+            undo = Decode<Guid[]>(r.GetString(0))!;
+            redo = Decode<Guid[]>(r.GetString(1))!;
         }
         var steps = new Dictionary<Guid, HistoryStep>();
         using (var cmd = Command(c, tx, "SELECT step_id,json FROM resource_history_steps WHERE workspace_id=$w AND resource=$r", args))
         using (var r = cmd.ExecuteReader())
         while (r.Read())
         {
-            var step = JsonSerializer.Deserialize<HistoryStep>(r.GetString(1))!;
+            var step = Decode<HistoryStep>(r.GetString(1))!;
             if (step.StepId != Guid.Parse(r.GetString(0)))
                 throw StorageErrors.Block("StorageInvalid");
             steps.Add(step.StepId, step);

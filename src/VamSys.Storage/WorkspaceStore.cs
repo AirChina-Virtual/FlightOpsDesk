@@ -1,16 +1,14 @@
 using Microsoft.Data.Sqlite;
 using VamSys.Core;
-using static VamSys.Infrastructure.Sql;
-using static VamSys.Infrastructure.RowSerializer;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace VamSys.Infrastructure;
 
+// The public face of local storage. Every method delegates to one repository or service; callers and tests only see this type.
 public sealed partial class WorkspaceStore
 {
     readonly StorageContext context;
-
+    readonly SettingsRepository settings;
+    readonly SecretStore secrets;
 #if VAMSYS_TEST_SUPPORT
     public WorkspaceStore(string directory) : this(directory,null) {}
     internal WorkspaceStore(string directory,Action<string>? barrier)
@@ -19,6 +17,8 @@ public sealed partial class WorkspaceStore
 #endif
     {
         context = new(directory);
+        settings = new(context);
+        secrets = new(context);
 #if VAMSYS_TEST_SUPPORT
         Barrier=barrier;
 #endif
@@ -27,77 +27,25 @@ public sealed partial class WorkspaceStore
     }
     object writeLock => context.WriteLock;
     SqliteConnection Open() => context.Connections.Open();
-    public string LoadLanguage()
-    {
-        using var c = Open();
-        using var cmd = c.CreateCommand();
-        cmd.CommandText = "SELECT value FROM app_settings WHERE key='language'";
-        return cmd.ExecuteScalar() as string == "en-US" ? "en-US" : "zh-CN";
-    }
-    public void SaveLanguage(string language)
-    {
-        lock (writeLock)
-        {
-            using var c = Open();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "INSERT INTO app_settings VALUES('language',$value) ON CONFLICT(key) DO UPDATE SET value=$value";
-            cmd.Parameters.AddWithValue("$value", language == "en-US" ? language : "zh-CN");
-            cmd.ExecuteNonQuery();
-        }
-    }
-    public string LoadTableDensity()
-    {
-        using var c = Open();
-        using var cmd = c.CreateCommand();
-        cmd.CommandText = "SELECT value FROM app_settings WHERE key='table_density'";
-        return cmd.ExecuteScalar() as string == "compact" ? "compact" : "comfortable";
-    }
-    public void SaveTableDensity(string density)
-    {
-        lock (writeLock)
-        {
-            using var c = Open();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "INSERT INTO app_settings VALUES('table_density',$value) ON CONFLICT(key) DO UPDATE SET value=$value";
-            cmd.Parameters.AddWithValue("$value", density == "compact" ? "compact" : "comfortable");
-            cmd.ExecuteNonQuery();
-        }
-    }
+
+    public string LoadLanguage() => settings.LoadLanguage();
+    public void SaveLanguage(string language) => settings.SaveLanguage(language);
+    public string LoadTableDensity() => settings.LoadTableDensity();
+    public void SaveTableDensity(string density) => settings.SaveTableDensity(density);
+
     public List<(Guid Id, string Name)> List()
     {
         using var c = Open();
-        using var cmd = c.CreateCommand();
-        cmd.CommandText = "SELECT id,name FROM workspaces ORDER BY name";
-        using var r = cmd.ExecuteReader();
-        var result = new List<(Guid, string)>();
-        while (r.Read())
-            result.Add((Guid.Parse(r.GetString(0)), r.GetString(1)));
-        return result;
+        return WorkspaceRepository.List(c);
     }
     public Workspace Load(Guid id)
     {
         using var c = Open();
-        using var tx = c.BeginTransaction(deferred: true);
-        var w = Workspace.Deserialize((string)(Scalar(c, tx, "SELECT json FROM workspaces WHERE id=$id", ("$id", id.ToString())) ?? throw new KeyNotFoundException()));
-        w.StorageRevision = Convert.ToInt64(Scalar(c, tx, "SELECT revision FROM workspace_revisions WHERE workspace_id=$id", ("$id", id.ToString())));
-        ReadJobs(c, tx, w);
-        ReadResources(c, tx, w);
-        tx.Commit();
-        return w;
+        return WorkspaceRepository.Load(c, id);
     }
-    static void ReadJobs(SqliteConnection c, SqliteTransaction tx, Workspace w)
-    {
-        w.Jobs.Clear();
-        using (var cmd = Command(c, tx, "SELECT json FROM batch_jobs WHERE workspace_id=$id ORDER BY ordinal", ("$id", w.Id.ToString())))
-        using (var reader = cmd.ExecuteReader())
-        while (reader.Read())
-            w.Jobs.Add(System.Text.Json.JsonSerializer.Deserialize<BatchJob>(reader.GetString(0))!);
-        var jobs = w.Jobs.ToDictionary(j => j.Id);
-        using (var cmd = Command(c, tx, "SELECT job_id,json FROM batch_items WHERE workspace_id=$id ORDER BY job_id,ordinal", ("$id", w.Id.ToString())))
-        using (var reader = cmd.ExecuteReader())
-        while (reader.Read())
-            jobs[Guid.Parse(reader.GetString(0))].Items.Add(System.Text.Json.JsonSerializer.Deserialize<ChangeItem>(reader.GetString(1))!);
-    }
+
+    public void SaveSecret(Guid id, string secret) => secrets.Save(id, secret);
+    public string? LoadSecret(Guid id) => secrets.Load(id);
     public void UpdateOperationsCredentials(Workspace workspace, string clientId, string secret)
         => SaveConnection(workspace, clientId, secret, true, null, null);
     public void SaveConnectionSettings(Workspace workspace, string clientId, string secret, string url, bool localRouteTimes)
@@ -114,25 +62,7 @@ public sealed partial class WorkspaceStore
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException();
         clientId = clientId.Trim();
-        OperationsCredentials? credentials = null;
-        if (secret.Length > 0)
-        {
-            if (clientId.Length == 0 || string.IsNullOrWhiteSpace(secret))
-                throw StorageErrors.Block("ApiCredentials");
-            credentials = new(clientId, secret); // Secret is opaque; never trim it.
-        }
-        else
-        {
-            if (requireNewSecret)
-                throw StorageErrors.Block("ApiCredentials");
-            if (LoadSecret(workspace.Id) is string raw)
-            {
-                var saved = System.Text.Json.JsonSerializer.Deserialize<OperationsCredentials>(raw) ?? throw StorageErrors.Block("ApiCredentials");
-                if (saved.ClientId.Trim() != clientId)
-                    throw StorageErrors.Block("ApiCredentials");
-                credentials = new(clientId, saved.Secret);
-            }
-        }
+        var credentials = secrets.ResolveCredentials(workspace.Id, clientId, secret, requireNewSecret);
         var staged = Workspace.Deserialize(workspace.Serialize());
         staged.ClientId = clientId;
         staged.Mode = RunMode.Offline;
@@ -141,8 +71,8 @@ public sealed partial class WorkspaceStore
             staged.InstanceUrl = url;
         if (localRouteTimes.HasValue)
             staged.LocalRouteTimes = localRouteTimes.Value;
-        var encrypted = credentials == null ? null : ProtectedData.Protect(Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(credentials)), workspace.Id.ToByteArray(), DataProtectionScope.CurrentUser);
-        workspace.StorageRevision = SavePayload(Capture(staged), encrypted);
+        var encrypted = credentials == null ? null : SecretStore.Protect(credentials, workspace.Id);
+        workspace.StorageRevision = SavePayload(RowSerializer.Capture(staged), encrypted);
         foreach (var data in workspace.Resources.Values)
             data.History.Acknowledge(data.History.Capture());
         workspace.ClientId = staged.ClientId;
@@ -150,30 +80,5 @@ public sealed partial class WorkspaceStore
         workspace.ConnectedAt = null;
         workspace.InstanceUrl = staged.InstanceUrl;
         workspace.LocalRouteTimes = staged.LocalRouteTimes;
-    }
-    public void SaveSecret(Guid id, string secret)
-    {
-        if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException();
-        var encrypted = ProtectedData.Protect(Encoding.UTF8.GetBytes(secret), id.ToByteArray(), DataProtectionScope.CurrentUser);
-        lock (writeLock)
-        {
-            using var c = Open();
-            using var cmd = c.CreateCommand();
-            cmd.CommandText = "INSERT INTO secrets VALUES($id,$value) ON CONFLICT(id) DO UPDATE SET value=$value";
-            cmd.Parameters.AddWithValue("$id", id.ToString());
-            cmd.Parameters.AddWithValue("$value", encrypted);
-            cmd.ExecuteNonQuery();
-        }
-    }
-    public string? LoadSecret(Guid id)
-    {
-        if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException();
-        using var c = Open();
-        using var cmd = c.CreateCommand();
-        cmd.CommandText = "SELECT value FROM secrets WHERE id=$id";
-        cmd.Parameters.AddWithValue("$id", id.ToString());
-        return cmd.ExecuteScalar() is byte[] bytes ? Encoding.UTF8.GetString(ProtectedData.Unprotect(bytes, id.ToByteArray(), DataProtectionScope.CurrentUser)) : null;
     }
 }

@@ -11,16 +11,6 @@ namespace VamSys.Infrastructure;
 
 public sealed partial class WorkspaceStore
 {
-    static void WriteJobs(SqliteConnection c, SqliteTransaction tx, FullPayload p)
-    {
-        Execute(c, tx, "DELETE FROM batch_jobs WHERE workspace_id=$w", ("$w", p.Id.ToString()));
-        foreach (var job in p.Jobs)
-        {
-            Execute(c, tx, "INSERT INTO batch_jobs(workspace_id,id,ordinal,json) VALUES($w,$j,$n,$json)", ("$w", p.Id.ToString()), ("$j", job.Id.ToString()), ("$n", job.Ordinal), ("$json", job.Json));
-            foreach (var item in job.Items)
-                Execute(c, tx, "INSERT INTO batch_items(workspace_id,job_id,id,ordinal,json) VALUES($w,$j,$i,$n,$json)", ("$w", p.Id.ToString()), ("$j", job.Id.ToString()), ("$i", item.Id.ToString()), ("$n", item.Ordinal), ("$json", item.Json));
-        }
-    }
     long Commit(Guid id, long expected, string kind, Action<SqliteConnection, SqliteTransaction> write, bool allowNew = false)
     {
         lock (writeLock)
@@ -34,12 +24,12 @@ public sealed partial class WorkspaceStore
             {
                 using var c = Open();
                 using var tx = c.BeginTransaction();
-                var revision = Scalar(c, tx, "SELECT revision FROM workspace_revisions WHERE workspace_id=$w", ("$w", id.ToString()));
+                var revision = WorkspaceRepository.ReadRevision(c, tx, id);
                 if (revision == null ? !allowNew || expected != 0 : Convert.ToInt64(revision) != expected)
                     throw StorageErrors.Block("StorageStale");
                 write(c, tx);
                 var next = expected + 1;
-                Execute(c, tx, "INSERT INTO workspace_revisions(workspace_id,revision) VALUES($w,$r) ON CONFLICT(workspace_id) DO UPDATE SET revision=$r", ("$w", id.ToString()), ("$r", next));
+                WorkspaceRepository.WriteRevision(c, tx, id, next);
                 context.Fault(kind + ":BeforeCommit");
                 tx.Commit();
                 committed = true;
@@ -53,10 +43,9 @@ public sealed partial class WorkspaceStore
     internal long SavePayload(FullPayload p, byte[]? secret = null)
         => Commit(p.Id, p.Revision, "Full", (c, tx) =>
         {
-            Execute(c, tx, "INSERT INTO workspaces(id,name,json,format_version) VALUES($id,$name,$json,4) ON CONFLICT(id) DO UPDATE SET name=$name,json=$json,format_version=4",
-                ("$id", p.Id.ToString()), ("$name", p.Name), ("$json", p.Json));
-            WriteJobs(c, tx, p);
-            WriteResources(c, tx, p);
+            WorkspaceRepository.Upsert(c, tx, p);
+            JobRepository.Write(c, tx, p);
+            ResourceRowRepository.Write(c, tx, p);
             if (secret != null)
                 Execute(c, tx, "INSERT INTO secrets(id,value) VALUES($id,$s) ON CONFLICT(id) DO UPDATE SET value=$s", ("$id", p.Id.ToString()), ("$s", secret));
         }, true);
@@ -100,18 +89,9 @@ public sealed partial class WorkspaceStore
         var expected = w.StorageRevision;
         w.StorageRevision = await Task.Run(() => Commit(w.Id, expected, "Draft", (c, tx) =>
         {
-            using var update = Command(c, tx, "UPDATE resource_rows SET json=$json WHERE workspace_id=$w AND resource=$r AND collection=1 AND local_id=$id", ("$w", workspace), ("$r", 0), ("$id", ""), ("$json", ""));
-            update.Prepare();
-            foreach (var row in rows)
-            {
-                update.Parameters["$r"].Value = row.Kind;
-                update.Parameters["$id"].Value = row.Id;
-                update.Parameters["$json"].Value = row.Json;
-                if (update.ExecuteNonQuery() != 1)
-                    throw StorageErrors.Block("StorageInvalid");
-            }
+            ResourceRowRepository.UpdateDraftRows(c, tx, workspace, rows);
             foreach (var h in history)
-                WriteHistory(c, tx, w.Id, h.Kind, h.Payload);
+                HistoryRepository.Write(c, tx, w.Id, h.Kind, h.Payload);
         }));
         foreach (var h in history)
             h.Payload.Owner.Acknowledge(h.Payload.Captured);
@@ -151,17 +131,17 @@ public sealed partial class WorkspaceStore
             var i = checkpoint.Item?.Id.ToString();
             var next = await Task.Run(() => store.Commit(workspace.Id, expected, checkpoint.Kind.ToString(), (c, tx) =>
             {
-                if (Execute(c, tx, "UPDATE batch_jobs SET json=$json WHERE workspace_id=$w AND id=$j", ("$json", header), ("$w", w), ("$j", j)) != 1)
+                if (JobRepository.UpdateHeader(c, tx, w, j, header) != 1)
                     throw StorageErrors.Block("StorageInvalid");
-                if (item != null && Execute(c, tx, "UPDATE batch_items SET json=$json WHERE workspace_id=$w AND job_id=$j AND id=$i", ("$json", item), ("$w", w), ("$j", j), ("$i", i)) != 1)
+                if (item != null && JobRepository.UpdateItem(c, tx, w, j, i!, item) != 1)
                     throw StorageErrors.Block("StorageInvalid");
                 foreach (var (id, json) in items)
-                    if (Execute(c, tx, "UPDATE batch_items SET json=$json WHERE workspace_id=$w AND job_id=$j AND id=$i", ("$json", json), ("$w", w), ("$j", j), ("$i", id)) != 1)
+                    if (JobRepository.UpdateItem(c, tx, w, j, id, json) != 1)
                         throw StorageErrors.Block("StorageInvalid");
                 if (full != null)
-                { Execute(c, tx, "UPDATE workspaces SET name=$name,json=$json WHERE id=$w", ("$name", full.Name), ("$json", full.Json), ("$w", w)); WriteResources(c, tx, full); }
+                { WorkspaceRepository.UpdateNameAndJson(c, tx, workspace.Id, full.Name, full.Json); ResourceRowRepository.Write(c, tx, full); }
                 if (delta != null)
-                { WriteDelta(c, tx, workspace.Id, delta, snapshot, draft); if (root != null) Execute(c, tx, "UPDATE workspaces SET json=$json WHERE id=$w", ("$json", root), ("$w", w)); }
+                { ResourceRowRepository.WriteDelta(c, tx, workspace.Id, delta, snapshot, draft); if (root != null) WorkspaceRepository.UpdateJson(c, tx, workspace.Id, root); }
             }));
             workspace.StorageRevision = next;
             if (full != null)
