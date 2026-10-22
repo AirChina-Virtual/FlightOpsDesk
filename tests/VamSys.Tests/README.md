@@ -35,7 +35,7 @@ dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-v3 artifacts/v
 
 部分检查会调用 Windows 的密钥保护或启动额外进程，因此完整测试要在 Windows 上运行。测试数据都放在单独目录，不使用用户的真实数据。
 
-R0 起新增的 xUnit 项目独立运行，不计入旧运行器的 271 项：`VamSys.UnitTests` 当前 74 项，`VamSys.IntegrationTests` 当前 50 项。单元测试应分别用 Release、Debug 运行，以覆盖行守卫的两种编译配置。
+R0 起新增的 xUnit 项目独立运行，不计入旧运行器的项数（R2 删除领域层旧场景后，工作树中为 240 项，主检出多一项 v3 二进制检查）：`VamSys.UnitTests` 当前 404 项（含 1 项因产品缺口跳过），`VamSys.IntegrationTests` 当前 50 项。需求与新测试的对应见 [TEST-COVERAGE.md](../../docs/TEST-COVERAGE.md)。单元测试应分别用 Release、Debug 运行，以覆盖行守卫的两种编译配置。
 
 ~~~powershell
 dotnet run --project tests/VamSys.UnitTests -c Release -p:RestoreLockedMode=true

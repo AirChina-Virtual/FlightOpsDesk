@@ -173,6 +173,19 @@ public class CsvAdapterTests
     }
 
     [Fact]
+    public void Export_splits_by_default_below_ten_mebibytes_per_file()
+    {
+        const int limit = 10 * 1024 * 1024;
+        var data = new ResourceData { Draft = [.. Enumerable.Range(0, 3).Select(i => Row(("ICAO/IATA", $"X{i}"), ("Name", new string((char)('a' + i), 4_000_000))))] };
+
+        var files = Csv.Export(Airports, Planner.Plan(Airports, data));
+
+        Assert.Equal(2, files.Count);
+        Assert.All(files, f => Assert.True(f.Length <= limit));
+        Assert.Equal(3, files.Sum(f => Csv.Parse(Text(f)).Rows.Count));
+    }
+
+    [Fact]
     public void Export_fails_when_one_row_alone_exceeds_the_limit()
     {
         var item = new ChangeItem { Resource = Airports, After = Row(("ICAO/IATA", "ZBAA"), ("Name", new string('中', 30))) };

@@ -91,6 +91,20 @@ public class RuleEngineTests
         Assert.Equal("n", preview.Get("Name"));
     }
 
+    // Product gap found while writing these tests (not fixed here: src/ is out of scope for R2 tests). The minute-shift rule
+    // got input validation and per-row skips in A4; the day-shift rule still lets the raw parser exceptions escape.
+    [Theory(Skip = "Product gap: ShiftDays throws a raw FormatException / OverflowException for an empty or malformed date or a non-numeric day count instead of a localized validation message or a per-row skip (compare A4 for ShiftMinutes).")]
+    [InlineData("", "1")]
+    [InlineData("2026-12-31", "1")]
+    [InlineData("2026-12-31 12:00:00", "x")]
+    public void ShiftDays_reports_unusable_input_as_a_message_instead_of_a_raw_parser_exception(string date, string days)
+    {
+        var error = Record.Exception(() => RuleEngine.Preview([Row(("Date", date))], new(RuleKind.ShiftDays, "Date", days)));
+
+        Assert.IsNotType<FormatException>(error);
+        Assert.IsNotType<OverflowException>(error);
+    }
+
     [Fact]
     public void Evaluate_reports_no_skips_and_no_validation_message_for_rules_other_than_minute_shift()
     {
