@@ -65,6 +65,7 @@ if(args.Length==2 && args[0]=="--benchmark-v3"){await StorageV3Scenarios.Benchma
 if(args.Length==1 && args[0]=="--storage"){await StorageScenarios.Run(Test);await DraftSaveScenarios.Run(Test);Console.WriteLine($"{passed} storage scenarios passed.");return;}
 if(args.Length==2 && args[0]=="--benchmark-storage"){await StorageScenarios.Benchmark(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-core"){CorePerformanceBenchmark.Run(args[1]);return;}
+if(args.Length==2 && args[0]=="--benchmark-review"){CorePerformanceBenchmark.RunReview(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-core-load"){CorePerformanceBenchmark.RunLoad(args[1]);return;}
 if(args.Length==1 && args[0]=="--core-optimization"){await CoreOptimizationScenarios.Run(Test);Summary("core optimization ");return;}
 if(args.Length==1 && args[0]=="--ui-interactions"){await UiInteractionScenarios.Run(Test);Summary("UI interactions ");return;}

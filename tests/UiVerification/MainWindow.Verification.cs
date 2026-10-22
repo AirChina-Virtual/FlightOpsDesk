@@ -301,7 +301,7 @@ public sealed partial class MainWindow
         {visible[0].Cells.Single(c=>c.Field=="Name").Value=command[5..];return new{edited=true};}
         return new{error="Unknown QA command"};
     }
-    object ReviewVerificationState() => new { resources = reviewPlan?.Entries.Select(e => e.Change.Resource.ToString()).Distinct().ToArray(),
+    object ReviewVerificationState() => new { resources = reviewPlan?.Entries.Select(e => e.Planned.Resource.ToString()).Distinct().ToArray(),
         total = reviewPlan?.Entries.Count, ready = reviewPlan?.SubmitItems.Count, resourcePickerVisible = ResourceBar.Visibility == Visibility.Visible,
         renderedText = FindVisual<ListView>(PageHost) is { } list ? FindVisual<TextBlock>(list)?.Text : null,
         rows = (FindVisual<ListView>(PageHost)?.Items.Count ?? 0), mode = workspace.Mode.ToString() };

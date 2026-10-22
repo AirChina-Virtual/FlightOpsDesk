@@ -54,8 +54,20 @@ public static class ApiOperationPolicy
         ResourceKind.Routes when item.Kind == ChangeKind.Update && item.Fields.ContainsKey("Fleet IDs") => "Routes:Update:FleetIds:Scheduled",
         ResourceKind.Routes when IsJumpseatCreate(item) => "Routes:Create:Jumpseat",
         ResourceKind.Fleets when item.Kind == ChangeKind.Create && item.After.Get("Parameter IDs") != "" => "Fleets:Create:ParameterIds",
-        _ => $"{item.Resource}:{item.Kind}"
+        _ => PlainKey(item.Resource, item.Kind)
     };
+    // The default key (resource, a colon, kind) for every defined pair, built once: the review asks for one key per change.
+    static readonly string[,] PlainKeys = BuildPlainKeys();
+    static string[,] BuildPlainKeys()
+    {
+        var keys = new string[(int)Enum.GetValues<ResourceKind>().Max() + 1, (int)Enum.GetValues<ChangeKind>().Max() + 1];
+        foreach (var resource in Enum.GetValues<ResourceKind>())
+            foreach (var kind in Enum.GetValues<ChangeKind>())
+                keys[(int)resource, (int)kind] = string.Concat(resource.ToString(), ":", kind.ToString());
+        return keys;
+    }
+    static string PlainKey(ResourceKind resource, ChangeKind kind)
+        => (uint)resource < PlainKeys.GetLength(0) && (uint)kind < PlainKeys.GetLength(1) ? PlainKeys[(int)resource, (int)kind] : string.Concat(resource.ToString(), ":", kind.ToString());
     public static string JumpseatSignature(DataRow row) => "jumpseat:" + JsonSerializer.Serialize(new[] { row.Get("Departure Time (HH:MM)"), row.Get("Arrival Time (HH:MM)"), row.Get("Start Date"), row.Get("End Date") });
     public static string FieldLabel(string field, ILocalizationService language) => field switch
     {
