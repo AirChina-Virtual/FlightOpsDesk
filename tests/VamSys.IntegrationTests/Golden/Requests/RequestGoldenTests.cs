@@ -272,7 +272,7 @@ public class RequestGoldenTests
             Resource = ResourceKind.Routings,
             Kind = ChangeKind.Update,
             Before = before,
-            After = after,
+            After = after.Copy(), // plan items own their rows; the draft row stays untouched
             Fields = new() { ["Remarks"] = new(FieldIntent.Set, "changed"), ["Internal Remarks"] = new(FieldIntent.Unspecified, null) }
         };
         w.Begin("run");
