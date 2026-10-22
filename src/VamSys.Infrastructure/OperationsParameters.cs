@@ -101,7 +101,7 @@ public sealed partial class OperationsAdapter
             using var json = JsonDocument.Parse(text);
             return json.RootElement.TryGetProperty("updated_at", out var value) ? value.ToString() : null;
         }
-        item.PreflightComparison = new(Timestamp(item.Before), Timestamp(current), Maps[item.Resource].Keys
+        item.PreflightComparison = new(Timestamp(item.Before), Timestamp(current), WireFields(item.Resource).Select(f => f.Csv)
             .Where(f => !Equivalent(f, item.Before?.Get(f) ?? "", current?.Get(f) ?? ""))
             .Select(f => new ApiFieldDifference(f, item.Before?.Get(f), current?.Get(f))).ToArray());
     }

@@ -22,14 +22,8 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
     public string ConnectionId => workspace.AirlineId ?? throw Block("ApiConnectFirst");
     public static InvalidOperationException Block(string key, string? field = null) => MessageErrors.Attach(new InvalidOperationException(Messages.Define(key, ("field", field))), Messages.Define(key, ("field", field)));
     public static string Collection(ResourceKind k) => k switch { ResourceKind.Airports => "airports", ResourceKind.Fleets => "fleet", ResourceKind.Routings => "routings", ResourceKind.Routes => "routes", _ => throw new ArgumentException() };
-    static readonly Dictionary<ResourceKind, Dictionary<string, string>> Maps = new()
-    {
-        [ResourceKind.Airports] = new() { ["Name"] = "name", ["Category"] = "category", ["Container IDs"] = "container_ids" },
-        [ResourceKind.Fleets] = new() { ["Name"] = "name", ["Type Code"] = "code", ["Type (pax/cargo/...)"] = "type", ["Max Passengers"] = "max_pax", ["Max Freight"] = "max_cargo", ["Container Units"] = "container_units", ["Hide in Phoenix"] = "hide_in_phoenix", ["Parameter IDs"] = "parameter_ids" },
-        [ResourceKind.Aircraft] = new() { ["Name"] = "name", ["Registration"] = "registration", ["SELCAL"] = "selcal", ["Fin Number"] = "fin_number", ["Hex Code"] = "hexcode", ["Passengers"] = "passengers", ["Freight"] = "cargo", ["Internal Remarks"] = "internal_remarks" },
-        [ResourceKind.Routings] = new() { ["Route String"] = "route", ["Remarks"] = "remarks", ["Internal Remarks"] = "internal_remarks", ["Tags"] = "tag", ["Days of Operation"] = "days_of_operation" },
-        [ResourceKind.Routes] = new() { ["Type"] = "type", ["Callsign"] = "callsign", ["Flight Number"] = "flight_number", ["Fleet IDs"] = "fleet_ids", ["Start Date"] = "start_date", ["End Date"] = "end_date", ["Departure Time (HH:MM)"] = "departure_time", ["Arrival Time (HH:MM)"] = "arrival_time", ["Service Days"] = "service_days", ["Routing"] = "route", ["Remarks"] = "remarks", ["Internal Remarks"] = "internal_remarks", ["Tags"] = "tag", ["Is Hidden"] = "hidden", ["Altitude"] = "altitude", ["Cost Index"] = "cost_index" }
-    };
+    // CSV column, wire name, value type and the other per-field facts live in the field table (FieldSpecs).
+    static IReadOnlyList<FieldSpec> WireFields(ResourceKind kind) => FieldSpecs.Get(kind).WireFields;
     static string Value(JsonElement e) => e.ValueKind switch { JsonValueKind.Null => "", JsonValueKind.Array => string.Join(',', e.EnumerateArray().Select(Value)), JsonValueKind.True => "TRUE", JsonValueKind.False => "FALSE", JsonValueKind.String => e.GetString()!, _ => e.ToString() };
     public DataRow FromJson(ResourceKind kind, JsonElement value)
     {
@@ -49,13 +43,14 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             row.Fields["ID"] = id;
         else
             row.Fields["ICAO/IATA"] = value.TryGetProperty("icao", out var icao) && icao.ValueKind == JsonValueKind.String ? icao.GetString()! : Value(value.GetProperty("iata"));
-        foreach (var (field, wire) in Maps[kind])
-        if (value.TryGetProperty(wire, out var v))
+        foreach (var spec in WireFields(kind))
+        if (value.TryGetProperty(spec.Wire!, out var v))
         {
+            var field = spec.Csv;
             var text = Value(v);
-            if (wire is "departure_time" or "arrival_time" && text.Length == 8)
+            if (spec.Type == FieldType.Time && text.Length == 8)
                 text = text[..5];
-            if (wire is "start_date" or "end_date" && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            if (spec.Type == FieldType.Date && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
                 text = date.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
             row.Fields[field] = text;
         }
@@ -370,46 +365,48 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             { if (!create) throw Block("ApiMoveFleet"); if (preview) PreviewReference(text, ResourceKind.Fleets); else PositiveId(text); continue; }
             if (field == "ICAO/IATA")
             { if (!create) throw Block("ApiImmutable", field); body["icao_iata"] = text; continue; }
-            if (field is "Departure Airport (ICAO/IATA)" or "Arrival Airport (ICAO/IATA)")
+            if (FieldSpecs.Column(field) is { Role: var role } && role == FieldRole.Endpoint)
             {
                 if (!create)
                     throw Block("ApiImmutable", field);
                 body[(field.StartsWith("Departure") ? "departure" : "arrival") + (c.Resource == ResourceKind.Routes ? "_id" : "_airport_id")] = AirportId(text, preview);
                 continue;
             }
-            if (!Maps[c.Resource].TryGetValue(field, out var wire))
+            var spec = FieldSpecs.Get(c.Resource).Find(field);
+            if (spec?.Wire is not { } wire)
             { if (Schemas.All[c.Resource].Columns.Contains(field)) throw Block("ApiUnsupported", field); continue; }
+            // Fleet sets can only change on scheduled routes.
             if (wire == "fleet_ids" && !create && !(c.Before?.Get("Type") == "scheduled" && c.After.Get("Type") == "scheduled"))
                 throw Block("ApiFleetSet");
-            if (wire == "parameter_ids" && !create)
+            if (spec.CreateOnly && !create)
                 throw Block("ApiParameterCreateOnly");
-            if (!create && c.Resource == ResourceKind.Routes && c.Before?.Get("Type") == "jumpseat" && (wire is "callsign" or "flight_number"))
+            if (!create && c.Resource == ResourceKind.Routes && c.Before?.Get("Type") == "jumpseat" && spec.JumpseatReadOnly)
                 throw Block("ApiJumpseatIdentity");
             if (wire == "type" && !create && c.Resource == ResourceKind.Routes && (text == "jumpseat" || c.Before!.Get("Type") == "jumpseat"))
                 throw Block("ApiJumpseat");
             if (text.Length == 0)
             {
-                if (c.Resource == ResourceKind.Airports && wire == "container_ids")
+                if (spec.ClearsToEmptyArray)
                 { body[wire] = Array.Empty<long>(); continue; }
                 throw Block("ApiClear", field);
             }
             object result = text;
-            if (wire is "max_pax" or "max_cargo" or "container_units" or "passengers" or "cargo" or "altitude")
+            if (spec.Type == FieldType.Integer || spec.Type == FieldType.KgInteger)
             { if (!long.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var number)) throw Block("ApiInvalid", field); result = number; }
-            if (wire is "hide_in_phoenix" or "hidden")
+            if (spec.Type == FieldType.Bool)
             { if (!bool.TryParse(text, out var flag)) throw Block("ApiInvalid", field); result = flag; }
-            if (wire is "tag" or "service_days" or "days_of_operation")
+            if (spec.Type == FieldType.TagList || spec.Type == FieldType.DayList)
                 result = text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray();
-            if (wire is "fleet_ids" or "container_ids")
-                result = text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(t => preview && wire == "fleet_ids" ? PreviewReference(t, ResourceKind.Fleets) : PositiveId(t)).Distinct().ToArray();
-            if (wire == "parameter_ids")
+            if (spec.Type == FieldType.IdList)
+                result = text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(t => preview && spec.Reference == ResourceKind.Fleets ? PreviewReference(t, ResourceKind.Fleets) : PositiveId(t)).Distinct().ToArray();
+            if (spec.Type == FieldType.ParameterIdList)
             {
                 var ids = text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).Select(t => PositiveId(t).ToString(CultureInfo.InvariantCulture)).Distinct().ToArray();
                 if (ids.Length != 1)
                     throw Block("ApiInvalid", field);
                 result = ids;
             }
-            if (wire is "departure_time" or "arrival_time")
+            if (spec.Type == FieldType.Time)
             {
                 if (workspace.LocalRouteTimes)
                     throw Block("ApiUtc");
@@ -420,7 +417,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
                 { using var doc = JsonDocument.Parse(raw); if (doc.RootElement.TryGetProperty(wire, out var t) && t.ValueKind == JsonValueKind.String && t.GetString()!.Length == 8) seconds = t.GetString()![6..]; }
                 result = text.Length == 5 ? time.ToString("HH:mm", CultureInfo.InvariantCulture) + ":" + seconds : text;
             }
-            if (wire is "start_date" or "end_date")
+            if (spec.Type == FieldType.Date)
             {
                 if (workspace.LocalRouteTimes || !DateTime.TryParseExact(text, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
                     throw Block("ApiUtc");
@@ -577,8 +574,8 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             return false;
         if (item.Resource == ResourceKind.Aircraft && current.Identity?.ParentFleetId != expected.Identity?.ParentFleetId)
             return false;
-        IEnumerable<string> fields = before && item.Kind == ChangeKind.Delete ? Maps[item.Resource].Keys : item.Fields.Keys;
-        var relevant = fields.Where(f => Maps[item.Resource].ContainsKey(f) || Schemas.ReferenceFields(item.Resource).Contains(f)).ToList();
+        IEnumerable<string> fields = before && item.Kind == ChangeKind.Delete ? WireFields(item.Resource).Select(f => f.Csv) : item.Fields.Keys;
+        var relevant = fields.Where(f => FieldSpecs.Get(item.Resource).Find(f)?.Wire != null || Schemas.ReferenceFields(item.Resource).Contains(f)).ToList();
         if (!relevant.All(f => f is "Departure Airport (ICAO/IATA)" or "Arrival Airport (ICAO/IATA)"
             ? SameEndpoint(item.Resource, current, expected, f, before)
             : Equivalent(f, current.Get(f), f == "Fleet ID" ? expected.Identity?.ParentFleetId ?? expected.Get(f) : expected.Get(f))))
@@ -590,7 +587,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             {
                 using var original = JsonDocument.Parse(expected.RawApiJson);
                 foreach (var f in relevant)
-                    if (Maps[item.Resource].TryGetValue(f, out var wire) && wire is "departure_time" or "arrival_time" or "start_date" or "end_date")
+                    if (FieldSpecs.Get(item.Resource).Find(f) is { Wire: { } wire, Type: var type } && (type == FieldType.Time || type == FieldType.Date))
                         if (original.RootElement.TryGetProperty(wire, out var a) && actual.RootElement.TryGetProperty(wire, out var b) && a.ToString() != b.ToString())
                             return false;
             }
@@ -626,7 +623,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             { reasons.Add(new(wire, wanted.GetRawText(), null)); continue; }
             if (ApiOperationPolicy.IsJumpseatCreate(item) && (wire is "callsign" or "flight_number") && actual.ValueKind == JsonValueKind.Null)
                 continue;
-            if (!WireEquivalent(wire, actual, wanted))
+            if (!WireEquivalent(item.Resource, wire, actual, wanted))
                 reasons.Add(new(wire, wanted.GetRawText(), actual.GetRawText()));
         }
         if (ApiOperationPolicy.IsJumpseatCreate(item) && item.CanProposeRecoveryId)
@@ -652,9 +649,10 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         }
         return new(reasons.Count == 0, reasons);
     }
-    static bool WireEquivalent(string wire, JsonElement actual, JsonElement wanted)
+    static bool WireEquivalent(ResourceKind kind, string wire, JsonElement actual, JsonElement wanted)
     {
-        if (wire is "start_date" or "end_date")
+        var type = FieldSpecs.Get(kind).FindByWire(wire)?.Type ?? default;
+        if (type == FieldType.Date)
             return actual.ValueKind == JsonValueKind.String && wanted.ValueKind == JsonValueKind.String
                 && DateTimeOffset.TryParse(actual.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var a)
                 && DateTimeOffset.TryParse(wanted.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var b) && a == b;
@@ -663,7 +661,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
             if (actual.ValueKind != JsonValueKind.Array)
                 return false;
             // The documented response allows string IDs, while requests require integer IDs.
-            string Key(JsonElement value) => wire is "fleet_ids" or "container_ids" or "parameter_ids"
+            string Key(JsonElement value) => (type == FieldType.IdList || type == FieldType.ParameterIdList)
                 && long.TryParse(value.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var id)
                 ? "id:" + id.ToString(CultureInfo.InvariantCulture) : value.ValueKind == JsonValueKind.String ? "string:" + value.GetString() : value.GetRawText();
             var keys = actual.EnumerateArray().Select(Key).ToArray();
@@ -671,6 +669,6 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         }
         return JsonElement.DeepEquals(actual, wanted);
     }
-    internal static bool Equivalent(string field, string a, string b) => field is "Fleet IDs" or "Tags" or "Service Days" or "Days of Operation" or "Container IDs"
+    internal static bool Equivalent(string field, string a, string b) => FieldSpecs.IsSetCompared(field)
         ? a.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToHashSet().SetEquals(b.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)) : a == b;
 }
