@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using System.Text.Json;
 using VamSys.Core;
+using static VamSys.Infrastructure.Sql;
 
 namespace VamSys.Infrastructure;
 
@@ -15,18 +16,18 @@ public sealed partial class WorkspaceStore
         if (version > FormatVersion)
             throw StorageErrors.Block("StorageNewer");
         if (version == FormatVersion)
-        { Execute(c, null, "PRAGMA journal_mode=WAL"); return; }
+        { SqliteConnectionFactory.EnableWal(c); return; }
         var exists = Convert.ToInt32(Scalar(c, null, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='workspaces'")) > 0;
         if (exists)
         {
             MigrationBackup = Path.Combine(directory, "workspaces-before-v4-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Guid.NewGuid().ToString("N") + ".db");
-            using var backup = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = MigrationBackup, Pooling = false }.ToString());
-            backup.Open();
+            using var backup = SqliteConnectionFactory.OpenBackupTarget(MigrationBackup);
+
             c.BackupDatabase(backup);
             if (!Equals(Scalar(backup, null, "PRAGMA integrity_check"), "ok"))
                 throw StorageErrors.Block("StorageBackupFailed");
         }
-        OnStorageBarrier("Migration:BeforeTransaction");
+        context.Fault("Migration:BeforeTransaction");
         using var tx = c.BeginTransaction();
         Execute(c, tx, "DROP TRIGGER IF EXISTS workspace_format_insert; DROP TRIGGER IF EXISTS workspace_format_update;");
         if (exists)
@@ -85,11 +86,11 @@ public sealed partial class WorkspaceStore
             CREATE TRIGGER workspace_format_insert BEFORE INSERT ON workspaces WHEN NEW.format_version!=4 BEGIN SELECT RAISE(ABORT,'unsupported workspace format'); END;
             CREATE TRIGGER workspace_format_update BEFORE UPDATE ON workspaces WHEN NEW.format_version!=4 BEGIN SELECT RAISE(ABORT,'unsupported workspace format'); END;
             """);
-        OnStorageBarrier("Migration:BeforeCommit");
+        context.Fault("Migration:BeforeCommit");
         Execute(c, tx, "PRAGMA user_version=4");
         tx.Commit();
-        OnStorageBarrier("Migration:AfterCommit");
-        Execute(c, null, "PRAGMA journal_mode=WAL");
+        context.Fault("Migration:AfterCommit");
+        SqliteConnectionFactory.EnableWal(c);
     }
     static void MigrateV3History(SqliteConnection c, SqliteTransaction tx, Guid workspace)
     {
@@ -116,17 +117,4 @@ public sealed partial class WorkspaceStore
             WriteHistory(c, tx, workspace, kind, CaptureHistory(data.History, full: true), full: true);
         }
     }
-    static SqliteCommand Command(SqliteConnection c, SqliteTransaction? tx, string sql, params (string, object?)[] values)
-    {
-        var cmd = c.CreateCommand();
-        cmd.Transaction = tx;
-        cmd.CommandText = sql;
-        foreach (var (key, value) in values)
-            cmd.Parameters.AddWithValue(key, value ?? DBNull.Value);
-        return cmd;
-    }
-    static int Execute(SqliteConnection c, SqliteTransaction? tx, string sql, params (string, object?)[] values)
-    { using var cmd = Command(c, tx, sql, values); return cmd.ExecuteNonQuery(); }
-    static object? Scalar(SqliteConnection c, SqliteTransaction? tx, string sql, params (string, object?)[] values)
-    { using var cmd = Command(c, tx, sql, values); return cmd.ExecuteScalar(); }
 }

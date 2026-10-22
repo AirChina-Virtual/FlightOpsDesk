@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using VamSys.Core;
+using static VamSys.Infrastructure.Sql;
 namespace VamSys.Infrastructure;
 
 public sealed partial class WorkspaceStore

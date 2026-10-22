@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using VamSys.Core;
+using static VamSys.Infrastructure.Sql;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -7,9 +8,8 @@ namespace VamSys.Infrastructure;
 
 public sealed partial class WorkspaceStore
 {
-    readonly string connectionString;
-    readonly object writeLock;
-    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, object> locks = new(StringComparer.OrdinalIgnoreCase);
+    readonly StorageContext context;
+
 #if VAMSYS_TEST_SUPPORT
     public WorkspaceStore(string directory) : this(directory,null) {}
     internal WorkspaceStore(string directory,Action<string>? barrier)
@@ -17,25 +17,15 @@ public sealed partial class WorkspaceStore
     public WorkspaceStore(string directory)
 #endif
     {
-        directory = Path.GetFullPath(directory);
-        Directory.CreateDirectory(directory);
-        connectionString = new SqliteConnectionStringBuilder { DataSource = Path.Combine(directory, "workspaces.db") }.ToString();
-        writeLock = locks.GetOrAdd(directory, _ => new());
+        context = new(directory);
 #if VAMSYS_TEST_SUPPORT
         Barrier=barrier;
 #endif
-        lock (writeLock)
-            Initialize(directory);
+        lock (context.WriteLock)
+            Initialize(context.Connections.DataDirectory);
     }
-    // With no implementation in product builds, the compiler removes these calls and their arguments.
-    partial void OnStorageBarrier(string point);
-    SqliteConnection Open()
-    {
-        var c = new SqliteConnection(connectionString);
-        c.Open();
-        Execute(c, null, "PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL;");
-        return c;
-    }
+    object writeLock => context.WriteLock;
+    SqliteConnection Open() => context.Connections.Open();
     public string LoadLanguage()
     {
         using var c = Open();

@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using System.Security.Cryptography;
 using System.Text.Json;
 using VamSys.Core;
+using static VamSys.Infrastructure.Sql;
 
 namespace VamSys.Infrastructure;
 
@@ -11,7 +12,7 @@ public sealed record WorkspaceMaintenanceResult(Workspace Workspace, WorkspaceBa
 
 public sealed partial class WorkspaceStore
 {
-    public string DataDirectory => Path.GetDirectoryName(new SqliteConnectionStringBuilder(connectionString).DataSource)!;
+    public string DataDirectory => context.Connections.DataDirectory;
     // A rebased, succeeded or manually confirmed item is final; its in-flight step stays as evidence.
     public static bool HasUnresolvedWrites(Workspace workspace) => workspace.Jobs.Any(j => j.Items.Any(i =>
         i.State is ItemState.Running or ItemState.Unknown
@@ -34,14 +35,13 @@ public sealed partial class WorkspaceStore
                 throw StorageErrors.Block("StorageStale");
             if (HasUnresolvedWrites(current))
                 throw StorageErrors.Block("MaintenanceUnsafe");
-            OnStorageBarrier("Maintenance:BeforeBackup");
+            context.Fault("Maintenance:BeforeBackup");
             var directory = Path.Combine(DataDirectory, "Backups");
             Directory.CreateDirectory(directory);
             var path = Path.Combine(directory, $"workspaces-before-clear-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{id:N}-{Guid.NewGuid():N}.db");
             using (var source = Open())
-            using (var backup = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = path, Pooling = false }.ToString()))
+            using (var backup = SqliteConnectionFactory.OpenBackupTarget(path))
             {
-                backup.Open();
                 source.BackupDatabase(backup);
                 if (!Equals(Scalar(backup, null, "PRAGMA integrity_check"), "ok"))
                     throw StorageErrors.Block("MaintenanceBackupFailed");
@@ -66,7 +66,7 @@ public sealed partial class WorkspaceStore
                 historySteps = current.Resources.Sum(p => p.Value.Undo.Count + p.Value.Redo.Count),
                 remoteRollbackSupported = false
             }, new JsonSerializerOptions { WriteIndented = true }));
-            OnStorageBarrier("Maintenance:AfterBackup");
+            context.Fault("Maintenance:AfterBackup");
             ct.ThrowIfCancellationRequested();
             current.Resources = Enum.GetValues<ResourceKind>().ToDictionary(k => k, _ => new ResourceData());
             current.Jobs = [];

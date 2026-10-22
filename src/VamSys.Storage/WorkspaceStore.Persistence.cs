@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 using VamSys.Core;
+using static VamSys.Infrastructure.Sql;
 
 namespace VamSys.Infrastructure;
 
@@ -69,11 +70,11 @@ public sealed partial class WorkspaceStore
                 write(c, tx);
                 var next = expected + 1;
                 Execute(c, tx, "INSERT INTO workspace_revisions(workspace_id,revision) VALUES($w,$r) ON CONFLICT(workspace_id) DO UPDATE SET revision=$r", ("$w", id.ToString()), ("$r", next));
-                OnStorageBarrier(kind + ":BeforeCommit");
+                context.Fault(kind + ":BeforeCommit");
                 tx.Commit();
                 committed = true;
                 metrics?.Saved(true, Stopwatch.GetElapsedTime(start));
-                OnStorageBarrier(kind + ":AfterCommit");
+                context.Fault(kind + ":AfterCommit");
                 return next;
             }
             catch { if (!committed) metrics?.Saved(false, Stopwatch.GetElapsedTime(start)); throw; }

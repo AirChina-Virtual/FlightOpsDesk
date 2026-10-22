@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using System.Globalization;
 using System.Text.Json;
 using VamSys.Core;
+using static VamSys.Infrastructure.Sql;
 namespace VamSys.Infrastructure;
 
 public sealed partial class WorkspaceStore
