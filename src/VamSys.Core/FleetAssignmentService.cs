@@ -11,12 +11,9 @@ public sealed record FleetAssignmentPreview(string Field, List<DataRow> Rows, Li
 /// <summary>Computes final local association sets, never HTTP array patch operations.</summary>
 public sealed class FleetAssignmentService
 {
-    public static string Field(ResourceKind kind) => kind switch
-    {
-        ResourceKind.Aircraft => "Fleet ID",
-        ResourceKind.Routes => "Fleet IDs",
-        _ => throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_77F9BBEB62")), Messages.Define("Text_77F9BBEB62"))
-    };
+    // The column that references fleets, as the field table names it; other resources have none.
+    public static string Field(ResourceKind kind) => FieldSpecs.Get(kind).Fields.FirstOrDefault(f => f.Reference == ResourceKind.Fleets)?.Csv
+        ?? throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_77F9BBEB62")), Messages.Define("Text_77F9BBEB62"));
     public static List<string> Tokens(string value) => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
     public IReadOnlyList<FleetOption> Options(Workspace workspace, IEnumerable<string>? existing = null)
