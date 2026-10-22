@@ -40,8 +40,11 @@ static class PackageChecks
                     Require(methods.Contains(method) == qa, $"Unexpected QA entry point {method} in {name} (QA={qa})");
             if (name is "VamSys.Storage" or "VamSys.Infrastructure")
             {
-                foreach (var method in name == "VamSys.Storage" ? new[] { "get_Barrier", "set_Barrier", "OnStorageBarrier" } : [])
+                foreach (var method in name == "VamSys.Storage" ? new[] { "get_Barrier", "set_Barrier", "get_Faults", "set_Faults" } : [])
                     Require(methods.Contains(method) == qa, $"Unexpected storage test hook {method} (QA={qa})");
+                if (name == "VamSys.Storage")
+                    Require(metadata.TypeDefinitions.Any(handle => metadata.GetString(metadata.GetTypeDefinition(handle).Name) == "ActionStorageFaults") == qa,
+                        $"Unexpected storage fault implementation (QA={qa})");
                 var friends = metadata.GetAssemblyDefinition().GetCustomAttributes().Any(handle =>
                 {
                     var constructor = metadata.GetCustomAttribute(handle).Constructor;

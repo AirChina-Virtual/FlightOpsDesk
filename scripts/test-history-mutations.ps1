@@ -19,7 +19,7 @@ foreach($name in @('missing-after','missing-redo-delete')) {
         $old="if (undo.Count > 0)`n            undo[^1] = Change(undo[^1], true);"
         $new='// MUTATION: omit same-step After update'
     }else{
-        $path=Join-Path $dir 'src/VamSys.Infrastructure/WorkspaceStore.History.cs'
+        $path=Join-Path $dir 'src/VamSys.Storage/Repositories/HistoryRepository.cs'
         $old='foreach (var step in h.Deletes)' + "`n            " + 'Execute(c, tx, "DELETE FROM resource_history_steps WHERE workspace_id=$w AND resource=$r AND step_id=$id", [.. args, ("$id", step.ToString())]);'
         $new='// MUTATION: retain discarded redo and evicted steps'
     }
