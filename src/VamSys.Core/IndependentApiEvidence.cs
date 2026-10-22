@@ -25,29 +25,10 @@ public static class IndependentApiEvidence
             return true;
         if (item.Kind is not (ChangeKind.Create or ChangeKind.Update))
             return false;
-        string[] allowed = (item.Resource, item.Kind) switch
-        {
-            (ResourceKind.Airports, ChangeKind.Create) => ["ICAO/IATA", "Name"],
-            (ResourceKind.Airports, ChangeKind.Update) => ["Name"],
-            (ResourceKind.Fleets, ChangeKind.Create) => ["Name", "Type Code", "Type (pax/cargo/...)", "Max Passengers", "Max Freight", "Hide in Phoenix", "Parameter IDs"],
-            (ResourceKind.Fleets, ChangeKind.Update) => ["Name", "Max Passengers", "Max Freight"],
-            (ResourceKind.Aircraft, ChangeKind.Create) => ["Fleet ID", "Name", "Registration", "Passengers", "Freight", "Internal Remarks"],
-            (ResourceKind.Aircraft, ChangeKind.Update) when IsMove(item) => ["Fleet ID"],
-            (ResourceKind.Aircraft, ChangeKind.Update) => ["Name", "Freight"],
-            (ResourceKind.Routings, ChangeKind.Create) => ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Route String", "Remarks"],
-            (ResourceKind.Routings, ChangeKind.Update) => ["Remarks"],
-            (ResourceKind.Routes, ChangeKind.Create) => ["Type", "Callsign", "Flight Number", "Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)",
-                "Departure Time (HH:MM)", "Arrival Time (HH:MM)", "Routing", "Is Hidden", "Start Date", "End Date", "Remarks", "Internal Remarks", "Service Days"],
-            (ResourceKind.Routes, ChangeKind.Update) when type == "scheduled" => ["Remarks", "Cost Index", "Departure Time (HH:MM)", "Arrival Time (HH:MM)", "Fleet IDs"],
-            (ResourceKind.Routes, ChangeKind.Update) => ["Remarks", "Cost Index", "Departure Time (HH:MM)", "Arrival Time (HH:MM)"],
-            _ => []
-        };
-        if (item.Resource == ResourceKind.Routes && item.Kind == ChangeKind.Create && type == "jumpseat")
-            allowed = [.. allowed, "Cost Index"];
-        if (item.Resource == ResourceKind.Routes && item.Kind == ChangeKind.Create && type == "scheduled")
-            allowed = [.. allowed, "Fleet IDs"];
+        // Which fields were exercised per operation is the Evidence column of the field table.
+        var move = IsMove(item);
         return item.Fields.Where(p => p.Value.Intent != FieldIntent.Unspecified && p.Key != "_delete" && !(item.Kind == ChangeKind.Create && string.IsNullOrEmpty(p.Value.Value)))
-            .All(p => allowed.Contains(p.Key, StringComparer.Ordinal));
+            .All(p => FieldSpecs.InEvidence(item.Resource, p.Key, item.Kind, move, type));
     }
 }
 

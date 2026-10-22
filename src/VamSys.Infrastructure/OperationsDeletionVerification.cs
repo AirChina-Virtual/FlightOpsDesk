@@ -31,7 +31,7 @@ public sealed partial class OperationsAdapter
     }
     // For display only; whether the record is unchanged is decided by Matches(before: true).
     internal List<ApiFieldDifference> BeforeDifferences(ChangeItem item, DataRow current)
-        => Maps[item.Resource].Keys.Where(f => !Equivalent(f, item.Before?.Get(f) ?? "", current.Get(f)))
+        => WireFields(item.Resource).Select(f => f.Csv).Where(f => !Equivalent(f, item.Before?.Get(f) ?? "", current.Get(f)))
             .Select(f => new ApiFieldDifference(f, item.Before?.Get(f), current.Get(f))).ToList();
     internal async Task EnsureReadConnectionAsync(CancellationToken ct)
     {

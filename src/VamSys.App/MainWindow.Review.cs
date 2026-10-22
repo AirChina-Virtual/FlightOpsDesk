@@ -34,13 +34,16 @@ public sealed partial class MainWindow
             if (mode == RunMode.Online && ApiOperationPolicy.HasOpenOnlineItems(w))
                 blockers.Add(Messages.Define("ApiPendingJob"));
             if (mode == RunMode.Demo)
+            {
+                var pass = new ValidationPass(w);
                 foreach (var (kind, data) in w.Resources.Where(p => p.Value.Draft.Count > 0))
-                    foreach (var issue in Schemas.Validate(w, kind))
+                    foreach (var issue in Schemas.Validate(w, kind, pass))
                     {
                         var row = data.FindDraftRow(issue.RowId);
                         blockers.Add(Messages.Define("ReviewValidationIssue", ("resource", Schemas.All[kind].Name),
                             ("key", row is null ? issue.RowId.ToString()[..8] : Schemas.Key(kind, row)), ("field", issue.Field), ("reason", issue.Description)));
                     }
+            }
             var plan = ReviewPlanBuilder.Build(planner.PlanWorkspace(w), mode, connected, verified, preview, blockers, w.ContractHash);
             _ = plan.ContentKey();
             return plan;
