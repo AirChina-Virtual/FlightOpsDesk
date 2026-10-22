@@ -12,6 +12,7 @@ public sealed partial class WorkspaceStore
     readonly SecretStore secrets;
     readonly UnitOfWork unit;
     readonly WorkspaceWriter writer;
+    readonly MaintenanceService maintenance;
 #if VAMSYS_TEST_SUPPORT
     public WorkspaceStore(string directory) : this(directory,null) {}
     internal WorkspaceStore(string directory,Action<string>? barrier)
@@ -24,6 +25,7 @@ public sealed partial class WorkspaceStore
         secrets = new(context);
         unit = new(context);
         writer = new(unit);
+        maintenance = new(context, unit);
 #if VAMSYS_TEST_SUPPORT
         Barrier=barrier;
 #endif
@@ -67,6 +69,12 @@ public sealed partial class WorkspaceStore
     public Task<bool> TrySaveDraftRowsAsync(Workspace w, IReadOnlyCollection<DraftRowChanges> changes) => writer.TrySaveDraftRowsAsync(w, changes);
     public IBatchCheckpointWriter CheckpointWriter(Workspace w) => new BatchCheckpointWriter(unit, w);
     internal long SavePayload(FullPayload p, byte[]? secret = null) => writer.SavePayload(p, secret);
+
+    public string DataDirectory => context.Connections.DataDirectory;
+    public static bool HasUnresolvedWrites(Workspace workspace) => MaintenanceService.HasUnresolvedWrites(workspace);
+    public WorkspaceMaintenancePreview PreviewMaintenance(Guid id) => maintenance.Preview(id);
+    public Task<WorkspaceMaintenanceResult> BackupAndClearAsync(Guid id, long expectedRevision, CancellationToken ct = default)
+        => Task.Run(() => maintenance.BackupAndClear(id, expectedRevision, ct), ct);
 
     public void SaveSecret(Guid id, string secret) => secrets.Save(id, secret);
     public string? LoadSecret(Guid id) => secrets.Load(id);
