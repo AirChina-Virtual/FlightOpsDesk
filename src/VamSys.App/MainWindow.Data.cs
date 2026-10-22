@@ -319,13 +319,18 @@ public sealed partial class MainWindow
                     var before = ChangePlanner.GetChangeKind(current, tableBaseline.GetValueOrDefault(currentId));
                     var key = currentId + ":" + field;
                     var newStep = lastEditedCell != key;
-                    data.Edit([currentId], () => current.Fields[field] = value, newStep: newStep);
+                    // Rows are replaced, never edited in place: the view follows the replacement.
+                    var replacement = current.Copy();
+                    replacement.Fields[field] = value;
+                    data.Edit([currentId], () => data.ReplaceDraftRows([replacement]), newStep: newStep);
+                    view!.ReplaceRow(replacement);
+                    current = replacement;
                     lastEditedCell = key;
                     var after = ChangePlanner.GetChangeKind(current, tableBaseline.GetValueOrDefault(currentId));
                     if (changeCounts.TryGetValue(data, out var count))
                         changeCounts[data] = count + (after != null ? 1 : 0) - (before != null ? 1 : 0);
                     view?.Cells.FirstOrDefault(c => c.Field == "_delete")?.RefreshLanguage();
-                    edits.Cell(owner, link.Kind, currentId, newStep);
+                    edits.Cell(owner, link.Kind, currentId);
                     SaveSoon();
                     Status(() => L("Text_75141EDE81"));
                 })

@@ -36,8 +36,8 @@ static class DraftSaveScenarios
             using(var full=PerformanceRun.Begin(w.Id,Guid.NewGuid())){var watch=Stopwatch.StartNew();store.Save(w);fullMs=watch.Elapsed.TotalMilliseconds;fullBytes=full.JsonBytes;}
             using(var c=Open(dir))Sql(c,Touched);
             var data=w.Resources[ResourceKind.Routes];var edits=new DraftEdits();
-            data.Edit([data.Draft[10].LocalId],()=>data.Draft[10].Fields["Flight Number"]="EDIT1",newStep:false);edits.Cell(w,ResourceKind.Routes,data.Draft[10].LocalId,false);
-            data.Edit([data.Draft[19999].LocalId],()=>data.Draft[19999].Fields["Callsign"]="EDIT2",newStep:false);edits.Cell(w,ResourceKind.Routes,data.Draft[19999].LocalId,false);
+            data.Edit([data.Draft[10].LocalId],()=>data.Draft[10].Fields["Flight Number"]="EDIT1",newStep:false);edits.Cell(w,ResourceKind.Routes,data.Draft[10].LocalId);
+            data.Edit([data.Draft[19999].LocalId],()=>data.Draft[19999].Fields["Callsign"]="EDIT2",newStep:false);edits.Cell(w,ResourceKind.Routes,data.Draft[19999].LocalId);
             long rowBytes;double rowMs;
             using(var run=PerformanceRun.Begin(w.Id,Guid.NewGuid())){var watch=Stopwatch.StartNew();Assert(await store.TrySaveDraftRowsAsync(w,edits.Changes));rowMs=watch.Elapsed.TotalMilliseconds;rowBytes=run.JsonBytes;Assert(run.Checkpoints["Draft"]==1);}
             using(var c=Open(dir))
@@ -48,7 +48,7 @@ static class DraftSaveScenarios
             }
             Assert(store.Load(w.Id).Serialize()==w.Serialize(),"Reload differs after row save");
             // A new undo step writes that resource's history too, and nothing else.
-            data.Edit([data.Draft[5].LocalId],()=>data.Draft[5].Fields["Flight Number"]="EDIT3");edits.Take();edits.Cell(w,ResourceKind.Routes,data.Draft[5].LocalId,true);
+            data.Edit([data.Draft[5].LocalId],()=>data.Draft[5].Fields["Flight Number"]="EDIT3");edits.Take();edits.Cell(w,ResourceKind.Routes,data.Draft[5].LocalId);
             long historyBytes;using(var run=PerformanceRun.Begin(w.Id,Guid.NewGuid())){Assert(await store.TrySaveDraftRowsAsync(w,edits.Changes));historyBytes=run.JsonBytes;}
             using(var c=Open(dir))
             {
@@ -92,23 +92,23 @@ static class DraftSaveScenarios
         {
             var dir=Temp();var store=new WorkspaceStore(dir);var w=Fixture();store.Save(w);
             var other=store.Load(w.Id);other.Name="changed elsewhere";store.Save(other);
-            var row=w.Resources[ResourceKind.Fleets].Draft[0];row.Fields["Name"]="stale edit";var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId,false);
+            var row=w.Resources[ResourceKind.Fleets].Draft[0];row.Fields["Name"]="stale edit";var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);
             var revision=w.StorageRevision;
             try{await store.TrySaveDraftRowsAsync(w,edits.Changes);throw new Exception("Stale row save accepted");}catch(InvalidOperationException e){Assert(MessageErrors.Describe(e).Code=="StorageStale");}
             Assert(w.StorageRevision==revision&&store.Load(w.Id).Resources[ResourceKind.Fleets].Draft[0].Get("Name")!="stale edit");
-            var fresh=store.Load(w.Id);var before=fresh.Serialize();var missing=new DraftEdits();missing.Cell(fresh,ResourceKind.Fleets,Guid.NewGuid(),true);
+            var fresh=store.Load(w.Id);var before=fresh.Serialize();var missing=new DraftEdits();missing.Cell(fresh,ResourceKind.Fleets,Guid.NewGuid());
             Assert(!await store.TrySaveDraftRowsAsync(fresh,missing.Changes)&&store.Load(w.Id).Serialize()==before,"Missing row wrote data");
         });
         await test("Pending edits hand over to a save, return after failure and force full saves when unsure",()=>
         {
             var w=new Workspace();var id=Guid.NewGuid();var edits=new DraftEdits();
             Assert(!edits.CanSaveRows(w),"Empty edits allow a row save");
-            edits.Cell(w,ResourceKind.Fleets,id,false);Assert(edits.CanSaveRows(w)&&!edits.CanSaveRows(new Workspace()));
+            edits.Cell(w,ResourceKind.Fleets,id);Assert(edits.CanSaveRows(w)&&!edits.CanSaveRows(new Workspace()));
             var taken=edits.Take();Assert(!edits.CanSaveRows(w)&&taken.CanSaveRows(w)&&taken.Changes.Single().Rows.Single()==id&&taken.Changes.Single().History!.Upserts.Length==0);
-            var later=Guid.NewGuid();edits.Cell(w,ResourceKind.Routes,later,true);edits.Restore(taken);
+            var later=Guid.NewGuid();edits.Cell(w,ResourceKind.Routes,later);edits.Restore(taken);
             Assert(edits.RequiresFullSave&&!edits.CanSaveRows(w)&&edits.Changes.Count==2,"Failed save not merged back");
             var retried=edits.Take();Assert(retried.RequiresFullSave&&!edits.RequiresFullSave&&edits.Changes.Count==0);
-            var switched=new DraftEdits();switched.Cell(w,ResourceKind.Fleets,id,false);switched.Cell(new Workspace(),ResourceKind.Fleets,id,false);
+            var switched=new DraftEdits();switched.Cell(w,ResourceKind.Fleets,id);switched.Cell(new Workspace(),ResourceKind.Fleets,id);
             Assert(switched.RequiresFullSave,"Edits from two workspaces allowed a row save");
             return Task.CompletedTask;
         });

@@ -13,7 +13,7 @@ public partial class App : Application
     }
     static void RecordFailure(Exception e)
     {
-        var directory = Environment.GetEnvironmentVariable("VAMSYS_DATA_DIR") ?? System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VamSysBatch");
+        var directory = VamSys.Core.AppPaths.DataDirectory;
         System.IO.Directory.CreateDirectory(directory);
         System.IO.File.AppendAllText(System.IO.Path.Combine(directory, "startup-error.log"), $"{DateTimeOffset.UtcNow:O} {e.GetType().Name} {e.Message}\n{e.StackTrace}\n");
     }
@@ -21,7 +21,7 @@ public partial class App : Application
     {
         try
         {
-            var directory = Environment.GetEnvironmentVariable("VAMSYS_DATA_DIR") ?? System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VamSysBatch");
+            var directory = VamSys.Core.AppPaths.DataDirectory;
             dataLease = new(directory);
             window = new MainWindow();
             window.Closed += (_, _) => { dataLease?.Dispose(); dataLease = null; };

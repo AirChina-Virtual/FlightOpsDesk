@@ -91,8 +91,11 @@ sealed class WorkspaceScenario : IDisposable
     public void EditCell(ResourceKind kind, DataRow row, string field, string value, bool newStep = true)
     {
         var data = Data(kind);
-        data.Edit([row.LocalId], () => row.Fields[field] = value, newStep: newStep);
-        Edits.Cell(W, kind, row.LocalId, newStep);
+        // Callers keep their first row reference; edits go to the current row, which is replaced like the app does.
+        var replacement = (data.FindDraftRow(row.LocalId) ?? row).Copy();
+        replacement.Fields[field] = value;
+        data.Edit([row.LocalId], () => data.ReplaceDraftRows([replacement]), newStep: newStep);
+        Edits.Cell(W, kind, row.LocalId);
     }
 
     /// <summary>Undo or redo; row-level save when the step replaced rows in place, otherwise a full save.</summary>
@@ -171,7 +174,12 @@ sealed class WorkspaceScenario : IDisposable
                 if (row is null)
                 { data.Conflicts.Remove(conflict); await SaveAll(); continue; }
                 if (useRemote(kind, conflict))
-                    data.Edit([row.LocalId], () => { if (conflict.Field == "*") data.Draft.Remove(row); else row.Fields[conflict.Field] = conflict.Remote ?? ""; }, newStep: false, structural: conflict.Field == "*");
+                {
+                    var replacement = row.Copy();
+                    if (conflict.Field != "*")
+                        replacement.Fields[conflict.Field] = conflict.Remote ?? "";
+                    data.Edit([row.LocalId], () => { if (conflict.Field == "*") data.Draft.Remove(row); else data.ReplaceDraftRows([replacement]); }, newStep: false, structural: conflict.Field == "*");
+                }
                 data.Conflicts.Remove(conflict);
                 await SaveAll();
             }

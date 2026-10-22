@@ -74,7 +74,10 @@ public sealed partial class WorkspaceStore
             if (version < 2)
                 Execute(c, tx, "INSERT INTO workspace_revisions VALUES($id,0)", ("$id", id));
             if (version < 2)
+            {
                 WriteJobs(c, tx, payload);
+            }
+            // Always runs, whatever the previous version.
             WriteResources(c, tx, payload);
         }
         Execute(c, tx, """

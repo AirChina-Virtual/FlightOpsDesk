@@ -66,7 +66,7 @@ static class StorageProcessScenarios
         using var lease=new DataDirectoryLease(args[1]);
         var store=new WorkspaceStore(args[1],Barrier);var w=store.Load(Guid.Parse(args[3]));
         var data=w.Resources[ResourceKind.Fleets];var row=data.Draft[0];data.Edit([row.LocalId],()=>row.Fields["Name"]="Edited in child");
-        var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId,true);
+        var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);
         StorageScenarios.Check(await store.TrySaveDraftRowsAsync(w,edits.Changes),"Row save fell back");
         await writer.WriteLineAsync(JsonSerializer.Serialize(new Wire("done")));
     }

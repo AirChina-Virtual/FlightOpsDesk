@@ -107,6 +107,8 @@ public sealed class CsvAdapter : ICsvResourceAdapter
             var added = rows.Where(r => !existing.ContainsKey(Schemas.Key(kind, r))).ToArray();
             data.Edit(matchedIds.Concat(added.Select(r => r.LocalId)), () =>
             {
+                // Matched rows are replaced by edited copies, never edited in place.
+                var replacements = new List<DataRow>();
                 foreach (var incoming in rows)
                 {
                     var key = Schemas.Key(kind, incoming);
@@ -114,16 +116,19 @@ public sealed class CsvAdapter : ICsvResourceAdapter
                     {
                         if (matches.Count != 1)
                             throw MessageErrors.Attach(new InvalidOperationException(Messages.Define("Text_C73CE653CA", ("arg0", key))), Messages.Define("Text_C73CE653CA", ("arg0", key)));
+                        var replacement = matches[0].Copy();
                         foreach (var (f, v) in incoming.Fields)
                         {
                             if (kind == ResourceKind.Airports && f == "ICAO/IATA" && matches[0].Identity != null)
                                 continue;
-                            matches[0].Fields[f] = v;
+                            replacement.Fields[f] = v;
                         }
+                        replacements.Add(replacement);
                     }
                     else
                         data.Draft.Add(incoming);
                 }
+                data.ReplaceDraftRows(replacements);
             }, structural: added.Length > 0);
         }
         data.Columns = data.Columns.Concat(rows.SelectMany(r => r.Fields.Keys)).Distinct().ToList();

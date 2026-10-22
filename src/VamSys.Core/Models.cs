@@ -15,23 +15,89 @@ public record Issue(Guid RowId, string Field, MessageDescriptor Description)
 
 public sealed class DataRow
 {
-    public DataRow() { LocalId = Guid.NewGuid(); Fields = new(StringComparer.Ordinal); }
+    public DataRow() { localId = Guid.NewGuid(); fields = new(StringComparer.Ordinal); }
     // A copy already has its identity and fields; avoid allocating defaults to overwrite.
     DataRow(DataRow source)
     {
-        LocalId = source.LocalId;
-        Identity = source.Identity;
-        RawApiJson = source.RawApiJson;
-        Fields = new(source.Fields, StringComparer.Ordinal);
+        localId = source.localId;
+        identity = source.identity;
+        rawApiJson = source.rawApiJson;
+        fields = new(source.fields, StringComparer.Ordinal);
     }
     internal DataRow(Guid localId, ResourceIdentity? identity, string? rawApiJson, Dictionary<string, string> fields)
-    { LocalId = localId; Identity = identity; RawApiJson = rawApiJson; Fields = fields; }
-    public Guid LocalId { get; set; }
-    public ResourceIdentity? Identity { get; set; }
-    public string? RawApiJson { get; set; }
-    public Dictionary<string, string> Fields { get; set; }
-    public string Get(string key) => Fields.GetValueOrDefault(key, "");
+    { this.localId = localId; this.identity = identity; this.rawApiJson = rawApiJson; this.fields = fields; }
+
+    Guid localId;
+    ResourceIdentity? identity;
+    string? rawApiJson;
+    Dictionary<string, string> fields;
+    // Debug-only guard state (not serialized, absent from Release builds): once a row has been placed in a
+    // ResourceData list it is frozen and its content must never change; edits replace the row with a copy.
+#if DEBUG
+    bool frozen;
+    int fingerprint;
+#endif
+
+    public Guid LocalId { get => localId; set { GuardWrite(); localId = value; } }
+    public ResourceIdentity? Identity { get => identity; set { GuardWrite(); identity = value; } }
+    public string? RawApiJson { get => rawApiJson; set { GuardWrite(); rawApiJson = value; } }
+    // The dictionary itself cannot intercept writes: assignment is guarded immediately and indexer/Add/Remove
+    // writes are detected by AssertUnchanged at the next edit, capture, copy-in or freeze.
+    public Dictionary<string, string> Fields { get => fields; set { GuardWrite(); fields = value; } }
+    public string Get(string key) => fields.GetValueOrDefault(key, "");
     public DataRow Copy() => new(this);
+
+    /// <summary>True when the debug guard is compiled into this build (Debug configuration of VamSys.Core).</summary>
+    public static bool GuardEnabled =>
+#if DEBUG
+        true;
+#else
+        false;
+#endif
+    public bool HasBeenFrozen() =>
+#if DEBUG
+        frozen;
+#else
+        false;
+#endif
+    /// <summary>Debug builds: marks the row as owned by a ResourceData list (verifying it when already frozen). No-op in Release.</summary>
+    public void Freeze()
+    {
+#if DEBUG
+        if (frozen)
+            AssertUnchanged();
+        else
+        { fingerprint = Fingerprint(); frozen = true; }
+#endif
+    }
+    /// <summary>Debug builds: throws when a frozen row's content differs from when it was frozen. No-op in Release.</summary>
+    public void AssertUnchanged()
+    {
+#if DEBUG
+        if (frozen && fingerprint != Fingerprint())
+            throw new InvalidOperationException($"DataRow {localId} was modified in place after it was placed in a ResourceData list; replace the row with a Copy() instead.");
+#endif
+    }
+    void GuardWrite()
+    {
+#if DEBUG
+        if (frozen)
+            throw new InvalidOperationException($"DataRow {localId} is frozen; replace the row with a Copy() instead of editing it in place.");
+#endif
+    }
+#if DEBUG
+    int Fingerprint()
+    {
+        var hash = new HashCode();
+        hash.Add(localId);
+        hash.Add(identity);
+        hash.Add(rawApiJson, StringComparer.Ordinal);
+        hash.Add(fields.Count);
+        foreach (var (key, value) in fields)
+        { hash.Add(key, StringComparer.Ordinal); hash.Add(value, StringComparer.Ordinal); }
+        return hash.ToHashCode();
+    }
+#endif
 }
 public sealed record ResourceIdentity(string RemoteId, string ConnectionId, string? ParentFleetId = null);
 public sealed record MergeConflict(Guid RowId, string Field, string? Original, string? Local, string? Remote);
@@ -39,10 +105,19 @@ public sealed record MergeConflict(Guid RowId, string Field, string? Original, s
 [System.Text.Json.Serialization.JsonConverter(typeof(ResourceDataConverter))]
 public sealed partial class ResourceData
 {
-    public List<DataRow> Snapshot { get; set; } = [];
+    List<DataRow> snapshot = [];
     List<DataRow> draft = [];
     Dictionary<Guid, int>? draftIndex;
-    public List<DataRow> Draft { get => draft; set { draft = value; InvalidateDraftIndex(); } }
+    public List<DataRow> Snapshot { get => snapshot; set { snapshot = value; FreezeAll(value); } }
+    public List<DataRow> Draft { get => draft; set { draft = value; InvalidateDraftIndex(); FreezeAll(value); } }
+    // Debug builds: rows that enter a list become read-only (see DataRow.Freeze); a no-op in Release.
+    // [Conditional] also skips evaluating the arguments in Release.
+    [System.Diagnostics.Conditional("DEBUG")]
+    internal static void FreezeAll(IEnumerable<DataRow> rows)
+    {
+        foreach (var row in rows)
+            row.Freeze();
+    }
     public List<string> Columns { get; set; } = [];
     public DateTimeOffset? SnapshotAt { get; set; }
     public EditHistory History { get; set; } = new();
@@ -64,7 +139,7 @@ public sealed partial class ResourceData
     internal Dictionary<Guid, int> GetDraftPositions() { EnsureDraftIndex(); return draftIndex!; }
     // Used only after history has validated every source and destination position.
     internal void ReplaceIndexedDraft(List<DataRow> rows, Dictionary<Guid, int> positions)
-    { draft = rows; draftIndex = positions; }
+    { draft = rows; draftIndex = positions; FreezeAll(rows); }
     public int FindDraftPosition(Guid id)
     {
         EnsureDraftIndex();
@@ -94,6 +169,7 @@ public sealed partial class ResourceData
         }
         foreach (var (position, row) in prepared)
             Draft[position] = row;
+        FreezeAll(prepared.Select(p => p.Row));
     }
     public void ClearHistory(bool invalidateIndex = true) { History.Clear(); if (invalidateIndex) InvalidateDraftIndex(); }
     public HistoryMove UndoEdit() => History.Move(this, undo: true);
@@ -107,6 +183,7 @@ public sealed class Workspace
     public string Name { get; set; } = Messages.Define("Text_707DBE0213");
     public RunMode Mode { get; set; }
     public bool LocalRouteTimes { get; set; }
+    // Persisted but unused: the API address is fixed (OperationsAdapter.BaseUri). Kept for the saved format.
     public string InstanceUrl { get; set; } = "";
     public string? AirlineId { get; set; }
     public string? ClientId { get; set; }

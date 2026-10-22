@@ -12,9 +12,9 @@ public sealed class DraftEdits
     public Workspace? Owner { get; private set; }
     public bool RequiresFullSave { get; private set; }
 
-    // A value edited in place; checkpointed when the edit also added an undo step.
-    public void Cell(Workspace workspace, ResourceKind kind, Guid row, bool checkpointed) => Rows(workspace, kind, [row]);
-    // Rows replaced in place, e.g. by an undo or redo; the moved step is saved with that resource's history.
+    // A cell edit; the row was replaced by an edited copy.
+    public void Cell(Workspace workspace, ResourceKind kind, Guid row) => Rows(workspace, kind, [row]);
+    // Rows replaced, e.g. by an undo or redo; the moved step is saved with that resource's history.
     public void Rows(Workspace workspace, ResourceKind kind, IEnumerable<Guid> changed)
     {
         if (Owner != null && !ReferenceEquals(Owner, workspace))
