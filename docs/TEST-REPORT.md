@@ -4,6 +4,37 @@
 
 自动回归使用隔离合成数据，数据库位于 GUID 或测试专用目录。已有真实 vCCA 账号的独立 API 脚本证据，写入只针对当轮自建记录，并完成清理。独立脚本、软件模拟回归、软件真实 GET 与窗口／真实写入验收分别记录，见 [能力验证矩阵](CAPABILITY-MATRIX.md)。本轮不自动执行新的真实业务写入，不使用 computer-use。
 
+## R2 领域与 I/O 边界验收（2026-10-22）
+
+最终源码在 Release 下通过 395 项检查：旧运行器 271 项（37.3 s）、xUnit 单元测试 74 项、集成测试 50 项，失败和跳过均为 0。Debug 单元测试另跑 74 项，全部通过，包含行不可变守卫。分析器干净重建通过，198 条现有告警未超过 198 条基线；基线只把 Core 的 4 条告警归属迁到 Domain，没有增加额度。
+
+本轮新增 5 项单元测试，检查 Domain／Application 的实际程序集归属、依赖方向、Domain 不调用文件／网络／环境目录／日志 API、编译后的中英文资源与旧消息、宿主缺失资源日志的顺序及重复注册。C# 迭代器生成的 `Environment.CurrentManagedThreadId` 调用单独放行，其他 Environment 调用仍禁止。改动前的架构测试有 3 项按预期失败，迁移后通过。
+
+请求、存储、CSV 金样及枚举、持久化形状、资源键、AutomationId、能力常量清单全部通过，预期文件和 `docs/contracts` 没有修改。真实数据检查使用 R0 保存副本的再复制目录，与原有计数、摘要和 Pending 项基线一致；未连接 API，未打开用户原库或执行其任务。
+
+`test-history-mutations.ps1` 已适配 Domain 路径及格式化后的锚点。两个隔离副本分别省略同一步 After 更新、保留应删除的 redo 历史，均成功编译并被历史行为断言拒绝。Release 中四个行属性 setter 的空守卫调用已在 IL 中移除，Debug 行守卫测试仍通过。
+
+正式包与最终 QA 包分别发布到本机 `artifacts/r2-closeout-20261022/after-product`、`after-qa-recheck`，包检查均通过。正式包 541 个文件、245,534,638 字节；QA 包 545 个文件、245,905,632 字节。两者包含 Domain、Application 和中英文资源；正式包检查覆盖测试入口、故障注入、PDB、运行文件、依赖及文档链接。现有 `artifacts/flightops-app` 没有替换。
+
+首轮窗口检查在 `data-edit-rebound` 失败：QA 代码读取了编辑前的旧行对象，而 R2 编辑会替换行。该检查已改为按 LocalId 重新取得当前草稿中的目标行与上一页行，同时断言新值与上一页内容。生产编辑逻辑未变。修正后 5 万行数据页脚本通过，初始失败日志单独保留为 `after-data-ui-initial-failure.log`。
+
+本轮在隔离 QA 包和 150% 显示缩放下完成以下窗口检查：
+
+| 检查 | 结果与证据 |
+|---|---|
+| 5 万行数据页 | 功能与脚本绝对阈值通过；分页、跨页选择、重绑后编辑、撤销／重做和关闭均通过，见 `after-data-ui.log`。相对基线的性能判定另见性能报告 |
+| 撤销与重做 | 真实按钮、跨自动保存续写、切换工作区和重启后的历史通过，见 `after-History-ui.log` |
+| 自动保存及强制退出 | 两次编辑各写行，没有完整保存，强制结束后值仍存在，见 `after-Autosave-ui.log` |
+| 旧 v4 读取新库 | R2 前提交 `a761ac79` 的程序集读取新版上述自动保存数据库，内容断言通过，见 `old-v4-read-new-db.log` |
+| 关闭失败与重试 | 冻结后阻止编辑、操作和重复关闭；注入保存失败后恢复；重试关闭和重启读取通过，见 `after-Close-ui.log` |
+| 2 万行交互矩阵 | 中英文、明暗、宽窄窗口、两种密度共 16 种组合通过；舒适 6 行、紧凑 9 行，见 `after-interactions-ui.log` |
+| 真实鼠标、键盘及 UIA | 前台窗口下点击、输入、Tab、Esc、UIA Value／SetValue 和删除行只读通过；修正后的正式测试脚本复跑也通过，见 `after-cells-foreground.log` 与 `after-cells-final.log` |
+| 启动、读取、切换、审阅、滚动和内存 | 完成测量，脚本自身没有相对性能门槛；数值及判定见性能报告 |
+
+鼠标脚本此前在新旧版本均出现点击后焦点仍在标题栏的失败。UIA 返回物理像素坐标，原 PowerShell 进程未启用 DPI 感知；在启用 DPI 感知且保持 QA 前台后，全流程通过。脚本现显式启用 DPI 感知、刷新窗口句柄并在点击前核验前台窗口。诊断中另有一次在 UIA SetValue 后仍存在编辑框的失败，重跑完整通过；这些失败日志均保留，没有删除断言。坐标依据见 [Microsoft UI Automation 缩放说明](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-screenscaling)。
+
+最终构建、测试、包哈希和源码清单在 `artifacts/r2-closeout-20261022`：`final-analyzer.log`、`final-VamSys.*.log`、`final-debug-tests.log`、`history-mutations.log`、`*-package.log`、`*-sha256.csv`、`product-source-sha256.csv`。原始数据只在本机保存，不提交真实数据库。功能检查通过，性能验收未通过，因此 R2 保持未关闭；全部完成的性能对照及原始失败记录见 [性能报告](PERFORMANCE.md)。云端 CI 尚未运行，旧本地化脚本的已知问题仍按 R6／R7 处理。
+
 ## 自动测试（2026-10-20）
 
 **271 项全部通过（约 29 s）。** 其中“真实 v3 旧程序拒绝 v4 数据库”一项需要本机保留的旧程序（`artifacts/step5-v3-baseline`），没有该基线的机器上为 270 项。包含此前 API／维护、呈现和 9 项启动交接回归、21 项已验证范围开放与写入结果判定回归，以及 11 项路线图阶段 1（解除卡死）回归。

@@ -4,7 +4,7 @@
 
 ## 文案与数据边界
 
-- `VamSys.Core/Resources/Strings.resx` 是中文基础资源，`Strings.en-US.resx` 是英文资源。现有 `Text_…` 键为固定标识，修改翻译时保留键；新文案建议采用有意义的语义键。禁止根据修改后的文字重新生成现有键。
+- `src/VamSys.Domain/Resources/Strings.resx` 是中文基础资源，`Strings.en-US.resx` 是英文资源。资源基名继续使用 `VamSys.Core.Resources.Strings`。现有 `Text_…` 键为固定标识，修改翻译时保留键；新文案建议采用有意义的语义键。禁止根据修改后的文字重新生成现有键。
 - `ILocalizationService` 负责资源查找、显示文化和语言事件，业务层不读取当前界面语言。参数按名称匹配，替换仅进行一遍，用户输入中的花括号不会再被解释。
 - 官方表头、字段名、枚举数据值、ID、用户机型名称、备注和未知 CSV 列不翻译。Windows 原生系统界面遵循系统语言。
 - 数量和任务日期显式使用显示文化；业务解析和 CSV 格式保留原契约。不会改动进程的全局 CultureInfo。

@@ -64,9 +64,11 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:Restor
 | 目录 | 内容 |
 |---|---|
 | [src/VamSys.App](src/VamSys.App/README.md) | 窗口、数据表格、审阅、任务、多语言和图标 |
-| [src/VamSys.Core](src/VamSys.Core/README.md) | 判断数据怎样修改和检查、撤销历史、生成修改清单 |
+| [src/VamSys.Domain](src/VamSys.Domain/README.md) | 字段规格、数据检查、撤销历史、生成修改清单；不依赖其他产品项目 |
+| [src/VamSys.Application](src/VamSys.Application/README.md) | I/O 端口、批次编排、待保存编辑和关闭流程；仅依赖 Domain |
 | [src/VamSys.Infrastructure](src/VamSys.Infrastructure/README.md) | 连接 vaMSYS、查找重复记录、在本机保存数据 |
 | [tests/VamSys.Tests](tests/VamSys.Tests/README.md) | 自动测试、窗口脚本和测量方法 |
+| tests/VamSys.UnitTests、tests/VamSys.IntegrationTests | xUnit 单元测试、架构与兼容性清单、请求／存储／CSV 金样和真实库副本回归 |
 | scripts | 生成程序和图标、自动操作窗口、测量性能 |
 | docs | 使用方法、API 支持情况、测试与性能报告、升级说明；history 保存历史报告 |
 | examples | CSV 示例 |
@@ -78,10 +80,11 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:Restor
 artifacts、archive、`.tools`、bin 和 obj 都只保存在本机，不会提交到 GitHub。
 
 - **artifacts**
-  - flightops-app：当前正式包；2026-10-20 阶段 1 版，由提交 6f52a7c 构建，通过 271 项回归和包检查。阶段 1 新增的界面尚未做窗口验收。
+  - flightops-app：保留的 2026-10-20 阶段 1 正式包；2026-10-22 读取 DLL 的 ProductVersion 为 `1.0.0+3cc71c595ddb129a6a6450fcc91d58ea7939da27`。本轮没有替换该目录，R2 新包单独存放。
   - FlightOpsDesk-2026-10-20-phase1-win-x64.zip 及 .sha256：当前正式交付压缩包与校验文件；上一版（审阅修复版）的正式目录和 ZIP 已归档到 archive/2026-10-20-phase1-release。
   - step5-v3-baseline：真实旧版程序的回归基线，测试会用到，不能当作普通旧包清理。
-  - v3-qa、test-build 和各项目 bin/obj：可重建输出，本次整理已删除，后续发布或构建会重新生成。
+  - r2-closeout-20261022：R2 的独立正式包 `after-product`、修正窗口检查后的 QA 包 `after-qa-recheck`、初始 QA 包、重构前对照包，以及测试日志、性能原始数据、源码和程序集哈希。现有正式交付目录与 ZIP 保留。
+  - v3-qa、test-build 和各项目 bin/obj：可重建输出；此前整理曾删除，本轮测试已重新生成部分构建缓存。
 - **archive**：按日期存放已归档的内容。每个目录都有说明、逐文件 SHA-256 清单（*-files.csv）、ZIP 校验值及清理记录。2026-10-19-performance 保存此前测量、窗口结果和旧包；2026-10-20-cleanup 保存本次被替换的正式包，以及 core-performance（含修改前源码）、checkbox-theme、encoding-verification、cache-cleanup、repository-metadata、step5-performance、storage-v3-20260922 和 step5 日志。
 - **阶段 1 提交后整理**：删除构建输出（src／tests 的 bin、obj，artifacts/test-build）和测试生成的 artifacts/step5-performance，共 1,503 个文件、约 601 MB，均可重新生成；逐文件清单在 archive/2026-10-20-phase1-cleanup。
 - **此前的构建后整理**：archive/2026-10-20-startup-fix-cleanup 保存 152 个项目文件的清理前备份、未提交差异、重新生成的 6 份 step5-performance 结果、逐文件清单与删除记录。已删除重新构建产生的 test-build 及 src/tests 的 bin/obj；当前正式目录、ZIP、SDK 和旧版兼容性基线保留。
@@ -91,4 +94,4 @@ artifacts、archive、`.tools`、bin 和 obj 都只保存在本机，不会提�
 
 ## 验证记录
 
-**260 项自动测试通过**（没有本机旧版基线时为 259 项），使用隔离合成数据。最近修复了未发出或被认证拒绝的写入被误标为未知、Unknown 无法解除、旧版两步新建无法续传、空 VA 无法连接和数字 Client ID 改写诊断正文，此前还修复了短数字 Client ID 下删除自动核对失败、提交保存失败后任务残留和 Unknown 审阅重复执行，均有对应回归；此前 15 项范围开放、飞机移动、删除只读核对和持久化回归，此前重量、诊断、批准、jumpseat、维护与启动交接回归保留。新增界面没有重新做窗口视觉验收，本轮没有执行软件真实业务写入。独立真实 API 结果和软件验证分别记录，详见 [测试报告](docs/TEST-REPORT.md)。
+2026-10-22，R2 最终源码通过 395 项 Release 检查（旧运行器 271、单元测试 74、集成测试 50），另有 74 项 Debug 单元测试通过。真实数据库检查使用隔离副本，失败和跳过均为 0；三类金样预期未变，分析器没有新增告警，正式包与 QA 包通过隔离检查。窗口功能检查通过；性能对照仍有超线项，R2 尚未关闭，详见 [测试报告](docs/TEST-REPORT.md) 与 [性能报告](docs/PERFORMANCE.md)。阶段进度与未完成项见 [重构计划](docs/REFACTOR-PLAN-2026-10-20.md)。
