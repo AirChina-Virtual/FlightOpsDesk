@@ -6,6 +6,7 @@ namespace VamSys.Infrastructure;
 // The public face of local storage. Every method delegates to one repository or service; callers and tests only see this type.
 public sealed partial class WorkspaceStore
 {
+    public const int FormatVersion = SchemaV4.Version;
     readonly StorageContext context;
     readonly SettingsRepository settings;
     readonly SecretStore secrets;
@@ -23,7 +24,19 @@ public sealed partial class WorkspaceStore
         Barrier=barrier;
 #endif
         lock (context.WriteLock)
-            Initialize(context.Connections.DataDirectory);
+            Upgrade();
+    }
+    // Path of the backup made when this open upgraded an older database; null when no upgrade was needed.
+    public string? MigrationBackup { get; private set; }
+    void Upgrade()
+    {
+        var runner = new MigrationRunner(context);
+        try
+        {
+            using var c = Open();
+            runner.Run(c);
+        }
+        finally { MigrationBackup = runner.Backup; }
     }
     object writeLock => context.WriteLock;
     SqliteConnection Open() => context.Connections.Open();

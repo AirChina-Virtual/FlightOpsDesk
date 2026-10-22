@@ -38,6 +38,14 @@ internal static class WorkspaceRepository
     public static void UpdateNameAndJson(SqliteConnection c, SqliteTransaction tx, Guid id, string name, string json)
         => Execute(c, tx, "UPDATE workspaces SET name=$name,json=$json WHERE id=$w", ("$name", name), ("$json", json), ("$w", id.ToString()));
 
+    // Migration steps: the header rewritten in the v4 shape, only the format marker, and the first save version.
+    public static void SetV4Header(SqliteConnection c, SqliteTransaction tx, string id, string json)
+        => Execute(c, tx, "UPDATE workspaces SET json=$json,format_version=4 WHERE id=$id", ("$json", json), ("$id", id));
+    public static void MarkFormat4(SqliteConnection c, SqliteTransaction tx, string id)
+        => Execute(c, tx, "UPDATE workspaces SET format_version=4 WHERE id=$id", ("$id", id));
+    public static void InsertInitialRevision(SqliteConnection c, SqliteTransaction tx, string id)
+        => Execute(c, tx, "INSERT INTO workspace_revisions VALUES($id,0)", ("$id", id));
+
     public static object? ReadRevision(SqliteConnection c, SqliteTransaction tx, Guid id)
         => Scalar(c, tx, "SELECT revision FROM workspace_revisions WHERE workspace_id=$w", ("$w", id.ToString()));
     public static void WriteRevision(SqliteConnection c, SqliteTransaction tx, Guid id, long revision)
