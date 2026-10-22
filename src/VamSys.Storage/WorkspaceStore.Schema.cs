@@ -13,7 +13,7 @@ public sealed partial class WorkspaceStore
         using var c = Open();
         var version = Convert.ToInt32(Scalar(c, null, "PRAGMA user_version"));
         if (version > FormatVersion)
-            throw OperationsAdapter.Block("StorageNewer");
+            throw StorageErrors.Block("StorageNewer");
         if (version == FormatVersion)
         { Execute(c, null, "PRAGMA journal_mode=WAL"); return; }
         var exists = Convert.ToInt32(Scalar(c, null, "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='workspaces'")) > 0;
@@ -24,7 +24,7 @@ public sealed partial class WorkspaceStore
             backup.Open();
             c.BackupDatabase(backup);
             if (!Equals(Scalar(backup, null, "PRAGMA integrity_check"), "ok"))
-                throw OperationsAdapter.Block("StorageBackupFailed");
+                throw StorageErrors.Block("StorageBackupFailed");
         }
         OnStorageBarrier("Migration:BeforeTransaction");
         using var tx = c.BeginTransaction();
@@ -60,7 +60,7 @@ public sealed partial class WorkspaceStore
             var json = (string)Scalar(c, tx, "SELECT json FROM workspaces WHERE id=$id", ("$id", id))!;
             var w = Workspace.Deserialize(json);
             if (w.Id.ToString() != id)
-                throw OperationsAdapter.Block("StorageInvalid");
+                throw StorageErrors.Block("StorageInvalid");
             if (version == 3)
             {
                 MigrateV3History(c, tx, w.Id);
@@ -101,17 +101,17 @@ public sealed partial class WorkspaceStore
             using (var reader = cmd.ExecuteReader())
             while (reader.Read())
             {
-                var row = JsonSerializer.Deserialize<DataRow>(reader.GetString(1)) ?? throw OperationsAdapter.Block("StorageInvalid");
+                var row = JsonSerializer.Deserialize<DataRow>(reader.GetString(1)) ?? throw StorageErrors.Block("StorageInvalid");
                 if (row.LocalId.ToString() != reader.GetString(0))
-                    throw OperationsAdapter.Block("StorageInvalid");
+                    throw StorageErrors.Block("StorageInvalid");
                 data.Draft.Add(row);
             }
             using (var cmd = Command(c, tx, "SELECT undo_json,redo_json FROM resource_history WHERE workspace_id=$w AND resource=$r", args))
             using (var reader = cmd.ExecuteReader())
             {
                 if (!reader.Read())
-                    throw OperationsAdapter.Block("StorageInvalid");
-                data.History = EditHistory.ConvertLegacy(data.Draft, JsonSerializer.Deserialize<List<List<DataRow>>>(reader.GetString(0)) ?? throw OperationsAdapter.Block("StorageInvalid"), JsonSerializer.Deserialize<List<List<DataRow>>>(reader.GetString(1)) ?? throw OperationsAdapter.Block("StorageInvalid"));
+                    throw StorageErrors.Block("StorageInvalid");
+                data.History = EditHistory.ConvertLegacy(data.Draft, JsonSerializer.Deserialize<List<List<DataRow>>>(reader.GetString(0)) ?? throw StorageErrors.Block("StorageInvalid"), JsonSerializer.Deserialize<List<List<DataRow>>>(reader.GetString(1)) ?? throw StorageErrors.Block("StorageInvalid"));
             }
             WriteHistory(c, tx, workspace, kind, CaptureHistory(data.History, full: true), full: true);
         }

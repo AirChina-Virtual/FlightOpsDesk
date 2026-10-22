@@ -54,7 +54,7 @@ public partial class EnumInventoryTests
     [Fact]
     public void Enum_member_names_and_numeric_values_are_locked()
     {
-        var assemblies = new[] { typeof(Workspace).Assembly, typeof(BatchExecutor).Assembly, typeof(WorkspaceStore).Assembly };
+        var assemblies = new[] { typeof(Workspace).Assembly, typeof(BatchExecutor).Assembly, typeof(OperationsAdapter).Assembly, typeof(WorkspaceStore).Assembly };
         var lines = assemblies.Distinct().SelectMany(Describe).Concat(DescribeApp()).ToList();
         Assert.Contains(lines, l => l.StartsWith("VamSys.Core:VamSys.Core.ItemState.ManuallyConfirmed => 7"));
         Golden.Verify("Enums.txt", lines);

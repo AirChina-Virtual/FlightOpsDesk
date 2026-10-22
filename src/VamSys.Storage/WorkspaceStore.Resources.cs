@@ -57,7 +57,7 @@ public sealed partial class WorkspaceStore
         var w = workspaceId.ToString();
         var kind = (int)delta.Resource;
         if (Execute(c, tx, "UPDATE resource_metadata SET snapshot_at=$at WHERE workspace_id=$w AND resource=$r", ("$at", delta.SnapshotAt.ToString("O")), ("$w", w), ("$r", kind)) != 1)
-            throw OperationsAdapter.Block("StorageInvalid");
+            throw StorageErrors.Block("StorageInvalid");
         if (delta.Conflicts != null)
             Execute(c, tx, "UPDATE resource_metadata SET conflicts_json=$conflicts WHERE workspace_id=$w AND resource=$r", ("$conflicts", Encode(delta.Conflicts.ToList())), ("$w", w), ("$r", kind));
         void Row(int collection, RowMutation mutation, string? json)

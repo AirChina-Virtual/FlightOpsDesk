@@ -112,10 +112,10 @@ public sealed partial class WorkspaceStore
     public void SaveConnectionSettings(Workspace workspace, string clientId, string secret, string url, bool localRouteTimes)
     {
         if (ApiOperationPolicy.HasOpenOnlineItems(workspace))
-            throw OperationsAdapter.Block("ApiPendingJob");
+            throw StorageErrors.Block("ApiPendingJob");
         url = url.Trim();
         if (url != "" && (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo != ""))
-            throw OperationsAdapter.Block("ApiInvalid", "URL");
+            throw StorageErrors.Block("ApiInvalid", "URL");
         SaveConnection(workspace, clientId, secret, false, url, localRouteTimes);
     }
     void SaveConnection(Workspace workspace, string clientId, string secret, bool requireNewSecret, string? url, bool? localRouteTimes)
@@ -127,18 +127,18 @@ public sealed partial class WorkspaceStore
         if (secret.Length > 0)
         {
             if (clientId.Length == 0 || string.IsNullOrWhiteSpace(secret))
-                throw OperationsAdapter.Block("ApiCredentials");
+                throw StorageErrors.Block("ApiCredentials");
             credentials = new(clientId, secret); // Secret is opaque; never trim it.
         }
         else
         {
             if (requireNewSecret)
-                throw OperationsAdapter.Block("ApiCredentials");
+                throw StorageErrors.Block("ApiCredentials");
             if (LoadSecret(workspace.Id) is string raw)
             {
-                var saved = System.Text.Json.JsonSerializer.Deserialize<OperationsCredentials>(raw) ?? throw OperationsAdapter.Block("ApiCredentials");
+                var saved = System.Text.Json.JsonSerializer.Deserialize<OperationsCredentials>(raw) ?? throw StorageErrors.Block("ApiCredentials");
                 if (saved.ClientId.Trim() != clientId)
-                    throw OperationsAdapter.Block("ApiCredentials");
+                    throw StorageErrors.Block("ApiCredentials");
                 credentials = new(clientId, saved.Secret);
             }
         }

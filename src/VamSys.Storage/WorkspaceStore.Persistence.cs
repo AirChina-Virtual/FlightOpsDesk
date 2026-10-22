@@ -65,7 +65,7 @@ public sealed partial class WorkspaceStore
                 using var tx = c.BeginTransaction();
                 var revision = Scalar(c, tx, "SELECT revision FROM workspace_revisions WHERE workspace_id=$w", ("$w", id.ToString()));
                 if (revision == null ? !allowNew || expected != 0 : Convert.ToInt64(revision) != expected)
-                    throw OperationsAdapter.Block("StorageStale");
+                    throw StorageErrors.Block("StorageStale");
                 write(c, tx);
                 var next = expected + 1;
                 Execute(c, tx, "INSERT INTO workspace_revisions(workspace_id,revision) VALUES($w,$r) ON CONFLICT(workspace_id) DO UPDATE SET revision=$r", ("$w", id.ToString()), ("$r", next));
@@ -97,7 +97,7 @@ public sealed partial class WorkspaceStore
     {
         var w = Workspace.Deserialize(json);
         if (w.Id != id || w.Name != name)
-            throw OperationsAdapter.Block("StorageInvalid");
+            throw StorageErrors.Block("StorageInvalid");
         Save(w);
     }
     public static string SerializeForSave(Workspace w) => w.Serialize();
@@ -137,7 +137,7 @@ public sealed partial class WorkspaceStore
                 update.Parameters["$id"].Value = row.Id;
                 update.Parameters["$json"].Value = row.Json;
                 if (update.ExecuteNonQuery() != 1)
-                    throw OperationsAdapter.Block("StorageInvalid");
+                    throw StorageErrors.Block("StorageInvalid");
             }
             foreach (var h in history)
                 WriteHistory(c, tx, w.Id, h.Kind, h.Payload);
@@ -160,11 +160,11 @@ public sealed partial class WorkspaceStore
             var delta = checkpoint.Delta;
             var full = checkpoint.RebasedWorkspace == null ? null : Capture(checkpoint.RebasedWorkspace);
             if ((checkpoint.Kind == CheckpointKind.Rebase) != (delta != null || full != null) || delta != null && full != null || checkpoint.Kind == CheckpointKind.Rebase && item == null || full != null && full.Id != workspace.Id)
-                throw OperationsAdapter.Block("StorageInvalid");
+                throw StorageErrors.Block("StorageInvalid");
             if (checkpoint.Items != null && (checkpoint.Kind != CheckpointKind.Task || item != null || items.Select(i => i.Id).Distinct().Count() != items.Count))
-                throw OperationsAdapter.Block("StorageInvalid");
+                throw StorageErrors.Block("StorageInvalid");
             if (delta != null && (checkpoint.Item!.Resource != delta.Resource || checkpoint.Item.After.LocalId != delta.LocalId || new[] { delta.Snapshot, delta.Draft }.Any(m => m.Action == RowMutationKind.Upsert ? (m.Row == null || m.Row.LocalId != delta.LocalId) : m.Row != null)))
-                throw OperationsAdapter.Block("StorageInvalid");
+                throw StorageErrors.Block("StorageInvalid");
             string? snapshot = delta?.Snapshot.Row is { } sr ? Encode(sr) : null, draft = delta?.Draft.Row is { } dr ? Encode(dr) : null;
             string? root = null;
             if (delta?.VerifiedOperation != null)
@@ -181,12 +181,12 @@ public sealed partial class WorkspaceStore
             var next = await Task.Run(() => store.Commit(workspace.Id, expected, checkpoint.Kind.ToString(), (c, tx) =>
             {
                 if (Execute(c, tx, "UPDATE batch_jobs SET json=$json WHERE workspace_id=$w AND id=$j", ("$json", header), ("$w", w), ("$j", j)) != 1)
-                    throw OperationsAdapter.Block("StorageInvalid");
+                    throw StorageErrors.Block("StorageInvalid");
                 if (item != null && Execute(c, tx, "UPDATE batch_items SET json=$json WHERE workspace_id=$w AND job_id=$j AND id=$i", ("$json", item), ("$w", w), ("$j", j), ("$i", i)) != 1)
-                    throw OperationsAdapter.Block("StorageInvalid");
+                    throw StorageErrors.Block("StorageInvalid");
                 foreach (var (id, json) in items)
                     if (Execute(c, tx, "UPDATE batch_items SET json=$json WHERE workspace_id=$w AND job_id=$j AND id=$i", ("$json", json), ("$w", w), ("$j", j), ("$i", id)) != 1)
-                        throw OperationsAdapter.Block("StorageInvalid");
+                        throw StorageErrors.Block("StorageInvalid");
                 if (full != null)
                 { Execute(c, tx, "UPDATE workspaces SET name=$name,json=$json WHERE id=$w", ("$name", full.Name), ("$json", full.Json), ("$w", w)); WriteResources(c, tx, full); }
                 if (delta != null)

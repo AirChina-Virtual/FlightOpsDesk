@@ -25,7 +25,7 @@ public sealed partial class WorkspaceStore
         if (full)
             Execute(c, tx, "INSERT INTO resource_history_state VALUES($w,$r,$u,$d)", [.. args, ("$u", h.Undo), ("$d", h.Redo)]);
         else if (h.OrderChanged && Execute(c, tx, "UPDATE resource_history_state SET undo_json=$u,redo_json=$d WHERE workspace_id=$w AND resource=$r", [.. args, ("$u", h.Undo), ("$d", h.Redo)]) != 1)
-            throw OperationsAdapter.Block("StorageInvalid");
+            throw StorageErrors.Block("StorageInvalid");
     }
     static void ReadHistory(SqliteConnection c, SqliteTransaction tx, Guid id, ResourceKind kind, ResourceData data)
     {
@@ -35,7 +35,7 @@ public sealed partial class WorkspaceStore
         using (var r = cmd.ExecuteReader())
         {
             if (!r.Read())
-                throw OperationsAdapter.Block("StorageInvalid");
+                throw StorageErrors.Block("StorageInvalid");
             undo = JsonSerializer.Deserialize<Guid[]>(r.GetString(0))!;
             redo = JsonSerializer.Deserialize<Guid[]>(r.GetString(1))!;
         }
@@ -46,11 +46,11 @@ public sealed partial class WorkspaceStore
         {
             var step = JsonSerializer.Deserialize<HistoryStep>(r.GetString(1))!;
             if (step.StepId != Guid.Parse(r.GetString(0)))
-                throw OperationsAdapter.Block("StorageInvalid");
+                throw StorageErrors.Block("StorageInvalid");
             steps.Add(step.StepId, step);
         }
         if (undo.Length + redo.Length != steps.Count)
-            throw OperationsAdapter.Block("StorageInvalid");
+            throw StorageErrors.Block("StorageInvalid");
         data.History = EditHistory.From(new([.. undo.Select(id => steps[id])], [.. redo.Select(id => steps[id])]));
         data.History.Validate(data);
         data.History.Acknowledge(data.History.Capture());

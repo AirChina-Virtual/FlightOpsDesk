@@ -4,11 +4,9 @@
     <EmbeddedResource Include="../../docs/contracts/operations.json" LogicalName="Operations.OpenApi.json" />
     <ProjectReference Include="../VamSys.Domain/VamSys.Domain.csproj" />
     <ProjectReference Include="../VamSys.Application/VamSys.Application.csproj" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.12" />
+    <ProjectReference Include="../VamSys.Storage/VamSys.Storage.csproj" AdditionalProperties="VamSysTestSupport=$(VamSysTestSupport)" />
   </ItemGroup>
   <ItemGroup Condition="'$(VamSysTestSupport)' == 'true'">
-    <Compile Include="../../tests/TestSupport/WorkspaceStore.TestHooks.cs" Link="TestSupport/WorkspaceStore.TestHooks.cs" />
     <Compile Include="../../tests/TestSupport/AssemblyInfo.cs" Link="TestSupport/AssemblyInfo.cs" />
   </ItemGroup>
 </Project>

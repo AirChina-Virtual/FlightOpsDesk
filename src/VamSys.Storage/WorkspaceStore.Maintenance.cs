@@ -31,9 +31,9 @@ public sealed partial class WorkspaceStore
             ct.ThrowIfCancellationRequested();
             var current = Load(id);
             if (current.StorageRevision != expectedRevision)
-                throw OperationsAdapter.Block("StorageStale");
+                throw StorageErrors.Block("StorageStale");
             if (HasUnresolvedWrites(current))
-                throw OperationsAdapter.Block("MaintenanceUnsafe");
+                throw StorageErrors.Block("MaintenanceUnsafe");
             OnStorageBarrier("Maintenance:BeforeBackup");
             var directory = Path.Combine(DataDirectory, "Backups");
             Directory.CreateDirectory(directory);
@@ -44,7 +44,7 @@ public sealed partial class WorkspaceStore
                 backup.Open();
                 source.BackupDatabase(backup);
                 if (!Equals(Scalar(backup, null, "PRAGMA integrity_check"), "ok"))
-                    throw OperationsAdapter.Block("MaintenanceBackupFailed");
+                    throw StorageErrors.Block("MaintenanceBackupFailed");
                 Execute(backup, null, "PRAGMA wal_checkpoint(TRUNCATE)");
             }
             var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
@@ -78,7 +78,7 @@ public sealed partial class WorkspaceStore
             {
                 // Keep the workspace identity/settings and encrypted secrets. Never delete the workspace row.
                 if (Execute(c, tx, "UPDATE workspaces SET json=$json WHERE id=$id", ("$json", payload.Json), ("$id", id.ToString())) != 1)
-                    throw OperationsAdapter.Block("StorageInvalid");
+                    throw StorageErrors.Block("StorageInvalid");
                 WriteJobs(c, tx, payload);
                 WriteResources(c, tx, payload);
             });

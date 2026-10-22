@@ -207,6 +207,14 @@
       "vamsys.infrastructure": {
         "type": "Project",
         "dependencies": {
+          "VamSys.Application": "[1.0.0, )",
+          "VamSys.Domain": "[1.0.0, )",
+          "VamSys.Storage": "[1.0.0, )"
+        }
+      },
+      "vamsys.storage": {
+        "type": "Project",
+        "dependencies": {
           "Microsoft.Data.Sqlite": "[10.0.12, )",
           "System.Security.Cryptography.ProtectedData": "[10.0.12, )",
           "VamSys.Application": "[1.0.0, )",
