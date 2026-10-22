@@ -10,6 +10,8 @@ public sealed partial class WorkspaceStore
     readonly StorageContext context;
     readonly SettingsRepository settings;
     readonly SecretStore secrets;
+    readonly UnitOfWork unit;
+    readonly WorkspaceWriter writer;
 #if VAMSYS_TEST_SUPPORT
     public WorkspaceStore(string directory) : this(directory,null) {}
     internal WorkspaceStore(string directory,Action<string>? barrier)
@@ -20,6 +22,8 @@ public sealed partial class WorkspaceStore
         context = new(directory);
         settings = new(context);
         secrets = new(context);
+        unit = new(context);
+        writer = new(unit);
 #if VAMSYS_TEST_SUPPORT
         Barrier=barrier;
 #endif
@@ -38,7 +42,6 @@ public sealed partial class WorkspaceStore
         }
         finally { MigrationBackup = runner.Backup; }
     }
-    object writeLock => context.WriteLock;
     SqliteConnection Open() => context.Connections.Open();
 
     public string LoadLanguage() => settings.LoadLanguage();
@@ -56,6 +59,14 @@ public sealed partial class WorkspaceStore
         using var c = Open();
         return WorkspaceRepository.Load(c, id);
     }
+
+    public void Save(Workspace w) => writer.Save(w);
+    public Task SaveAsync(Workspace w) => writer.SaveAsync(w);
+    public void SaveJson(Guid id, string name, string json) => writer.SaveJson(id, name, json);
+    public static string SerializeForSave(Workspace w) => w.Serialize();
+    public Task<bool> TrySaveDraftRowsAsync(Workspace w, IReadOnlyCollection<DraftRowChanges> changes) => writer.TrySaveDraftRowsAsync(w, changes);
+    public IBatchCheckpointWriter CheckpointWriter(Workspace w) => new BatchCheckpointWriter(unit, w);
+    internal long SavePayload(FullPayload p, byte[]? secret = null) => writer.SavePayload(p, secret);
 
     public void SaveSecret(Guid id, string secret) => secrets.Save(id, secret);
     public string? LoadSecret(Guid id) => secrets.Load(id);

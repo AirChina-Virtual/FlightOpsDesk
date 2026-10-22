@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -32,6 +33,10 @@ internal sealed class SecretStore(StorageContext context)
         cmd.Parameters.AddWithValue("$id", id.ToString());
         return cmd.ExecuteScalar() is byte[] bytes ? Encoding.UTF8.GetString(ProtectedData.Unprotect(bytes, id.ToByteArray(), DataProtectionScope.CurrentUser)) : null;
     }
+
+    // Inside a save transaction: the secret travels with the workspace row in the same commit.
+    public static void Upsert(SqliteConnection c, SqliteTransaction tx, Guid id, byte[] encrypted)
+        => Sql.Execute(c, tx, "INSERT INTO secrets(id,value) VALUES($id,$s) ON CONFLICT(id) DO UPDATE SET value=$s", ("$id", id.ToString()), ("$s", encrypted));
 
     // The credentials a connection save will store, or null when the caller keeps the stored secret untouched.
     public OperationsCredentials? ResolveCredentials(Guid workspaceId, string clientId, string secret, bool requireNewSecret)

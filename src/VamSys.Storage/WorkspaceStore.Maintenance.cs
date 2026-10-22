@@ -28,7 +28,7 @@ public sealed partial class WorkspaceStore
         => Task.Run(() => BackupAndClear(id, expectedRevision, ct), ct);
     WorkspaceMaintenanceResult BackupAndClear(Guid id, long expectedRevision, CancellationToken ct)
     {
-        lock (writeLock)
+        lock (context.WriteLock)
         {
             ct.ThrowIfCancellationRequested();
             var current = Load(id);
@@ -75,7 +75,7 @@ public sealed partial class WorkspaceStore
             current.Mode = RunMode.Offline;
             current.ConnectedAt = null;
             var payload = Capture(current);
-            current.StorageRevision = Commit(id, expectedRevision, "Maintenance", (c, tx) =>
+            current.StorageRevision = unit.Commit(id, expectedRevision, "Maintenance", (c, tx) =>
             {
                 // Keep the workspace identity/settings and encrypted secrets. Never delete the workspace row.
                 if (WorkspaceRepository.UpdateJson(c, tx, id, payload.Json) != 1)
