@@ -209,22 +209,20 @@ public static class ReviewPlanBuilder
         var samples = new Dictionary<string, int>(StringComparer.Ordinal);
         // The same reason objects are shared by all entries that have it (the key serializes each once).
         MessageDescriptor? connect = null, sample = null, evidence = null;
-        // Operation keys, evidence and the API preview read a ChangeItem. A change that has none yet is shown to them through
-        // one reused item that refers to the planned rows; nothing keeps it, and the preview does not write to it.
-        ChangeItem? view = null;
-        var viewFields = new Dictionary<string, FieldChange>(StringComparer.Ordinal);
-        ChangeItem ItemOf(PlannedChange change)
+        // Operation keys, evidence and the API preview read a ChangeItem. A change that has none yet gets its own transient item
+        // that refers to the planned rows (no row copies); it is not kept or shared with another change.
+        static ChangeItem ItemOf(PlannedChange change)
         {
             if (change.BuiltItem is { } built)
                 return built;
-            view ??= new ChangeItem();
-            view.Resource = change.Resource; view.Kind = change.Kind; view.Before = change.Before; view.After = change.After;
-            view.RequiresAirlineParameter = change.RequiresAirlineParameter;
-            viewFields.Clear();
+            var fields = new Dictionary<string, FieldChange>(change.FieldCount, StringComparer.Ordinal);
             foreach (var field in change.Fields())
-                viewFields.Add(field.Key, field.Value);
-            view.Fields = viewFields;
-            return view;
+                fields.Add(field.Key, field.Value);
+            return new ChangeItem
+            {
+                Resource = change.Resource, Kind = change.Kind, Before = change.Before, After = change.After,
+                RequiresAirlineParameter = change.RequiresAirlineParameter, Fields = fields
+            };
         }
         foreach (var change in changes)
         {
@@ -233,16 +231,16 @@ public static class ReviewPlanBuilder
                 entries.Add(new(change, ReviewDisposition.AwaitingConnection, connect ??= Messages.Define("ReviewConnect")));
                 continue;
             }
+            var item = mode == RunMode.Online ? ItemOf(change) : null;
             try
-            { if (mode == RunMode.Online) preview!(ItemOf(change)); }
+            { if (mode == RunMode.Online) preview!(item!); }
             catch (Exception e) { entries.Add(new(change, ReviewDisposition.Blocked, MessageErrors.Describe(e))); continue; }
             // Only an Online review samples operations and consults the evidence.
             var external = false;
             if (mode == RunMode.Online)
             {
-                var item = ItemOf(change);
-                var operation = ApiOperationPolicy.Key(item);
-                external = IndependentApiEvidence.Covers(item, externalEvidenceContractHash);
+                var operation = ApiOperationPolicy.Key(item!);
+                external = IndependentApiEvidence.Covers(item!, externalEvidenceContractHash);
                 if (!verified.Contains(operation) && !external)
                 {
                     var count = samples.GetValueOrDefault(operation);
