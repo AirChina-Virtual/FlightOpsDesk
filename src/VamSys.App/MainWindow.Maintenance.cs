@@ -72,9 +72,10 @@ public sealed partial class MainWindow
             try
             {
                 // Reconcile only an ambiguous post-commit failure. A failed backup/transaction keeps live state intact.
-                var persisted = store.Load(owner);
-                if (persisted.StorageRevision != preview.Revision)
-                { workspace = persisted; workspace.Mode = RunMode.Offline; if (apiSessions.Remove(owner, out var session)) session.Client.Dispose(); ClearMaintenanceViewState(owner); InvalidateDataViews(); }
+                if (store.CountRows(owner).Revision != preview.Revision)
+                {
+                    var persisted = store.Load(owner);
+                    workspace = persisted; workspace.Mode = RunMode.Offline; if (apiSessions.Remove(owner, out var session)) session.Client.Dispose(); ClearMaintenanceViewState(owner); InvalidateDataViews(); }
             }
             catch { storageBlocked = true; }
             throw;

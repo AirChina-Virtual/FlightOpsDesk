@@ -27,9 +27,12 @@ internal sealed class MaintenanceService(StorageContext context, UnitOfWork unit
 
     public WorkspaceMaintenancePreview Preview(Guid id)
     {
-        var w = Load(id);
-        return new(id, w.Name, context.Connections.DataDirectory, w.StorageRevision, w.Resources.Sum(p => p.Value.Snapshot.Count), w.Resources.Sum(p => p.Value.Draft.Count),
-            w.Jobs.Count, w.Resources.Sum(p => p.Value.Conflicts.Count), w.Resources.Sum(p => p.Value.Undo.Count + p.Value.Redo.Count), !HasUnresolvedWrites(w));
+        // Counts and the jobs are read directly; the rows are never loaded for a preview.
+        using var c = context.Connections.Open();
+        var counts = WorkspaceRepository.Counts(c, id);
+        var jobs = WorkspaceRepository.LoadJobs(c, id);
+        return new(id, counts.Name, context.Connections.DataDirectory, counts.Revision, counts.Snapshots, counts.Drafts,
+            counts.Jobs, counts.Conflicts, counts.HistorySteps, !HasUnresolvedWrites(new Workspace { Jobs = jobs }));
     }
 
     public WorkspaceMaintenanceResult BackupAndClear(Guid id, long expectedRevision, CancellationToken ct)
@@ -81,6 +84,7 @@ internal sealed class MaintenanceService(StorageContext context, UnitOfWork unit
             current.Mode = RunMode.Offline;
             current.ConnectedAt = null;
             var payload = RowSerializer.Capture(current);
+            var capture = current.Journal().Capture(current, RowSerializer.HeaderKey(current));
             current.StorageRevision = unit.Commit(id, expectedRevision, "Maintenance", (c, tx) =>
             {
                 // Keep the workspace identity/settings and encrypted secrets. Never delete the workspace row.
@@ -89,6 +93,7 @@ internal sealed class MaintenanceService(StorageContext context, UnitOfWork unit
                 JobRepository.Write(c, tx, payload);
                 ResourceRowRepository.Write(c, tx, payload);
             });
+            current.Journal().Adopt(capture, current.StorageRevision);
             return new(current, new(path, manifest, hash, id, expectedRevision));
         }
     }

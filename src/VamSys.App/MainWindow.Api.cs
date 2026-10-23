@@ -39,7 +39,7 @@ public sealed partial class MainWindow
                 if (workspace.ContractHash != ApiContracts.Sha256)
                     workspace.VerifiedOperations.Clear();
                 workspace.ContractHash = ApiContracts.Sha256;
-                await Save(dataChanged: false);
+                await Save(dataChanged: false, JournalScope.Header);
                 var parameters = await ReadOptionalParameters(running.Token);
                 Status(() => L("ApiConnected", ("id", workspace.AirlineId ?? "?")) + (parameters ? "" : "\n" + L("ApiParametersUnavailable")));
             }
@@ -75,7 +75,16 @@ public sealed partial class MainWindow
     }
     Task ResolveApiConflicts() => ResolveConflicts([resource]);
     Task ResolveWorkspaceConflicts() => ResolveConflicts(Enum.GetValues<ResourceKind>());
+    // Every choice is applied in memory at once; the changes are saved a single time when the dialogs end or are cancelled.
     Task ResolveConflicts(IEnumerable<ResourceKind> kinds) => LocalOperation(async () =>
+    {
+        var changed = false;
+        try
+        { await ResolveConflictsInMemory(kinds, () => changed = true); }
+        finally
+        { if (changed) await Save(); }
+    });
+    async Task ResolveConflictsInMemory(IEnumerable<ResourceKind> kinds, Action markChanged)
     {
         foreach (var kind in kinds)
         {
@@ -84,7 +93,7 @@ public sealed partial class MainWindow
             {
                 var row = data.FindDraftRow(conflict.RowId);
                 if (row is null)
-                { data.Conflicts.Remove(conflict); await Save(); continue; }
+                { data.Conflicts.Remove(conflict); markChanged(); continue; }
                 var content = Stack(Text(() => L(Schemas.All[kind].Name) + " · " + Schemas.Key(kind, row) + " · " + conflict.Field),
                     Text(() => L("ApiConflictValues", ("old", conflict.Original ?? "∅"), ("local", conflict.Local ?? "∅"), ("remote", conflict.Remote ?? "∅"))));
                 var dialog = new ContentDialog
@@ -113,10 +122,10 @@ public sealed partial class MainWindow
                     data.Edit([row.LocalId], () => { if (conflict.Field == "*") data.Draft.Remove(row); else data.ReplaceDraftRows([replacement]); }, newStep: false, structural: conflict.Field == "*");
                 }
                 data.Conflicts.Remove(conflict);
-                await Save();
+                markChanged();
             }
         }
-    });
+    }
     string ApiReview(ChangeItem change)
     {
         var text = $"{L(Schemas.All[change.Resource].Name)} · {EnumText(change.Kind)} · {Schemas.Key(change.Resource, change.After)}\n" +

@@ -29,6 +29,7 @@ Domain 不引用其他产品项目。文件、网络、环境目录和日志写�
 | BatchStep.cs、ResourceRebaseDelta.cs | 已保存的请求步骤和资源变化数据，不执行保存 |
 | FieldSpec.cs、LocalReference.cs | 字段规格表和本地引用的统一解析 |
 | EditHistory.cs | 不可变行前后状态、结构顺序、撤销重做、旧历史转换与版本化 JSON |
+| ChangeJournal.cs | 每个工作区一份“数据库现在是什么样”的记录；比较它与内存得出待写的行增删改、移动、字段定义、冲突、任务和头部变化，保存成功后才前进（用法见 [Storage 说明](../VamSys.Storage/README.md)）；不引用任何存储类型 |
 | Localization.cs、Resources | 选择中英文提示、填入参数，并兼容旧版保存的提示文字 |
 
 ## 用户修改一条记录后，会发生什么

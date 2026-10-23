@@ -29,8 +29,12 @@ internal static class ResourceRowRepository
         }
     }
 
-    public static void Read(SqliteConnection c, SqliteTransaction tx, Workspace w)
+    // Returns the resources whose stored positions are not 0, 1, 2, ... in either list (a task checkpoint or an older
+    // program left gaps); the journal assumes positions equal list indexes, so those resources are rewritten once.
+    public static HashSet<ResourceKind> Read(SqliteConnection c, SqliteTransaction tx, Workspace w)
     {
+        var gaps = new HashSet<ResourceKind>();
+        var expected = new Dictionary<(int Resource, int Collection), int>();
         w.Resources = Enum.GetValues<ResourceKind>().ToDictionary(k => k, _ => new ResourceData());
         using (var cmd = Command(c, tx, "SELECT resource,columns_json,conflicts_json,snapshot_at FROM resource_metadata WHERE workspace_id=$w", ("$w", w.Id.ToString())))
         using (var r = cmd.ExecuteReader())
@@ -41,16 +45,22 @@ internal static class ResourceRowRepository
             data.Conflicts = Decode<List<MergeConflict>>(r.GetString(2))!;
             data.SnapshotAt = r.IsDBNull(3) ? null : DateTimeOffset.Parse(r.GetString(3), CultureInfo.InvariantCulture);
         }
-        using (var cmd = Command(c, tx, "SELECT resource,collection,json FROM resource_rows WHERE workspace_id=$w ORDER BY resource,collection,ordinal", ("$w", w.Id.ToString())))
+        using (var cmd = Command(c, tx, "SELECT resource,collection,json,ordinal FROM resource_rows WHERE workspace_id=$w ORDER BY resource,collection,ordinal", ("$w", w.Id.ToString())))
         using (var r = cmd.ExecuteReader())
         while (r.Read())
         {
             var data = w.Resources[(ResourceKind)r.GetInt32(0)];
             var rows = r.GetInt32(1) == 0 ? data.Snapshot : data.Draft;
+            var list = (r.GetInt32(0), r.GetInt32(1));
+            var position = expected.GetValueOrDefault(list);
+            if (r.GetInt32(3) != position)
+                gaps.Add((ResourceKind)r.GetInt32(0));
+            expected[list] = position + 1;
             rows.Add(Decode<DataRow>(r.GetString(2))!);
         }
         foreach (var (kind, data) in w.Resources)
             HistoryRepository.Read(c, tx, w.Id, kind, data);
+        return gaps;
     }
 
     // Rewrites the JSON of draft rows that keep their position; every row must exist exactly once.
@@ -65,6 +75,68 @@ internal static class ResourceRowRepository
             update.Parameters["$json"].Value = row.Json;
             if (update.ExecuteNonQuery() != 1)
                 throw StorageErrors.Block("StorageInvalid");
+        }
+    }
+
+    // Applies the journal's change of one row list. Writes are counted so the caller can report them.
+    public static (int Writes, int Deletes, int Moves) Apply(SqliteConnection c, SqliteTransaction tx, string workspace, int kind, StoredRowList list)
+    {
+        const string where = "workspace_id=$w AND resource=$r AND collection=$c";
+        var key = new (string, object?)[] { ("$w", workspace), ("$r", kind), ("$c", list.Collection) };
+        if (list.Mode == ChangeMode.Rewrite)
+        {
+            Execute(c, tx, "DELETE FROM resource_rows WHERE " + where, key);
+            Insert(c, tx, workspace, kind, list.Collection, list.All);
+            return (list.All.Count, 0, 0);
+        }
+        using (var delete = Command(c, tx, "DELETE FROM resource_rows WHERE " + where + " AND local_id=$id", [.. key, ("$id", "")]))
+        {
+            delete.Prepare();
+            foreach (var id in list.Deleted)
+            {
+                delete.Parameters["$id"].Value = id;
+                if (delete.ExecuteNonQuery() != 1)
+                    throw StorageErrors.Block("StorageInvalid");
+            }
+        }
+        // Positions are unique per list: park the moving rows on negative ordinals first, then give them their final ones.
+        foreach (var phase in new[] { 1, 2 })
+        {
+            using var move = Command(c, tx, "UPDATE resource_rows SET ordinal=$n WHERE " + where + " AND local_id=$id", [.. key, ("$id", ""), ("$n", 0)]);
+            move.Prepare();
+            foreach (var (id, ordinal) in list.Moved)
+            {
+                move.Parameters["$id"].Value = id;
+                move.Parameters["$n"].Value = phase == 1 ? -1 - ordinal : ordinal;
+                if (move.ExecuteNonQuery() != 1)
+                    throw StorageErrors.Block("StorageInvalid");
+            }
+        }
+        using (var update = Command(c, tx, "UPDATE resource_rows SET json=$json WHERE " + where + " AND local_id=$id", [.. key, ("$id", ""), ("$json", "")]))
+        {
+            update.Prepare();
+            foreach (var row in list.Replaced)
+            {
+                update.Parameters["$id"].Value = row.Id;
+                update.Parameters["$json"].Value = row.Json;
+                if (update.ExecuteNonQuery() != 1)
+                    throw StorageErrors.Block("StorageInvalid");
+            }
+        }
+        Insert(c, tx, workspace, kind, list.Collection, list.Added);
+        return (list.Replaced.Count + list.Added.Count, list.Deleted.Count, list.Moved.Count);
+    }
+
+    static void Insert(SqliteConnection c, SqliteTransaction tx, string workspace, int kind, int collection, List<StoredPlacement> rows)
+    {
+        using var insert = Command(c, tx, "INSERT INTO resource_rows VALUES($w,$r,$c,$id,$n,$json)", ("$w", workspace), ("$r", kind), ("$c", collection), ("$id", ""), ("$n", 0), ("$json", ""));
+        insert.Prepare();
+        foreach (var row in rows)
+        {
+            insert.Parameters["$id"].Value = row.Id;
+            insert.Parameters["$n"].Value = row.Ordinal;
+            insert.Parameters["$json"].Value = row.Json;
+            insert.ExecuteNonQuery();
         }
     }
 

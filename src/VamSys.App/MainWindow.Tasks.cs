@@ -47,7 +47,9 @@ public sealed partial class MainWindow
                     var reset = job.Items.Where(i => i.State == ItemState.Failed).ToList();
                     foreach (var i in reset)
                         i.State = ItemState.Pending;
-                    await Save(dataChanged: false);
+                    // The items were changed in place, so the job has to be marked for the journal.
+                    workspace.Journal().TouchJob(job);
+                    await Save(dataChanged: false, JournalScope.Jobs);
                     foreach (var i in reset)
                         vm!.Update(i.Id);
                     await ExecuteDemo(job);

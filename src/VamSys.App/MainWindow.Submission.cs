@@ -9,7 +9,7 @@ public sealed partial class MainWindow
         if (!CanEditData() || workspace.Mode != mode)
             return;
         await TaskSubmission.SubmitAsync(workspace, mode, LocalOperation,
-            () => ConfirmWorkspaceSubmission(mode), () => Save(dataChanged: false), SavedJobIsDurable, SelectTasksForSubmission,
+            () => ConfirmWorkspaceSubmission(mode), () => Save(dataChanged: false, JournalScope.Jobs), SavedJobIsDurable, SelectTasksForSubmission,
             () => workspace, job => mode == RunMode.Online ? ExecuteApi(job) : ExecuteDemo(job));
     }
 
@@ -17,7 +17,7 @@ public sealed partial class MainWindow
     {
         // If storage cannot be read, keep the job and block further saves until reload.
         try
-        { return store.Load(workspace.Id).Jobs.Any(j => j.Id == job.Id); }
+        { return store.JobExists(workspace.Id, job.Id); }
         catch { storageBlocked = true; return true; }
     }
 

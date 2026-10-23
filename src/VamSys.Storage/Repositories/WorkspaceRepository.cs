@@ -1,7 +1,6 @@
 using Microsoft.Data.Sqlite;
 using VamSys.Core;
 using static VamSys.Infrastructure.Sql;
-
 namespace VamSys.Infrastructure;
 
 // workspaces (header JSON without jobs and resources) and workspace_revisions (the save version).
@@ -25,9 +24,46 @@ internal static class WorkspaceRepository
         var w = Workspace.Deserialize((string)(Scalar(c, tx, "SELECT json FROM workspaces WHERE id=$id", ("$id", id.ToString())) ?? throw new KeyNotFoundException()));
         w.StorageRevision = Convert.ToInt64(Scalar(c, tx, "SELECT revision FROM workspace_revisions WHERE workspace_id=$id", ("$id", id.ToString())));
         JobRepository.Read(c, tx, w);
-        ResourceRowRepository.Read(c, tx, w);
+        var gaps = ResourceRowRepository.Read(c, tx, w);
         tx.Commit();
+        // What was just read is exactly what the database holds, so later saves can write only the difference.
+        w.Journal().Adopt(w.Journal().Capture(w, RowSerializer.HeaderKey(w)), w.StorageRevision);
+        foreach (var kind in gaps)
+            w.Journal().MarkRowsDirty(kind);
         return w;
+    }
+
+    // Name, revision, jobs and row counts of a stored workspace without loading rows or history.
+    public static WorkspaceCounts Counts(SqliteConnection c, Guid id)
+    {
+        using var tx = c.BeginTransaction(deferred: true);
+        var w = id.ToString();
+        var name = (string?)Scalar(c, tx, "SELECT name FROM workspaces WHERE id=$id", ("$id", w)) ?? throw new KeyNotFoundException();
+        var revision = Convert.ToInt64(Scalar(c, tx, "SELECT revision FROM workspace_revisions WHERE workspace_id=$id", ("$id", w)));
+        var resources = new Dictionary<ResourceKind, ResourceCounts>();
+        foreach (var kind in Enum.GetValues<ResourceKind>())
+        {
+            var args = new (string, object?)[] { ("$w", w), ("$r", (int)kind) };
+            int Count(string sql) => Convert.ToInt32(Scalar(c, tx, sql, args));
+            var conflicts = Scalar(c, tx, "SELECT conflicts_json FROM resource_metadata WHERE workspace_id=$w AND resource=$r", args);
+            resources[kind] = new(Count("SELECT count(*) FROM resource_rows WHERE workspace_id=$w AND resource=$r AND collection=0"),
+                Count("SELECT count(*) FROM resource_rows WHERE workspace_id=$w AND resource=$r AND collection=1"),
+                conflicts is string text ? RowSerializer.Decode<List<MergeConflict>>(text)!.Count : 0,
+                Count("SELECT count(*) FROM resource_history_steps WHERE workspace_id=$w AND resource=$r"));
+        }
+        var jobs = JobRepository.Count(c, tx, id);
+        tx.Commit();
+        return new(id, name, revision, jobs, resources);
+    }
+
+    // Jobs and their items only, for checks that do not need the resource rows.
+    public static List<BatchJob> LoadJobs(SqliteConnection c, Guid id)
+    {
+        using var tx = c.BeginTransaction(deferred: true);
+        var w = new Workspace { Id = id };
+        JobRepository.Read(c, tx, w);
+        tx.Commit();
+        return w.Jobs;
     }
 
     public static void Upsert(SqliteConnection c, SqliteTransaction tx, FullPayload p)
@@ -35,7 +71,7 @@ internal static class WorkspaceRepository
             ("$id", p.Id.ToString()), ("$name", p.Name), ("$json", p.Json));
     public static int UpdateJson(SqliteConnection c, SqliteTransaction tx, Guid id, string json)
         => Execute(c, tx, "UPDATE workspaces SET json=$json WHERE id=$id", ("$json", json), ("$id", id.ToString()));
-    public static void UpdateNameAndJson(SqliteConnection c, SqliteTransaction tx, Guid id, string name, string json)
+    public static int UpdateNameAndJson(SqliteConnection c, SqliteTransaction tx, Guid id, string name, string json)
         => Execute(c, tx, "UPDATE workspaces SET name=$name,json=$json WHERE id=$w", ("$name", name), ("$json", json), ("$w", id.ToString()));
 
     // Migration steps: the header rewritten in the v4 shape, only the format marker, and the first save version.
