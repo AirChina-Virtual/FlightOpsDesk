@@ -66,6 +66,32 @@ static class JournalBenchmark
         return result;
     }
 
+    // Cost of the job safety net: 1,000 history jobs x 20 items plus one active job of 20,000 items (the --seed-task-ui shape).
+    public static async Task JobsCost()
+    {
+        var dir = StorageScenarios.Temp();
+        var store = new WorkspaceStore(dir);
+        var w = new Workspace { Name = "Jobs", AirlineId = "7", Mode = RunMode.Online };
+        ChangeItem Item(int n) => new() { Kind = ChangeKind.Update, State = ItemState.Succeeded, RemoteId = n.ToString(), Message = "done " + n, After = new DataRow { Fields = new() { ["ID"] = n.ToString(), ["Name"] = "n" + n } } };
+        for (var j = 0; j < 1000; j++)
+            w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [.. Enumerable.Range(0, 20).Select(Item)] });
+        w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [.. Enumerable.Range(0, 20000).Select(Item)] });
+        store.Save(w);
+        async Task<double> Median(Func<Task> action)
+        {
+            var times = new List<double>();
+            for (var n = 0; n < 9; n++)
+            { var watch = Stopwatch.StartNew(); await action(); times.Add(watch.Elapsed.TotalMilliseconds); }
+            times.Sort();
+            return times[times.Count / 2];
+        }
+        var empty = await Median(() => store.SaveChangesAsync(w));
+        var n2 = 0;
+        var header = await Median(() => { w.ConnectedAt = DateTimeOffset.UnixEpoch.AddSeconds(++n2); return store.SaveHeaderAsync(w); });
+        var serialize = await Median(() => { foreach (var job in w.Jobs) _ = JsonSerializer.Serialize(job); return Task.CompletedTask; });
+        Console.WriteLine($"jobs 1000x20 + 1x20000: empty-journal save {empty:F1} ms, header-only save {header:F1} ms; (serializing every job once, for comparison: {serialize:F0} ms)");
+    }
+
     // Each case runs twice on fresh copies: once for time and bytes, once with write-counting triggers installed.
     public static async Task Run(string mode, string output)
     {

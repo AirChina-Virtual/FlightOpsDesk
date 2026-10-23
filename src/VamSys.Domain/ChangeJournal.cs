@@ -83,7 +83,7 @@ public sealed class ChangeJournal
     {
         public static readonly ResourceState Empty = new([], [], [], [], null);
     }
-    sealed record State(string HeaderKey, IReadOnlyDictionary<ResourceKind, ResourceState> Resources, BatchJob[] Jobs);
+    sealed record State(string HeaderKey, IReadOnlyDictionary<ResourceKind, ResourceState> Resources, BatchJob[] Jobs, long[] JobPrints);
 
     readonly object gate = new();
     State? state;
@@ -114,7 +114,7 @@ public sealed class ChangeJournal
         var resources = new Dictionary<ResourceKind, ResourceState>();
         foreach (var (kind, data) in w.Resources)
             resources[kind] = Observe(data);
-        var captured = new State(headerKey, resources, [.. w.Jobs]);
+        var captured = new State(headerKey, resources, [.. w.Jobs], [.. w.Jobs.Select(Fingerprint)]);
         lock (gate) return new(captured, tick);
     }
     static ResourceState Observe(ResourceData data) => new([.. data.Snapshot], [.. data.Draft], [.. data.Columns], [.. data.Conflicts], data.SnapshotAt);
@@ -205,11 +205,12 @@ public sealed class ChangeJournal
             }
             var jobs = JobsChange.Unchanged;
             var nextJobs = current.Jobs;
+            var nextPrints = current.JobPrints;
             if (scope.HasFlag(JournalScope.Jobs))
             {
-                jobs = CompareJobs(current.Jobs, w.Jobs, out nextJobs);
+                jobs = CompareJobs(current.Jobs, current.JobPrints, w.Jobs, out nextJobs, out nextPrints);
             }
-            var nextState = new State(headerChanged ? headerKey : current.HeaderKey, resources, nextJobs);
+            var nextState = new State(headerChanged ? headerKey : current.HeaderKey, resources, nextJobs, nextPrints);
             return new(current, nextState, storedRevision, tick, scope, headerChanged, changes, jobs);
         }
     }
@@ -232,21 +233,52 @@ public sealed class ChangeJournal
         }
     }
 
-    JobsChange CompareJobs(BatchJob[] old, List<BatchJob> current, out BatchJob[] next)
+    // Safety net for jobs nobody marked: a job whose state fingerprint differs from the saved one is rewritten as if touched.
+    JobsChange CompareJobs(BatchJob[] old, long[] oldPrints, List<BatchJob> current, out BatchJob[] next, out long[] nextPrints)
     {
+        var prints = new long[current.Count];
+        for (var i = 0; i < prints.Length; i++)
+            prints[i] = Fingerprint(current[i]);
+        nextPrints = prints;
         var prefix = current.Count >= old.Length;
         for (var i = 0; prefix && i < old.Length; i++)
             prefix = current[i].Id == old[i].Id;
         var rewritten = new List<JobPlacement>();
         if (prefix)
             for (var i = 0; i < old.Length; i++)
-                if (!ReferenceEquals(current[i], old[i]) || touchedJobs.ContainsKey(current[i].Id))
+                if (!ReferenceEquals(current[i], old[i]) || touchedJobs.ContainsKey(current[i].Id) || prints[i] != oldPrints[i])
                     rewritten.Add(new(current[i], i));
         var inserted = prefix ? current.Skip(old.Length).Select((j, n) => new JobPlacement(j, old.Length + n)).ToList() : [];
         if (prefix && rewritten.Count == 0 && inserted.Count == 0)
-        { next = old; return JobsChange.Unchanged; }
+        { next = old; nextPrints = oldPrints; return JobsChange.Unchanged; }
         next = [.. current];
         return prefix ? new(ChangeMode.Delta, inserted, rewritten, []) : new(ChangeMode.Rewrite, [], [], next);
+    }
+
+    // A cheap, serialization-free digest of everything the executors and resolvers keep in a job: status, and per item the
+    // state flags, remote ids, messages, diagnostics, API steps and the identity of the attached evidence objects. It
+    // catches in-place state changes nobody marked (those decide whether a write may be sent again); it is not a hash of
+    // the full JSON, so edits to other item details still need TouchJob.
+    static long Fingerprint(BatchJob job)
+    {
+        long h = unchecked((long)0xcbf29ce484222325);
+        void Add(long v) { unchecked { h = (h ^ v) * 0x100000001b3; h ^= h >>> 29; } }
+        void Text(string? s) => Add(s == null ? -1 : s.GetHashCode(StringComparison.Ordinal));
+        void Ref(object? o) => Add(o == null ? 0 : o is ValueType ? o.GetHashCode() : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(o));
+        Add(job.Id.GetHashCode()); Add((int)job.Mode); Add((int)job.StatusCode); Text(job.Status); Ref(job.Description); Add(job.Items.Count);
+        foreach (var item in job.Items)
+        {
+            Add(item.Id.GetHashCode()); Add((int)item.State); Add((int)item.Kind); Add((int)item.Resource);
+            Text(item.RemoteId); Text(item.RecoveryCandidateId); Text(item.Message); Text(item.Diagnostic);
+            Add((item.Rebased ? 1 : 0) | (item.CreateCompleted ? 2 : 0) | (item.WriteAccepted ? 4 : 0) | (item.RequiresAirlineParameter ? 8 : 0));
+            Add(item.RecoveryCandidates.Count); Add(item.Dependencies.Count); Add(item.VerificationDifferences.Count); Add(item.PreCreateCandidateIds?.Count ?? -1);
+            Ref(item.Description); Ref(item.DiagnosticDetails); Ref(item.ReadbackDetails); Ref(item.DeletionVerification); Ref(item.ManualResolution); Ref(item.PreflightComparison); Ref(item.ApiExpectedValues);
+            Ref(item.After); Ref(item.Before); Add(item.After.Fields.Count); Add(item.After.Identity?.GetHashCode() ?? 0);
+            Add(item.ApiSteps.Count);
+            foreach (var step in item.ApiSteps)
+            { Add((int)step.State); Text(step.Method); Text(step.Path); Text(step.RemoteId); Add(step.StartedAt?.Ticks ?? 0); Add(step.FinishedAt?.Ticks ?? 0); }
+        }
+        return h;
     }
 
     // Compares the stored rows with the current list. `rows` is the new stored state (the old array when nothing changed).

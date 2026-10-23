@@ -278,9 +278,13 @@ public class ChangeJournalTests
         Sync(w);
         Assert.True(Plan(w).Jobs.IsEmpty);
 
-        existing.Items[0].State = ItemState.Running; // in place: invisible without a mark
+        existing.Items[0].State = ItemState.Running; // in place, no mark: the state fingerprint finds it
+        var found = Plan(w).Jobs;
+        Assert.Same(existing, Assert.Single(found.Rewritten).Job);
+        w.Journal().Accept(Plan(w), 2);
+        w.StorageRevision = 2;
         Assert.True(Plan(w).Jobs.IsEmpty);
-        w.Journal().TouchJob(existing);
+        w.Journal().TouchJob(existing); // the fast path
         var touched = Plan(w).Jobs;
         Assert.Equal(ChangeMode.Delta, touched.Mode);
         Assert.Same(existing, Assert.Single(touched.Rewritten).Job);

@@ -149,17 +149,31 @@ public class JournalWriteScopeTests : IDisposable
     }
 
     [Fact]
-    public async Task A_touched_job_is_written_again_and_an_untouched_one_is_not()
+    public async Task A_job_changed_in_place_is_saved_with_or_without_a_mark_and_an_unchanged_one_is_not()
     {
         var existing = w.Jobs[0];
+        // No TouchJob: the state fingerprint is the safety net, so task state can never be lost.
         existing.Items[0].State = ItemState.Failed;
         await store.SaveChangesAsync(w);
-        Assert.True(store.LastSave!.WroteNothing); // changed in place without a mark: outside the contract
+        Assert.Equal(1, store.LastSave!.JobWrites);
+        Assert.Equal(ItemState.Failed, store.LoadJob(w.Id, existing.Id)!.Items[0].State);
+        Assert.Equal(store.Load(w.Id).Serialize(), w.Serialize());
+        existing.Items[0].ApiSteps.Add(new BatchStep { Method = "POST", Path = "fleet", State = BatchStepState.InFlight });
+        existing.Items[0].WriteAccepted = true;
+        await store.SaveChangesAsync(w);
+        Assert.Equal(1, store.LastSave.JobWrites);
+        Assert.Equal(BatchStepState.InFlight, store.LoadJob(w.Id, existing.Id)!.Items[0].ApiSteps[0].State);
+        existing.Items[0].ApiSteps[0].State = BatchStepState.ResponseReceived;
+        await store.SaveChangesAsync(w);
+        Assert.Equal(BatchStepState.ResponseReceived, store.LoadJob(w.Id, existing.Id)!.Items[0].ApiSteps[0].State);
         w.Journal().TouchJob(existing);
         await store.SaveChangesAsync(w);
         Assert.Equal(1, store.LastSave.JobWrites);
-        Assert.Equal(ItemState.Failed, store.LoadJob(w.Id, existing.Id)!.Items[0].State);
         await store.SaveChangesAsync(w);
+        Assert.True(store.LastSave.WroteNothing);
+        // A freshly loaded workspace starts from the stored state, not from a spurious difference.
+        var loaded = store.Load(w.Id);
+        await store.SaveChangesAsync(loaded);
         Assert.True(store.LastSave.WroteNothing);
     }
 

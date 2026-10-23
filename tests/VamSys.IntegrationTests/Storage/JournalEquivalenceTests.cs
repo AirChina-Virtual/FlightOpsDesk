@@ -225,8 +225,13 @@ public class JournalEquivalenceTests
 
         void AddJob() => W.Jobs.Add(NewJob());
 
-        // Jobs and their items are changed in place; that is only visible to the journal when the job is marked.
+        // Jobs and their items are changed in place; the journal sees it through the mark or, for state changes, the fingerprint.
         void ChangeJob()
+        {
+            ChangeJob(mark: rng.Next(2) == 0);
+        }
+        // mark: false is the safety net at work - the fingerprint must find the change.
+        void ChangeJob(bool mark)
         {
             if (W.Jobs.Count == 0)
                 return;
@@ -234,7 +239,8 @@ public class JournalEquivalenceTests
             if (job.Items.Count > 0)
                 job.Items[rng.Next(job.Items.Count)].State = (ItemState)rng.Next(0, 8);
             job.SetStatus((JobStatus)rng.Next(0, Enum.GetValues<JobStatus>().Length), Messages.Define("Text_5026A63B58"));
-            W.Journal().TouchJob(job);
+            if (mark)
+                W.Journal().TouchJob(job);
         }
 
         void RemoveOrSwapJob()
