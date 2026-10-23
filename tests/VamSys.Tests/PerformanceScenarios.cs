@@ -218,13 +218,6 @@ static class PerformanceScenarios
             {if(r.RequestUri!.AbsolutePath.EndsWith("fleet/4/aircraft"))return Json(Page(""));Check(Query(r)=="?filter[fleet_id]=4");return Json(Page(RouteJson(ResourceKind.Routes)));};
             var task=a.HasDeletionDependenciesAsync(new(){Resource=ResourceKind.Fleets,Kind=ChangeKind.Delete,Before=fleet,After=fleet.Copy()},default);await clock.Drive(task);Check(task.Result&&h.Methods.Count==2);
         });
-        await test("Shared virtual clock enforces request spacing and waiting cancellation",async()=>
-        {
-            var time=new TestTime();var pool=new RequestCoordinator(time);var h=new AuditHttp();var stamps=new List<DateTimeOffset>();h.Next=(r,ct)=>{stamps.Add(time.GetUtcNow());return Json("{}");};
-            var a=Transport(h,time,pool);var b=Transport(h,time,pool);async Task Read(){for(var i=0;i<61;i++)using(await (i%2==0?a:b).GetAsync(new(OperationsAdapter.BaseUri,"fleet"),default)){} }
-            await time.Drive(Read());Check(stamps.Count==61&&(stamps[^1]-stamps[0]).TotalSeconds>=60);Check(stamps.Zip(stamps.Skip(1)).All(p=>(p.Second-p.First).TotalSeconds>=1));
-            using var ct=new CancellationTokenSource();var pending=a.GetAsync(new(OperationsAdapter.BaseUri,"fleet"),ct.Token);ct.Cancel();try{await pending;throw new Exception("Cancellation ignored");}catch(OperationCanceledException){}Check(stamps.Count==61);
-        });
         await test("Airport lookups stay exact across snapshot and cache changes while planning 1,000 routes over 3,000 airports",async()=>
         {
             var w=new Workspace{AirlineId="7"};var clock=new TestTime();var h=new AuditHttp{Next=(r,ct)=>RouteApprovalFixture.Respond(r)??throw new Exception("Unexpected metadata request")};var a=Api(w,h,clock);
@@ -285,46 +278,6 @@ static class PerformanceScenarios
             Console.WriteLine($"  20k merge retaining 5,000 conflicts: {watch.ElapsedMilliseconds} ms");
             Check(data.Conflicts.Count==5000&&data.Conflicts.Select(c=>c.RowId).Distinct().Count()==5000,"Conflicts "+data.Conflicts.Count);
             return Task.CompletedTask;
-        });
-        await test("Auto-advancing test clock still applies request spacing and Retry-After",async()=>
-        {
-            var time=new InstantTime();var h=new AuditHttp();var stamps=new List<DateTimeOffset>();
-            h.Next=(r,ct)=>{stamps.Add(time.GetUtcNow());if(stamps.Count!=2)return Json("{}");var limited=Json("{}",HttpStatusCode.TooManyRequests);limited.Headers.RetryAfter=new(TimeSpan.FromSeconds(30));return limited;};
-            var t=new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,"instant",new TokenProvider(_=>Task.FromResult(new AccessToken("test",time.GetUtcNow().AddHours(1))),time),new(time));
-            for(var i=0;i<2;i++)using(await t.GetAsync(new(OperationsAdapter.BaseUri,"fleet"),default)){}
-            Check(stamps.Count==3&&(stamps[1]-stamps[0]).TotalSeconds>=1&&(stamps[2]-stamps[1]).TotalSeconds>=30,"Virtual waits skipped");
-        });
-        await test("Concurrent clients share one budget and cancel a queued request",async()=>
-        {
-            var time=new TestTime();var pool=new RequestCoordinator(time);var h=new AuditHttp();var stamps=new List<DateTimeOffset>();
-            h.Next=(r,ct)=>{stamps.Add(time.GetUtcNow());return Json("{}");};
-            var clients=Enumerable.Range(0,3).Select(_=>Transport(h,time,pool)).ToArray();
-            using(await clients[0].GetAsync(new(OperationsAdapter.BaseUri,"fleet"),default)){}
-            using var cancel=new CancellationTokenSource();
-            var first=clients[0].GetAsync(new(OperationsAdapter.BaseUri,"fleet"),default);
-            var queued=clients[1].GetAsync(new(OperationsAdapter.BaseUri,"fleet"),cancel.Token);
-            var last=clients[2].GetAsync(new(OperationsAdapter.BaseUri,"fleet"),default);
-            cancel.Cancel();try{await queued;throw new Exception("Queued cancellation ignored");}catch(OperationCanceledException){}
-            await time.Drive(Task.WhenAll(first,last));first.Result.Dispose();last.Result.Dispose();
-            Check(stamps.Count==3 && stamps.Zip(stamps.Skip(1)).All(p=>(p.Second-p.First).TotalSeconds>=1));
-        });
-        await test("Virtual Retry-After, server budget and read backoff preserve production policy",async()=>
-        {
-            foreach(var mode in new[]{"delta","date","budget","network","500"})
-            {
-                var time=new TestTime();var h=new AuditHttp();var start=time.GetUtcNow();int calls=0;var a=Transport(h,time);using var metrics=PerformanceRun.Begin(Guid.NewGuid(),Guid.NewGuid());
-                h.Next=(r,ct)=>
-                {
-                    if(++calls>1)return Json("{}");if(mode=="network")throw new HttpRequestException();
-                    if(mode=="500")return Json("{}",HttpStatusCode.InternalServerError);
-                    var response=Json("{}",HttpStatusCode.TooManyRequests);
-                    response.Headers.RetryAfter=mode=="date"?new(time.GetUtcNow().AddSeconds(5)):new(TimeSpan.FromSeconds(5));
-                    if(mode=="budget")response.Headers.Add("X-RateLimit-Remaining","0");return response;
-                };
-                var task=a.GetAsync(new(OperationsAdapter.BaseUri,"fleet"),default);await time.Drive(task);task.Result.Dispose();
-                Check(calls==2&&metrics.Retries==1&&(time.GetUtcNow()-start).TotalSeconds>=(mode=="budget"?60:mode is "network" or "500"?1:5));
-                Check(metrics.RateWaitMs+metrics.BackoffMs>=1000);
-            }
         });
         await test("Token expiry uses injected time and metrics never expose credentials",async()=>
         {

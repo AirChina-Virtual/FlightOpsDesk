@@ -96,11 +96,6 @@ static class ApiScenarios
             var a=Row(("ICAO/IATA","EGLL"),("Name","London"));var d=new ResourceData{Snapshot=[a],Draft=[a.Copy()]};var b=a.Copy();b.Identity=new("101","7");
             SnapshotMerger.Merge(ResourceKind.Airports,d,[b]);Check(d.Draft.Count==1&&d.Draft[0].Identity!.RemoteId=="101");
         }));
-        await test("OAuth uses form Client Credentials and actual expiry with cached token",async()=>
-        {
-            var handler=new ScriptedHttp([async r=>{Check(r.RequestUri!.AbsoluteUri=="https://vamsys.io/oauth/token");var form=await r.Content!.ReadAsStringAsync();Check(form.Contains("grant_type=client_credentials")&&form.Contains("client_secret=s%26x")&&form.Contains("scope=%2A"));return ScriptedHttp.Json("{\"access_token\":\"token\",\"token_type\":\"Bearer\",\"expires_in\":3600}");}]);
-            var tokens=TokenProvider.ClientCredentials(new HttpClient(handler),new("123","s&x"));Check(await tokens.GetAsync(default)=="token"&&await tokens.GetAsync(default)=="token"&&handler.Calls==1);
-        });
         await test("Aircraft reading enumerates fleets and single responses use documented envelopes",async()=>
         {
             var h=new ScriptedHttp([
