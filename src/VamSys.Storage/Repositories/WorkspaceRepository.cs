@@ -24,10 +24,12 @@ internal static class WorkspaceRepository
         var w = Workspace.Deserialize((string)(Scalar(c, tx, "SELECT json FROM workspaces WHERE id=$id", ("$id", id.ToString())) ?? throw new KeyNotFoundException()));
         w.StorageRevision = Convert.ToInt64(Scalar(c, tx, "SELECT revision FROM workspace_revisions WHERE workspace_id=$id", ("$id", id.ToString())));
         JobRepository.Read(c, tx, w);
-        ResourceRowRepository.Read(c, tx, w);
+        var gaps = ResourceRowRepository.Read(c, tx, w);
         tx.Commit();
         // What was just read is exactly what the database holds, so later saves can write only the difference.
         w.Journal().Adopt(w.Journal().Capture(w, RowSerializer.HeaderKey(w)), w.StorageRevision);
+        foreach (var kind in gaps)
+            w.Journal().MarkRowsDirty(kind);
         return w;
     }
 

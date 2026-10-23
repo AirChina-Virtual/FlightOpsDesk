@@ -256,7 +256,7 @@ public class JournalWriteScopeTests : IDisposable
         var job = w.Jobs[0];
         var item = job.Items[0];
         item.State = ItemState.Running;
-        await store.CheckpointWriter(w).WriteAsync(new(CheckpointKind.Task, job, item), default);
+        await store.CheckpointWriter(w).WriteAsync(new(CheckpointKind.Task, job, item), TestContext.Current.CancellationToken);
         Writes();
         await store.SaveChangesAsync(w);
         var report = store.LastSave!;
@@ -282,13 +282,42 @@ public class JournalWriteScopeTests : IDisposable
         Routes.Snapshot.Add(updated);
         Routes.ReplaceDraftRows([updated]);
         Routes.SnapshotAt = DateTimeOffset.UnixEpoch;
-        await store.CheckpointWriter(w).WriteAsync(new(CheckpointKind.Rebase, job, item, null, delta), default);
+        await store.CheckpointWriter(w).WriteAsync(new(CheckpointKind.Rebase, job, item, null, delta), TestContext.Current.CancellationToken);
         await store.SaveChangesAsync(w);
         Assert.Equal("Journal", store.LastSave!.Kind);
         Assert.Equal(600, store.LastSave.RowWrites); // both lists of the resource, positions repaired
         var loaded = store.Load(w.Id);
         Assert.Equal("REBASED", loaded.Resources[ResourceKind.Routes].Draft[0].Get("Callsign"));
         Assert.Equal(Routes.Snapshot.Select(r => r.LocalId), loaded.Resources[ResourceKind.Routes].Snapshot.Select(r => r.LocalId));
+    }
+
+    [Fact]
+    public async Task Gaps_in_the_stored_positions_are_repaired_instead_of_colliding_with_an_appended_row()
+    {
+        // A checkpoint (or an older program) left position 5 of the snapshot list empty.
+        using (var c = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = Path.Combine(dir.Path, "workspaces.db"), Pooling = false }.ToString()))
+        {
+            c.Open();
+            using var cmd = c.CreateCommand();
+            cmd.CommandText = "DELETE FROM resource_rows WHERE resource=$r AND collection=0 AND ordinal=5";
+            cmd.Parameters.AddWithValue("$r", (int)ResourceKind.Routes);
+            Assert.Equal(1, cmd.ExecuteNonQuery());
+        }
+        var loaded = store.Load(w.Id);
+        var data = loaded.Resources[ResourceKind.Routes];
+        Assert.Equal(299, data.Snapshot.Count);
+        data.Snapshot.Add(new DataRow { Fields = new() { ["ID"] = "9999" } });
+        await store.SaveChangesAsync(loaded);
+        Assert.Equal("Journal", store.LastSave!.Kind);
+        Assert.Equal(store.Load(w.Id).Serialize(), loaded.Serialize());
+        using var check = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = Path.Combine(dir.Path, "workspaces.db"), Pooling = false }.ToString());
+        check.Open();
+        using var positions = check.CreateCommand();
+        positions.CommandText = "SELECT count(*), min(ordinal), max(ordinal) FROM resource_rows WHERE resource=$r AND collection=0";
+        positions.Parameters.AddWithValue("$r", (int)ResourceKind.Routes);
+        using var reader = positions.ExecuteReader();
+        Assert.True(reader.Read());
+        Assert.Equal((300L, 0L, 299L), (reader.GetInt64(0), reader.GetInt64(1), reader.GetInt64(2)));
     }
 
     // ---- failure paths --------------------------------------------------------------------------------------------------

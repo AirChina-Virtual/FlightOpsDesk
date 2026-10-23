@@ -29,8 +29,12 @@ internal static class ResourceRowRepository
         }
     }
 
-    public static void Read(SqliteConnection c, SqliteTransaction tx, Workspace w)
+    // Returns the resources whose stored positions are not 0, 1, 2, ... in either list (a task checkpoint or an older
+    // program left gaps); the journal assumes positions equal list indexes, so those resources are rewritten once.
+    public static HashSet<ResourceKind> Read(SqliteConnection c, SqliteTransaction tx, Workspace w)
     {
+        var gaps = new HashSet<ResourceKind>();
+        var expected = new Dictionary<(int Resource, int Collection), int>();
         w.Resources = Enum.GetValues<ResourceKind>().ToDictionary(k => k, _ => new ResourceData());
         using (var cmd = Command(c, tx, "SELECT resource,columns_json,conflicts_json,snapshot_at FROM resource_metadata WHERE workspace_id=$w", ("$w", w.Id.ToString())))
         using (var r = cmd.ExecuteReader())
@@ -41,16 +45,22 @@ internal static class ResourceRowRepository
             data.Conflicts = Decode<List<MergeConflict>>(r.GetString(2))!;
             data.SnapshotAt = r.IsDBNull(3) ? null : DateTimeOffset.Parse(r.GetString(3), CultureInfo.InvariantCulture);
         }
-        using (var cmd = Command(c, tx, "SELECT resource,collection,json FROM resource_rows WHERE workspace_id=$w ORDER BY resource,collection,ordinal", ("$w", w.Id.ToString())))
+        using (var cmd = Command(c, tx, "SELECT resource,collection,json,ordinal FROM resource_rows WHERE workspace_id=$w ORDER BY resource,collection,ordinal", ("$w", w.Id.ToString())))
         using (var r = cmd.ExecuteReader())
         while (r.Read())
         {
             var data = w.Resources[(ResourceKind)r.GetInt32(0)];
             var rows = r.GetInt32(1) == 0 ? data.Snapshot : data.Draft;
+            var list = (r.GetInt32(0), r.GetInt32(1));
+            var position = expected.GetValueOrDefault(list);
+            if (r.GetInt32(3) != position)
+                gaps.Add((ResourceKind)r.GetInt32(0));
+            expected[list] = position + 1;
             rows.Add(Decode<DataRow>(r.GetString(2))!);
         }
         foreach (var (kind, data) in w.Resources)
             HistoryRepository.Read(c, tx, w.Id, kind, data);
+        return gaps;
     }
 
     // Rewrites the JSON of draft rows that keep their position; every row must exist exactly once.
