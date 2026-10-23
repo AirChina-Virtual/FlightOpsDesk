@@ -4,7 +4,7 @@
 
 状态含义：**完成**＝该需求在所有层都有新测试；**领域完成**＝领域层（含 Application 的纯逻辑）已有新测试，其余层待办；**待办（R3+）**＝尚无新测试，由旧测试保护。
 
-测试名称：行内写成 `命名空间简写.类名.{方法, 方法}`，完整名称由前缀加上简写得到：`Domain.` ＝ `VamSys.UnitTests.Domain.`，`Application.` ＝ `VamSys.UnitTests.Application.`，`Inventory.` ＝ `VamSys.UnitTests.Inventory.`，以 `IntegrationTests.` 开头的为 `VamSys.IntegrationTests.…`，以 `VamSys.UnitTests.` 开头的已写全（BatchShiftMinutesTests、LocalReferenceTests、RowReplacementTests 在根命名空间）。含 `Theory` 的方法名代表它的全部数据行。
+测试名称：行内写成 `命名空间简写.类名.{方法, 方法}`，完整名称由前缀加上简写得到：`Domain.` ＝ `VamSys.UnitTests.Domain.`，`Application.` ＝ `VamSys.UnitTests.Application.`，`Transport.` ＝ `VamSys.UnitTests.Transport.`，`Inventory.` ＝ `VamSys.UnitTests.Inventory.`，以 `IntegrationTests.` 开头的为 `VamSys.IntegrationTests.…`，以 `VamSys.UnitTests.` 开头的已写全（BatchShiftMinutesTests、LocalReferenceTests、RowReplacementTests 在根命名空间）。含 `Theory` 的方法名代表它的全部数据行。
 
 ## 3.1 功能
 
@@ -24,11 +24,11 @@
 | F12 CSV 导出：按资源、仅变化记录、保留未知列、超 10 MB 拆分、字节格式不变 | Domain、Application（任务标记“待到 Orwell 导入”） | Domain.CsvAdapterTests.{Export_*, A_planned_export_can_be_read_back_into_equal_rows}（含默认 10 MiB 拆分 `Export_splits_by_default_below_ten_mebibytes_per_file`）；IntegrationTests.Golden.Csv.CsvGoldenTests.Export_bytes_are_the_same_for_every_resource（R0） | AuditScenarios（任务标记与导出入口）、UiInteractionScenarios | 领域完成 |
 | F13 工作区审阅：后台构建、分组、本次提交／暂缓／受阻、依赖暂缓、内容键 | Domain（依赖）、Application、UI | Domain.ChangePlannerTests.{A_known_local_reference_is_replaced_by_the_remote_key_and_remark_text_is_left_alone, The_local_prefix_is_recognised_in_any_case_when_resolving_and_when_depending, Several_references_to_the_same_new_row_make_one_dependency_and_each_kind_adds_its_own}（依赖关系部分） | UiInteractionScenarios（审阅、样本与依赖、内容键） | 待办（R3+） |
 | F14 提交交接 | Application、UI | 待办（R4） | TaskSubmissionScenarios | 待办（R3+） |
-| F15 在线执行：判重、冲突检查、回读、检查点、未知项、401／403、429 | Application、Infrastructure | 待办（R4/R5）；IntegrationTests.Golden.Requests.RequestGoldenTests.Write_*（R0） | ApiScenarios、StorageProcessScenarios、ReauditScenarios、AuditScenarios、BatchExecutor 的演示执行器场景（Program.cs） | 待办（R3+） |
+| F15 在线执行：判重、冲突检查、回读、检查点、未知项、401／403、429 | Application、Infrastructure | 传输层完成（R5 第 1 项）：Transport.ResponseClassifierTests（全部）、IntegrationTests.Transport.OperationsTransportTests.{Get_is_not_retried_after_a_client_error, Authentication_refusal_is_reported_once_and_drops_the_token, Validation_failure_exposes_the_field_errors, Throttled_write_makes_the_next_request_wait_for_retry_after, A_write_that_fails_before_it_is_sent_is_wrapped_as_not_sent, Token_refusal_before_a_write_keeps_the_access_error_inside}；判重、检查点、状态表待办（R4）；IntegrationTests.Golden.Requests.RequestGoldenTests.Write_*（R0） | ApiScenarios、StorageProcessScenarios、ReauditScenarios、AuditScenarios、BatchExecutor 的演示执行器场景（Program.cs） | 待办（R3+） |
 | F16 未知项出路 | Application、UI | 待办（R4） | UnblockScenarios、VerifiedScopeScenarios | 待办（R3+） |
 | F17 删除：本地引用检查；204／404 自动核对 | Domain（引用检查）、Infrastructure（核对） | Domain.DeletionServiceTests（全部）；Domain.SchemaValidationTests.{Deleting_is_only_valid_for_rows_that_exist_remotely, Deleting_a_row_that_other_rows_still_use_is_an_issue_on_the_deleted_row} | VerifiedScopeScenarios、UnblockScenarios（204／404 与只读核对） | 领域完成 |
 | F18 任务中心 | Presentation | 待办（R6） | TaskViewModelScenarios、test-v3-verification-ui | 待办（R3+） |
-| F19 诊断导出 | Infrastructure | 待办（R5） | LiveCompatibilityScenarios | 待办（R3+） |
+| F19 诊断导出 | Infrastructure | 脱敏、1 MiB 截断、哈希的行为未变，仅文件移到 `Transport/`；新增 IntegrationTests.Transport.OperationsTransportTests.Last_response_describes_the_latest_exchange_without_secrets；导出与截断单元测试待办（R5 后续） | LiveCompatibilityScenarios | 待办（R3+） |
 | F20 维护：备份后事务清理 | Storage | 待办（R3） | LiveCompatibilityScenarios | 待办（R3+） |
 | F21 演示工作区与离线模式 | Application、Infrastructure | 待办（R4） | ApiScenarios | 待办（R3+） |
 | F22 中英文即时切换、缺失键日志 | Domain、UI | Domain.LocalizationTests（全部）；Domain.LocalizationDiagnosticsTests（R2 已有）；Inventory.ResourceKeyInventoryTests（R0） | Program.cs 语言偏好持久化场景（存储部分）、Program.cs 执行期间切换语言不重发场景、test-localization-ui | 领域完成 |
@@ -41,9 +41,9 @@
 
 | # | 层 | 新测试 | 仍覆盖的旧场景 | 状态 |
 |---|---|---|---|---|
-| I01 写入不自动重发；未知只 GET；已有 ID 不再 POST | Application、Infrastructure | IntegrationTests.Golden.Requests.RequestGoldenTests.{Write_timeout_not_applied_is_recovered_read_only_and_never_resent, Write_timeout_applied_by_server_is_confirmed_by_read_without_resend, Create_post_timeout_is_never_resent_during_recovery, Write_429_returns_to_pending_and_is_sent_once_on_resume}（R0）；执行流水线状态表待办（R4） | StorageProcessScenarios、AuditScenarios、ReauditScenarios、Program.cs 演示执行器场景 | 待办（R3+） |
+| I01 写入不自动重发；未知只 GET；已有 ID 不再 POST | Application、Infrastructure | IntegrationTests.Golden.Requests.RequestGoldenTests.{Write_timeout_not_applied_is_recovered_read_only_and_never_resent, Write_timeout_applied_by_server_is_confirmed_by_read_without_resend, Create_post_timeout_is_never_resent_during_recovery, Write_429_returns_to_pending_and_is_sent_once_on_resume}（R0）；Transport.ReadRetryPolicyTests（全部，含“写入入口不接受重试策略”的反射检查）；IntegrationTests.Transport.OperationsTransportTests.{A_write_answered_with_a_server_error_or_throttle_is_never_resent, A_write_lost_after_sending_is_reported_as_it_happened_and_never_resent, A_write_cancelled_after_sending_is_not_a_not_sent_error, Get_gives_up_after_three_retries_and_reports_the_last_answer, Get_cancelled_by_the_caller_is_not_retried}（R5）；执行流水线状态表待办（R4） | StorageProcessScenarios、AuditScenarios、ReauditScenarios、Program.cs 演示执行器场景 | 待办（R3+） |
 | I02 写后回读比对 | Application、Infrastructure | IntegrationTests.Golden.Requests.RequestGoldenTests（R0 请求序列）；回读比对单元测试待办（R4） | ApiScenarios、ReauditScenarios | 待办（R3+） |
-| I03 全进程 ≤60 次／分钟、间隔 ≥1 s、Retry-After | Infrastructure | 待办（R5） | ContractScenarios | 待办（R3+） |
+| I03 全进程 ≤60 次／分钟、间隔 ≥1 s、Retry-After | Infrastructure | Transport.RequestBudgetTests（全部：1 秒间隔、61 次 ≥60 秒、同一 VA 共享预算、Retry-After 秒数／日期／过去／缺省、剩余额度 0、排队取消、退避时长、等待计入速率／退避）；IntegrationTests.Transport.OperationsTransportTests.{Transports_of_one_va_share_the_budget_and_stay_one_second_apart, Transports_for_different_vas_do_not_wait_for_each_other, A_queued_read_can_be_cancelled_without_sending, Retry_after_server_budget_and_read_backoff_keep_the_production_waits, Get_retries_wait_the_backoff_and_the_retry_after}；Transport.TokenProviderTests、IntegrationTests.Transport.ClientCredentialsTests | ContractScenarios | 完成（传输层） |
 | I04 新建前判重、修改前读最新、删除前检查引用 | Domain（引用）、Infrastructure | Domain.DeletionServiceTests.{A_fleet_is_in_use_under_any_name_an_aircraft_may_use_for_it, Each_reference_in_a_route_fleet_list_is_one_issue_and_other_fleets_do_not_count, An_airport_is_in_use_by_a_route_or_routing_endpoint, An_airport_is_in_use_under_its_codes_its_remote_id_and_its_api_aliases, Imported_info_columns_of_an_airport_also_count_as_names_for_it, Rows_that_are_themselves_marked_deleted_or_are_deleted_together_do_not_block_the_deletion, A_preview_made_before_a_new_reference_appeared_cannot_be_applied}；IntegrationTests.Golden.Requests.RequestGoldenTests.Create_blocked_*（R0） | CandidateIndexScenarios | 领域完成 |
 | I05 请求前后先保存；版本号防覆盖；保存失败不改内存 | Application、Storage | Application.DraftEditsTests.After_a_failed_save_the_rows_come_back_and_the_next_save_must_write_everything；Application.WindowCloseControllerTests.A_failed_save_reopens_the_window_unfreezes_it_and_rethrows_so_the_close_can_be_retried | StorageProcessScenarios、DraftSaveScenarios、Program.cs 执行器持久化失败场景 | 待办（R3+） |
 | I06 CSV 字节格式不变 | Domain | Domain.CsvAdapterTests.{Export_quotes_a_cell_only_when_it_has_a_comma_quote_or_line_break, Export_then_parse_returns_the_same_cell, Export_writes_utf8_without_bom_and_crlf_endings, Export_orders_columns_key_first_then_required_then_the_rest_as_seen}；IntegrationTests.Golden.Csv.CsvGoldenTests.Export_bytes_are_the_same_for_every_resource（R0） | AuditScenarios | 完成 |
@@ -93,8 +93,28 @@
 | 规划中 FieldIntent 清空与未指定 | `ChangePlanner.Plan` 把空值也记为 `Set` | 7 个用例失败：ChangePlannerTests.Only_changed_fields_are_planned_and_an_empty_value_is_Clear_not_unspecified、Planning_matches_a_straightforward_full_row_oracle、CsvAdapterTests.Patch_import_keeps_unlisted_rows_and_columns_and_an_explicit_empty_value_clears |
 | 本地引用阻止删除 | `DeletionService.Preview` 不再调用 `CheckReferences` | 17 个用例失败：DeletionServiceTests 中的引用检查各用例（别名、airport 端点、过期预览、Info-* 列、同时删除）、SchemaValidationTests 中被引用行删除的用例 |
 
+## R5 传输管线：已删除的旧场景（第 1 项）
+
+删除前逐条读过断言；每个断言在新测试中都有对应。
+
+| 旧场景 | 断言 | 新测试 |
+|---|---|---|
+| Program.cs “Transport follows cursor pages, protects origin and reports auth” | 两页共 2 行且 2 次请求；其它源被拒；401 抛出 `ApiAccessException` | IntegrationTests.Transport.OperationsTransportTests.{Pages_are_requested_with_one_hundred_rows_and_followed_by_cursor, Reads_and_writes_outside_the_operations_origin_are_refused_before_any_request, A_page_that_fails_with_an_auth_error_surfaces_it}；Transport.PagerTests |
+| Program.cs “429 honors Retry-After and retries without losing page” | 首次 429 带 Retry-After，重试后拿到完整页 | OperationsTransportTests.{Get_is_retried_after_throttling_or_a_server_error, Get_retries_wait_the_backoff_and_the_retry_after, Retry_after_server_budget_and_read_backoff_keep_the_production_waits}；RequestBudgetTests.Retry_After_* |
+| ContractScenarios “Rejected page size falls back to the documented default” | 422 后第二次请求不带 page[size]，行数 1 | PagerTests.First_page_rejecting_the_size_falls_back…（400、422）；OperationsTransportTests.A_rejected_page_size_falls_back_to_the_default_page |
+| PerformanceScenarios “Shared virtual clock enforces request spacing and waiting cancellation” | 两个传输共享预算发 61 次，跨度 ≥60 秒、相邻 ≥1 秒；排队中的请求取消后不再发出 | OperationsTransportTests.{Transports_of_one_va_share_the_budget_and_stay_one_second_apart, A_queued_read_can_be_cancelled_without_sending}；RequestBudgetTests.{Sixty_one_requests…, Instances_for_one_va…, Cancelling_a_queued_request…} |
+| PerformanceScenarios “Auto-advancing test clock still applies request spacing and Retry-After” | 自动推进的时钟下间隔 ≥1 秒、429 后 ≥30 秒 | RequestBudgetTests.Instant_time_still_computes_the_waits；OperationsTransportTests.Get_retries_wait_the_backoff_and_the_retry_after |
+| PerformanceScenarios “Concurrent clients share one budget and cancel a queued request” | 三个客户端共享预算、间隔 ≥1 秒、排队的取消 | RequestBudgetTests.{Instances_for_one_va…, Requests_of_one_va_never_overlap, Cancelling_a_queued_request…}；OperationsTransportTests.A_write_cancelled_while_queued_behind_the_rate_limit_is_not_sent |
+| PerformanceScenarios “Virtual Retry-After, server budget and read backoff preserve production policy” | delta／date／budget／network／500 五种情形：请求 2 次、重试计数 1、等待 ≥5／5／60／1／1 秒、等待指标 ≥1000 ms | OperationsTransportTests.Retry_after_server_budget_and_read_backoff_keep_the_production_waits（同五种情形、同断言）；RequestBudgetTests |
+| ApiScenarios “OAuth uses form Client Credentials and actual expiry with cached token” | 令牌地址、表单字段（含 `scope=*`）、第二次取令牌不再请求 | IntegrationTests.Transport.ClientCredentialsTests.{The_token_request_is_a_form_post…, The_token_is_cached_until_one_minute_before_expiry}；Transport.TokenProviderTests |
+
+Program.cs 的 “401/403 pauses batch without sending later rows” 断言的是演示执行器 `BatchExecutor` 的行为（见 X01），不是传输，保留。PerformanceScenarios 的 “Token expiry uses injected time and metrics never expose credentials” 还检查性能指标序列化，保留。
+
+`TransportOutcome` 是带静态成员的 `record struct` 而不是枚举，这样枚举清单（Inventory/Expected/Enums.txt）不变。
+
 ## 数量
 
+- R5 第 1 项：旧运行器 240 → 232（删除 8 个传输场景）；单元测试 404 → 576 项，集成测试 50 → 129 项（各含 1 项跳过），Release 与 Debug 均通过；请求金样、存储／CSV 金样和清单期望文件未变；分析器基线 186 → 180（删除的旧场景带走 6 条警告，新测试无新增）。
 - 旧运行器：270 项 → 240 项（删除 30 个场景；另有 1 个场景只保留存储部分后改名，数量不变）。基线数在工作树中比主检出少一项（`artifacts/step5-v3-baseline` 缺失），属预期。
 - 单元测试：74 项 → 404 项（含 1 项因产品缺口跳过）；Release 与 Debug 均通过。集成测试 50 项（49 通过、1 跳过）未变；金样与清单期望文件未变。
 - 分析器警告基线：198 → 186（旧运行器 CA1307 −11、CA1310 −1），新测试没有增加任何警告。

@@ -8,8 +8,8 @@ tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|CA1307|5
 tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|CA1310|2
 tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|CA2000|5
 tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|xUnit1051|3
-tests/VamSys.Tests/VamSys.Tests.csproj|CA1307|82
+tests/VamSys.Tests/VamSys.Tests.csproj|CA1307|78
 tests/VamSys.Tests/VamSys.Tests.csproj|CA1310|53
-tests/VamSys.Tests/VamSys.Tests.csproj|CA2000|16
+tests/VamSys.Tests/VamSys.Tests.csproj|CA2000|14
 tests/VamSys.UnitTests/VamSys.UnitTests.csproj|CA1307|6
 tests/VamSys.UnitTests/VamSys.UnitTests.csproj|CA1310|2

@@ -75,13 +75,6 @@ static class ContractScenarios
             throttle=false;await clock.Drive(new OperationsBatchExecutor(a,w).ExecuteAsync(job,()=>Task.CompletedTask,default));
             Check(item.State==ItemState.Succeeded&&item.RemoteId=="5"&&h.Methods.Count(m=>m==HttpMethod.Post)==2);
         });
-        await test("Rejected page size falls back to the documented default",async()=>
-        {
-            var clock=new TestTime();var h=new AuditHttp();var sizes=new List<bool>();
-            h.Next=(r,ct)=>{var sized=Uri.UnescapeDataString(r.RequestUri!.Query).Contains("page[size]");sizes.Add(sized);return sized?Json("{}",HttpStatusCode.UnprocessableEntity):Json(Page(Fleet));};
-            var rows=0;async Task Read(){await foreach(var _ in Transport(h,clock).ReadPagesAsync(new(OperationsAdapter.BaseUri,"fleet"),default))rows++;}
-            await clock.Drive(Read());Check(rows==1&&sizes.SequenceEqual([true,false]));
-        });
         await test("Route fields follow StoreRouteRequest: jumpseat identity, cost index and ISO dates",()=>
         {
             var w=new Workspace();var row=new DataRow{Fields=new(){["Type"]="jumpseat",["Departure Airport (ICAO/IATA)"]="EGLL",["Arrival Airport (ICAO/IATA)"]="EGKK",["Cost Index"]="1000"}};

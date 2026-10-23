@@ -129,15 +129,6 @@ await Test("Remote conflict blocks overwrite", async () =>
     var fake=new CountingService(new DemoService(w)); var item=new ChangeItem { Resource=ResourceKind.Airports,Kind=ChangeKind.Update,Before=Row(("ICAO/IATA","ZBAA"),("Name","old")),After=Row(("ICAO/IATA","ZBAA"),("Name","new")) };
     await new BatchExecutor(fake,fake).ExecuteAsync(new BatchJob { Items=[item] },()=>Task.CompletedTask,CancellationToken.None); Check(item.State==ItemState.Conflict && fake.Writes==0);
 });
-await Test("Transport follows cursor pages, protects origin and reports auth", async () =>
-{
-    var handler = new FakeHttp(); using var http=new HttpClient(handler); var token=new TokenProvider(_=>Task.FromResult(new AccessToken("fake",DateTimeOffset.UtcNow.AddHours(1))));
-    var transport=new OperationsTransport(http,new Uri("https://example.test"),Guid.NewGuid().ToString(),token,InstantTime.Requests());
-    int count=0; await foreach(var r in transport.ReadPagesAsync(new Uri("https://example.test/routes"),CancellationToken.None)) count++;
-    Check(count==2 && handler.Calls==2);
-    try { await transport.GetAsync(new Uri("https://elsewhere.test/routes"),CancellationToken.None); throw new Exception("Origin accepted"); } catch(InvalidOperationException) { }
-    handler.AuthFail=true; try { await transport.GetAsync(new Uri("https://example.test/routes"),CancellationToken.None); throw new Exception("Auth accepted"); } catch(ApiAccessException) { }
-});
 await Test("Cross-resource creates resolve returned IDs before dependent writes", async () =>
 {
     var w=new Workspace(); var fleet=Row(("Name","New fleet")); var plane=Row(("Name","New plane"),("Fleet ID","local:"+fleet.LocalId));
@@ -165,12 +156,6 @@ await Test("401/403 pauses batch without sending later rows", async () =>
 {
     var fake=new AccessDeniedService(); var job=new BatchJob { Items=[new ChangeItem { Resource=ResourceKind.Fleets },new ChangeItem { Resource=ResourceKind.Fleets }] };
     await new BatchExecutor(fake,fake).ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None); Check(fake.Calls==1 && job.Status.Contains("暂停"));
-});
-await Test("429 honors Retry-After and retries without losing page", async () =>
-{
-    using var http = new HttpClient(new ThrottledHttp());
-    var transport=new OperationsTransport(http,new Uri("https://example.test"),Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("fake",DateTimeOffset.UtcNow.AddHours(1)))),InstantTime.Requests());
-    using var result=await transport.GetAsync(new Uri("https://example.test/routes"),CancellationToken.None); Check(result.RootElement.GetProperty("data").GetArrayLength()==0);
 });
 await Test("Recovered create with persisted remote ID verifies without repeat", async () =>
 {
@@ -244,10 +229,10 @@ sealed class CountingService(DemoService inner) : IResourceReader,IResourceWrite
 }
 sealed class FakeHttp : HttpMessageHandler
 {
-    public int Calls; public bool AuthFail;
+    public int Calls;
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
     {
-        Calls++; if(AuthFail) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized));
+        Calls++;
         return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent(Calls==1 ? "{\"data\":[{\"id\":1}],\"meta\":{\"next_cursor_url\":\"https://example.test/routes?cursor=2\"}}" : "{\"data\":[{\"id\":2}],\"meta\":{\"next_cursor_url\":null}}") });
     }
 }
@@ -257,13 +242,4 @@ sealed class AccessDeniedService : IResourceReader,IResourceWriter
     public async IAsyncEnumerable<DataRow> ReadAllAsync(ResourceKind k,[System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct) { await Task.CompletedTask; yield break; }
     public Task<DataRow?> FindAsync(ResourceKind k,string id,CancellationToken ct)=>throw new ApiAccessException("denied");
     public Task<string?> WriteAsync(ChangeItem c,CancellationToken ct) { Calls++; throw new ApiAccessException("denied"); }
-}
-sealed class ThrottledHttp : HttpMessageHandler
-{
-    int calls;
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
-    {
-        var response=new HttpResponseMessage(++calls==1 ? HttpStatusCode.TooManyRequests : HttpStatusCode.OK) { Content=new StringContent("{\"data\":[]}") };
-        response.Headers.RetryAfter=new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(1)); return Task.FromResult(response);
-    }
 }

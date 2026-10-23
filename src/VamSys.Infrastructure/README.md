@@ -8,8 +8,15 @@
 
 | 文件 | 具体作用 |
 |---|---|
-| OperationsTransport.cs | 发送请求、管理登录令牌、控制请求频率，并处理服务器要求等待、报错和取消 |
-| ApiDiagnostics.cs | 结构化错误、脱敏、正文限制和诊断导出；OAuth 正文不进入证据 |
+| Transport/OperationsTransport.cs | 传输门面：保留原有的公开接口，转交给下面各部分 |
+| Transport/RequestPipeline.cs | 一次请求的完整流程；读与写是两个入口，只有读入口带重试策略 |
+| Transport/RequestBudget.cs | 同一 VA 的请求预算：一次一个、间隔 ≥1 秒、Retry-After、剩余额度为 0 时等一分钟（`RequestCoordinator` 持有各 VA 的预算和时钟） |
+| Transport/TokenProvider.cs | OAuth 取令牌，并按 `expires_in` 缓存 |
+| Transport/ResponseClassifier.cs | 把 HTTP 结果或异常归为未发出／被拒未处理／已接受／结果未知／字段错误／其它 |
+| Transport/ReadRetryPolicy.cs | 只用于 GET 的退避重试 |
+| Transport/Pager.cs、OriginPolicy.cs | 游标分页（页长 100，被拒时退回默认）；HTTPS、同源和路径限制 |
+| Transport/TransportExceptions.cs | `ApiResponseException`、`RequestNotSentException` |
+| Transport/ApiDiagnostics.cs | 结构化错误、脱敏、正文限制和诊断导出；OAuth 正文不进入证据 |
 | OperationsParameters.cs | 参数只读查询、会话缓存、批准前缀预检与字段差异证据 |
 | OperationsAdapter.cs | 把修改转换成 API 请求，读取返回数据，检查记录是否正确以及修改是否成功 |
 | OperationsMovement.cs | 单独 fleet_id PATCH、目标机队预检、目标父路径回读及旧步骤校验 |
@@ -18,7 +25,7 @@
 | CandidateIndex.cs | 按 ID、名称或注册号等信息快速查找记录；同名的不同记录都保留 |
 | OperationsBatchExecutor.cs | 逐条提交修改，保存每一步的进度；中断后先核对结果，再更新本地数据 |
 | DemoService.cs | 提供带有演示标记的测试数据；连接真实服务器失败时不会偷偷切换到演示 |
-| Performance.cs | 记录发送了多少请求，以及等待、保存和处理分别用了多久 |
+| ApiContracts.cs | 契约版本与哈希、未验证适配器 |
 
 有些记录需要先创建，再补充其他属性。创建返回 ID 后，必须先把 ID 和进度保存成功，才能提交下一步。如果上次停在“执行中”或“结果未知”，恢复时只查询结果，不直接重发新增或修改请求。账号或权限出错时任务暂停；其他记录失败也不能让一条结果未确认的记录失去防重复保护。
 
