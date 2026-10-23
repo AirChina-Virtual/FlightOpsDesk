@@ -68,6 +68,68 @@ internal static class ResourceRowRepository
         }
     }
 
+    // Applies the journal's change of one row list. Writes are counted so the caller can report them.
+    public static (int Writes, int Deletes, int Moves) Apply(SqliteConnection c, SqliteTransaction tx, string workspace, int kind, StoredRowList list)
+    {
+        const string where = "workspace_id=$w AND resource=$r AND collection=$c";
+        var key = new (string, object?)[] { ("$w", workspace), ("$r", kind), ("$c", list.Collection) };
+        if (list.Mode == ChangeMode.Rewrite)
+        {
+            Execute(c, tx, "DELETE FROM resource_rows WHERE " + where, key);
+            Insert(c, tx, workspace, kind, list.Collection, list.All);
+            return (list.All.Count, 0, 0);
+        }
+        using (var delete = Command(c, tx, "DELETE FROM resource_rows WHERE " + where + " AND local_id=$id", [.. key, ("$id", "")]))
+        {
+            delete.Prepare();
+            foreach (var id in list.Deleted)
+            {
+                delete.Parameters["$id"].Value = id;
+                if (delete.ExecuteNonQuery() != 1)
+                    throw StorageErrors.Block("StorageInvalid");
+            }
+        }
+        // Positions are unique per list: park the moving rows on negative ordinals first, then give them their final ones.
+        foreach (var phase in new[] { 1, 2 })
+        {
+            using var move = Command(c, tx, "UPDATE resource_rows SET ordinal=$n WHERE " + where + " AND local_id=$id", [.. key, ("$id", ""), ("$n", 0)]);
+            move.Prepare();
+            foreach (var (id, ordinal) in list.Moved)
+            {
+                move.Parameters["$id"].Value = id;
+                move.Parameters["$n"].Value = phase == 1 ? -1 - ordinal : ordinal;
+                if (move.ExecuteNonQuery() != 1)
+                    throw StorageErrors.Block("StorageInvalid");
+            }
+        }
+        using (var update = Command(c, tx, "UPDATE resource_rows SET json=$json WHERE " + where + " AND local_id=$id", [.. key, ("$id", ""), ("$json", "")]))
+        {
+            update.Prepare();
+            foreach (var row in list.Replaced)
+            {
+                update.Parameters["$id"].Value = row.Id;
+                update.Parameters["$json"].Value = row.Json;
+                if (update.ExecuteNonQuery() != 1)
+                    throw StorageErrors.Block("StorageInvalid");
+            }
+        }
+        Insert(c, tx, workspace, kind, list.Collection, list.Added);
+        return (list.Replaced.Count + list.Added.Count, list.Deleted.Count, list.Moved.Count);
+    }
+
+    static void Insert(SqliteConnection c, SqliteTransaction tx, string workspace, int kind, int collection, List<StoredPlacement> rows)
+    {
+        using var insert = Command(c, tx, "INSERT INTO resource_rows VALUES($w,$r,$c,$id,$n,$json)", ("$w", workspace), ("$r", kind), ("$c", collection), ("$id", ""), ("$n", 0), ("$json", ""));
+        insert.Prepare();
+        foreach (var row in rows)
+        {
+            insert.Parameters["$id"].Value = row.Id;
+            insert.Parameters["$n"].Value = row.Ordinal;
+            insert.Parameters["$json"].Value = row.Json;
+            insert.ExecuteNonQuery();
+        }
+    }
+
     // One rebase: snapshot/draft row mutations, snapshot time, conflicts and optional history clearing for a single record.
     public static void WriteDelta(SqliteConnection c, SqliteTransaction tx, Guid workspaceId, ResourceRebaseDelta delta, string? snapshot, string? draft)
     {

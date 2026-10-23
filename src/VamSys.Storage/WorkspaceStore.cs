@@ -62,8 +62,36 @@ public sealed partial class WorkspaceStore
         return WorkspaceRepository.Load(c, id);
     }
 
+    // Full saves: the whole workspace is rewritten. Used for a workspace that was never saved and as the fallback of the journal saves.
     public void Save(Workspace w) => writer.Save(w);
     public Task SaveAsync(Workspace w) => writer.SaveAsync(w);
+    // Journal saves: only what changed since the database was last synchronised with the workspace is written (nothing
+    // when nothing changed). A scope limits the save to the header or the jobs and leaves other changes pending.
+    public void SaveChanges(Workspace w, JournalScope scope = JournalScope.All) => writer.SaveChanges(w, scope);
+    public Task SaveChangesAsync(Workspace w, JournalScope scope = JournalScope.All) => writer.SaveChangesAsync(w, scope);
+    public void SaveHeader(Workspace w) => writer.SaveChanges(w, JournalScope.Header);
+    public Task SaveHeaderAsync(Workspace w) => writer.SaveChangesAsync(w, JournalScope.Header);
+    public void SaveJobs(Workspace w) => writer.SaveChanges(w, JournalScope.Jobs);
+    public Task SaveJobsAsync(Workspace w) => writer.SaveChangesAsync(w, JournalScope.Jobs);
+    // What the last successful save through this store wrote.
+    public SaveReport? LastSave => writer.LastSave;
+
+    // Targeted reads that do not load the workspace.
+    public bool JobExists(Guid workspaceId, Guid jobId)
+    {
+        using var c = Open();
+        return JobRepository.Exists(c, workspaceId, jobId);
+    }
+    public BatchJob? LoadJob(Guid workspaceId, Guid jobId)
+    {
+        using var c = Open();
+        return JobRepository.ReadOne(c, workspaceId, jobId);
+    }
+    public WorkspaceCounts CountRows(Guid workspaceId)
+    {
+        using var c = Open();
+        return WorkspaceRepository.Counts(c, workspaceId);
+    }
     public void SaveJson(Guid id, string name, string json) => writer.SaveJson(id, name, json);
     public static string SerializeForSave(Workspace w) => w.Serialize();
     public Task<bool> TrySaveDraftRowsAsync(Workspace w, IReadOnlyCollection<DraftRowChanges> changes) => writer.TrySaveDraftRowsAsync(w, changes);
@@ -95,7 +123,7 @@ public sealed partial class WorkspaceStore
             throw new PlatformNotSupportedException();
         clientId = clientId.Trim();
         var credentials = secrets.ResolveCredentials(workspace.Id, clientId, secret, requireNewSecret);
-        var staged = Workspace.Deserialize(workspace.Serialize());
+        var staged = workspace.StageHeader();
         staged.ClientId = clientId;
         staged.Mode = RunMode.Offline;
         staged.ConnectedAt = null;
@@ -104,9 +132,9 @@ public sealed partial class WorkspaceStore
         if (localRouteTimes.HasValue)
             staged.LocalRouteTimes = localRouteTimes.Value;
         var encrypted = credentials == null ? null : SecretStore.Protect(credentials, workspace.Id);
-        workspace.StorageRevision = SavePayload(RowSerializer.Capture(staged), encrypted);
-        foreach (var data in workspace.Resources.Values)
-            data.History.Acknowledge(data.History.Capture());
+        // The header and the encrypted credentials are written together with whatever else is pending; the workspace
+        // itself changes only after the commit.
+        writer.SaveChanges(workspace, JournalScope.All, staged, encrypted);
         workspace.ClientId = staged.ClientId;
         workspace.Mode = RunMode.Offline;
         workspace.ConnectedAt = null;

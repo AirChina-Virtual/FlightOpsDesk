@@ -96,18 +96,20 @@ public sealed partial class MainWindow : Window
         WorkspacePicker.SelectedItem = ((List<WorkspaceChoice>)WorkspacePicker.ItemsSource).First(x => x.Id == workspace.Id);
         ready = wasReady;
     }
-    // Cell edits not yet saved. Every other change is followed by a full save, which also covers these.
+    // Cell edits not yet saved. Every other change is followed by a journal save, which also covers these.
     readonly DraftEdits edits = new();
-    // dataChanged: false only for saves that record jobs or connection state and leave every row untouched.
-    async Task Save(bool dataChanged = true)
+    // The journal save writes only what changed since the database last matched the workspace (nothing at all when
+    // nothing changed). dataChanged: false only for saves that record jobs or connection state and leave every row untouched;
+    // such saves pass a narrower scope, which leaves other pending changes (and the recorded cell edits) for later.
+    async Task Save(bool dataChanged = true, JournalScope scope = JournalScope.All)
     {
         if (dataChanged)
             InvalidateDataViews();
         await saveGate.WaitAsync();
-        var taken = edits.Take();
+        var taken = scope == JournalScope.All ? edits.Take() : null;
         try
-        { if (storageBlocked) throw OperationsAdapter.Block("StorageReload"); await store.SaveAsync(workspace); }
-        catch { edits.Restore(taken); throw; }
+        { if (storageBlocked) throw OperationsAdapter.Block("StorageReload"); await store.SaveChangesAsync(workspace, scope); }
+        catch { if (taken != null) edits.Restore(taken); throw; }
         finally { saveGate.Release(); }
     }
     // Autosave writes the edited rows and changed history steps, including same-cell continuations.
@@ -120,7 +122,7 @@ public sealed partial class MainWindow : Window
             if (storageBlocked)
                 throw OperationsAdapter.Block("StorageReload");
             if (!taken.CanSaveRows(workspace) || !await store.TrySaveDraftRowsAsync(workspace, taken.Changes))
-                await store.SaveAsync(workspace);
+                await store.SaveChangesAsync(workspace);
         }
         catch { edits.Restore(taken); throw; }
         finally { saveGate.Release(); }
@@ -452,7 +454,7 @@ public sealed partial class MainWindow : Window
         for (int i = 0; i < parts.Count; i++)
             await File.WriteAllBytesAsync(Path.Combine(folder.Path, $"{prefix}-{i + 1}.csv"), parts[i]);
         workspace.Jobs.Add(new BatchJob { Mode = RunMode.Offline, Items = changes, Description = Messages.Define("Text_D964132351", ("arg0", parts.Count), ("arg1", folder.Path)), StatusCode = JobStatus.AwaitingImport, Status = Messages.Define("Text_D964132351", ("arg0", parts.Count), ("arg1", folder.Path)) });
-        await Save(dataChanged: false);
+        await Save(dataChanged: false, JournalScope.Jobs);
         Status(() => L("Text_B680DD9FD1", ("arg0", parts.Count)));
     });
     Task StartDemo() => SubmitWorkspace(RunMode.Demo);
@@ -468,7 +470,8 @@ public sealed partial class MainWindow : Window
                 demo.RestoreSuccessful(history);
             Navigation.SelectedItem = Navigation.MenuItems[4];
             Render();
-            await new BatchExecutor(demo, demo).ExecuteAsync(job, async () => { await Save(); }, running.Token, item => NotifyTask(new(workspace.Id, job.Id, item?.Id, job.StatusCode != JobStatus.Running)));
+            // The executor changes the job and its items in place and asks for a save after every item: only the job is written.
+            await new BatchExecutor(demo, demo).ExecuteAsync(job, async () => { workspace.Journal().TouchJob(job); await Save(dataChanged: false, JournalScope.Jobs); }, running.Token, item => NotifyTask(new(workspace.Id, job.Id, item?.Id, job.StatusCode != JobStatus.Running)));
             // Rebase only verified successful rows, keeping failures and unrelated drafts intact.
             foreach (var item in job.Items.Where(i => i.State == ItemState.Succeeded && !i.Rebased))
             {
@@ -498,6 +501,7 @@ public sealed partial class MainWindow : Window
                 data.SnapshotAt = DateTimeOffset.UtcNow;
                 data.ClearHistory(invalidateIndex: item.Kind == ChangeKind.Delete);
             }
+            workspace.Journal().TouchJob(job);
             await Save();
             foreach (var item in job.Items)
                 NotifyTask(new(workspace.Id, job.Id, item.Id));

@@ -46,6 +46,20 @@ public sealed class DataRow
     public Dictionary<string, string> Fields { get => fields; set { GuardWrite(); fields = value; } }
     public string Get(string key) => fields.GetValueOrDefault(key, "");
     public DataRow Copy() => new(this);
+    /// <summary>True when both rows serialize to the same JSON: same id, identity, raw API text and fields in the same order.</summary>
+    public static bool SameContent(DataRow? a, DataRow? b)
+    {
+        if (ReferenceEquals(a, b))
+            return true;
+        if (a is null || b is null || a.localId != b.localId || a.identity != b.identity || a.rawApiJson != b.rawApiJson || a.fields.Count != b.fields.Count)
+            return false;
+        using var left = a.fields.GetEnumerator();
+        using var right = b.fields.GetEnumerator();
+        while (left.MoveNext() && right.MoveNext())
+            if (left.Current.Key != right.Current.Key || left.Current.Value != right.Current.Value)
+                return false;
+        return true;
+    }
 
     /// <summary>True when the debug guard is compiled into this build (Debug configuration of VamSys.Domain).</summary>
     public static bool GuardEnabled =>
@@ -193,6 +207,10 @@ public sealed class Workspace
     public List<string> VerifiedOperations { get; set; } = [];
     public Dictionary<ResourceKind, ResourceData> Resources { get; set; } = Enum.GetValues<ResourceKind>().ToDictionary(k => k, _ => new ResourceData());
     public List<BatchJob> Jobs { get; set; } = [];
+    ChangeJournal journal = new();
+    /// <summary>What the database holds for this workspace, so a save can write only the difference (see ChangeJournal).
+    /// A method rather than a property: it is not part of the workspace's data and must stay out of its persisted shape.</summary>
+    public ChangeJournal Journal() => journal;
     // Used to stage an atomic rebase. The caller replaces the changed ResourceData;
     // unchanged resources and jobs are shared for read-only serialization.
     public Workspace StageResource(ResourceKind kind, ResourceData data)
@@ -200,6 +218,7 @@ public sealed class Workspace
         var copy = (Workspace)MemberwiseClone();
         copy.Resources = new(Resources) { [kind] = data };
         copy.VerifiedOperations = [.. VerifiedOperations];
+        copy.journal = new();
         return copy;
     }
     // Stages a change to every resource without deep-copying rows, jobs or undo history.
@@ -208,6 +227,15 @@ public sealed class Workspace
         var copy = (Workspace)MemberwiseClone();
         copy.Resources = Resources.ToDictionary(p => p.Key, p => p.Value.ShallowCopy());
         copy.VerifiedOperations = [.. VerifiedOperations];
+        copy.journal = new();
+        return copy;
+    }
+    // A copy for composing a header change (connection settings) without touching this workspace; rows and jobs are shared.
+    public Workspace StageHeader()
+    {
+        var copy = (Workspace)MemberwiseClone();
+        copy.VerifiedOperations = [.. VerifiedOperations];
+        copy.journal = new();
         return copy;
     }
     public string Serialize() => JsonSerializer.Serialize(this);

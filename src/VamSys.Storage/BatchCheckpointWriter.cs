@@ -11,6 +11,9 @@ internal sealed class BatchCheckpointWriter(UnitOfWork unit, Workspace workspace
     public async Task WriteAsync(BatchCheckpoint checkpoint, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        // The executor changed this job in memory before asking for the checkpoint; whatever happens next, a later
+        // journal save must write it again unless this checkpoint made it durable.
+        workspace.Journal().TouchJob(checkpoint.Job);
         var start = Stopwatch.GetTimestamp();
         var expected = workspace.StorageRevision;
         var header = Encode(checkpoint.Job, true);
@@ -54,5 +57,12 @@ internal sealed class BatchCheckpointWriter(UnitOfWork unit, Workspace workspace
         workspace.StorageRevision = next;
         if (full != null)
             full.Acknowledge();
+        // Row writes of a checkpoint keep their own positions (appended rows, replaced snapshots), so the rows of the
+        // affected resources are written again by the next journal save; everything else the journal knows stays valid.
+        if (delta != null)
+            workspace.Journal().MarkRowsDirty(delta.Resource);
+        if (full != null)
+            workspace.Journal().MarkAllRowsDirty();
+        workspace.Journal().AfterExternalWrite(expected, next);
     }
 }

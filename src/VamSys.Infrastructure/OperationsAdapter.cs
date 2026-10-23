@@ -151,6 +151,8 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         workspace.Resources = staged.Resources;
         workspace.VerifiedOperations = staged.VerifiedOperations;
         workspace.AirlineId = staged.AirlineId;
+        // The staged copy was just saved in full and now is the workspace: the journal of the copy describes the database.
+        workspace.Journal().AdoptFrom(staged.Journal());
         known = reader.known;
         knownAirportsVersion++;
         SessionAirlineId = reader.SessionAirlineId ?? SessionAirlineId;
