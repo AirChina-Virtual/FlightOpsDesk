@@ -90,7 +90,7 @@
 | A1 两个远端机场共用 IATA 使刷新失败 | Domain.SnapshotMergerTests.A1_two_remote_airports_sharing_an_iata_code_do_not_fail_the_refresh_and_the_code_matches_no_local_row；IntegrationTests.Golden.Requests.RequestGoldenTests.Refresh_two_airports_with_the_same_iata（R0，端到端）；旧 UnblockScenarios.RunRefresh 仍在 |
 | A2（OperationsBatchExecutor／OperationsAdapter，Infrastructure） | 不属于领域层；对应旧回归仍在 tests/VamSys.Tests，待 R5 |
 | A4 平移分钟跨午夜、非法输入 | VamSys.UnitTests.BatchShiftMinutesTests（R1，全部）；Domain.RuleEngineTests.Minute_shift_rows_that_cannot_move_come_back_unchanged_and_are_listed_as_skips |
-| A5 草稿行只替换不原地修改 | VamSys.UnitTests.RowReplacementTests（全部，Debug 下行守卫）；本批所有新测试都通过替换行修改数据，在 Debug 与 Release 下都通过 |
+| A5 草稿行只替换不原地修改 | VamSys.UnitTests.RowReplacementTests（全部：R4 起为编译层面测试——反射检查无公开 setter（仅 init）、Fields 不可转回可变字典、With／Builder 返回副本、序列化属性顺序不变）；本批所有新测试都通过替换行修改数据，在 Debug 与 Release 下都通过 |
 | `LOCAL:` 引用大小写 | VamSys.UnitTests.LocalReferenceTests（R1，全部）；Domain.CsvAdapterTests.Import_writes_the_local_reference_prefix_in_lowercase_whatever_the_file_used；Domain.ChangePlannerTests.The_local_prefix_is_recognised_in_any_case_when_resolving_and_when_depending；Domain.CsvAdapterTests.Export_refuses_a_reference_to_a_row_that_has_no_remote_id_yet；IntegrationTests.LocalReferenceCaseTests（R0） |
 
 ## 测试有效性：回植错误（R7 做法第 7 步，领域规则部分）
