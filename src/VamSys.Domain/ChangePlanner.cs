@@ -124,17 +124,15 @@ public static class RuleEngine
         var skips = new List<RuleSkip>();
         foreach (var row in rows)
         {
-            var copy = row.Copy();
-            result.Add(copy);
             var old = row.Get(rule.Field);
             if (!TimeOnly.TryParseExact(old, ["HH:mm", "HH:mm:ss"], CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
-            { skips.Add(new(row.LocalId, "BatchShiftSkippedInvalidTime")); continue; }
+            { result.Add(row); skips.Add(new(row.LocalId, "BatchShiftSkippedInvalidTime")); continue; }
             // Whole-day arithmetic: the date and the other time are never adjusted, so leaving 00:00-23:59 skips the row.
             var seconds = (long)time.ToTimeSpan().TotalSeconds + minutes * 60L;
             if (seconds is < 0 or >= 86400)
-            { skips.Add(new(row.LocalId, "BatchShiftSkippedCrossesMidnight")); continue; }
+            { result.Add(row); skips.Add(new(row.LocalId, "BatchShiftSkippedCrossesMidnight")); continue; }
             // Seconds in API times are kept; the original HH:mm / HH:mm:ss shape is kept too.
-            copy.Fields[rule.Field] = TimeOnly.FromTimeSpan(TimeSpan.FromSeconds(seconds)).ToString(old.Length == 8 ? "HH:mm:ss" : "HH:mm", CultureInfo.InvariantCulture);
+            result.Add(row.With(rule.Field, TimeOnly.FromTimeSpan(TimeSpan.FromSeconds(seconds)).ToString(old.Length == 8 ? "HH:mm:ss" : "HH:mm", CultureInfo.InvariantCulture)));
         }
         return new(result, skips);
     }
@@ -143,7 +141,6 @@ public static class RuleEngine
     {
         return rows.Select(row =>
         {
-            var copy = row.Copy();
             var old = row.Get(rule.Field);
             var value = rule.Kind switch
             {
@@ -156,8 +153,7 @@ public static class RuleEngine
                 RuleKind.Retire => DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
                 _ => throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_5CBDBA3063")), Messages.Define("Text_5CBDBA3063"))
             };
-            copy.Fields[rule.Kind == RuleKind.Retire ? "End Date" : rule.Field] = value;
-            return copy;
+            return row.With(rule.Kind == RuleKind.Retire ? "End Date" : rule.Field, value);
         }).ToList();
     }
 }

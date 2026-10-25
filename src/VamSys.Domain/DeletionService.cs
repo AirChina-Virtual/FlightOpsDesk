@@ -80,8 +80,6 @@ public sealed class DeletionService
     // Rows are replaced, never edited in place.
     static DataRow WithDeleteFlag(DataRow row, string value)
     {
-        var copy = row.Copy();
-        copy.Fields["_delete"] = value;
-        return copy;
+        return row.With("_delete", value);
     }
 }

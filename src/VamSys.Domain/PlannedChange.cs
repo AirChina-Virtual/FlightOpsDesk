@@ -17,7 +17,6 @@ public sealed class PlannedChange
     readonly ChangeKind kind;
     readonly DataRow? before;
     DataRow after;
-    bool ownsAfter;
     string[] names;
     readonly ChangeItem? existing;
     ChangeItem? item;
@@ -52,9 +51,7 @@ public sealed class PlannedChange
     /// <summary>Rewrites one reference field on the planned row (a private copy) and marks it as set.</summary>
     internal void Resolve(string field, string value)
     {
-        if (!ownsAfter)
-        { after = after.Copy(); ownsAfter = true; }
-        after.Fields[field] = value;
+        after = after.With(field, value);
         if (Array.IndexOf(names, field) < 0)
             names = [.. names, field];
     }
@@ -112,9 +109,9 @@ public sealed class PlannedChange
             var value = after.Get(name);
             fields.Add(name, new(value == "" ? FieldIntent.Clear : FieldIntent.Set, value));
         }
-        return item = new ChangeItem(ownsAfter ? after : after.Copy(), fields)
+        return item = new ChangeItem(after, fields)
         {
-            Id = Id, Resource = resource, Kind = kind, Before = before?.Copy(),
+            Id = Id, Resource = resource, Kind = kind, Before = before,
             RequiresAirlineParameter = requiresAirlineParameter, Dependencies = [.. dependencies]
         };
     }

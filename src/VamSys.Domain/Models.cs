@@ -13,107 +13,6 @@ public record Issue(Guid RowId, string Field, MessageDescriptor Description)
     public string Message => Description.ToString();
 }
 
-public sealed class DataRow
-{
-    public DataRow() { localId = Guid.NewGuid(); fields = new(StringComparer.Ordinal); }
-    // A copy already has its identity and fields; avoid allocating defaults to overwrite.
-    DataRow(DataRow source)
-    {
-        localId = source.localId;
-        identity = source.identity;
-        rawApiJson = source.rawApiJson;
-        fields = new(source.fields, StringComparer.Ordinal);
-    }
-    internal DataRow(Guid localId, ResourceIdentity? identity, string? rawApiJson, Dictionary<string, string> fields)
-    { this.localId = localId; this.identity = identity; this.rawApiJson = rawApiJson; this.fields = fields; }
-
-    Guid localId;
-    ResourceIdentity? identity;
-    string? rawApiJson;
-    Dictionary<string, string> fields;
-    // Debug-only guard state (not serialized, absent from Release builds): once a row has been placed in a
-    // ResourceData list it is frozen and its content must never change; edits replace the row with a copy.
-#if DEBUG
-    bool frozen;
-    int fingerprint;
-#endif
-
-    public Guid LocalId { get => localId; set { GuardWrite(); localId = value; } }
-    public ResourceIdentity? Identity { get => identity; set { GuardWrite(); identity = value; } }
-    public string? RawApiJson { get => rawApiJson; set { GuardWrite(); rawApiJson = value; } }
-    // The dictionary itself cannot intercept writes: assignment is guarded immediately and indexer/Add/Remove
-    // writes are detected by AssertUnchanged at the next edit, capture, copy-in or freeze.
-    public Dictionary<string, string> Fields { get => fields; set { GuardWrite(); fields = value; } }
-    public string Get(string key) => fields.GetValueOrDefault(key, "");
-    public DataRow Copy() => new(this);
-    /// <summary>True when both rows serialize to the same JSON: same id, identity, raw API text and fields in the same order.</summary>
-    public static bool SameContent(DataRow? a, DataRow? b)
-    {
-        if (ReferenceEquals(a, b))
-            return true;
-        if (a is null || b is null || a.localId != b.localId || a.identity != b.identity || a.rawApiJson != b.rawApiJson || a.fields.Count != b.fields.Count)
-            return false;
-        using var left = a.fields.GetEnumerator();
-        using var right = b.fields.GetEnumerator();
-        while (left.MoveNext() && right.MoveNext())
-            if (left.Current.Key != right.Current.Key || left.Current.Value != right.Current.Value)
-                return false;
-        return true;
-    }
-
-    /// <summary>True when the debug guard is compiled into this build (Debug configuration of VamSys.Domain).</summary>
-    public static bool GuardEnabled =>
-#if DEBUG
-        true;
-#else
-        false;
-#endif
-    public bool HasBeenFrozen() =>
-#if DEBUG
-        frozen;
-#else
-        false;
-#endif
-    /// <summary>Debug builds: marks the row as owned by a ResourceData list (verifying it when already frozen). No-op in Release.</summary>
-    public void Freeze()
-    {
-#if DEBUG
-        if (frozen)
-            AssertUnchanged();
-        else
-        { fingerprint = Fingerprint(); frozen = true; }
-#endif
-    }
-    /// <summary>Debug builds: throws when a frozen row's content differs from when it was frozen. No-op in Release.</summary>
-    public void AssertUnchanged()
-    {
-#if DEBUG
-        if (frozen && fingerprint != Fingerprint())
-            throw new InvalidOperationException($"DataRow {localId} was modified in place after it was placed in a ResourceData list; replace the row with a Copy() instead.");
-#endif
-    }
-    [System.Diagnostics.Conditional("DEBUG")]
-    void GuardWrite()
-    {
-#if DEBUG
-        if (frozen)
-            throw new InvalidOperationException($"DataRow {localId} is frozen; replace the row with a Copy() instead of editing it in place.");
-#endif
-    }
-#if DEBUG
-    int Fingerprint()
-    {
-        var hash = new HashCode();
-        hash.Add(localId);
-        hash.Add(identity);
-        hash.Add(rawApiJson, StringComparer.Ordinal);
-        hash.Add(fields.Count);
-        foreach (var (key, value) in fields)
-        { hash.Add(key, StringComparer.Ordinal); hash.Add(value, StringComparer.Ordinal); }
-        return hash.ToHashCode();
-    }
-#endif
-}
 public sealed record ResourceIdentity(string RemoteId, string ConnectionId, string? ParentFleetId = null);
 public sealed record MergeConflict(Guid RowId, string Field, string? Original, string? Local, string? Remote);
 
@@ -123,23 +22,15 @@ public sealed partial class ResourceData
     List<DataRow> snapshot = [];
     List<DataRow> draft = [];
     Dictionary<Guid, int>? draftIndex;
-    public List<DataRow> Snapshot { get => snapshot; set { snapshot = value; FreezeAll(value); } }
-    public List<DataRow> Draft { get => draft; set { draft = value; InvalidateDraftIndex(); FreezeAll(value); } }
-    // Debug builds: rows that enter a list become read-only (see DataRow.Freeze); a no-op in Release.
-    // [Conditional] also skips evaluating the arguments in Release.
-    [System.Diagnostics.Conditional("DEBUG")]
-    internal static void FreezeAll(IEnumerable<DataRow> rows)
-    {
-        foreach (var row in rows)
-            row.Freeze();
-    }
+    public List<DataRow> Snapshot { get => snapshot; set => snapshot = value; }
+    public List<DataRow> Draft { get => draft; set { draft = value; InvalidateDraftIndex(); } }
     public List<string> Columns { get; set; } = [];
     public DateTimeOffset? SnapshotAt { get; set; }
     public EditHistory History { get; set; } = new();
     public IReadOnlyList<HistoryStep> Undo => History.Undo;
     public IReadOnlyList<HistoryStep> Redo => History.Redo;
     public List<MergeConflict> Conflicts { get; set; } = [];
-    // New collections over the same row objects. Callers must replace rows, never edit them in place.
+    // New collections over the same (immutable) row objects.
     public ResourceData ShallowCopy() => new() { Snapshot = [.. Snapshot], Draft = [.. Draft], Columns = [.. Columns], SnapshotAt = SnapshotAt, History = History.Copy(), Conflicts = [.. Conflicts] };
     public void InvalidateDraftIndex() => draftIndex = null;
     internal void EnsureDraftIndex()
@@ -154,7 +45,7 @@ public sealed partial class ResourceData
     internal Dictionary<Guid, int> GetDraftPositions() { EnsureDraftIndex(); return draftIndex!; }
     // Used only after history has validated every source and destination position.
     internal void ReplaceIndexedDraft(List<DataRow> rows, Dictionary<Guid, int> positions)
-    { draft = rows; draftIndex = positions; FreezeAll(rows); }
+    { draft = rows; draftIndex = positions; }
     public int FindDraftPosition(Guid id)
     {
         EnsureDraftIndex();
@@ -184,7 +75,6 @@ public sealed partial class ResourceData
         }
         foreach (var (position, row) in prepared)
             Draft[position] = row;
-        FreezeAll(prepared.Select(p => p.Row));
     }
     public void ClearHistory(bool invalidateIndex = true) { History.Clear(); if (invalidateIndex) InvalidateDraftIndex(); }
     public HistoryMove UndoEdit() => History.Move(this, undo: true);
