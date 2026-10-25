@@ -148,13 +148,12 @@ public class PersistedJsonShapeTests
 
     static ChangeItem SampleItem()
     {
-        var row = new DataRow { Identity = new ResourceIdentity("7", "conn", "3"), RawApiJson = "{}" };
-        row.Fields["Name"] = "A";
+        var row = new DataRow { Identity = new ResourceIdentity("7", "conn", "3"), RawApiJson = "{}", Fields = new Dictionary<string, string> { ["Name"] = "A" } };
         var item = new ChangeItem
         {
             Resource = ResourceKind.Routes,
             Kind = ChangeKind.Update,
-            Before = row.Copy(),
+            Before = row.Dup(),
             After = row,
             State = ItemState.Unknown,
             RemoteId = "7",
@@ -185,8 +184,8 @@ public class PersistedJsonShapeTests
         job.SetStatus(JobStatus.NeedsAttention, Messages.Define("ApiUnknown"));
         var workspace = new Workspace { Mode = RunMode.Online, VerifiedOperations = ["Routes:Read"], Jobs = [job] };
         var resource = workspace.Resources[ResourceKind.Fleets];
-        resource.Snapshot.Add(item.After.Copy());
-        resource.Draft.Add(item.After.Copy());
+        resource.Snapshot.Add(item.After.Dup());
+        resource.Draft.Add(item.After.Dup());
         resource.Columns.Add("Name");
         resource.SnapshotAt = DateTimeOffset.UnixEpoch;
         resource.Conflicts.Add(new MergeConflict(Guid.Empty, "Name", "a", "b", "c"));

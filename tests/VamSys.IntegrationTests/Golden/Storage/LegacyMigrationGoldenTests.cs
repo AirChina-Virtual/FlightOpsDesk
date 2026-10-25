@@ -65,7 +65,7 @@ public class LegacyMigrationGoldenTests
     {
         var w = new Workspace { Name = "Legacy fixture", AirlineId = "7", Mode = RunMode.Online };
         var data = w.Resources[ResourceKind.Fleets];
-        data.Draft.Add(new DataRow { Fields = new() { ["Name"] = "New", ["Type Code"] = "B738", ["Type (pax/cargo/...)"] = "pax", ["Max Passengers"] = "180", ["Unknown"] = "001" } });
+        data.Draft.Add(new DataRow { Fields = new Dictionary<string, string> { ["Name"] = "New", ["Type Code"] = "B738", ["Type (pax/cargo/...)"] = "pax", ["Max Passengers"] = "180", ["Unknown"] = "001" } });
         data.Edit([], () => { });
         w.Jobs.Add(new() { Mode = RunMode.Online, Items = new ChangePlanner().Plan(ResourceKind.Fleets, data) });
         var item = w.Jobs[0].Items[0];
@@ -112,7 +112,7 @@ public class LegacyMigrationGoldenTests
         }
     }
 
-    static List<DataRow> Clone(IEnumerable<DataRow> rows) => rows.Select(r => r.Copy()).ToList();
+    static List<DataRow> Clone(IEnumerable<DataRow> rows) => rows.Select(r => r.Dup()).ToList();
     static string LegacyJson(Workspace w)
     {
         var root = JsonNode.Parse(w.Serialize())!;

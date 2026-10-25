@@ -17,7 +17,7 @@ static class HistoryScenarios
         public void Back(){if(Undo.Count==0)return;Redo.Add(Draft);Draft=Undo[^1];Undo.RemoveAt(Undo.Count-1);}
         public void Forward(){if(Redo.Count==0)return;Undo.Add(Draft);Draft=Redo[^1];Redo.RemoveAt(Redo.Count-1);}
     }
-    static List<DataRow> Clone(IEnumerable<DataRow> rows)=>rows.Select(r=>r.Copy()).ToList();
+    static List<DataRow> Clone(IEnumerable<DataRow> rows)=>rows.Select(r=>r.Dup()).ToList();
     // Canonical comparison is independent of the new RowImage equality and dictionary iteration order.
     static string Rows(IEnumerable<DataRow> rows)=>JsonSerializer.Serialize(rows.Select(r=>new {r.LocalId,r.Identity,r.RawApiJson,Fields=r.Fields.OrderBy(p=>p.Key,StringComparer.Ordinal)}));
     static void Match(ResourceData data,Oracle oracle,string context)
@@ -56,9 +56,9 @@ static class HistoryScenarios
                 if(checkpoint)oracle.Checkpoint();
                 if(oracle.Draft.Count==0||op==3)
                 {
-                    var row=new DataRow{Fields=new(){["Name"]="row "+turn,["empty"]=""},Identity=new(turn.ToString(),"7"),RawApiJson="{\"raw\":"+turn+"}"};
+                    var row=new DataRow{Fields = new Dictionary<string, string> {["Name"]="row "+turn,["empty"]=""},Identity=new(turn.ToString(),"7"),RawApiJson="{\"raw\":"+turn+"}"};
                     var position=random.Next(oracle.Draft.Count+1);
-                    data.Edit([row.LocalId],()=>data.Draft.Insert(position,row.Copy()),newStep:checkpoint,structural:true);oracle.Draft.Insert(position,row.Copy());
+                    data.Edit([row.LocalId],()=>data.Draft.Insert(position,row.Dup()),newStep:checkpoint,structural:true);oracle.Draft.Insert(position,row.Dup());
                 }
                 else if(op==4)
                 {
@@ -72,8 +72,8 @@ static class HistoryScenarios
                 {
                     var position=random.Next(oracle.Draft.Count);var id=oracle.Draft[position].LocalId;
                     var field=turn%2==0?"Name":"empty";var value=turn%7==0?"":"值"+turn;
-                    void Change(DataRow row){if(turn%11==0)row.Fields.Remove(field);else row.Fields[field]=value;if(turn%13==0){row.Identity=null;row.RawApiJson=null;}}
-                    data.Edit([id],()=>Change(data.Draft[position]),newStep:checkpoint);Change(oracle.Draft[position]);
+                    void Change(List<DataRow> rows){var b=rows[position].ToBuilder();if(turn%11==0)b.Remove(field);else b[field]=value;if(turn%13==0){b.Identity=null;b.RawApiJson=null;}rows[position]=b.ToRow();}
+                    data.Edit([id],()=>Change(data.Draft),newStep:checkpoint);Change(oracle.Draft);
                 }
             }
             Match(data,oracle,$"seed {seed} turn {turn} op {op}");
@@ -93,14 +93,14 @@ static class HistoryScenarios
             foreach(var next in new[]{"same","other","undo","close","failure"})
             {
                 var dir=Temp();var store=new WorkspaceStore(dir);var w=Fixture();var d=w.Resources[ResourceKind.Fleets];var row=d.Draft[0];var initial=row.Get("Name");store.Save(w);
-                d.Edit([row.LocalId],()=>row.Fields["Name"]="first");var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);var taken=edits.Take();
+                d.Edit([row.LocalId],()=>d.ReplaceDraftRows([row.With("Name","first")]));var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);var taken=edits.Take();
                 using var entered=new ManualResetEventSlim();using var release=new ManualResetEventSlim();
                 store.Barrier=p=>{if(p=="Draft:BeforeCommit"){entered.Set();if(!release.Wait(10000))throw new TimeoutException();if(next=="failure")throw new IOException("injected");}};
                 var saving=store.TrySaveDraftRowsAsync(w,taken.Changes);Check(entered.Wait(10000));
                 try
                 {
                     if(next=="undo")d.UndoEdit();
-                    else {d.Edit([row.LocalId],()=>row.Fields[next=="other"?"extra":"Name"]="second",newStep:next=="other");edits.Cell(w,ResourceKind.Fleets,row.LocalId);}
+                    else {d.Edit([row.LocalId],()=>d.ReplaceDraftRows([row.With(next=="other"?"extra":"Name","second")]),newStep:next=="other");edits.Cell(w,ResourceKind.Fleets,row.LocalId);}
                 }
                 finally{release.Set();}
                 if(next=="failure")
@@ -193,7 +193,7 @@ static class HistoryScenarios
         Directory.CreateDirectory(directory);var results=new List<object>();
         foreach(var count in new[]{1,1000,20000})
         {
-            var w=new Workspace();var d=w.Resources[ResourceKind.Fleets];d.Draft=Enumerable.Range(0,count).Select(n=>new DataRow{Fields=new(){["Name"]="row",["ID"]=n.ToString()}}).ToList();
+            var w=new Workspace();var d=w.Resources[ResourceKind.Fleets];d.Draft=Enumerable.Range(0,count).Select(n=>new DataRow{Fields = new Dictionary<string, string> {["Name"]="row",["ID"]=n.ToString()}}).ToList();
             var dir=Temp();var store=new WorkspaceStore(dir);store.Save(w);d.FindDraftRow(d.Draft[0].LocalId);
             var samples=new List<double>();var allocations=new List<long>();var bytes=new List<long>();
             using var c=Open(dir);Sql(c,"CREATE TABLE touched(tbl TEXT,id TEXT);CREATE TRIGGER row_u AFTER UPDATE ON resource_rows BEGIN INSERT INTO touched VALUES('row',NEW.local_id);END;CREATE TRIGGER step_i AFTER INSERT ON resource_history_steps BEGIN INSERT INTO touched VALUES('insert',NEW.step_id);END;CREATE TRIGGER step_u AFTER UPDATE ON resource_history_steps BEGIN INSERT INTO touched VALUES('update',NEW.step_id);END;CREATE TRIGGER step_d AFTER DELETE ON resource_history_steps BEGIN INSERT INTO touched VALUES('delete',OLD.step_id);END;CREATE TRIGGER head_u AFTER UPDATE ON resource_history_state BEGIN INSERT INTO touched VALUES('head','');END;CREATE TRIGGER revision_u AFTER UPDATE ON workspace_revisions BEGIN INSERT INTO touched VALUES('revision','');END;");
@@ -201,7 +201,7 @@ static class HistoryScenarios
             {
                 Sql(c,"DELETE FROM touched");var before=GC.GetTotalAllocatedBytes(true);using var metrics=PerformanceRun.Begin(w.Id,Guid.NewGuid());var watch=Stopwatch.StartNew();
                 var row=d.Draft[n%count];var evicted=d.Undo.Count==20?d.Undo[0].StepId:(Guid?)null;
-                d.Edit([row.LocalId],()=>row.Fields["Name"]="edit"+n);var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);Check(await store.TrySaveDraftRowsAsync(w,edits.Changes));
+                d.Edit([row.LocalId],()=>d.ReplaceDraftRows([row.With("Name","edit"+n)]));var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);Check(await store.TrySaveDraftRowsAsync(w,edits.Changes));
                 var ms=watch.Elapsed.TotalMilliseconds;var allocation=GC.GetTotalAllocatedBytes(true)-before;
                 Check(metrics.JsonBytes<=8192,"history payload grew with draft size");
                 Check(Convert.ToInt32(Sql(c,"SELECT count(*) FROM touched"))==(evicted==null?4:5),"wrong write scope");
@@ -212,7 +212,7 @@ static class HistoryScenarios
             }
             var expected=d.Draft[0].Get("Name");var disk=store.Load(w.Id);Check(disk.Serialize()==w.Serialize());
             d.UndoEdit();d.UndoEdit();store.Save(w);var discarded=d.Redo.Select(s=>s.StepId).ToArray();
-            var current=d.Draft[0];d.Edit([current.LocalId],()=>current.Fields["Name"]="branch");var pending=new DraftEdits();pending.Cell(w,ResourceKind.Fleets,current.LocalId);Check(await store.TrySaveDraftRowsAsync(w,pending.Changes));
+            var current=d.Draft[0];d.Edit([current.LocalId],()=>d.ReplaceDraftRows([current.With("Name","branch")]));var pending=new DraftEdits();pending.Cell(w,ResourceKind.Fleets,current.LocalId);Check(await store.TrySaveDraftRowsAsync(w,pending.Changes));
             foreach(var id in discarded)Check(Convert.ToInt32(Sql(c,"SELECT count(*) FROM resource_history_steps WHERE step_id=$id",("$id",id.ToString())))==0,"discarded redo still stored");
             Check(store.Load(w.Id).Resources[ResourceKind.Fleets].Redo.Count==0);
             samples.Sort();var p95=samples[(int)Math.Ceiling(samples.Count*.95)-1];var median=(samples[9]+samples[10])/2;

@@ -16,7 +16,7 @@ public class EditHistoryTests
     static ResourceData Fleets(int count)
     {
         var rows = Enumerable.Range(0, count).Select(i => Row(("ID", i.ToString()), ("Name", "row " + i), ("Remarks", "r"))).ToList();
-        return new() { Snapshot = rows.Select(r => r.Copy()).ToList(), Draft = rows };
+        return new() { Snapshot = rows.Select(r => r.Dup()).ToList(), Draft = rows };
     }
 
     static string[] Names(ResourceData data) => [.. data.Draft.Select(r => r.Get("Name"))];
@@ -233,7 +233,7 @@ public class EditHistoryTests
     {
         public List<DataRow> Draft = [];
         public List<List<DataRow>> Undo = [], Redo = [];
-        public static List<DataRow> Clone(IEnumerable<DataRow> rows) => rows.Select(r => r.Copy()).ToList();
+        public static List<DataRow> Clone(IEnumerable<DataRow> rows) => rows.Select(r => r.Dup()).ToList();
         public void Checkpoint() { Undo.Add(Clone(Draft)); if (Undo.Count > 20) Undo.RemoveAt(0); Redo.Clear(); }
         public void Back() { if (Undo.Count == 0) return; Redo.Add(Draft); Draft = Undo[^1]; Undo.RemoveAt(Undo.Count - 1); }
         public void Forward() { if (Redo.Count == 0) return; Undo.Add(Draft); Draft = Redo[^1]; Redo.RemoveAt(Redo.Count - 1); }
@@ -274,10 +274,10 @@ public class EditHistoryTests
                     model.Checkpoint();
                 if (model.Draft.Count == 0 || op == 3)
                 {
-                    var row = new DataRow { Fields = new() { ["Name"] = "row " + turn, ["empty"] = "" }, Identity = new(turn.ToString(), "7"), RawApiJson = "{\"raw\":" + turn + "}" };
+                    var row = new DataRow { Fields = new Dictionary<string, string> { ["Name"] = "row " + turn, ["empty"] = "" }, Identity = new(turn.ToString(), "7"), RawApiJson = "{\"raw\":" + turn + "}" };
                     var position = random.Next(model.Draft.Count + 1);
-                    data.Edit([row.LocalId], () => data.Draft.Insert(position, row.Copy()), newStep: checkpoint, structural: true);
-                    model.Draft.Insert(position, row.Copy());
+                    data.Edit([row.LocalId], () => data.Draft.Insert(position, row.Dup()), newStep: checkpoint, structural: true);
+                    model.Draft.Insert(position, row.Dup());
                 }
                 else if (op == 4)
                 {
@@ -297,10 +297,8 @@ public class EditHistoryTests
                     var value = turn % 7 == 0 ? "" : "值" + turn;
                     DataRow Mutated(DataRow row)
                     {
-                        var copy = row.Copy();
-                        if (turn % 11 == 0) copy.Fields.Remove(field); else copy.Fields[field] = value;
-                        if (turn % 13 == 0) { copy.Identity = null; copy.RawApiJson = null; }
-                        return copy;
+                        var copy = turn % 11 == 0 ? row.Without(field) : row.With(field, value);
+                        return turn % 13 == 0 ? copy.WithIdentity(null).WithRawApiJson(null) : copy;
                     }
                     data.Edit([id], () => data.ReplaceDraftRows([Mutated(data.Draft[position])]), newStep: checkpoint);
                     model.Draft[position] = Mutated(model.Draft[position]);
@@ -421,10 +419,7 @@ public class EditHistoryTests
     {
         var row = Row(("Name", "old"), ("Z unknown", "z"), ("A unknown", "a"), ("empty", ""));
         var data = new ResourceData { Draft = [row] };
-        var edited = row.Copy();
-        edited.Fields["Name"] = "new";
-        edited.Fields.Remove("empty");
-        edited.Fields["B unknown"] = "b";
+        var edited = row.With("Name", "new").Without("empty").With("B unknown", "b");
         data.Edit([row.LocalId], () => data.ReplaceDraftRows([edited]));
         var afterJson = JsonSerializer.Serialize(data.Draft[0]);
 

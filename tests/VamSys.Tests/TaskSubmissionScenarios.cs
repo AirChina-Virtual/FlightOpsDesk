@@ -225,8 +225,8 @@ static class TaskSubmissionScenarios
             {
                 var raw = $$"""{"id":{{id}},"departure_id":101,"arrival_id":102,"type":"scheduled","callsign":"TST{{id}}","flight_number":"TS{{id}}","fleet_ids":[4]}""";
                 server.Rows.Add("routes/" + id, raw);
-                using var doc = JsonDocument.Parse(raw); var before = api.FromJson(ResourceKind.Routes, doc.RootElement); var after = before.Copy(); after.Fields["_delete"] = "TRUE";
-                shell.Owner.Resources[ResourceKind.Routes].Snapshot.Add(before.Copy()); shell.Owner.Resources[ResourceKind.Routes].Draft.Add(after.Copy());
+                using var doc = JsonDocument.Parse(raw); var before = api.FromJson(ResourceKind.Routes, doc.RootElement); var after=before.With("_delete","TRUE");
+                shell.Owner.Resources[ResourceKind.Routes].Snapshot.Add(before.Dup()); shell.Owner.Resources[ResourceKind.Routes].Draft.Add(after.Dup());
                 shell.Reviewed.Add(new() { Resource = ResourceKind.Routes, Kind = ChangeKind.Delete, Before = before, After = after });
             }
             await shell.Store.SaveAsync(shell.Owner); var history = shell.StoredHistory();

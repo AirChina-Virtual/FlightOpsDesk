@@ -9,7 +9,7 @@ public class ChangeJournalTests
 {
     const string Header = "header";
 
-    static DataRow Row(string name, string value = "") => new() { Fields = new() { ["Name"] = name, ["Value"] = value } };
+    static DataRow Row(string name, string value = "") => new() { Fields = new Dictionary<string, string> { ["Name"] = name, ["Value"] = value } };
 
     static Workspace Synced(int rows, ResourceKind kind = ResourceKind.Fleets)
     {
@@ -17,7 +17,7 @@ public class ChangeJournalTests
         var data = w.Resources[kind];
         for (var n = 0; n < rows; n++)
             data.Draft.Add(Row("row" + n));
-        data.Snapshot = [.. data.Draft.Select(r => r.Copy())];
+        data.Snapshot = [.. data.Draft.Select(r => r.Dup())];
         Sync(w);
         return w;
     }
@@ -67,8 +67,7 @@ public class ChangeJournalTests
         var w = Synced(10);
         var data = w.Resources[ResourceKind.Fleets];
         var target = data.Draft[4];
-        var edited = target.Copy();
-        edited.Fields["Name"] = "edited";
+        var edited = target.With("Name", "edited");
         data.Edit([target.LocalId], () => data.ReplaceDraftRows([edited]));
         var change = Only(Plan(w));
         Assert.True(change.Snapshot.IsEmpty);
@@ -88,12 +87,10 @@ public class ChangeJournalTests
     {
         var w = Synced(10);
         var data = w.Resources[ResourceKind.Fleets];
-        data.Draft[3] = data.Draft[3].Copy();
+        data.Draft[3] = data.Draft[3].Dup();
         Assert.True(Plan(w).IsEmpty);
         // The copy became the new baseline, so a later real change is still found against it.
-        var edited = data.Draft[3].Copy();
-        edited.Fields["Name"] = "x";
-        data.Draft[3] = edited;
+        data.Draft[3] = data.Draft[3].With("Name", "x");
         Assert.Single(Only(Plan(w)).Draft.Replaced);
     }
 
@@ -320,8 +317,7 @@ public class ChangeJournalTests
     {
         var w = Synced(10);
         var data = w.Resources[ResourceKind.Fleets];
-        var edited = data.Draft[2].Copy();
-        edited.Fields["Name"] = "cell";
+        var edited = data.Draft[2].With("Name", "cell");
         data.Edit([edited.LocalId], () => data.ReplaceDraftRows([edited]));
         w.Journal().AcceptDraftRows(ResourceKind.Fleets, [edited]);
         w.Journal().AfterExternalWrite(1, 2);
@@ -416,13 +412,11 @@ public class ChangeJournalTests
             {
                 case 0 when count > 0: // replace
                     var at = rng.Next(count);
-                    var copy = list[at].Copy();
-                    copy.Fields["Value"] = "v" + step;
-                    list[at] = copy;
+                    list[at] = list[at].With("Value", "v" + step);
                     break;
                 case 1: // same-content replacement
                     if (count > 0)
-                    { var same = rng.Next(count); list[same] = list[same].Copy(); }
+                    { var same = rng.Next(count); list[same] = list[same].Dup(); }
                     break;
                 case 2: // append
                     for (var n = rng.Next(1, 4); n > 0; n--)
@@ -450,7 +444,7 @@ public class ChangeJournalTests
                 default: // replace the whole list with copies
                     if (rng.Next(6) == 0)
                     {
-                        var copies = list.Select(r => r.Copy()).ToList();
+                        var copies = list.Select(r => r.Dup()).ToList();
                         if (list == data.Draft) data.Draft = copies; else data.Snapshot = copies;
                     }
                     break;

@@ -30,7 +30,7 @@ static class CandidateIndexScenarios
                 var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var clock=new TestTime();var api=Api(w,h,clock);
                 var data=w.Resources[ResourceKind.Fleets];data.Draft.Add(NewFleet("Seed"));
                 SnapshotMerger.Merge(ResourceKind.Fleets,data,[Parse(api,ResourceKind.Fleets,Fleet(4,"Old"))]);
-                data.Draft.Single(r=>r.Identity?.RemoteId=="4").Fields["Name"]="Renamed";data.Draft.Add(NewFleet(candidate));
+                data.ReplaceDraftRows([data.Draft.Single(r=>r.Identity?.RemoteId=="4").With("Name","Renamed")]);data.Draft.Add(NewFleet(candidate));
                 var remote=new Dictionary<int,string>{{4,"Old"}};int next=10,lists=0,posts=0;
                 h.Next=(r,ct)=>{
                     var path=r.RequestUri!.AbsolutePath;
@@ -55,7 +55,7 @@ static class CandidateIndexScenarios
                 var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var clock=new TestTime();var api=Api(w,h,clock);
                 var data=w.Resources[ResourceKind.Fleets];data.Draft.Add(NewFleet("Seed"));
                 SnapshotMerger.Merge(ResourceKind.Fleets,data,[Parse(api,ResourceKind.Fleets,Fleet(4,"Old"))]);
-                data.Draft.Single(r=>r.Identity?.RemoteId=="4").Fields["Name"]="Renamed";
+                data.ReplaceDraftRows([data.Draft.Single(r=>r.Identity?.RemoteId=="4").With("Name","Renamed")]);
                 data.Draft.Add(NewFleet("Old"));data.Draft.Add(NewFleet("Renamed"));data.Draft.Add(NewFleet("Independent"));
                 var remote=new Dictionary<int,string>{{4,"Old"}};int next=10,posts=0,puts=0;bool fault=true;
                 h.Next=(r,ct)=>{
@@ -143,11 +143,11 @@ static class CandidateIndexScenarios
             var query=Create(ResourceKind.Fleets,NewFleet("same"));
             var read=Candidates(api,query,session);await clock.Drive(read);Check(read.Result.Count==2);
             var first=read.Result.Single(r=>r.Identity!.RemoteId=="4");
-            var update=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Update,Before=first,After=first.Copy()};update.After.Fields["Name"]="Renamed";
+            var update=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Update,Before=first,After=first.Dup()};update.After=update.After.With("Name","Renamed");
             api.ReserveCandidate(update,session);Check(api.CandidateBlock(query,session)=="ApiIdentityPending");
             api.ConfirmCandidate(update,Parse(api,ResourceKind.Fleets,Fleet(4,"Renamed")),session);
             Check((await Candidates(api,query,session)).Single().Identity!.RemoteId=="5");
-            var deletion=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Delete,Before=read.Result.Single(r=>r.Identity!.RemoteId=="5"),After=read.Result[1].Copy(),RemoteId="5"};
+            var deletion=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Delete,Before=read.Result.Single(r=>r.Identity!.RemoteId=="5"),After=read.Result[1].Dup(),RemoteId="5"};
             api.ReserveCandidate(deletion,session);Check(api.CandidateBlock(query,session)=="ApiIdentityPending");
             api.ConfirmCandidate(deletion,null,session);Check((await Candidates(api,query,session)).Count==0);
             var renamed=Create(ResourceKind.Fleets,NewFleet("RENAMED"));Check((await Candidates(api,renamed,session)).Count==1&&h.Methods.Count==1);
@@ -168,7 +168,7 @@ static class CandidateIndexScenarios
             foreach(var kind in new[]{ResourceKind.Routes,ResourceKind.Routings}){
                 var field=kind==ResourceKind.Routes?"Flight Number":"Route String";var suffix=kind==ResourceKind.Routes?"_id":"_airport_id";
                 var raw="{\"id\":9,"+(kind==ResourceKind.Routes?"":"\"airline_id\":7,")+"\"departure"+suffix+"\":101,\"arrival"+suffix+"\":101,\""+(kind==ResourceKind.Routes?"flight_number":"route")+"\":\"OLD\"}";
-                var before=Parse(api,kind,raw);var after=before.Copy();after.Fields[field]="NEW";
+                var before=Parse(api,kind,raw);var after=before.With(field,"NEW");
                 var unknown=new ChangeItem{Resource=kind,Kind=ChangeKind.Update,Before=before,After=after};api.ReserveCandidate(unknown,session);
                 foreach(var code in new[]{"LHR","egll","101"})
                 foreach(var value in new[]{"old","new"}){
@@ -214,7 +214,7 @@ static class CandidateIndexScenarios
         await test("Legacy completed rows need no raw snapshot and recovery starts a fresh index",async()=>
         {
             var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var clock=new TestTime();var api=Api(w,h,clock);
-            var old=Row(("ICAO/IATA","LHR"));old.Identity=new("101","7");
+            var old=Row(("ICAO/IATA","LHR")).WithIdentity(new("101","7"));
             w.Resources[ResourceKind.Airports].Snapshot.Add(old);
             var completed=Create(ResourceKind.Airports,old);completed.State=ItemState.Succeeded;completed.CreateCompleted=true;completed.RemoteId="101";
             var next=Create(ResourceKind.Fleets,NewFleet("New"));
@@ -222,11 +222,11 @@ static class CandidateIndexScenarios
             h.Next=(r,ct)=>r.Method==HttpMethod.Post?Json(Fleet(10,"New"),HttpStatusCode.Created):r.RequestUri!.AbsolutePath.EndsWith("/fleet")?Json(Page([Fleet(4,"Connected")])):Json("{\"data\":"+Fleet(10,"New")+"}");
             await RunJob(api,w,job,clock);Check(next.State==ItemState.Succeeded&&h.Methods.Count(m=>m==HttpMethod.Post)==1);
             // A missing legacy identity cannot silently free an unknown deletion's signature.
-            var unknown=new ChangeItem{Resource=ResourceKind.Airports,Kind=ChangeKind.Delete,Before=old,After=old.Copy(),State=ItemState.Unknown};
+            var unknown=new ChangeItem{Resource=ResourceKind.Airports,Kind=ChangeKind.Delete,Before=old,After=old.Dup(),State=ItemState.Unknown};
             var session=new CandidateQuerySession();api.SeedCandidates(new(){Items=[unknown]},session);
             Check(api.CandidateBlock(Create(ResourceKind.Airports,Row(("ICAO/IATA","EGLL"))),session)=="ApiIdentityPending");
             // A legacy response with no usable aliases is opaque too, not an empty reservation.
-            unknown.Before.RawApiJson="{}";
+            unknown.Before=unknown.Before!.WithRawApiJson("{}");
             session=new CandidateQuerySession();api.SeedCandidates(new(){Items=[unknown]},session);
             Check(api.CandidateBlock(Create(ResourceKind.Airports,Row(("ICAO/IATA","EGLL"))),session)=="ApiIdentityPending");
         });

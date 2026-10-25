@@ -22,7 +22,7 @@ static class StorageV3Scenarios
             foreach(var(i,k)in j.Items.Select((i,k)=>(i,k)))Sql(c,"INSERT INTO batch_items VALUES($w,$job,$id,$n,$j)",("$w",w.Id.ToString()),("$job",j.Id.ToString()),("$id",i.Id.ToString()),("$n",k),("$j",JsonSerializer.Serialize(i)));
         }
     }
-    public static ResourceRebaseDelta Delta(ChangeItem item)=>new(item.Resource,item.After.LocalId,new(RowMutationKind.Upsert,item.After.Copy()),new(RowMutationKind.Upsert,item.After.Copy()),DateTimeOffset.UnixEpoch,true,"Fleets:Create");
+    public static ResourceRebaseDelta Delta(ChangeItem item)=>new(item.Resource,item.After.LocalId,new(RowMutationKind.Upsert,item.After.Dup()),new(RowMutationKind.Upsert,item.After.Dup()),DateTimeOffset.UnixEpoch,true,"Fleets:Create");
     public static async Task Run(Func<string,Func<Task>,Task> test)
     {
         await test("Closing freezes before await, rejects repeated close and restores interaction after failure",async()=>{
@@ -39,9 +39,9 @@ static class StorageV3Scenarios
             var dir=Temp();var store=new WorkspaceStore(dir);var w=Fixture();store.Save(w);var row=w.Resources[ResourceKind.Fleets].Draft[0];
             using var entered=new ManualResetEventSlim();using var release=new ManualResetEventSlim();
             store.Barrier=p=>{if(p=="Full:BeforeCommit"){entered.Set();if(!release.Wait(10000))throw new TimeoutException();}};
-            var close=new WindowCloseController();row.Fields["Name"]="accepted";
+            var close=new WindowCloseController();var fleetDraft=w.Resources[ResourceKind.Fleets].Draft;fleetDraft[0]=row.With("Name","accepted");
             var closing=close.RequestAsync(false,()=>store.SaveAsync(w),_=>{});
-            Assert(entered.Wait(10000));if(close.IsOpen)row.Fields["Name"]="must not enter";
+            Assert(entered.Wait(10000));if(close.IsOpen)fleetDraft[0]=fleetDraft[0].With("Name","must not enter");
             release.Set();Assert(await closing);Assert(store.Load(w.Id).Resources[ResourceKind.Fleets].Draft[0].Get("Name")=="accepted");
         });
         foreach(var corrupt in new[]{false,true})
@@ -82,8 +82,8 @@ static class StorageV3Scenarios
         });
         await test("v3 row order, targeted deletion and stale full snapshot rejection",async()=>{
             var dir=Temp();var store=new WorkspaceStore(dir);var w=Fixture();var data=w.Resources[ResourceKind.Fleets];
-            var first=data.Draft[0];var other=new DataRow{Fields=new(){["Name"]="other"}};
-            data.Snapshot=[first.Copy(),other.Copy()];data.Draft.Add(other);store.Save(w);var stale=store.Load(w.Id);
+            var first=data.Draft[0];var other=new DataRow{Fields = new Dictionary<string, string> {["Name"]="other"}};
+            data.Snapshot=[first.Dup(),other.Dup()];data.Draft.Add(other);store.Save(w);var stale=store.Load(w.Id);
             var item=w.Jobs[0].Items[0];item.State=ItemState.Succeeded;
             await store.CheckpointWriter(w).WriteAsync(new(CheckpointKind.Rebase,w.Jobs[0],item,Delta:Delta(item)),default);
             var disk=store.Load(w.Id);Assert(disk.Resources[ResourceKind.Fleets].Snapshot.Select(r=>r.LocalId).SequenceEqual([other.LocalId,first.LocalId]));
@@ -100,8 +100,8 @@ static class StorageV3Scenarios
         foreach(var(rows,undo,same)in new[]{(1,0,false),(20000,0,false),(20000,3,false),(20000,3,true)})
         {
             var w=Workspace.Deserialize(template);var kind=same?ResourceKind.Fleets:ResourceKind.Routes;var data=w.Resources[kind];
-            for(var n=0;n<rows;n++){var row=new DataRow{Fields=new(){["Name"]="Row "+n,["ID"]=n.ToString()}};data.Draft.Add(row);data.Snapshot.Add(row.Copy());}
-            for(var n=0;n<undo;n++){var row=data.Draft[n%data.Draft.Count];data.Edit([row.LocalId],()=>row.Fields["Name"]="history "+n);}
+            for(var n=0;n<rows;n++){var row=new DataRow{Fields = new Dictionary<string, string> {["Name"]="Row "+n,["ID"]=n.ToString()}};data.Draft.Add(row);data.Snapshot.Add(row.Dup());}
+            for(var n=0;n<undo;n++){var row=data.Draft[n%data.Draft.Count];data.Edit([row.LocalId],()=>data.ReplaceDraftRows([row.With("Name","history "+n)]));}
             var dir=Temp();var store=new WorkspaceStore(dir);store.Save(w);var item=w.Jobs[0].Items[0];item.State=ItemState.Succeeded;
             using var c=Open(dir);
             Sql(c,"CREATE TABLE touched(resource INTEGER,local_id TEXT); CREATE TRIGGER row_i AFTER INSERT ON resource_rows BEGIN INSERT INTO touched VALUES(NEW.resource,NEW.local_id); END; CREATE TRIGGER row_u AFTER UPDATE ON resource_rows BEGIN INSERT INTO touched VALUES(NEW.resource,NEW.local_id); END; CREATE TRIGGER row_d AFTER DELETE ON resource_rows BEGIN INSERT INTO touched VALUES(OLD.resource,OLD.local_id); END;");

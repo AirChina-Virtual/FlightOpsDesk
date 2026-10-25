@@ -11,10 +11,10 @@ static class CorePerformanceBenchmark
         var data = new ResourceData();
         for (var n = 0; n < count; n++)
         {
-            var row = new DataRow();
-            foreach (var field in Schemas.All[ResourceKind.Routes].Columns) row.Fields[field] = field == "_delete" ? "FALSE" : field + " " + n;
-            row.Fields["ID"] = n.ToString(); row.Fields["Type"] = "jumpseat";
-            data.Draft.Add(row); data.Snapshot.Add(row.Copy());
+            var row = new DataRow.Builder();
+            foreach (var field in Schemas.All[ResourceKind.Routes].Columns) row[field] = field == "_delete" ? "FALSE" : field + " " + n;
+            row["ID"] = n.ToString(); row["Type"] = "jumpseat";
+            var built = row.ToRow(); data.Draft.Add(built); data.Snapshot.Add(built.Dup());
         }
         return data;
     }
@@ -26,7 +26,7 @@ static class CorePerformanceBenchmark
             foreach (var percent in new[] { 0, 1, 10, 100 })
             {
                 var data = Fixture(count);
-                for (var n = 0; n < count * percent / 100; n++) data.Draft[n].Fields["Remarks"] = "edited";
+                for (var n = 0; n < count * percent / 100; n++) data.Draft[n] = data.Draft[n].With("Remarks", "edited");
                 cases.Add(new { Name="plan", Rows=count, Percent=percent, K=0, Metrics=Measure(() => planner.Plan(ResourceKind.Routes, data)) });
             }
             var indexed = Fixture(count); var id = indexed.Draft[0].LocalId;
@@ -35,18 +35,18 @@ static class CorePerformanceBenchmark
             foreach (var k in new[] { 1, 10, 100 })
             {
                 var data = Fixture(count); var ids = data.Draft.Take(k).Select(r => r.LocalId).ToArray();
-                data.Edit(ids, () => { foreach (var key in ids) data.FindDraftRow(key)!.Fields["Remarks"] = "edited"; });
+                data.Edit(ids, () => { data.ReplaceDraftRows(ids.Select(key => data.FindDraftRow(key)!.With("Remarks", "edited")).ToArray()); });
                 data.FindDraftRow(ids[0]);
                 cases.Add(new { Name="undo-redo", Rows=count, Percent=0, K=k, Metrics=Measure(() => { data.UndoEdit(); data.RedoEdit(); }) });
                 var assignment = new FleetAssignmentService(); var toggle = false;
                 cases.Add(new { Name="replace", Rows=count, Percent=0, K=k, Metrics=Measure(() => {
                     toggle = !toggle;
-                    var rows = ids.Select(key => { var row=data.FindDraftRow(key)!.Copy(); row.Fields["Remarks"]=toggle?"A":"B"; return row; }).ToList();
+                    var rows = ids.Select(key => { var row=data.FindDraftRow(key)!.With("Remarks",toggle?"A":"B"); return row; }).ToList();
                     assignment.Apply(data, new("Remarks", rows, []));
                 }) });
             }
             var history = Fixture(count);
-            for (var n=0;n<20;n++) { var row=history.Draft[n]; history.Edit([row.LocalId],()=>row.Fields["Remarks"]="edited"); }
+            for (var n=0;n<20;n++) { var row=history.Draft[n]; history.Edit([row.LocalId],()=>history.ReplaceDraftRows([row.With("Remarks","edited")])); }
             cases.Add(new { Name="validate-20", Rows=count, Percent=0, K=20, Metrics=Measure(()=>history.History.Validate(history)) });
             var structural = Fixture(count); var added = new DataRow();
             structural.Edit([added.LocalId],()=>structural.Draft.Add(added),structural:true);
@@ -63,7 +63,7 @@ static class CorePerformanceBenchmark
         foreach (var count in new[] {1000,20000,50000})
         {
             var history = Fixture(count);
-            for(var n=0;n<20;n++){var row=history.Draft[n];history.Edit([row.LocalId],()=>row.Fields["Remarks"]="edited");}
+            for(var n=0;n<20;n++){var row=history.Draft[n];history.Edit([row.LocalId],()=>history.ReplaceDraftRows([row.With("Remarks","edited")]));}
             var json = JsonSerializer.Serialize(history);
             cases.Add(new{Name="load-20",Rows=count,Percent=0,K=20,JsonBytes=System.Text.Encoding.UTF8.GetByteCount(json),Metrics=Measure(()=>{
                 var restored=JsonSerializer.Deserialize<ResourceData>(json)!;
@@ -79,16 +79,16 @@ static class CorePerformanceBenchmark
     public static Workspace ReviewWorkspace(int changes, RunMode mode)
     {
         var workspace = new Workspace { Name = "review", Mode = mode };
-        DataRow Row(params (string Field, string Value)[] fields) { var row = new DataRow(); foreach (var (f, v) in fields) row.Fields[f] = v; return row; }
+        DataRow Row(params (string Field, string Value)[] fields) { var row = new DataRow.Builder(); foreach (var (f, v) in fields) row[f] = v; return row.ToRow(); }
         CsvAdapter.Import(ResourceKind.Airports, workspace.Resources[ResourceKind.Airports], [Row(("ICAO/IATA", "ZBAA"), ("Name", "Beijing")), Row(("ICAO/IATA", "ZSPD"), ("Name", "Shanghai"))], true);
         CsvAdapter.Import(ResourceKind.Fleets, workspace.Resources[ResourceKind.Fleets], [Row(("ID", "1"), ("Name", "Boeing 737-800"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "pax"), ("Max Passengers", "189"))], true);
         DataRow Route(int n)
         {
-            var row = new DataRow();
-            foreach (var field in Schemas.All[ResourceKind.Routes].Columns) row.Fields[field] = "";
+            var row = new DataRow.Builder();
+            foreach (var field in Schemas.All[ResourceKind.Routes].Columns) row[field] = "";
             foreach (var (field, value) in new (string, string)[] { ("ID", n.ToString()), ("Departure Airport (ICAO/IATA)", "ZBAA"), ("Arrival Airport (ICAO/IATA)", "ZSPD"), ("Type", "scheduled"), ("Callsign", "QA" + n.ToString("D5")), ("Flight Number", n.ToString("D6")), ("Fleet IDs", "1"), ("Start Date", "2026-10-01 00:00:00"), ("End Date", "2027-10-01 00:00:00"), ("Departure Time (HH:MM)", "10:00"), ("Arrival Time (HH:MM)", "12:00"), ("Remarks", "row " + n), ("Tags", "performance"), ("Is Hidden", "FALSE"), ("Altitude", "33000"), ("Cost Index", "AUTO"), ("_delete", "FALSE") })
-                row.Fields[field] = value;
-            return row;
+                row[field] = value;
+            return row.ToRow();
         }
         var created = changes / 20; var deleted = changes / 20; var existing = changes - created;
         var rows = Enumerable.Range(0, existing).Select(Route).ToList();
@@ -97,12 +97,10 @@ static class CorePerformanceBenchmark
         var drafts = new List<DataRow>(data.Draft.Count + created);
         for (var n = 0; n < data.Draft.Count; n++)
         {
-            var row = data.Draft[n].Copy();
-            if (n < existing - deleted) row.Fields["Remarks"] = "review " + n;
-            else row.Fields["_delete"] = "TRUE";
-            drafts.Add(row);
+            var row = data.Draft[n];
+            drafts.Add(n < existing - deleted ? row.With("Remarks", "review " + n) : row.With("_delete", "TRUE"));
         }
-        for (var n = 0; n < created; n++) { var row = Route(existing + n); row.Fields["ID"] = ""; drafts.Add(row); }
+        for (var n = 0; n < created; n++) { var row = Route(existing + n).With("ID", ""); drafts.Add(row); }
         data.Draft = drafts;
         return workspace;
     }

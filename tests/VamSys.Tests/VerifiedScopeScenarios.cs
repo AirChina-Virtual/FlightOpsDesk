@@ -10,7 +10,7 @@ static class VerifiedScopeScenarios
     static void Check(bool value,string message="Verified scope assertion failed"){if(!value)throw new Exception(message);}
     static string Json(object? value)=>JsonSerializer.Serialize(value);
     static ChangeItem Update(ResourceKind kind,string field,string value)=>new(){Resource=kind,Kind=ChangeKind.Update,
-        Before=new(){Fields=new(){["Type"]="scheduled"}},After=new(){Fields=new(){["Type"]="scheduled",[field]=value}},Fields=new(){[field]=new(FieldIntent.Set,value)}};
+        Before=new(){Fields = new Dictionary<string, string> {["Type"]="scheduled"}},After=new(){Fields = new Dictionary<string, string> {["Type"]="scheduled",[field]=value}},Fields=new(){[field]=new(FieldIntent.Set,value)}};
     static async Task Blocked(Action action,string code)
     {try{action();}catch(InvalidOperationException e){Check(MessageErrors.Describe(e).Code==code,e.Message);return;}await Task.CompletedTask;throw new Exception("Expected "+code);}
 
@@ -93,18 +93,18 @@ static class VerifiedScopeScenarios
         public DataRow Add(ResourceKind kind,string path,string raw)
         {
             Remote.Rows[path]=JsonNode.Parse(raw)!.AsObject();using var json=JsonDocument.Parse(raw);var row=Api.FromJson(kind,json.RootElement);
-            W.Resources[kind].Snapshot.Add(row.Copy());W.Resources[kind].Draft.Add(row.Copy());return row;
+            W.Resources[kind].Snapshot.Add(row.Dup());W.Resources[kind].Draft.Add(row.Dup());return row;
         }
         public ChangeItem Move()
         {
-            var before=W.Resources[ResourceKind.Aircraft].Snapshot.Single().Copy();var after=before.Copy();after.Fields["Fleet ID"]="5";
+            var before=W.Resources[ResourceKind.Aircraft].Snapshot.Single().Dup();var after=before.With("Fleet ID","5");
             W.Resources[ResourceKind.Aircraft].ReplaceDraftRows([after]);
             return new(){Resource=ResourceKind.Aircraft,Kind=ChangeKind.Update,Before=before,After=after,Fields=new(){["Fleet ID"]=new(FieldIntent.Set,"5")}};
         }
         public ChangeItem Delete(ResourceKind kind,string type="scheduled")
         {
-            var before=kind==ResourceKind.Airports?W.Resources[kind].Snapshot[0].Copy():Add(kind,"routes/201",$$"""{"id":201,"departure_id":101,"arrival_id":102,"type":"{{type}}","callsign":"TST201","flight_number":"TS201","fleet_ids":[4]}""").Copy();
-            var after=before.Copy();after.Fields["_delete"]="TRUE";W.Resources[kind].ReplaceDraftRows([after]);
+            var before=kind==ResourceKind.Airports?W.Resources[kind].Snapshot[0].Dup():Add(kind,"routes/201",$$"""{"id":201,"departure_id":101,"arrival_id":102,"type":"{{type}}","callsign":"TST201","flight_number":"TS201","fleet_ids":[4]}""").Dup();
+            var after=before.With("_delete","TRUE");W.Resources[kind].ReplaceDraftRows([after]);
             return new(){Resource=kind,Kind=ChangeKind.Delete,Before=before,After=after};
         }
         public BatchJob Job(params ChangeItem[] items)
@@ -139,11 +139,11 @@ static class VerifiedScopeScenarios
             }
             var unknown=Enumerable.Range(0,5).Select(_=>Update(ResourceKind.Routings,"Tags","not-tested")).ToList();
             Check(ReviewPlanBuilder.Build(unknown,RunMode.Online,true,new HashSet<string>(),_=>{},externalEvidenceContractHash:ApiContracts.Sha256).SubmitItems.Count==3,"Unverified tag variant was unlocked");
-            var route=Update(ResourceKind.Routes,"Remarks","x");route.Before!.Fields["Type"]="charter";route.After.Fields["Type"]="charter";
+            var route=Update(ResourceKind.Routes,"Remarks","x");route.Before=route.Before!.With("Type","charter");route.After=route.After.With("Type","charter");
             Check(!IndependentApiEvidence.Covers(route,ApiContracts.Sha256));
-            var fleet=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,After=new(){Fields=new(){["Type (pax/cargo/...)"]="pax"}},Fields=new(){["Type (pax/cargo/...)"]=new(FieldIntent.Set,"pax")}};
+            var fleet=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,After=new(){Fields = new Dictionary<string, string> {["Type (pax/cargo/...)"]="pax"}},Fields=new(){["Type (pax/cargo/...)"]=new(FieldIntent.Set,"pax")}};
             Check(!IndependentApiEvidence.Covers(fleet,ApiContracts.Sha256));
-            var jumpseat=new ChangeItem{Resource=ResourceKind.Routes,Kind=ChangeKind.Create,After=new(){Fields=new(){["Type"]="jumpseat",["Fleet IDs"]="4"}},Fields=new(){["Type"]=new(FieldIntent.Set,"jumpseat"),["Fleet IDs"]=new(FieldIntent.Set,"4")}};
+            var jumpseat=new ChangeItem{Resource=ResourceKind.Routes,Kind=ChangeKind.Create,After=new(){Fields = new Dictionary<string, string> {["Type"]="jumpseat",["Fleet IDs"]="4"}},Fields=new(){["Type"]=new(FieldIntent.Set,"jumpseat"),["Fleet IDs"]=new(FieldIntent.Set,"4")}};
             Check(!IndependentApiEvidence.Covers(jumpseat,ApiContracts.Sha256));return Task.CompletedTask;
         });
         await test("External scope never bypasses actual preview validation or pending-job blockers",()=>
@@ -198,12 +198,12 @@ static class VerifiedScopeScenarios
                 using var f=new Fixture();var item=f.Move();
                 if(bad=="foreign")f.Remote.Rows["fleet/5"]["airline_id"]=8;
                 if(bad=="missing")f.Remote.Rows.Remove("fleet/5");
-                if(bad=="locally-deleted")f.W.Resources[ResourceKind.Fleets].Draft.Single(r=>r.Identity?.RemoteId=="5").Fields["_delete"]="TRUE";
+                if(bad=="locally-deleted")f.W.Resources[ResourceKind.Fleets].ReplaceDraftRows([f.W.Resources[ResourceKind.Fleets].Draft.Single(r=>r.Identity?.RemoteId=="5").With("_delete","TRUE")]);
                 if(bad=="mixed")item.Fields["Name"]=new(FieldIntent.Set,"Other");
                 if(bad=="steps")item.ApiSteps=[new(){Method="PUT",Path="aircraft/8",Body=new(){["fleet_id"]=JsonSerializer.SerializeToElement(5)}}];
                 var job=f.Job(item);await f.Run(job);Check(item.State==ItemState.Failed&&f.Remote.Requests.All(r=>r.Method=="GET"),bad);
             }
-            using var empty=new Fixture();var invalid=empty.Move();invalid.After.Fields["Fleet ID"]="";invalid.Fields["Fleet ID"]=new(FieldIntent.Clear,"");
+            using var empty=new Fixture();var invalid=empty.Move();invalid.After=invalid.After.With("Fleet ID","");invalid.Fields["Fleet ID"]=new(FieldIntent.Clear,"");
             await Blocked(()=>empty.Api.Plan(invalid),"ApiInvalid");
             using var changed=new Fixture();var moved=changed.Move();changed.Remote.Rows["fleet/4/aircraft/8"]["fleet_id"]=6;
             await changed.Run(changed.Job(moved));Check(moved.State==ItemState.Conflict&&changed.Remote.Requests.All(r=>r.Method=="GET"));
@@ -261,12 +261,12 @@ static class VerifiedScopeScenarios
             }
             ChangeItem Rename(Fixture f)
             {
-                var before=f.W.Resources[ResourceKind.Airports].Snapshot[0].Copy();var after=before.Copy();after.Fields["Name"]="Heathrow";
+                var before=f.W.Resources[ResourceKind.Airports].Snapshot[0].Dup();var after=before.With("Name","Heathrow");
                 return new(){Resource=ResourceKind.Airports,Kind=ChangeKind.Update,State=ItemState.Unknown,Before=before,After=after,Fields=new(){["Name"]=new(FieldIntent.Set,"Heathrow")},
                     ApiSteps=[new(){Method="PUT",Path="airports/101",State=BatchStepState.InFlight}]};
             }
             ChangeItem NewFleet()=>new(){Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,State=ItemState.Unknown,
-                After=new(){Fields=new(){["Name"]="Fleet 9",["Type Code"]="A320",["Type (pax/cargo/...)"]="cargo"}},
+                After=new(){Fields = new Dictionary<string, string> {["Name"]="Fleet 9",["Type Code"]="A320",["Type (pax/cargo/...)"]="cargo"}},
                 Fields=new(){["Name"]=new(FieldIntent.Set,"Fleet 9"),["Type Code"]=new(FieldIntent.Set,"A320"),["Type (pax/cargo/...)"]=new(FieldIntent.Set,"cargo")},
                 ApiSteps=[new(){Method="POST",Path="fleet",State=BatchStepState.InFlight}]};
             foreach(var applied in new[]{false,true})
@@ -294,13 +294,13 @@ static class VerifiedScopeScenarios
         {
             foreach(var variant in new[]{"resume","sent","changed"})
             {
-                using var f=new Fixture();var row=new DataRow{Fields=new(){["Name"]="Fleet 9",["Type Code"]="A320",["Type (pax/cargo/...)"]="cargo",["Max Freight"]="1000"}};
-                f.W.Resources[ResourceKind.Fleets].Draft.Add(row.Copy());
+                using var f=new Fixture();var row=new DataRow{Fields = new Dictionary<string, string> {["Name"]="Fleet 9",["Type Code"]="A320",["Type (pax/cargo/...)"]="cargo",["Max Freight"]="1000"}};
+                f.W.Resources[ResourceKind.Fleets].Draft.Add(row.Dup());
                 var item=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,State=ItemState.Unknown,After=row,
                     Fields=row.Fields.ToDictionary(p=>p.Key,p=>new FieldChange(FieldIntent.Set,p.Value))};
                 var post=new ApiStep(HttpMethod.Post,"fleet",new(){["name"]="Fleet 9",["code"]="A320",["type"]="cargo"});var put=new ApiStep(HttpMethod.Put,"{created}",new(){["max_cargo"]=1000L});
                 OperationsAdapter.PrepareSteps(item,[post,put]);item.ApiExpectedValues=OperationsAdapter.ExpectedValues([post,put]);
-                item.ApiSteps[0].State=BatchStepState.ResponseReceived;item.ApiSteps[0].RemoteId="9";item.RemoteId="9";item.CreateCompleted=true;item.After.Identity=new("9","7");
+                item.ApiSteps[0].State=BatchStepState.ResponseReceived;item.ApiSteps[0].RemoteId="9";item.RemoteId="9";item.CreateCompleted=true;item.After=item.After.WithIdentity(new("9","7"));
                 if(variant=="sent"){item.ApiSteps[1].State=BatchStepState.InFlight;item.ApiSteps[1].Path="fleet/9";}
                 f.Remote.Rows["fleet/9"]=JsonNode.Parse($$"""{"id":9,"airline_id":7,"name":"{{(variant=="changed"?"Renamed":"Fleet 9")}}","code":"A320","type":"cargo","max_cargo":0}""")!.AsObject();
                 var job=f.Job(item);await f.Run(job);
@@ -340,8 +340,8 @@ static class VerifiedScopeScenarios
                 if(fault=="method")item.DiagnosticDetails=item.DiagnosticDetails! with{Method="PUT"};
                 if(fault=="path")item.DiagnosticDetails=item.DiagnosticDetails! with{Path="/api/v3/operations/routes/999"};
                 if(fault=="steps")item.ApiSteps[0].State=BatchStepState.InFlight;
-                if(fault=="identity")item.After.Identity=new("999","7");
-                if(fault=="localIdentity")item.After.LocalId=Guid.NewGuid();
+                if(fault=="identity")item.After=item.After.WithIdentity(new("999","7"));
+                if(fault=="localIdentity")item.After=item.After.WithLocalId(Guid.NewGuid());
                 if(fault=="accepted")item.WriteAccepted=false;
                 if(fault=="time")item.DiagnosticDetails=item.DiagnosticDetails! with{FinishedAt=f.Time.Clock.GetUtcNow().AddYears(1)};
                 if(fault=="oldjson"){item.ApiSteps=[];item.DiagnosticDetails=null;}
@@ -353,7 +353,7 @@ static class VerifiedScopeScenarios
         {
             using var f=new Fixture();var item=f.Delete(ResourceKind.Routes);f.Receipt(item,true);
             var pending=new ChangeItem{Resource=ResourceKind.Routes,Kind=ChangeKind.Delete};var job=f.Job(item,pending);var pendingBefore=Json(pending);
-            var fleets=f.W.Resources[ResourceKind.Fleets];var row=fleets.Draft[0];fleets.Edit([row.LocalId],()=>row.Fields["Name"]="Unrelated local edit");f.Store.Save(f.W);
+            var fleets=f.W.Resources[ResourceKind.Fleets];var row=fleets.Draft[0];fleets.Edit([row.LocalId],()=>fleets.ReplaceDraftRows([row.With("Name","Unrelated local edit")]));f.Store.Save(f.W);
             var history=fleets.Undo.Count;
             await new OperationsDeletionVerifier(f.Api,f.W).VerifyAsync(job,f.Store.CheckpointWriter(f.W),default);
             var checkedItem=job.Items[0];Check(checkedItem.State==ItemState.Succeeded&&checkedItem.DeletionVerification!.WasManuallyConfirmed);

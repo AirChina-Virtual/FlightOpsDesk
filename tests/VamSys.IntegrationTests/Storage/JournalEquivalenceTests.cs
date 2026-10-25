@@ -50,14 +50,14 @@ public class JournalEquivalenceTests
         DataRow NewRow(ResourceKind kind, int n) => new()
         {
             Identity = rng.Next(3) == 0 ? new((1000 + n).ToString(), "7") : null,
-            Fields = new() { [Schemas.All[kind].Key] = "k" + Steps + "-" + n + "-" + rng.Next(1000), ["Name"] = "name" + rng.Next(100), ["Value"] = rng.Next(10) == 0 ? "" : "v" + rng.Next(50) },
+            Fields = new Dictionary<string, string> { [Schemas.All[kind].Key] = "k" + Steps + "-" + n + "-" + rng.Next(1000), ["Name"] = "name" + rng.Next(100), ["Value"] = rng.Next(10) == 0 ? "" : "v" + rng.Next(50) },
         };
 
         void AddRowTo(ResourceData data, ResourceKind kind, bool immediate = false)
         {
             var row = NewRow(kind, data.Draft.Count);
             if (immediate)
-            { data.Draft.Add(row); data.Snapshot.Add(row.Copy()); }
+            { data.Draft.Add(row); data.Snapshot.Add(row.Dup()); }
             else
                 data.Edit([row.LocalId], () => data.Draft.Add(row), structural: true);
             data.Columns = data.Columns.Concat(row.Fields.Keys).Distinct().ToList();
@@ -114,8 +114,7 @@ public class JournalEquivalenceTests
             if (data.Draft.Count == 0)
             { AddRowTo(data, kind); return; }
             var row = data.Draft[rng.Next(data.Draft.Count)];
-            var copy = row.Copy();
-            copy.Fields[Fields[rng.Next(Fields.Length)]] = "e" + rng.Next(1000);
+            var copy = row.With(Fields[rng.Next(Fields.Length)], "e" + rng.Next(1000));
             data.Edit([row.LocalId], () => data.ReplaceDraftRows([copy]), newStep: rng.Next(3) != 0);
             edits.Cell(W, kind, row.LocalId);
         }
@@ -161,7 +160,7 @@ public class JournalEquivalenceTests
                 return;
             var chosen = data.Draft.OrderBy(_ => rng.Next()).Take(rng.Next(1, Math.Min(40, data.Draft.Count) + 1)).ToArray();
             var field = Fields[rng.Next(Fields.Length)];
-            var copies = chosen.Select(r => { var c = r.Copy(); c.Fields[field] = "b" + rng.Next(100); return c; }).ToArray();
+            var copies = chosen.Select(r => r.With(field, "b" + rng.Next(100))).ToArray();
             data.Edit(copies.Select(r => r.LocalId), () => data.ReplaceDraftRows(copies));
             if (!data.Columns.Contains(field))
                 data.Columns.Add(field);
@@ -172,15 +171,14 @@ public class JournalEquivalenceTests
             var kind = AnyKind();
             var data = Data(kind);
             var rows = Enumerable.Range(0, rng.Next(0, 15)).Select(n => NewRow(kind, n)).ToList();
-            foreach (var row in rows)
-                row.Fields[Schemas.All[kind].Key] = "imp" + rng.Next(100000);
+            rows = [.. rows.Select(row => row.With(Schemas.All[kind].Key, "imp" + rng.Next(100000)))];
             rows = [.. rows.DistinctBy(r => r.Fields[Schemas.All[kind].Key])];
             if (rng.Next(2) == 0)
                 CsvAdapter.Import(kind, data, rows, baseline: true);
             else
             {
                 // A patch import: some existing keys (replaced rows), some new ones (appended rows).
-                var existing = data.Draft.Where(r => Schemas.Key(kind, r) != "").Take(rng.Next(0, 4)).Select(r => { var c = new DataRow(); c.Fields[Schemas.All[kind].Key] = r.Get(Schemas.All[kind].Key); c.Fields["Value"] = "patched" + rng.Next(100); return c; });
+                var existing = data.Draft.Where(r => Schemas.Key(kind, r) != "").Take(rng.Next(0, 4)).Select(r => new DataRow { Fields = new Dictionary<string, string> { [Schemas.All[kind].Key] = r.Get(Schemas.All[kind].Key), ["Value"] = "patched" + rng.Next(100) } });
                 var patch = existing.Concat(rows).DistinctBy(r => Schemas.Key(kind, r)).ToList();
                 try
                 { CsvAdapter.Import(kind, data, patch, baseline: false); }
@@ -196,16 +194,16 @@ public class JournalEquivalenceTests
             var incoming = new List<DataRow>();
             foreach (var row in data.Snapshot.Where(_ => rng.Next(4) != 0))
             {
-                var copy = row.Copy();
+                var copy = row.ToBuilder();
                 copy.Identity ??= new((5000 + incoming.Count).ToString(), "7");
                 if (rng.Next(3) == 0)
-                    copy.Fields["Value"] = "remote" + rng.Next(100);
-                incoming.Add(copy);
+                    copy["Value"] = "remote" + rng.Next(100);
+                incoming.Add(copy.ToRow());
             }
             for (var n = rng.Next(0, 4); n > 0; n--)
             {
                 var row = NewRow(kind, n);
-                row.Identity = new((9000 + n + rng.Next(500)).ToString(), "7");
+                row = row.WithIdentity(new((9000 + n + rng.Next(500)).ToString(), "7"));
                 incoming.Add(row);
             }
             incoming = [.. incoming.DistinctBy(r => r.Identity!.RemoteId)];
@@ -284,7 +282,7 @@ public class JournalEquivalenceTests
                 case 1 when data.Snapshot.Count > 0: data.Snapshot.RemoveAt(rng.Next(data.Snapshot.Count)); break;
                 case 2 when data.Draft.Count > 0: data.Draft.RemoveAll(r => rng.Next(8) == 0); data.InvalidateDraftIndex(); data.ClearHistory(); break;
                 case 3: data.Columns.Add("c" + rng.Next(100)); break;
-                default: data.Snapshot = [.. data.Snapshot.Select(r => r.Copy())]; break;
+                default: data.Snapshot = [.. data.Snapshot.Select(r => r.Dup())]; break;
             }
         }
 

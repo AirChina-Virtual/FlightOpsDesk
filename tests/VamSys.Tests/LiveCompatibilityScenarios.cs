@@ -37,7 +37,7 @@ static class LiveCompatibilityScenarios
         void Add(ResourceKind kind,string path,string json)
         {
             Rows[path]=JsonNode.Parse(json)!.AsObject();using var doc=JsonDocument.Parse(json);var row=Api.FromJson(kind,doc.RootElement);
-            Workspace.Resources[kind].Snapshot.Add(row.Copy());Workspace.Resources[kind].Draft.Add(row.Copy());
+            Workspace.Resources[kind].Snapshot.Add(row.Dup());Workspace.Resources[kind].Draft.Add(row.Dup());
         }
         HttpResponseMessage Reply(string body,HttpStatusCode status=HttpStatusCode.OK)
         {
@@ -99,7 +99,7 @@ static class LiveCompatibilityScenarios
         }
         public ChangeItem Edit(ResourceKind kind,string id,string field,string value)
         {
-            var before=Workspace.Resources[kind].Snapshot.Single(r=>r.Identity!.RemoteId==id).Copy();var after=before.Copy();after.Fields[field]=value;
+            var before=Workspace.Resources[kind].Snapshot.Single(r=>r.Identity!.RemoteId==id).Dup();var after=before.With(field,value);
             Workspace.Resources[kind].ReplaceDraftRows([after]);
             return new(){Resource=kind,Kind=ChangeKind.Update,Before=before,After=after,Fields=new(){[field]=new(FieldIntent.Set,value)}};
         }
@@ -141,16 +141,16 @@ static class LiveCompatibilityScenarios
                 Check(!steps[0].Body.ContainsKey("weight_unit")&&!steps[0].Body.ContainsKey("simbrief_overrides"));
             }
             foreach(var value in new[]{"-1","1.5","9223372036854775808"})
-            {aircraft.After.Fields["Freight"]=value;aircraft.Fields["Freight"]=new(FieldIntent.Set,value);await Blocked(()=>{server.Api.Plan(aircraft);return Task.CompletedTask;},"ApiInvalid");}
+            {aircraft.After=aircraft.After.With("Freight",value);aircraft.Fields["Freight"]=new(FieldIntent.Set,value);await Blocked(()=>{server.Api.Plan(aircraft);return Task.CompletedTask;},"ApiInvalid");}
             aircraft.Fields["Freight"]=new(FieldIntent.Set,"0");Check((long)server.Api.Plan(aircraft)[0].Body["cargo"]! ==0);
             foreach(var field in new[]{"weight_unit","simbrief_overrides"})await Blocked(()=>
             {OperationsAdapter.ValidateBody(ResourceKind.Aircraft,false,new(){[field]=field=="weight_unit"?"kg":new object()});return Task.CompletedTask;},"ApiKnownWeightRestriction");
-            var offline=new Workspace();fleet.After.Fields["Max Freight"]="1.5";offline.Resources[ResourceKind.Fleets].Draft.Add(fleet.After);
+            var offline=new Workspace();fleet.After=fleet.After.With("Max Freight","1.5");offline.Resources[ResourceKind.Fleets].Draft.Add(fleet.After);
             Check(!Schemas.Validate(offline,ResourceKind.Fleets).Any(i=>i.Field=="Max Freight"));offline.Mode=RunMode.Online;
             Check(Schemas.Validate(offline,ResourceKind.Fleets).Any(i=>i.Field=="Max Freight"));
             var csv=new CsvAdapter();Check(csv.Map(csv.Parse("Name,Max Freight\r\nNew,1.5\r\n"),new Dictionary<string,string>()).Single().Get("Max Freight")=="1.5");
             using var raw=JsonDocument.Parse("""{"id":8,"airline_id":7,"fleet_id":4,"name":"Plane","registration":"QA-TEST","weight_unit":"lbs","simbrief_overrides":{"paxwgt":85}}""");
-            var baseline=server.Api.FromJson(ResourceKind.Aircraft,raw.RootElement);var changed=baseline.Copy();changed.Fields["Name"]="Changed";
+            var baseline=server.Api.FromJson(ResourceKind.Aircraft,raw.RootElement);var changed=baseline.With("Name","Changed");
             var sparse=new ChangeItem{Resource=ResourceKind.Aircraft,Kind=ChangeKind.Update,Before=baseline,After=changed,Fields=new(){["Name"]=new(FieldIntent.Set,"Changed")}};
             Check(server.Api.Plan(sparse).Single().Body.Count==1&&baseline.RawApiJson!.Contains("simbrief_overrides"));
         });
@@ -237,7 +237,7 @@ static class LiveCompatibilityScenarios
             Check(planned.RequiresAirlineParameter);
             await Blocked(()=>{server.Api.Plan(planned);return Task.CompletedTask;},"ApiParameterRequired");
             var legacy=JsonSerializer.Deserialize<ChangeItem>("""{"Resource":1,"Kind":0}""")!;Check(!legacy.RequiresAirlineParameter);
-            planned.After.Fields["Parameter IDs"]="1";planned.Fields["Parameter IDs"]=new(FieldIntent.Set,"1");await server.Run(planned);
+            planned.After=planned.After.With("Parameter IDs","1");planned.Fields["Parameter IDs"]=new(FieldIntent.Set,"1");await server.Run(planned);
             Check(planned.State==ItemState.Succeeded,planned.Message);
         });
         await test("Live new fleet parameters: string request IDs, numeric response IDs and no existing reassignment",async()=>
@@ -285,8 +285,8 @@ static class LiveCompatibilityScenarios
             using var server=new Server();server.Rows["fleet/4"]["updated_at"]="2026-10-20T12:27:34Z";
             var item=server.Edit(ResourceKind.Fleets,"4","Name","Changed");await server.Run(item);Check(item.State==ItemState.Succeeded);
             Check(item.PreflightComparison is {BusinessFields.Count:0} && item.PreflightComparison.PreviousUpdatedAt!=item.PreflightComparison.CurrentUpdatedAt);
-            var row=server.Workspace.Resources[ResourceKind.Fleets].Snapshot.Single(r=>r.Identity!.RemoteId=="4");var data=new ResourceData{Snapshot=[row.Copy()],Draft=[row.Copy()]};
-            data.Draft[0].Fields["Name"]="Local";using var doc=JsonDocument.Parse(server.Rows["fleet/4"].ToJsonString());var incoming=server.Api.FromJson(ResourceKind.Fleets,doc.RootElement);
+            var row=server.Workspace.Resources[ResourceKind.Fleets].Snapshot.Single(r=>r.Identity!.RemoteId=="4");var data=new ResourceData{Snapshot=[row.Dup()],Draft=[row.Dup()]};
+            data.Draft[0]=data.Draft[0].With("Name","Local");using var doc=JsonDocument.Parse(server.Rows["fleet/4"].ToJsonString());var incoming=server.Api.FromJson(ResourceKind.Fleets,doc.RootElement);
             SnapshotMerger.Merge(ResourceKind.Fleets,data,[incoming]);Check(data.Conflicts.Count==0&&data.Draft[0].Get("Name")=="Local");
             var conflict=server.Edit(ResourceKind.Fleets,"4","Name","Local");server.Rows["fleet/4"]["name"]="Remote";
             await server.Run(conflict);Check(conflict.State==ItemState.Conflict&&conflict.PreflightComparison!.BusinessFields.Any(f=>f.Field=="Name"));

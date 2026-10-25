@@ -77,7 +77,7 @@ static class ContractScenarios
         });
         await test("Route fields follow StoreRouteRequest: jumpseat identity, cost index and ISO dates",()=>
         {
-            var w=new Workspace();var row=new DataRow{Fields=new(){["Type"]="jumpseat",["Departure Airport (ICAO/IATA)"]="EGLL",["Arrival Airport (ICAO/IATA)"]="EGKK",["Cost Index"]="1000"}};
+            var w=new Workspace();var row=new DataRow{Fields = new Dictionary<string, string> {["Type"]="jumpseat",["Departure Airport (ICAO/IATA)"]="EGLL",["Arrival Airport (ICAO/IATA)"]="EGKK",["Cost Index"]="1000"}};
             w.Resources[ResourceKind.Routes].Draft.Add(row);
             var issues=Schemas.Validate(w,ResourceKind.Routes).Select(i=>i.Field).ToHashSet();
             Check(issues.Contains("Callsign")&&issues.Contains("Flight Number")&&issues.Contains("Cost Index")&&!issues.Contains("Fleet IDs"));

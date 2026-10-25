@@ -195,8 +195,8 @@ public class ReviewPlanBehaviorTests
         var item = Build(w).SubmitItems.Single(i => Number(i.After.LocalId) == 30);
         Assert.Equal("edited 30", item.After.Get("Remarks"));
         Assert.Equal("r30", item.Before!.Get("Remarks"));
-        item.After.Fields["Remarks"] = "mutated by a job";
-        item.Before.Fields["Remarks"] = "mutated by a job";
+        item.After = item.After.With("Remarks", "mutated by a job");
+        item.Before = item.Before.With("Remarks", "mutated by a job");
         Assert.Equal("edited 30", w.Resources[ResourceKind.Routes].Draft.Single(r => r.LocalId == Id(30)).Get("Remarks"));
         Assert.Equal("r30", w.Resources[ResourceKind.Routes].Snapshot.Single(r => r.LocalId == Id(30)).Get("Remarks"));
     }

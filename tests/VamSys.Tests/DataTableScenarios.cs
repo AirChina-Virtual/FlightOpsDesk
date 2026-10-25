@@ -14,7 +14,7 @@ static class DataTableScenarios
             var row=new DataRow{Identity=new("9","7")};var model=new RowViewModel(row,[cell]);model.Rebind(row);
             Check(cell.VisibleText=="Server did not retain"&&cell.IsReadOnly,"Null presentation missing");
             cell.Value="blocked";Check(commits==0&&cell.Value=="","Read-only identity accepted input");
-            serverNull=false;model.Rebind(new DataRow{Fields=new(){["Callsign"]="ACA123"}});cell.Value="ACA124";
+            serverNull=false;model.Rebind(new DataRow{Fields = new Dictionary<string, string> {["Callsign"]="ACA123"}});cell.Value="ACA124";
             Check(!cell.IsReadOnly&&cell.VisibleText=="ACA124"&&commits==1,"Recycled new record remains locked");return Task.CompletedTask;
         });
         await test("Cell label notifications skip unchanged text and preserve language updates", () =>
@@ -29,15 +29,15 @@ static class DataTableScenarios
         });
         await test("Reused page cells synchronize without commits and edit the current row only", () =>
         {
-            var original=new DataRow{Fields=new(){["Remarks"]="original"}};
-            var replacement=new DataRow{Fields=new(){["Remarks"]="replacement"}};
-            var commits=0;RowViewModel? model=null;
-            var cell=new CellViewModel("Remarks","original",value=>{commits++;model!.Row.Fields["Remarks"]=value;}){CanEdit=()=>!Schemas.Deleted(model!.Row)};
+            var original=new DataRow{Fields = new Dictionary<string, string> {["Remarks"]="original"}};
+            var replacement=new DataRow{Fields = new Dictionary<string, string> {["Remarks"]="replacement"}};
+            var commits=0;var committed=new List<(DataRow Row,string Value)>();RowViewModel? model=null;
+            var cell=new CellViewModel("Remarks","original",value=>{commits++;committed.Add((model!.Row,value));}){CanEdit=()=>!Schemas.Deleted(model!.Row)};
             model=new(original,[cell]);model.Rebind(replacement);
             Check(commits==0&&cell.Value=="replacement"&&ReferenceEquals(model.Row,replacement),"Rebind produced an edit");
-            cell.Value="typed";Check(commits==1&&replacement.Get("Remarks")=="typed"&&original.Get("Remarks")=="original","Reused callback edited previous page");
-            replacement.Fields["_delete"]="TRUE";model.Rebind(replacement);cell.Value="rejected";
-            Check(cell.IsReadOnly&&commits==1&&replacement.Get("Remarks")=="typed","Deleted row accepted input");
+            cell.Value="typed";Check(commits==1&&committed[0].Value=="typed"&&ReferenceEquals(committed[0].Row,replacement)&&original.Get("Remarks")=="original","Reused callback edited previous page");
+            var deleted=replacement.With("_delete","TRUE");model.Rebind(deleted);cell.Value="rejected";
+            Check(cell.IsReadOnly&&commits==1&&committed.Count==1,"Deleted row accepted input");
             return Task.CompletedTask;
         });
         await test("UI fixture refuses existing files before creating or modifying a database", () =>

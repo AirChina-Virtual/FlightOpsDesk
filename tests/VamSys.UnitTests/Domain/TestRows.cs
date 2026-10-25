@@ -14,12 +14,6 @@ internal static class TestRows
     public static DataRow? Parse(string spec)
         => spec == "-" ? null : Row(spec.Split('|', StringSplitOptions.RemoveEmptyEntries).Select(p => { var i = p.IndexOf('=', StringComparison.Ordinal); return (p[..i], p[(i + 1)..]); }).ToArray());
 
-    public static DataRow With(this DataRow row, string field, string value)
-    { var copy = row.Copy(); copy.Fields[field] = value; return copy; }
-
-    public static DataRow Without(this DataRow row, string field)
-    { var copy = row.Copy(); copy.Fields.Remove(field); return copy; }
-
     /// <summary>A cell edit as the application performs it: a recorded step that replaces the row.</summary>
     public static void Change(this ResourceData data, Guid id, string field, string value, bool newStep = true)
         => data.Edit([id], () => data.ReplaceDraftRows([data.FindDraftRow(id)!.With(field, value)]), newStep);

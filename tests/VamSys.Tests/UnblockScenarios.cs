@@ -50,7 +50,7 @@ static class UnblockScenarios
             using var f=new Fixture();
             ChangeItem Rename(BatchStepState? step,bool accepted=false,bool created=false,ItemState state=ItemState.Pending)
             {
-                var before=f.W.Resources[ResourceKind.Fleets].Snapshot[0].Copy();var after=before.Copy();after.Fields["Name"]="Renamed";
+                var before=f.W.Resources[ResourceKind.Fleets].Snapshot[0].Dup();var after=before.With("Name","Renamed");
                 return new(){Resource=ResourceKind.Fleets,Kind=ChangeKind.Update,State=state,Before=before,After=after,Fields=new(){["Name"]=new(FieldIntent.Set,"Renamed")},
                     WriteAccepted=accepted,CreateCompleted=created,ApiSteps=step is {} s?[new(){Method="PUT",Path="fleet/4",State=s}]:[]};
             }
@@ -92,24 +92,24 @@ static class UnblockScenarios
         {
             using var f=new Fixture();
             // Field values, missing records and the aircraft parent fleet.
-            var plane=new ChangeItem{Resource=ResourceKind.Aircraft,Kind=ChangeKind.Create,After=new(){Fields=new(){["Fleet ID"]="4",["Registration"]="B-TEST"}},
+            var plane=new ChangeItem{Resource=ResourceKind.Aircraft,Kind=ChangeKind.Create,After=new(){Fields = new Dictionary<string, string> {["Fleet ID"]="4",["Registration"]="B-TEST"}},
                 ApiExpectedValues=Values(("registration","B-TEST"),("name","Plane"))};
             var aircraft=f.W.Resources[ResourceKind.Aircraft].Snapshot.Single();
             Verdict(f,plane,aircraft,null,"aircraft matches");
             plane.ApiExpectedValues=Values(("registration","B-TEST"),("name","Renamed"));Verdict(f,plane,aircraft,"name","field difference");
-            plane.ApiExpectedValues=Values(("registration","B-TEST"));plane.After.Fields["Fleet ID"]="5";Verdict(f,plane,aircraft,"fleet_id","parent fleet");
+            plane.ApiExpectedValues=Values(("registration","B-TEST"));plane.After=plane.After.With("Fleet ID","5");Verdict(f,plane,aircraft,"fleet_id","parent fleet");
             Verdict(f,plane,null,"record","missing record");
             // Airport identity is matched through its ICAO/IATA aliases, not a wire field.
-            var airport=new ChangeItem{Resource=ResourceKind.Airports,Kind=ChangeKind.Create,After=new(){Fields=new(){["ICAO/IATA"]="EGLL",["Name"]="London"}},
+            var airport=new ChangeItem{Resource=ResourceKind.Airports,Kind=ChangeKind.Create,After=new(){Fields = new Dictionary<string, string> {["ICAO/IATA"]="EGLL",["Name"]="London"}},
                 ApiExpectedValues=Values(("icao_iata","EGLL"),("name","London"))};
             var london=f.W.Resources[ResourceKind.Airports].Snapshot[0];
             Verdict(f,airport,london,null,"airport alias matches");
-            airport.After.Fields["ICAO/IATA"]="EGSS";airport.ApiExpectedValues=Values(("icao_iata","EGSS"),("name","London"));
+            airport.After=airport.After.With("ICAO/IATA","EGSS");airport.ApiExpectedValues=Values(("icao_iata","EGSS"),("name","London"));
             Verdict(f,airport,london,"ICAO/IATA","airport alias");
             // A recovered jumpseat create must be new and created within the request window.
             var now=f.Time.Clock.GetUtcNow();
             ChangeItem Jumpseat()=>new(){Resource=ResourceKind.Routes,Kind=ChangeKind.Create,State=ItemState.Unknown,PreCreateCandidateIds=["300"],
-                After=new(){Fields=new(){["Type"]="jumpseat",["Departure Airport (ICAO/IATA)"]="EGLL",["Arrival Airport (ICAO/IATA)"]="EGKK"}},
+                After=new(){Fields = new Dictionary<string, string> {["Type"]="jumpseat",["Departure Airport (ICAO/IATA)"]="EGLL",["Arrival Airport (ICAO/IATA)"]="EGKK"}},
                 ApiExpectedValues=Values(("type","jumpseat"),("departure_id",101),("arrival_id",102),("callsign","TST301")),
                 ApiSteps=[new(){Method="POST",Path="routes",State=BatchStepState.InFlight,StartedAt=now,FinishedAt=now.AddSeconds(1)}]};
             DataRow Route(string id,DateTimeOffset created)=>Parse(f,ResourceKind.Routes,
@@ -120,7 +120,7 @@ static class UnblockScenarios
             var unrecorded=Jumpseat();unrecorded.PreCreateCandidateIds=null;Verdict(f,unrecorded,Route("301",now),"pre_create_candidates","unrecorded candidates");
             var unstarted=Jumpseat();unstarted.ApiSteps[0].StartedAt=null;Verdict(f,unstarted,Route("301",now),"request_window","unrecorded request window");
             // A resumed legacy create compares only its POST values and leaves the saved expectation untouched.
-            var created=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,After=new(){Fields=new(){["Name"]="Fleet 4"}},
+            var created=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,After=new(){Fields = new Dictionary<string, string> {["Name"]="Fleet 4"}},
                 ApiSteps=[new(){Method="POST",Path="fleet",Body=Values(("name","Fleet 4"))},new(){Method="PUT",Path="{created}",Body=Values(("max_cargo",9))}]};
             var expected=Values(("name","Fleet 4"),("max_cargo",9));created.ApiExpectedValues=expected;
             var fleet=f.W.Resources[ResourceKind.Fleets].Snapshot[0];
@@ -303,7 +303,7 @@ static class UnblockScenarios
             // 101 also shares LHR while it has a local identity row; 103 and 105 share LCY and have none.
             f.Remote.Rows["airports/101"]["iata"]="LHR";f.Remote.Rows["airports/106"]=Airport(106,"EGLX","LHR");
             f.Remote.Rows["airports/103"]=Airport(103,"EGLC","LCY");f.Remote.Rows["airports/105"]=Airport(105,"EGLY","LCY");f.Remote.Rows["airports/104"]=Airport(104,"EGSS","STN");
-            var ambiguous=new DataRow{Fields=new(){["ICAO/IATA"]="lcy",["Name"]="Local"}};var unique=new DataRow{Fields=new(){["ICAO/IATA"]="stn",["Name"]="Stansted"}};
+            var ambiguous=new DataRow{Fields = new Dictionary<string, string> {["ICAO/IATA"]="lcy",["Name"]="Local"}};var unique=new DataRow{Fields = new Dictionary<string, string> {["ICAO/IATA"]="stn",["Name"]="Stansted"}};
             f.W.Resources[ResourceKind.Airports].Draft.AddRange([ambiguous,unique]);f.Store.Save(f.W);
             await f.Api.RefreshSnapshotsAsync(staged=>f.Store.SaveAsync(staged),default);
             var data=f.W.Resources[ResourceKind.Airports];
@@ -321,7 +321,7 @@ static class UnblockScenarios
         var fleets=f.W.Resources[ResourceKind.Fleets];
         if(variant=="delete")
         {
-            var row=fleets.Snapshot.Single(r=>r.Identity!.RemoteId=="5").Copy();var marked=row.Copy();marked.Fields["_delete"]="TRUE";fleets.ReplaceDraftRows([marked.Copy()]);
+            var row=fleets.Snapshot.Single(r=>r.Identity!.RemoteId=="5").Dup();var marked=row.With("_delete","TRUE");fleets.ReplaceDraftRows([marked.Dup()]);
             var removal=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Delete,State=ItemState.Unknown,Before=row,After=marked,WriteAccepted=true,RemoteId="5",
                 ApiSteps=[new(){Method="DELETE",Path="fleet/5",State=BatchStepState.ResponseReceived}]};
             removal.SetMessage(Messages.Define("ApiUnknown"));return removal;
@@ -329,14 +329,14 @@ static class UnblockScenarios
         if(variant=="create")
         {
             f.Remote.Rows["fleet/9"]=System.Text.Json.Nodes.JsonNode.Parse("{\"id\":9,\"airline_id\":7,\"name\":\"SERVER NAME\",\"code\":\"A320\",\"type\":\"cargo\"}")!.AsObject();
-            var row=new DataRow{Fields=new(){["Name"]="Local name",["Type Code"]="A320",["Type (pax/cargo/...)"]="cargo"}};fleets.Draft.Add(row.Copy());
-            var after=row.Copy();after.Identity=new("9","7");
+            var row=new DataRow{Fields = new Dictionary<string, string> {["Name"]="Local name",["Type Code"]="A320",["Type (pax/cargo/...)"]="cargo"}};fleets.Draft.Add(row.Dup());
+            var after=row.WithIdentity(new("9","7"));
             var create=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,State=ItemState.Unknown,After=after,RemoteId="9",CreateCompleted=true,WriteAccepted=true,
                 Fields=row.Fields.ToDictionary(p=>p.Key,p=>new FieldChange(FieldIntent.Set,p.Value)),ApiExpectedValues=Values(("name","Local name"),("code","A320"),("type","cargo")),
                 ApiSteps=[new(){Method="POST",Path="fleet",State=BatchStepState.ResponseReceived,RemoteId="9"}]};
             create.SetMessage(Messages.Define("ApiReadbackMismatch"));return create;
         }
-        var before=fleets.Snapshot.Single(r=>r.Identity!.RemoteId=="4").Copy();var renamed=before.Copy();renamed.Fields["Name"]="Local name";fleets.ReplaceDraftRows([renamed.Copy()]);
+        var before=fleets.Snapshot.Single(r=>r.Identity!.RemoteId=="4").Dup();var renamed=before.With("Name","Local name");fleets.ReplaceDraftRows([renamed.Dup()]);
         f.Remote.Rows["fleet/4"]["name"]="SERVER NAME";
         var update=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Update,State=ItemState.Unknown,Before=before,After=renamed,WriteAccepted=true,
             Fields=new(){["Name"]=new(FieldIntent.Set,"Local name")},ApiExpectedValues=Values(("name","Local name")),

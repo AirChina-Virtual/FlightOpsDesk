@@ -19,17 +19,11 @@ static class ReviewPlanFixture
 
     public static DataRow Row(int n, params (string Field, string Value)[] fields)
     {
-        var row = new DataRow { LocalId = Id(n) };
-        foreach (var (field, value) in fields)
-            row.Fields[field] = value;
-        return row;
+        return new DataRow { LocalId = Id(n), Fields = fields.ToDictionary(f => f.Field, f => f.Value) };
     }
     public static DataRow With(DataRow row, params (string Field, string Value)[] fields)
     {
-        var copy = row.Copy();
-        foreach (var (field, value) in fields)
-            copy.Fields[field] = value;
-        return copy;
+        return row.With(fields.Select(f => KeyValuePair.Create(f.Field, f.Value)));
     }
     public static string Token(int n) => LocalReference.Format(Id(n));
 
@@ -48,12 +42,12 @@ static class ReviewPlanFixture
         var zspd = Row(2, ("ICAO/IATA", "ZSPD"), ("Name", "Shanghai"), ("_delete", "FALSE"));
         var zggg = Row(3, ("ICAO/IATA", "ZGGG"), ("Name", "Guangzhou"), ("_delete", "FALSE"));
         Put(w, ResourceKind.Airports, [zbaa, zspd, zggg],
-            [With(zbaa, ("Name", "Beijing Capital")), With(zspd, ("_delete", "TRUE")), zggg.Copy(), Row(4, ("ICAO/IATA", "ZUUU"), ("Name", "Chengdu"), ("_delete", "FALSE"))]);
+            [With(zbaa, ("Name", "Beijing Capital")), With(zspd, ("_delete", "TRUE")), zggg.Dup(), Row(4, ("ICAO/IATA", "ZUUU"), ("Name", "Chengdu"), ("_delete", "FALSE"))]);
 
         var alpha = Row(10, ("ID", "1"), ("Name", "Alpha"), ("Type (pax/cargo/...)", "pax"), ("_delete", "FALSE"));
         Put(w, ResourceKind.Fleets, [alpha],
         [
-            alpha.Copy(),
+            alpha.Dup(),
             Row(11, ("Name", "Beta 1"), ("Type (pax/cargo/...)", "pax"), ("_delete", "FALSE")),
             Row(12, ("Name", "Beta 2"), ("Type (pax/cargo/...)", "pax"), ("_delete", "FALSE")),
             Row(13, ("Name", "Beta 3"), ("Type (pax/cargo/...)", "pax"), ("_delete", "FALSE")),

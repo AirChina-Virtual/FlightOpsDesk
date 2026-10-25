@@ -22,11 +22,11 @@ static class ReauditScenarios
                 var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=Api(w,h);var item=NewFleet();
                 var field=mode=="boolean"?"Hide in Phoenix":"Max Passengers";
                 var value=mode=="boolean"?"true":mode=="numeric"?"0189":"";
-                item.After.Fields[field]=value;item.Fields[field]=new(value==""?FieldIntent.Clear:FieldIntent.Set,value);
+                item.After=item.After.With(field,value);item.Fields[field]=new(value==""?FieldIntent.Clear:FieldIntent.Set,value);
                 var raw=mode=="unsent-default"?Fleet.Replace("189","0"):Fleet;
                 h.Next=(r,ct)=>r.Method==HttpMethod.Get && r.RequestUri!.AbsolutePath.EndsWith("/fleet")?Json(Page)
                     :r.Method==HttpMethod.Post?Json(raw,HttpStatusCode.Created):Json("{\"data\":"+raw+"}");
-                w.Resources[item.Resource].Draft.Add(item.After.Copy());var job=new BatchJob{Items=[item]};w.Jobs.Add(job);
+                w.Resources[item.Resource].Draft.Add(item.After.Dup());var job=new BatchJob{Items=[item]};w.Jobs.Add(job);
                 await new OperationsBatchExecutor(a,w).ExecuteAsync(job,()=>Task.CompletedTask,default);
                 Check(item.State==ItemState.Succeeded && item.ApiExpectedValues!=null);
                 if(mode=="unsent-default") Check(!item.ApiExpectedValues!.ContainsKey("max_pax") && !h.Methods.Contains(HttpMethod.Put));
@@ -40,8 +40,7 @@ static class ReauditScenarios
             {
                 var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=Api(w,h);
                 var old=Fleet.Replace("true","false").Replace("189","0");var before=Parse(a,ResourceKind.Fleets,old);
-                var after=before.Copy();var field=mode=="boolean"?"Hide in Phoenix":"Max Passengers";var value=mode=="boolean"?"true":"0189";
-                after.Fields[field]=value;
+                var field=mode=="boolean"?"Hide in Phoenix":"Max Passengers";var value=mode=="boolean"?"true":"0189";var after=before.With(field,value);
                 var item=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Update,Before=before,After=after,
                     Fields=new(){[field]=new(FieldIntent.Set,value),["Name"]=new(FieldIntent.Unspecified,"ignored")}};
                 var wrote=false;
@@ -54,10 +53,10 @@ static class ReauditScenarios
         await test("Explicit zero and empty collection are not omitted defaults",()=>
         {
             var w=new Workspace{AirlineId="7"};var a=Api(w,new());var item=NewFleet();
-            item.After.Fields["Max Passengers"]="0";item.Fields["Max Passengers"]=new(FieldIntent.Set,"0");
+            item.After=item.After.With("Max Passengers","0");item.Fields["Max Passengers"]=new(FieldIntent.Set,"0");
             Check(!a.Matches(item,Parse(a,ResourceKind.Fleets,Fleet),item.After,false));
             var before=Parse(a,ResourceKind.Airports,"""{"id":101,"airline_id":7,"icao":"EGLL","iata":"LHR","container_ids":[1]}""");
-            var after=before.Copy();after.Fields["Container IDs"]="";
+            var after=before.With("Container IDs","");
             var clear=new ChangeItem{Resource=ResourceKind.Airports,Kind=ChangeKind.Update,Before=before,After=after,Fields=new(){["Container IDs"]=new(FieldIntent.Clear,"")}};
             Check(!a.Matches(clear,before,after,false));
             Check(a.Matches(clear,Parse(a,ResourceKind.Airports,before.RawApiJson!.Replace("[1]","[]")),after,false));return Task.CompletedTask;
@@ -91,7 +90,7 @@ static class ReauditScenarios
         {
             var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=Api(w,h);
             var item=Create(ResourceKind.Airports,Row(("ICAO/IATA","EGLL"),("Name","Hub")));item.State=ItemState.Unknown;item.RemoteId="102";
-            var job=new BatchJob{Items=[item]};w.Jobs.Add(job);w.Resources[item.Resource].Draft.Add(item.After.Copy());
+            var job=new BatchJob{Items=[item]};w.Jobs.Add(job);w.Resources[item.Resource].Draft.Add(item.After.Dup());
             Check(item.CanProposeRecoveryId && item.EditableRecoveryId=="102");item.ProposeRecoveryId("102");
             h.Next=(r,ct)=>Json("""{"data":{"id":102,"airline_id":7,"icao":"EGKK","iata":"LGW","name":"Hub"}}""");
             await new OperationsBatchExecutor(a,w).ExecuteAsync(job,()=>Task.CompletedTask,default);

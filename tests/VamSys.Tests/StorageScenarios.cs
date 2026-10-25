@@ -15,7 +15,7 @@ static class StorageScenarios
     internal static Workspace Fixture()
     {
         var w=new Workspace{Name="Storage fixture",AirlineId="7",Mode=RunMode.Online};
-        var r=new DataRow{Fields=new(){["Name"]="New",["Type Code"]="B738",["Type (pax/cargo/...)"]="pax",["Max Passengers"]="180",["Unknown"]="001"}};
+        var r=new DataRow{Fields = new Dictionary<string, string> {["Name"]="New",["Type Code"]="B738",["Type (pax/cargo/...)"]="pax",["Max Passengers"]="180",["Unknown"]="001"}};
         w.Resources[ResourceKind.Fleets].Draft.Add(r);
         w.Resources[ResourceKind.Fleets].Edit([],()=>{});
         w.Jobs.Add(new(){Mode=RunMode.Online,Items=new ChangePlanner().Plan(ResourceKind.Fleets,w.Resources[ResourceKind.Fleets])});
@@ -116,7 +116,7 @@ static class StorageScenarios
             var dir=Temp();var store=new WorkspaceStore(dir);var w=Fixture();store.Save(w);
             var staged=Workspace.Deserialize(w.Serialize());var item=staged.Jobs[0].Items[0];
             item.State=ItemState.Succeeded;item.RemoteId="10";item.Rebased=true;
-            staged.Resources[ResourceKind.Fleets].Snapshot=[item.After.Copy()];staged.Resources[ResourceKind.Fleets].ClearHistory();staged.VerifiedOperations.Add("Fleets:Create");
+            staged.Resources[ResourceKind.Fleets].Snapshot=[item.After.Dup()];staged.Resources[ResourceKind.Fleets].ClearHistory();staged.VerifiedOperations.Add("Fleets:Create");
             store.Barrier=p=>{if(p==point)throw new IOException("fault");};
             using var run=PerformanceRun.Begin(w.Id,w.Jobs[0].Id);
             await Throws(()=>store.CheckpointWriter(w).WriteAsync(new(CheckpointKind.Rebase,staged.Jobs[0],item,staged),default));
@@ -183,9 +183,9 @@ static class StorageScenarios
         foreach(var(rows,undo)in new[]{(1,0),(20000,0),(20000,3)})
         {
             var w=Workspace.Deserialize(template);var data=w.Resources[ResourceKind.Routes];
-            data.Draft=Enumerable.Range(0,rows).Select(i=>new DataRow{Fields=new(){["ID"]=i.ToString(),["Callsign"]="ACA"+i,["Remarks"]="性能"}}).ToList();
-            data.Snapshot=data.Draft.Select(r=>r.Copy()).ToList();
-            for(var n=0;n<undo;n++){var row=data.Draft[n%data.Draft.Count];data.Edit([row.LocalId],()=>row.Fields["Remarks"]="history "+n);}
+            data.Draft=Enumerable.Range(0,rows).Select(i=>new DataRow{Fields = new Dictionary<string, string> {["ID"]=i.ToString(),["Callsign"]="ACA"+i,["Remarks"]="性能"}}).ToList();
+            data.Snapshot=data.Draft.Select(r=>r.Dup()).ToList();
+            for(var n=0;n<undo;n++){var row=data.Draft[n%data.Draft.Count];data.Edit([row.LocalId],()=>data.ReplaceDraftRows([row.With("Remarks","history "+n)]));}
             var dir=Temp();var store=new WorkspaceStore(dir);store.Save(w);
             using var c=Open(dir);var json=(string)Sql(c,"SELECT json FROM workspaces")!;
             Sql(c,"CREATE TRIGGER forbid_resources BEFORE UPDATE ON workspaces BEGIN SELECT RAISE(ABORT,'resource write'); END");
@@ -225,8 +225,8 @@ static class StorageScenarios
                 else
                 {
                     string[] keys=kind==ResourceKind.Airports?[names[rng.Next(names.Length)],names[rng.Next(names.Length)]]:[names[rng.Next(names.Length)]];
-                    var row=new DataRow{Identity=new(id,"7"),Fields=new(){["Name"]=keys[0]}};
-                    index.Put(row,keys.Select(n=>new CandidateSignature(kind,n)));baseline[id]=keys.ToArray();row.Fields["Name"]="mutated after put";
+                    var row=new DataRow{Identity=new(id,"7"),Fields = new Dictionary<string, string> {["Name"]=keys[0]}};
+                    index.Put(row,keys.Select(n=>new CandidateSignature(kind,n)));baseline[id]=keys.ToArray();
                 }
                 foreach(var name in names)
                 {

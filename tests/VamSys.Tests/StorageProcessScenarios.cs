@@ -65,7 +65,7 @@ static class StorageProcessScenarios
         }
         using var lease=new DataDirectoryLease(args[1]);
         var store=new WorkspaceStore(args[1],Barrier);var w=store.Load(Guid.Parse(args[3]));
-        var data=w.Resources[ResourceKind.Fleets];var row=data.Draft[0];data.Edit([row.LocalId],()=>row.Fields["Name"]="Edited in child");
+        var data=w.Resources[ResourceKind.Fleets];var row=data.Draft[0];data.Edit([row.LocalId],()=>data.ReplaceDraftRows([row.With("Name","Edited in child")]));
         var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);
         StorageScenarios.Check(await store.TrySaveDraftRowsAsync(w,edits.Changes),"Row save fell back");
         await writer.WriteLineAsync(JsonSerializer.Serialize(new Wire("done")));
@@ -190,7 +190,7 @@ static class StorageProcessScenarios
             StorageScenarios.Check(fleets.Undo.Count==original.Resources[ResourceKind.Fleets].Undo.Count+(saved?1:0),"Undo history after termination");
             StorageScenarios.Check(disk.StorageRevision==original.StorageRevision+(saved?1:0));
             // Everything else is exactly what was saved before, and the next full save still accepts the revision.
-            var expected=saved?original:disk;if(saved){var od=expected.Resources[ResourceKind.Fleets];od.History=fleets.History.Copy();od.Draft[0].Fields["Name"]="Edited in child";expected.StorageRevision=disk.StorageRevision;}
+            var expected=saved?original:disk;if(saved){var od=expected.Resources[ResourceKind.Fleets];od.History=fleets.History.Copy();od.Draft[0]=od.Draft[0].With("Name","Edited in child");expected.StorageRevision=disk.StorageRevision;}
             StorageScenarios.Check(disk.Serialize()==expected.Serialize(),"Unrelated data changed");
             disk.Name="after restart";store.Save(disk);StorageScenarios.Check(store.Load(w.Id).Name=="after restart");
         });
