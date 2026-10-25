@@ -61,6 +61,7 @@ public sealed partial class MainWindow
                 ResourcePicker.SelectedIndex=(int)ResourceKind.Routes;
                 if(page=="data")Render();else Navigation.SelectedItem=Navigation.MenuItems[1];
                 await dataQueryTask;RootGrid.UpdateLayout();
+                await WaitForDataPageReady();
                 return new{milliseconds=timer.Elapsed.TotalMilliseconds,state=DataVerificationState()};
             }
             case "data-state":RootGrid.UpdateLayout();return DataVerificationState();
@@ -305,6 +306,19 @@ public sealed partial class MainWindow
         total = reviewPlan?.Entries.Count, ready = reviewPlan?.SubmitItems.Count, resourcePickerVisible = ResourceBar.Visibility == Visibility.Visible,
         renderedText = FindVisual<ListView>(PageHost) is { } list ? FindVisual<TextBlock>(list)?.Text : null,
         rows = (FindVisual<ListView>(PageHost)?.Items.Count ?? 0), mode = workspace.Mode.ToString() };
+    // dataQueryTask can complete before the first row containers and cell editors are realised, or a
+    // superseded query can return early; wait until the page is really usable (10 s at most).
+    async Task WaitForDataPageReady()
+    {
+        var deadline=Stopwatch.StartNew();
+        while(deadline.Elapsed<TimeSpan.FromSeconds(10))
+        {
+            RootGrid.UpdateLayout();
+            if(!querying&&shownState?.Model.Total>0&&table?.ContainerFromIndex(0)!=null&&FindVisual<EditableCell>(table)!=null)return;
+            await Task.Delay(50);
+            await dataQueryTask;
+        }
+    }
     object DataVerificationState()
     {
         var scroll=table is null?null:FindVisual<ScrollViewer>(table);
