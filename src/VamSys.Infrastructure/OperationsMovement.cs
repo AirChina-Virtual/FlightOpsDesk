@@ -54,8 +54,7 @@ public sealed partial class OperationsAdapter
         var row = item.After;
         if (IndependentApiEvidence.IsMove(item))
         {
-            row = row.Copy();
-            row.Identity = new(id ?? item.Before!.Identity!.RemoteId, ConnectionId, item.After.Get("Fleet ID"));
+            row = row.WithIdentity(new(id ?? item.Before!.Identity!.RemoteId, ConnectionId, item.After.Get("Fleet ID")));
         }
         return FindRow(item.Resource, row, id, ct);
     }

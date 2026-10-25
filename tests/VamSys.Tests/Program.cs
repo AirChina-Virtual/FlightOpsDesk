@@ -85,7 +85,7 @@ if (args.Length == 2 && args[0] == "--seed-recovery-ui")
     pendingAirport.SetMessage(Messages.Define("ApiAirportCreatePending"));
     var pendingFleet=new ChangeItem { Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,State=ItemState.Pending,After=Row(("Name","Pending fleet")) };
     pendingFleet.SetMessage(Messages.Define("ApiIdentityPending"));
-    w.Resources[ResourceKind.Airports].Draft.Add(item.After.Copy());w.Jobs.Add(new(){Mode=RunMode.Online,Items=[item,pendingAirport,pendingFleet]});
+    w.Resources[ResourceKind.Airports].Draft.Add(item.After.Dup());w.Jobs.Add(new(){Mode=RunMode.Online,Items=[item,pendingAirport,pendingFleet]});
     new WorkspaceStore(args[1]).Save(w);Console.WriteLine("Seeded recovery UI without credentials");return;
 }
 if (args.Length == 2 && args[0] == "--seed-ui")
@@ -113,7 +113,7 @@ await Test("SQLite workspace isolation, persisted undo, and DPAPI", () => Sync((
 await Test("Batch success and resume do not duplicate writes", async () =>
 {
     var w = new Workspace(); var before = Row(("ICAO/IATA","ZBAA"),("Name","old")); CsvAdapter.Import(ResourceKind.Airports,w.Resources[ResourceKind.Airports],[before],true);
-    var fake = new CountingService(new DemoService(w)); w.Resources[ResourceKind.Airports].Draft[0].Fields["Name"]="new";
+    var fake = new CountingService(new DemoService(w)); var airportDraft=w.Resources[ResourceKind.Airports].Draft;airportDraft[0]=airportDraft[0].With("Name","new");
     var job = new BatchJob { Items = planner.Plan(ResourceKind.Airports,w.Resources[ResourceKind.Airports]) };
     var engine = new BatchExecutor(fake,fake); await engine.ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None); await engine.ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None);
     Check(fake.Writes==1); Check(job.Items[0].State==ItemState.Succeeded);
@@ -162,7 +162,7 @@ await Test("401/403 pauses batch without sending later rows", async () =>
 await Test("Recovered create with persisted remote ID verifies without repeat", async () =>
 {
     var w=new Workspace(); var after=Row(("ID",""),("Name","new")); var item=new ChangeItem { Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,After=after,State=ItemState.Running,RemoteId="123" };
-    var remote=after.Copy(); remote.Fields["ID"]="123"; w.Resources[ResourceKind.Fleets].Snapshot.Add(remote);
+    var remote=after.With("ID","123"); w.Resources[ResourceKind.Fleets].Snapshot.Add(remote);
     var fake=new CountingService(new DemoService(w)); await new BatchExecutor(fake,fake).ExecuteAsync(new BatchJob { Items=[item] },()=>Task.CompletedTask,CancellationToken.None);
     Check(item.State==ItemState.Succeeded && fake.Writes==0);
 });

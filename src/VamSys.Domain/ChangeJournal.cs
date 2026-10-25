@@ -62,7 +62,7 @@ public sealed class JournalCapture
 
 // The record of what the database holds for one workspace, kept next to the in-memory workspace.
 //
-// Rows are never edited in place (the Debug guard in DataRow enforces it): every change replaces, adds or removes row
+// Rows are never edited in place (DataRow is immutable, enforced by the compiler in every configuration): every change replaces, adds or removes row
 // objects. The journal therefore keeps the row objects the database was last synchronised with and derives the pending
 // changes by comparing them with the current lists. This covers every mutation path, including code that manipulates
 // the lists directly, so a change cannot be skipped by forgetting to record it. The small collections (columns,

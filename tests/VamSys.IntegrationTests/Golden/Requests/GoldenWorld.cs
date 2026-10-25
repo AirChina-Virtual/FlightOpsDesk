@@ -285,8 +285,8 @@ public sealed class GoldenWorld
             {
                 using var doc = JsonDocument.Parse(json.ToJsonString());
                 var row = Api.FromJson(kind, doc.RootElement);
-                Workspace.Resources[kind].Snapshot.Add(row.Copy());
-                Workspace.Resources[kind].Draft.Add(row.Copy());
+                Workspace.Resources[kind].Snapshot.Add(row.Dup());
+                Workspace.Resources[kind].Draft.Add(row.Dup());
             }
     }
 
@@ -296,9 +296,7 @@ public sealed class GoldenWorld
     /// <summary>Change fields of an existing draft row (replacing the row, never editing it in place).</summary>
     public DataRow Edit(ResourceKind kind, string remoteId, params (string Field, string Value)[] edits)
     {
-        var copy = Draft(kind, remoteId).Copy();
-        foreach (var (field, value) in edits)
-            copy.Fields[field] = value;
+        var copy = Draft(kind, remoteId).With(edits.Select(e => KeyValuePair.Create(e.Field, e.Value)));
         Workspace.Resources[kind].ReplaceDraftRows([copy]);
         return copy;
     }

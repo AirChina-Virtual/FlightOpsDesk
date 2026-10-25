@@ -21,9 +21,7 @@ public class SchemaValidationTests
     static DataRow ValidRoute(params (string Field, string Value)[] overrides)
     {
         var row = Row((Dep, "ZBAA"), (Arr, "ZSPD"), ("Type", "scheduled"), ("Callsign", "ACA123"), ("Flight Number", "AC123"), ("Fleet IDs", "1"));
-        foreach (var (field, value) in overrides)
-            row.Fields[field] = value;
-        return row;
+        return row.With(overrides.Select(o => KeyValuePair.Create(o.Field, o.Value)));
     }
 
     static List<Issue> Check(Workspace w, ResourceKind kind, params DataRow[] draft)
@@ -105,8 +103,8 @@ public class SchemaValidationTests
     [InlineData("", "Max Passengers", "1", "Type (pax/cargo/...)")]
     public void A_fleet_needs_the_capacity_columns_of_its_type(string type, string field, string value, string flagged)
     {
-        var fleet = Row(("Name", "F"), ("Type Code", "B738"), ("Type (pax/cargo/...)", type), ("Max Passengers", "100"), ("Max Freight", "1000"), ("Container Units", "2"));
-        fleet.Fields[field] = value;
+        var fleet = Row(("Name", "F"), ("Type Code", "B738"), ("Type (pax/cargo/...)", type), ("Max Passengers", "100"), ("Max Freight", "1000"), ("Container Units", "2"))
+            .With(field, value);
 
         var issues = Check(new Workspace(), ResourceKind.Fleets, fleet);
 
@@ -224,8 +222,7 @@ public class SchemaValidationTests
     {
         var w = new Workspace();
         var a = Row(("Name", "F"), ("Type Code", "A320"), ("Type (pax/cargo/...)", "cargo"), ("Max Freight", "1"));
-        var b = a.Copy();
-        b.LocalId = Guid.NewGuid();
+        var b = a.WithLocalId(Guid.NewGuid());
 
         var issues = Check(w, ResourceKind.Fleets, a, b);
 
@@ -233,8 +230,7 @@ public class SchemaValidationTests
 
         var existing = Base();
         var fleets = existing.Resources[ResourceKind.Fleets];
-        var again = fleets.Draft[0].Without("ID");
-        again.LocalId = Guid.NewGuid();
+        var again = fleets.Draft[0].Without("ID").WithLocalId(Guid.NewGuid());
         fleets.Draft = [.. fleets.Draft, again];
         Assert.Equal([again.LocalId], Schemas.Validate(existing, ResourceKind.Fleets).Where(i => i.Field == "ID").Select(i => i.RowId));
     }

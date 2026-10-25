@@ -85,7 +85,7 @@ VamSys.Core.ChangeItem.State => VamSys.Core.ItemState; get/set; ignore=Never
 VamSys.Core.ChangeItem.VerificationDifferences => System.Collections.Generic.List<VamSys.Core.ApiFieldDifference>; get/set; ignore=Never
 VamSys.Core.ChangeItem.WriteAccepted => System.Boolean; get/set; ignore=Never
 VamSys.Core.DataRow => kind Object
-VamSys.Core.DataRow.Fields => System.Collections.Generic.Dictionary<System.String,System.String>; get/set; ignore=Never
+VamSys.Core.DataRow.Fields => System.Collections.Generic.IReadOnlyDictionary<System.String,System.String>; get/set; ignore=Never
 VamSys.Core.DataRow.Identity => VamSys.Core.ResourceIdentity; get/set; ignore=Never
 VamSys.Core.DataRow.LocalId => System.Guid; get/set; ignore=Never
 VamSys.Core.DataRow.RawApiJson => System.String; get/set; ignore=Never

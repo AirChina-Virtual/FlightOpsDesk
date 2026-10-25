@@ -71,8 +71,8 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
             hash.Int((int)change.Kind);
             hash.Guid(after.LocalId);
             hash.Int(change.RequiresAirlineParameter ? 1 : 0);
-            hash.Fields(change.Before?.Fields);
-            hash.Fields(after.Fields);
+            hash.Fields(change.Before?.FieldEntries());
+            hash.Fields(after.FieldEntries());
             hash.Text(after.Identity?.RemoteId);
             hash.Text(after.Identity?.ConnectionId);
             hash.Text(after.Identity?.ParentFleetId);
@@ -123,23 +123,27 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
             BinaryPrimitives.WriteInt32LittleEndian(target, written);
             used -= target.Length - 4 - written;
         }
-        public void Fields(Dictionary<string, string>? fields)
+        public void Fields(DataRow.RowFields? fields)
         {
             if (fields is null)
             { Int(-1); return; }
-            Int(fields.Count);
-            foreach (var name in Sorted(fields.Keys))
-            { Text(name); Text(fields[name]); }
+            var map = fields.Value;
+            Int(map.Count);
+            foreach (var name in Sorted(map))
+            { Text(name); map.TryGetValue(name, out var text); Text(text); }
         }
         // One reused buffer instead of a sorted copy per row; valid until the next call.
         string[] names = new string[32];
-        public ArraySegment<string> Sorted(ICollection<string> keys)
+        public ArraySegment<string> Sorted(DataRow.RowFields fields)
         {
-            if (names.Length < keys.Count)
-                names = new string[keys.Count * 2];
-            keys.CopyTo(names, 0);
-            Array.Sort(names, 0, keys.Count, StringComparer.Ordinal);
-            return new(names, 0, keys.Count);
+            var count = fields.Count;
+            if (names.Length < count)
+                names = new string[count * 2];
+            var next = 0;
+            foreach (var key in fields.Keys)
+                names[next++] = key;
+            Array.Sort(names, 0, count, StringComparer.Ordinal);
+            return new(names, 0, count);
         }
         public ArraySegment<string> Sorted(PlannedChange change)
         {

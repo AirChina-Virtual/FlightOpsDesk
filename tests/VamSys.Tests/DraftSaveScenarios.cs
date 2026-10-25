@@ -23,8 +23,8 @@ static class DraftSaveScenarios
     static Workspace Large(int rows,int undo)
     {
         var w=Fixture();var data=w.Resources[ResourceKind.Routes];
-        for(var n=0;n<rows;n++){var row=new DataRow{Fields=new(){["ID"]=n.ToString(),["Flight Number"]="AC"+n,["Callsign"]="ACA123"}};data.Snapshot.Add(row.Copy());data.Draft.Add(row);}
-        for(var n=0;n<undo;n++){var row=data.Draft[n%rows];data.Edit([row.LocalId],()=>row.Fields["Callsign"]="HISTORY"+n);}
+        for(var n=0;n<rows;n++){var row=new DataRow{Fields = new Dictionary<string, string> {["ID"]=n.ToString(),["Flight Number"]="AC"+n,["Callsign"]="ACA123"}};data.Snapshot.Add(row.Dup());data.Draft.Add(row);}
+        for(var n=0;n<undo;n++){var row=data.Draft[n%rows];data.Edit([row.LocalId],()=>data.ReplaceDraftRows([row.With("Callsign","HISTORY"+n)]));}
         return w;
     }
     public static async Task Run(Func<string,Func<Task>,Task> test)
@@ -36,8 +36,8 @@ static class DraftSaveScenarios
             using(var full=PerformanceRun.Begin(w.Id,Guid.NewGuid())){var watch=Stopwatch.StartNew();store.Save(w);fullMs=watch.Elapsed.TotalMilliseconds;fullBytes=full.JsonBytes;}
             using(var c=Open(dir))Sql(c,Touched);
             var data=w.Resources[ResourceKind.Routes];var edits=new DraftEdits();
-            data.Edit([data.Draft[10].LocalId],()=>data.Draft[10].Fields["Flight Number"]="EDIT1",newStep:false);edits.Cell(w,ResourceKind.Routes,data.Draft[10].LocalId);
-            data.Edit([data.Draft[19999].LocalId],()=>data.Draft[19999].Fields["Callsign"]="EDIT2",newStep:false);edits.Cell(w,ResourceKind.Routes,data.Draft[19999].LocalId);
+            data.Edit([data.Draft[10].LocalId],()=>data.ReplaceDraftRows([data.Draft[10].With("Flight Number","EDIT1")]),newStep:false);edits.Cell(w,ResourceKind.Routes,data.Draft[10].LocalId);
+            data.Edit([data.Draft[19999].LocalId],()=>data.ReplaceDraftRows([data.Draft[19999].With("Callsign","EDIT2")]),newStep:false);edits.Cell(w,ResourceKind.Routes,data.Draft[19999].LocalId);
             long rowBytes;double rowMs;
             using(var run=PerformanceRun.Begin(w.Id,Guid.NewGuid())){var watch=Stopwatch.StartNew();Assert(await store.TrySaveDraftRowsAsync(w,edits.Changes));rowMs=watch.Elapsed.TotalMilliseconds;rowBytes=run.JsonBytes;Assert(run.Checkpoints["Draft"]==1);}
             using(var c=Open(dir))
@@ -48,7 +48,7 @@ static class DraftSaveScenarios
             }
             Assert(store.Load(w.Id).Serialize()==w.Serialize(),"Reload differs after row save");
             // A new undo step writes that resource's history too, and nothing else.
-            data.Edit([data.Draft[5].LocalId],()=>data.Draft[5].Fields["Flight Number"]="EDIT3");edits.Take();edits.Cell(w,ResourceKind.Routes,data.Draft[5].LocalId);
+            data.Edit([data.Draft[5].LocalId],()=>data.ReplaceDraftRows([data.Draft[5].With("Flight Number","EDIT3")]));edits.Take();edits.Cell(w,ResourceKind.Routes,data.Draft[5].LocalId);
             long historyBytes;using(var run=PerformanceRun.Begin(w.Id,Guid.NewGuid())){Assert(await store.TrySaveDraftRowsAsync(w,edits.Changes));historyBytes=run.JsonBytes;}
             using(var c=Open(dir))
             {
@@ -82,7 +82,7 @@ static class DraftSaveScenarios
             }
             Assert(data.Undo.Count==18&&data.Redo.Count==1);
             // A new row is structural: no replaced rows, so the caller saves everything.
-            var added=new DataRow{Fields=new(){["ID"]="new"}};data.Edit([added.LocalId],()=>data.Draft.Add(added),structural:true);
+            var added=new DataRow{Fields = new Dictionary<string, string> {["ID"]="new"}};data.Edit([added.LocalId],()=>data.Draft.Add(added),structural:true);
             var structural=data.UndoEdit();Assert(structural.Moved&&structural.ReplacedRows is null,"Structural undo reported replaced rows");
             data.RedoEdit();store.Save(w);
             while(data.Redo.Count>0)data.RedoEdit();
@@ -92,7 +92,7 @@ static class DraftSaveScenarios
         {
             var dir=Temp();var store=new WorkspaceStore(dir);var w=Fixture();store.Save(w);
             var other=store.Load(w.Id);other.Name="changed elsewhere";store.Save(other);
-            var row=w.Resources[ResourceKind.Fleets].Draft[0];row.Fields["Name"]="stale edit";var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);
+            var fleetDraft=w.Resources[ResourceKind.Fleets].Draft;var row=fleetDraft[0].With("Name","stale edit");fleetDraft[0]=row;var edits=new DraftEdits();edits.Cell(w,ResourceKind.Fleets,row.LocalId);
             var revision=w.StorageRevision;
             try{await store.TrySaveDraftRowsAsync(w,edits.Changes);throw new Exception("Stale row save accepted");}catch(InvalidOperationException e){Assert(MessageErrors.Describe(e).Code=="StorageStale");}
             Assert(w.StorageRevision==revision&&store.Load(w.Id).Resources[ResourceKind.Fleets].Draft[0].Get("Name")!="stale edit");

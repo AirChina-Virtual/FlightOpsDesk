@@ -40,25 +40,22 @@ public class CsvGoldenTests
 
     static DataRow Row(ResourceKind kind, string variant, bool identity)
     {
-        var row = new DataRow { Fields = new(StringComparer.Ordinal) };
+        var row = new DataRow.Builder();
         foreach (var f in FieldsOf(kind))
-            row.Fields[f] = Value(kind, f, variant);
+            row[f] = Value(kind, f, variant);
         if (identity)
         { row.Identity = new(variant.StartsWith("update") ? "11" : "12", "7"); row.RawApiJson = "{\"id\":" + row.Identity.RemoteId + "}"; }
-        return row;
+        return row.ToRow();
     }
 
     /// <summary>Update + delete (existing rows), then two creates, the second with quotes, commas, newlines and Chinese text.</summary>
     static List<ChangeItem> Changes(ResourceKind kind)
     {
         var update = Row(kind, "update-base", true);
-        var delete = Row(kind, "delete", true);
-        delete.Fields["_delete"] = "FALSE";
-        var data = new ResourceData { Snapshot = [update.Copy(), delete.Copy()] };
-        var updated = Row(kind, "update-new", true);
-        updated.LocalId = update.LocalId;
-        var deleted = delete.Copy();
-        deleted.Fields["_delete"] = "TRUE";
+        var delete = Row(kind, "delete", true).With("_delete", "FALSE");
+        var data = new ResourceData { Snapshot = [update.Dup(), delete.Dup()] };
+        var updated = Row(kind, "update-new", true).WithLocalId(update.LocalId);
+        var deleted = delete.With("_delete", "TRUE");
         data.Draft = [updated, deleted, Row(kind, "create", false), Row(kind, "special", false)];
         var items = new ChangePlanner().Plan(kind, data);
         Xunit.Assert.Equal([ChangeKind.Update, ChangeKind.Delete, ChangeKind.Create, ChangeKind.Create], items.Select(i => i.Kind));
@@ -91,7 +88,7 @@ public class CsvGoldenTests
 
             // A change without the unknown column forms its own column set and is exported separately.
             var differing = Changes(kind);
-            differing[2].After.Fields.Remove(Extra);
+            differing[2].After = differing[2].After.Without(Extra);
             Parts(golden, $"{name}.column-sets", csv.Export(kind, differing));
 
             // maxBytes exactly fits the header and the first two rows, and one byte less.
@@ -131,9 +128,8 @@ public class CsvGoldenTests
 
     static ResourceData Existing(ResourceKind kind)
     {
-        var row = Row(kind, "update-base", true);
-        row.Fields["Local only"] = "kept";
-        var data = new ResourceData { Snapshot = [row.Copy()], Draft = [row] };
+        var row = Row(kind, "update-base", true).With("Local only", "kept");
+        var data = new ResourceData { Snapshot = [row.Dup()], Draft = [row] };
         data.Columns = [.. row.Fields.Keys];
         return data;
     }
@@ -187,8 +183,8 @@ public class CsvGoldenTests
             }
             results.Add(entry);
         }
-        ResourceData Drafts(params string[] ids) => new() { Draft = ids.Select(id => new DataRow { Fields = new() { ["ID"] = id, ["Name"] = "n" } }).ToList() };
-        List<DataRow> Rows(params string[] ids) => ids.Select(id => new DataRow { Fields = new() { ["ID"] = id, ["Name"] = "n" } }).ToList();
+        ResourceData Drafts(params string[] ids) => new() { Draft = ids.Select(id => new DataRow { Fields = new Dictionary<string, string> { ["ID"] = id, ["Name"] = "n" } }).ToList() };
+        List<DataRow> Rows(params string[] ids) => ids.Select(id => new DataRow { Fields = new Dictionary<string, string> { ["ID"] = id, ["Name"] = "n" } }).ToList();
 
         Case("parse-empty", () => csv.Parse(""));
         Case("parse-ragged-row", () => csv.Parse("a,b\r\n1\r\n"));
@@ -204,7 +200,7 @@ public class CsvGoldenTests
         Case("export-local-reference", () =>
         {
             var item = Changes(ResourceKind.Aircraft)[2];
-            item.After.Fields["Fleet ID"] = "local:" + Guid.Empty;
+            item.After = item.After.With("Fleet ID", "local:" + Guid.Empty);
             csv.Export(ResourceKind.Aircraft, [item]);
         });
         Case("export-row-larger-than-max-bytes", () => csv.Export(ResourceKind.Fleets, Changes(ResourceKind.Fleets), 10));

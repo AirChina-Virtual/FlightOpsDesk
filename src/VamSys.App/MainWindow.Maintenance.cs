@@ -41,8 +41,7 @@ public sealed partial class MainWindow
         var id = (string)((ComboBoxItem)picker.SelectedItem).Tag;
         if (id == row.Get("Parameter IDs"))
             return;
-        var replacement = row.Copy();
-        replacement.Fields["Parameter IDs"] = id;
+        var replacement = row.With("Parameter IDs", id);
         Data.Edit([row.LocalId], () => Data.ReplaceDraftRows([replacement]));
         await Save();
     });

@@ -92,8 +92,7 @@ sealed class WorkspaceScenario : IDisposable
     {
         var data = Data(kind);
         // Callers keep their first row reference; edits go to the current row, which is replaced like the app does.
-        var replacement = (data.FindDraftRow(row.LocalId) ?? row).Copy();
-        replacement.Fields[field] = value;
+        var replacement = (data.FindDraftRow(row.LocalId) ?? row).With(field, value);
         data.Edit([row.LocalId], () => data.ReplaceDraftRows([replacement]), newStep: newStep);
         Edits.Cell(W, kind, row.LocalId);
     }
@@ -113,9 +112,10 @@ sealed class WorkspaceScenario : IDisposable
     public async Task<DataRow> AddRow(ResourceKind kind)
     {
         var data = Data(kind);
-        var row = new DataRow();
+        var builder = new DataRow.Builder();
         foreach (var f in Schemas.All[kind].Columns)
-            row.Fields[f] = f == "_delete" ? "FALSE" : "";
+            builder[f] = f == "_delete" ? "FALSE" : "";
+        var row = builder.ToRow();
         data.Edit([row.LocalId], () => data.Draft.Add(row), structural: true);
         data.Columns = data.Columns.Concat(row.Fields.Keys).Distinct().ToList();
         await SaveAll();
@@ -145,7 +145,7 @@ sealed class WorkspaceScenario : IDisposable
         var before = eligible.ToDictionary(r => r.LocalId);
         var changes = RuleEngine.Preview(eligible, rule).Where(r => r.Get(rule.Field) != before[r.LocalId].Get(rule.Field)).ToArray();
         Xunit.Assert.NotEmpty(changes);
-        data.Edit(changes.Select(r => r.LocalId), () => data.ReplaceDraftRows(changes.Select(r => r.Copy())));
+        data.Edit(changes.Select(r => r.LocalId), () => data.ReplaceDraftRows(changes.Select(r => r.Dup())));
         if (!data.Columns.Contains(rule.Field))
             data.Columns.Add(rule.Field);
         await SaveAll();
@@ -175,9 +175,7 @@ sealed class WorkspaceScenario : IDisposable
                 { data.Conflicts.Remove(conflict); await SaveAll(); continue; }
                 if (useRemote(kind, conflict))
                 {
-                    var replacement = row.Copy();
-                    if (conflict.Field != "*")
-                        replacement.Fields[conflict.Field] = conflict.Remote ?? "";
+                    var replacement = conflict.Field != "*" ? row.With(conflict.Field, conflict.Remote ?? "") : row.Dup();
                     data.Edit([row.LocalId], () => { if (conflict.Field == "*") data.Draft.Remove(row); else data.ReplaceDraftRows([replacement]); }, newStep: false, structural: conflict.Field == "*");
                 }
                 data.Conflicts.Remove(conflict);

@@ -43,7 +43,7 @@ public class ChangePlannerTests
         var before = Parse(baseline);
         var draft = Parse(row)!;
         if (before is not null)
-            draft.LocalId = before.LocalId;
+            draft = draft.WithLocalId(before.LocalId);
 
         var planned = Planner.Plan(ResourceKind.Fleets, Resource(before, draft));
         var kind = ChangePlanner.GetChangeKind(draft, before);
@@ -67,7 +67,7 @@ public class ChangePlannerTests
         var before = Parse(baseline);
         var draft = Parse(row)!;
         if (before is not null)
-            draft.LocalId = before.LocalId;
+            draft = draft.WithLocalId(before.LocalId);
 
         var change = Planner.Plan(ResourceKind.Fleets, Resource(before, draft)).Single();
 
@@ -97,8 +97,8 @@ public class ChangePlannerTests
         var data = Resource(before, draft);
 
         var change = Planner.Plan(ResourceKind.Fleets, data).Single();
-        change.After.Fields["Name"] = "detached";
-        change.Before!.Fields["Name"] = "detached";
+        change.After = change.After.With("Name", "detached");
+        change.Before = change.Before!.With("Name", "detached");
 
         Assert.Equal("B", data.Draft[0].Get("Name"));
         Assert.Equal("A", data.Snapshot[0].Get("Name"));
@@ -109,7 +109,7 @@ public class ChangePlannerTests
     public void Planning_keeps_draft_order_and_ignores_unchanged_rows()
     {
         var rows = Enumerable.Range(0, 5).Select(i => Row(("ID", i.ToString()), ("Name", "n" + i))).ToList();
-        var data = new ResourceData { Snapshot = rows.Select(r => r.Copy()).ToList(), Draft = [.. rows] };
+        var data = new ResourceData { Snapshot = rows.Select(r => r.Dup()).ToList(), Draft = [.. rows] };
         data.ReplaceDraftRows([rows[3].With("Name", "changed"), rows[1].With("Name", "changed")]);
 
         var kinds = Planner.Plan(ResourceKind.Fleets, data).Select(c => (c.After.Get("ID"), c.Kind)).ToList();
@@ -129,16 +129,15 @@ public class ChangePlannerTests
             var snapshot = Enumerable.Range(0, 300).Select(i => Row(("ID", i.ToString()), ("Name", "n" + i), ("Remarks", "r" + i))).ToList();
             var draft = snapshot.Select(r =>
             {
-                var copy = r.Copy();
-                switch (random.Next(7))
+                return random.Next(7) switch
                 {
-                    case 0: copy.Fields["Remarks"] = "edited"; break;
-                    case 1: copy.Fields["Remarks"] = ""; break;
-                    case 2: copy.Fields.Remove("Remarks"); break;
-                    case 3: copy.Fields["Unknown CSV"] = "unknown"; break;
-                    case 4: copy.Fields["_delete"] = "true"; break;
-                }
-                return copy;
+                    0 => r.With("Remarks", "edited"),
+                    1 => r.With("Remarks", ""),
+                    2 => r.Without("Remarks"),
+                    3 => r.With("Unknown CSV", "unknown"),
+                    4 => r.With("_delete", "true"),
+                    _ => r.Dup(),
+                };
             }).ToList();
             draft.Add(new());
             draft.Add(Row(("_delete", "TRUE")));
@@ -168,7 +167,7 @@ public class ChangePlannerTests
             var delete = row.Get("_delete").Equals("TRUE", StringComparison.OrdinalIgnoreCase);
             if (before != null && !delete && fields.Count == 0 || before is null && delete)
                 continue;
-            result.Add(new() { Resource = kind, Kind = delete ? ChangeKind.Delete : before is null ? ChangeKind.Create : ChangeKind.Update, Before = before?.Copy(), After = row.Copy(), Fields = fields });
+            result.Add(new() { Resource = kind, Kind = delete ? ChangeKind.Delete : before is null ? ChangeKind.Create : ChangeKind.Update, Before = before?.Dup(), After = row.Dup(), Fields = fields });
         }
         return result;
     }

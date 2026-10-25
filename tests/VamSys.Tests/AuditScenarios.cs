@@ -30,7 +30,7 @@ static class AuditScenarios
             await test("Unknown recovery survives restart and never writes: "+fault,async()=>
             {
                 var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var api=Api(w,h);
-                var before=Parse(api,ResourceKind.Fleets,Fleet);var after=before.Copy();after.Fields["Name"]="New";
+                var before=Parse(api,ResourceKind.Fleets,Fleet);var after=before.With("Name","New");
                 var item=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Update,State=ItemState.Unknown,Before=before,After=after,Fields=new(){["Name"]=new(FieldIntent.Set,"New")}};
                 var job=new BatchJob{Items=[item]};w.Jobs.Add(job);
                 using var cancel=new CancellationTokenSource();
@@ -90,7 +90,7 @@ static class AuditScenarios
             {
                 var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var api=Api(w,h);
                 var item=Create(ResourceKind.Airports,Row(("ICAO/IATA",code),("Name","Hub")));item.State=ItemState.Unknown;item.RemoteId="102";
-                w.Resources[item.Resource].Draft.Add(item.After.Copy());var job=new BatchJob{Items=[item]};
+                w.Resources[item.Resource].Draft.Add(item.After.Dup());var job=new BatchJob{Items=[item]};
                 h.Next=(r,ct)=>Json(Envelope(item.Resource,Gatwick));
                 await new OperationsBatchExecutor(api,w).ExecuteAsync(job,()=>Task.CompletedTask,default);
                 Check(item.State==ItemState.Unknown && !item.Rebased && w.Resources[item.Resource].Draft[0].Identity==null && w.Resources[item.Resource].Snapshot.Count==0 && w.VerifiedOperations.Count==0);
@@ -121,7 +121,7 @@ static class AuditScenarios
                     var w=new Workspace{AirlineId="7"};var api=Api(w,new());Airports(w,api);
                     var item=Route(kind,code,"LGW");var current=Parse(api,kind,RouteJson(kind));
                     Check(api.Matches(item,current,item.After,false));
-                    item.After.Fields["Departure Airport (ICAO/IATA)"]="LGW";
+                    item.After=item.After.With("Departure Airport (ICAO/IATA)","LGW");
                     item.Fields["Departure Airport (ICAO/IATA)"]=new(FieldIntent.Set,"LGW");
                     Check(!api.Matches(item,current,item.After,false));
                 }
@@ -141,9 +141,9 @@ static class AuditScenarios
             await test(kind+" resolved local dependency completes creation and survives restart",async()=>
             {
                 var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var api=Api(w,h);Airports(w,api);
-                var parent=Create(ResourceKind.Airports,w.Resources[ResourceKind.Airports].Snapshot[0].Copy());parent.State=ItemState.Succeeded;parent.RemoteId="101";
+                var parent=Create(ResourceKind.Airports,w.Resources[ResourceKind.Airports].Snapshot[0].Dup());parent.State=ItemState.Succeeded;parent.RemoteId="101";
                 var item=Route(kind,"local:"+parent.After.LocalId,"LGW");item.Dependencies.Add(parent.Id);
-                w.Resources[kind].Draft.Add(item.After.Copy());var job=new BatchJob{Items=[parent,item]};w.Jobs.Add(job);
+                w.Resources[kind].Draft.Add(item.After.Dup());var job=new BatchJob{Items=[parent,item]};w.Jobs.Add(job);
                 h.Next=(r,ct)=>(kind==ResourceKind.Routes?RouteApprovalFixture.Respond(r):null)??(r.Method==HttpMethod.Post ? Json(RouteJson(kind),HttpStatusCode.Created)
                     : Json(r.RequestUri!.AbsolutePath.EndsWith("/9")?Envelope(kind,RouteJson(kind)):List("")));
                 string saved="";await new OperationsBatchExecutor(api,w).ExecuteAsync(job,()=>{saved=w.Serialize();return Task.CompletedTask;},default);
@@ -157,7 +157,7 @@ static class AuditScenarios
                 {
                     var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var api=Api(w,h);Airports(w,api);
                     if(mode=="ambiguous") Parse(api,ResourceKind.Airports,London.Replace("101","103"));
-                    if(mode=="foreign") {w.Resources[ResourceKind.Airports].Snapshot[0].Identity=new("101","8");api=Api(w,h);}
+                    if(mode=="foreign") {var airports=w.Resources[ResourceKind.Airports].Snapshot;airports[0]=airports[0].WithIdentity(new("101","8"));api=Api(w,h);}
                     if(mode=="missing") {w.Resources[ResourceKind.Airports].Snapshot.Clear();api=Api(w,h);}
                     var item=Route(kind,"LHR","LGW");item.State=ItemState.Unknown;item.RemoteId="9";
                     h.Next=(r,ct)=>Json(Envelope(kind,RouteJson(kind)));

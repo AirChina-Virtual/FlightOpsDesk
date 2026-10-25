@@ -71,9 +71,7 @@ public sealed class FleetAssignmentService
             // Preserve exact strings on set-equivalent no-ops, including unresolved imported references.
             if (old.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(target))
                 continue;
-            var copy = row.Copy();
-            copy.Fields[field] = string.Join(',', target);
-            result.Add(copy);
+            result.Add(row.With(field, string.Join(',', target)));
         }
         return new(field, result, issues);
     }
@@ -85,7 +83,7 @@ public sealed class FleetAssignmentService
         if (preview.Rows.Count == 0)
             return;
         var replacements = preview.Rows.ToDictionary(r => r.LocalId);
-        data.Edit(replacements.Keys, () => data.ReplaceDraftRows(replacements.Values.Select(r => r.Copy())));
+        data.Edit(replacements.Keys, () => data.ReplaceDraftRows(replacements.Values.ToList()));
         if (!data.Columns.Contains(preview.Field))
             data.Columns.Add(preview.Field);
     }

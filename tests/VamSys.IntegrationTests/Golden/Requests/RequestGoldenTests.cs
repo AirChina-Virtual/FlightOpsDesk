@@ -262,9 +262,8 @@ public class RequestGoldenTests
     public async Task Update_with_unspecified_field_omits_it_from_body()
     {
         var w = new GoldenWorld();
-        var before = w.Workspace.Resources[ResourceKind.Routings].Snapshot.Single().Copy();
-        var after = before.Copy();
-        after.Fields["Remarks"] = "changed";
+        var before = w.Workspace.Resources[ResourceKind.Routings].Snapshot.Single().Dup();
+        var after = before.With("Remarks", "changed");
         w.Workspace.Resources[ResourceKind.Routings].ReplaceDraftRows([after]);
         // Built by hand: the planner never produces Unspecified, but saved tasks and the review screen can.
         var item = new ChangeItem
@@ -272,7 +271,7 @@ public class RequestGoldenTests
             Resource = ResourceKind.Routings,
             Kind = ChangeKind.Update,
             Before = before,
-            After = after.Copy(), // plan items own their rows; the draft row stays untouched
+            After = after.Dup(), // plan items own their rows; the draft row stays untouched
             Fields = new() { ["Remarks"] = new(FieldIntent.Set, "changed"), ["Internal Remarks"] = new(FieldIntent.Unspecified, null) }
         };
         w.Begin("run");

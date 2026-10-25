@@ -69,21 +69,35 @@ public sealed class CsvAdapter : ICsvResourceAdapter
         var names = table.Headers.Select(h => mapping.GetValueOrDefault(h, h)).ToArray();
         if (names.Any(string.IsNullOrWhiteSpace) || names.Distinct().Count() != names.Length)
             throw MessageErrors.Attach(new FormatException(Messages.Define("Text_E93E44505B")), Messages.Define("Text_E93E44505B"));
-        return table.Rows.Select(values => new DataRow { Fields = names.Zip(values).ToDictionary(x => x.First, x => x.Second) }).ToList();
+        var result = new List<DataRow>(table.Rows.Count);
+        foreach (var values in table.Rows)
+        {
+            var builder = new DataRow.Builder(names.Length);
+            for (var i = 0; i < names.Length && i < values.Count; i++)
+                builder[names[i]] = values[i];
+            result.Add(builder.ToRow());
+        }
+        return result;
     }
 
     public static void Import(ResourceKind kind, ResourceData data, List<DataRow> rows, bool baseline)
     {
         // Stored drafts always spell the prefix in lowercase, whatever the file used.
-        foreach (var row in rows)
-            foreach (var field in Schemas.ReferenceFields(kind))
-                if (row.Fields.TryGetValue(field, out var text) && LocalReference.ContainsLocal(text))
-                    row.Fields[field] = LocalReference.Normalize(text);
+        var referenceFields = Schemas.ReferenceFields(kind);
+        for (var i = 0; i < rows.Count; i++)
+        {
+            DataRow.Builder? edit = null;
+            foreach (var field in referenceFields)
+                if (rows[i].Fields.TryGetValue(field, out var text) && LocalReference.ContainsLocal(text))
+                    (edit ??= rows[i].ToBuilder())[field] = LocalReference.Normalize(text);
+            if (edit != null)
+                rows[i] = edit.ToRow();
+        }
         if (baseline)
         {
             if (rows.Any(r => Schemas.Key(kind, r) == ""))
                 throw MessageErrors.Attach(new FormatException(Messages.Define("Text_FF27EDEC0D")), Messages.Define("Text_FF27EDEC0D"));
-            data.Snapshot = rows.Select(r => r.Copy()).ToList();
+            data.Snapshot = [.. rows];
             data.Draft = rows;
             data.ClearHistory();
             data.SnapshotAt = DateTimeOffset.UtcNow;
@@ -116,14 +130,14 @@ public sealed class CsvAdapter : ICsvResourceAdapter
                     {
                         if (matches.Count != 1)
                             throw MessageErrors.Attach(new InvalidOperationException(Messages.Define("Text_C73CE653CA", ("arg0", key))), Messages.Define("Text_C73CE653CA", ("arg0", key)));
-                        var replacement = matches[0].Copy();
+                        var replacement = matches[0].ToBuilder();
                         foreach (var (f, v) in incoming.Fields)
                         {
                             if (kind == ResourceKind.Airports && f == "ICAO/IATA" && matches[0].Identity != null)
                                 continue;
-                            replacement.Fields[f] = v;
+                            replacement[f] = v;
                         }
-                        replacements.Add(replacement);
+                        replacements.Add(replacement.ToRow());
                     }
                     else
                         data.Draft.Add(incoming);

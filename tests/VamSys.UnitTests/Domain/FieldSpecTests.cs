@@ -171,9 +171,7 @@ public class FieldSpecTests
     {
         static ChangeItem Item(ResourceKind kind, ChangeKind op, params (string, string)[] fields)
         {
-            var row = new DataRow();
-            foreach (var (f, v) in fields)
-                row.Fields[f] = v;
+            var row = new DataRow { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
             return new() { Resource = kind, Kind = op, After = row, Fields = fields.ToDictionary(p => p.Item1, p => new FieldChange(FieldIntent.Set, p.Item2)) };
         }
         var hash = IndependentApiEvidence.ContractHash;
@@ -226,9 +224,7 @@ public class FieldSpecTests
         Assert.Equal("TRUE", row.Get("Hide in Phoenix"));
         Assert.Equal("9", row.Get("Parameter IDs"));
 
-        var create = row.Copy();
-        create.Identity = null;
-        create.Fields["ID"] = "";
+        var create = row.WithIdentity(null).With("ID", "");
         var item = new ChangeItem
         {
             Resource = ResourceKind.Fleets, Kind = ChangeKind.Create, After = create,
@@ -261,9 +257,7 @@ public class FieldSpecTests
 
     static ChangeItem Update(ResourceKind kind, DataRow before, params (string Field, string Value)[] edits)
     {
-        var after = before.Copy();
-        foreach (var (f, v) in edits)
-            after.Fields[f] = v;
+        var after = before.With(edits.Select(e => KeyValuePair.Create(e.Field, e.Value)));
         return new() { Resource = kind, Kind = ChangeKind.Update, Before = before, After = after, RemoteId = before.Identity!.RemoteId,
             Fields = edits.ToDictionary(e => e.Field, e => new FieldChange(e.Value.Length == 0 ? FieldIntent.Clear : FieldIntent.Set, e.Value)) };
     }
@@ -302,11 +296,9 @@ public class FieldSpecTests
     public void Validation_uses_the_table_types()
     {
         var workspace = new Workspace { AirlineId = "7", Mode = RunMode.Online };
-        var row = new DataRow();
-        foreach (var (f, v) in new[] { ("ID", "1"), ("Name", "F"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "cargo"), ("Max Freight", "1.5"), ("Hide in Phoenix", "yes"), ("Start Date", "x"), ("Service Days", "mon"), ("_delete", "FALSE") })
-            row.Fields[f] = v;
+        var row = new DataRow { Fields = (new[] { ("ID", "1"), ("Name", "F"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "cargo"), ("Max Freight", "1.5"), ("Hide in Phoenix", "yes"), ("Start Date", "x"), ("Service Days", "mon"), ("_delete", "FALSE") }).ToDictionary(p => p.Item1, p => p.Item2) };
         workspace.Resources[ResourceKind.Fleets].Draft.Add(row);
-        workspace.Resources[ResourceKind.Fleets].Snapshot.Add(row.Copy());
+        workspace.Resources[ResourceKind.Fleets].Snapshot.Add(row.Dup());
         var issues = Schemas.Validate(workspace, ResourceKind.Fleets).Select(i => i.Field).ToHashSet();
         Assert.Contains("Max Freight", issues);
         Assert.Contains("Hide in Phoenix", issues);
@@ -319,13 +311,9 @@ public class FieldSpecTests
     public void One_validation_pass_gives_the_same_issues_as_separate_runs()
     {
         var workspace = new Workspace { AirlineId = "7" };
-        var fleet = new DataRow();
-        foreach (var (f, v) in new[] { ("ID", ""), ("Name", "F"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "pax"), ("Max Passengers", "100"), ("_delete", "FALSE") })
-            fleet.Fields[f] = v;
+        var fleet = new DataRow { Fields = (new[] { ("ID", ""), ("Name", "F"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "pax"), ("Max Passengers", "100"), ("_delete", "FALSE") }).ToDictionary(p => p.Item1, p => p.Item2) };
         workspace.Resources[ResourceKind.Fleets].Draft.Add(fleet);
-        var aircraft = new DataRow();
-        foreach (var (f, v) in new[] { ("ID", ""), ("Name", "A"), ("Registration", "B-1"), ("Fleet ID", "99"), ("_delete", "FALSE") })
-            aircraft.Fields[f] = v;
+        var aircraft = new DataRow { Fields = (new[] { ("ID", ""), ("Name", "A"), ("Registration", "B-1"), ("Fleet ID", "99"), ("_delete", "FALSE") }).ToDictionary(p => p.Item1, p => p.Item2) };
         workspace.Resources[ResourceKind.Aircraft].Draft.Add(aircraft);
         var pass = new ValidationPass(workspace);
         foreach (var kind in Enum.GetValues<ResourceKind>())

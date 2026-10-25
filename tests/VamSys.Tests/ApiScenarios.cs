@@ -10,7 +10,7 @@ static class ApiScenarios
     static OperationsAdapter Adapter(Workspace w, HttpMessageHandler? handler=null) => new(new OperationsTransport(new HttpClient(handler??new ScriptedHttp([])),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("test-token",DateTimeOffset.UtcNow.AddHours(1)))),InstantTime.Requests()),w);
     static DataRow Parse(OperationsAdapter api,ResourceKind kind,string json) { using var d=JsonDocument.Parse(json); return api.FromJson(kind,d.RootElement); }
     static ChangeItem Edit(ResourceKind kind,DataRow before,string field,string value)
-    { var after=before.Copy(); after.Fields[field]=value; return new(){ Resource=kind,Kind=ChangeKind.Update,Before=before.Copy(),After=after,Fields=new(){[field]=new(value==""?FieldIntent.Clear:FieldIntent.Set,value)} }; }
+    { var after=before.With(field,value); return new(){ Resource=kind,Kind=ChangeKind.Update,Before=before.Dup(),After=after,Fields=new(){[field]=new(value==""?FieldIntent.Clear:FieldIntent.Set,value)} }; }
     static ChangeItem Create(ResourceKind kind,DataRow row)=>new(){ Resource=kind,Kind=ChangeKind.Create,After=row,Fields=row.Fields.ToDictionary(p=>p.Key,p=>new FieldChange(FieldIntent.Set,p.Value)) };
     static void Blocked(Action action,string code) { try{action();throw new Exception("Expected block: "+code);}catch(InvalidOperationException e){Check(MessageErrors.Describe(e).Code==code,"Wrong block: "+MessageErrors.Describe(e).Code);} }
     public static async Task Run(Func<string,Func<Task>,Task> test)
@@ -20,14 +20,14 @@ static class ApiScenarios
         {
             var w=new Workspace{AirlineId="7"};var api=Adapter(w);
             var airport=Parse(api,ResourceKind.Airports,"{\"id\":101,\"airline_id\":7,\"icao\":\"EGLL\",\"iata\":\"LHR\",\"name\":\"London\"}");
-            var data=new ResourceData{Snapshot=[airport.Copy()],Draft=[airport.Copy()]};
+            var data=new ResourceData{Snapshot=[airport.Dup()],Draft=[airport.Dup()]};
             CsvAdapter.Import(ResourceKind.Airports,data,[Row(("ICAO/IATA","LHR"),("Name","Updated"))],false);
             Check(data.Draft.Count==1&&data.Draft[0].Get("ICAO/IATA")=="EGLL"&&data.Draft[0].Get("Name")=="Updated");
             var undo=data.Undo.Count;
             try { CsvAdapter.Import(ResourceKind.Airports,data,[Row(("ICAO/IATA","LHR")),Row(("ICAO/IATA","EGLL"))],false);throw new Exception("Duplicate accepted"); }
             catch(FormatException){Check(data.Undo.Count==undo);}
-            var old=Row(("ICAO/IATA","LHR"),("Name","London"));var legacy=new ResourceData{Snapshot=[old.Copy()],Draft=[old.Copy()]};
-            SnapshotMerger.Merge(ResourceKind.Airports,legacy,[airport.Copy()]);Check(legacy.Draft.Count==1&&legacy.Conflicts.Count==0&&legacy.Draft[0].Identity!.RemoteId=="101");
+            var old=Row(("ICAO/IATA","LHR"),("Name","London"));var legacy=new ResourceData{Snapshot=[old.Dup()],Draft=[old.Dup()]};
+            SnapshotMerger.Merge(ResourceKind.Airports,legacy,[airport.Dup()]);Check(legacy.Draft.Count==1&&legacy.Conflicts.Count==0&&legacy.Draft[0].Identity!.RemoteId=="101");
         }));
         await test("Frozen official schema hash and route create integer associations",()=>Sync(()=>
         {
@@ -40,13 +40,13 @@ static class ApiScenarios
             var fleet=Row(("Name","New"),("Type Code","B738"),("Type (pax/cargo/...)","pax"));w.Resources[ResourceKind.Fleets].Draft.Add(fleet);
             var aircraft=Create(ResourceKind.Aircraft,Row(("Name","Plane"),("Registration","G-TEST"),("Fleet ID","local:"+fleet.LocalId)));
             Check(api.PreviewPlan(aircraft).Count==1);Blocked(()=>api.Plan(aircraft),"ApiInvalid");
-            var wrong=Row(("ID","1"));wrong.Identity=new("1","other");Blocked(()=>api.Plan(Edit(ResourceKind.Fleets,wrong,"Name","x")),"ApiWrongVa");
+            var wrong=Row(("ID","1")).WithIdentity(new("1","other"));Blocked(()=>api.Plan(Edit(ResourceKind.Fleets,wrong,"Name","x")),"ApiWrongVa");
         }));
         await test("20,000 API snapshots merge without losing row identity or sparse edits",()=>Sync(()=>
         {
-            var rows=Enumerable.Range(1,20000).Select(i=>new DataRow{Identity=new(i.ToString(),"7"),Fields=new(){["ID"]=i.ToString(),["Callsign"]="ACA"+i,["Remarks"]="old"}}).ToList();
-            var data=new ResourceData{Snapshot=rows.Select(r=>r.Copy()).ToList(),Draft=rows.Select(r=>r.Copy()).ToList()};
-            data.Draft[100].Fields["Remarks"]="local";var incoming=rows.Select(r=>r.Copy()).ToList();incoming[200].Fields["Remarks"]="remote";
+            var rows=Enumerable.Range(1,20000).Select(i=>new DataRow{Identity=new(i.ToString(),"7"),Fields=new Dictionary<string,string>{["ID"]=i.ToString(),["Callsign"]="ACA"+i,["Remarks"]="old"}}).ToList();
+            var data=new ResourceData{Snapshot=rows.Select(r=>r.Dup()).ToList(),Draft=rows.Select(r=>r.Dup()).ToList()};
+            data.Draft[100]=data.Draft[100].With("Remarks","local");var incoming=rows.Select(r=>r.Dup()).ToList();incoming[200]=incoming[200].With("Remarks","remote");
             var watch=System.Diagnostics.Stopwatch.StartNew();SnapshotMerger.Merge(ResourceKind.Routes,data,incoming);watch.Stop();
             Check(data.Draft.Count==20000&&data.Draft[100].Get("Remarks")=="local"&&data.Draft[200].Get("Remarks")=="remote"&&data.Conflicts.Count==0);
             Console.WriteLine($"  20k API merge: {watch.ElapsedMilliseconds} ms");
@@ -86,14 +86,14 @@ static class ApiScenarios
         }));
         await test("Three-way refresh preserves independent edits, CSV identity and sticky conflicts",()=>Sync(()=>
         {
-            var baseline=Row(("ID","1"),("Name","Original"),("Type Code","B738"));var draft=baseline.Copy();draft.Fields["Name"]="Mine";
+            var baseline=Row(("ID","1"),("Name","Original"),("Type Code","B738"));var draft=baseline.With("Name","Mine");
             var data=new ResourceData{Snapshot=[baseline],Draft=[draft]};
-            var fresh=Row(("ID","1"),("Name","Original"),("Type Code","B739"));fresh.Identity=new("1","7");
+            var fresh=Row(("ID","1"),("Name","Original"),("Type Code","B739")).WithIdentity(new("1","7"));
             SnapshotMerger.Merge(ResourceKind.Fleets,data,[fresh]);
             Check(data.Draft.Single().LocalId==draft.LocalId && data.Draft[0].Get("Name")=="Mine" && data.Draft[0].Get("Type Code")=="B739" && data.Conflicts.Count==0);
-            fresh=fresh.Copy();fresh.Fields["Name"]="Theirs";SnapshotMerger.Merge(ResourceKind.Fleets,data,[fresh]);Check(data.Conflicts.Count==1);
-            SnapshotMerger.Merge(ResourceKind.Fleets,data,[fresh.Copy()]);Check(data.Conflicts.Count==1);
-            var a=Row(("ICAO/IATA","EGLL"),("Name","London"));var d=new ResourceData{Snapshot=[a],Draft=[a.Copy()]};var b=a.Copy();b.Identity=new("101","7");
+            fresh=fresh.With("Name","Theirs");SnapshotMerger.Merge(ResourceKind.Fleets,data,[fresh]);Check(data.Conflicts.Count==1);
+            SnapshotMerger.Merge(ResourceKind.Fleets,data,[fresh.Dup()]);Check(data.Conflicts.Count==1);
+            var a=Row(("ICAO/IATA","EGLL"),("Name","London"));var d=new ResourceData{Snapshot=[a],Draft=[a.Dup()]};var b=a.WithIdentity(new("101","7"));
             SnapshotMerger.Merge(ResourceKind.Airports,d,[b]);Check(d.Draft.Count==1&&d.Draft[0].Identity!.RemoteId=="101");
         }));
         await test("Aircraft reading enumerates fleets and single responses use documented envelopes",async()=>
@@ -115,7 +115,7 @@ static class ApiScenarios
                 r=>Task.FromResult(ScriptedHttp.Json("{\"data\":{\"id\":4,\"airline_id\":7,\"name\":\"Fleet\",\"code\":\"B738\",\"type\":\"pax\",\"max_pax\":189}}"))]);
             var api=Adapter(w,h);var item=Create(ResourceKind.Fleets,Row(("Name","Fleet"),("Type Code","B738"),("Type (pax/cargo/...)","pax"),("Max Passengers","189")));
             StorageScenarios.LegacyFleetSteps(item);
-            w.Resources[ResourceKind.Fleets].Draft.Add(item.After.Copy());var job=new BatchJob{Mode=RunMode.Online,Items=[item]};var executor=new OperationsBatchExecutor(api,w);
+            w.Resources[ResourceKind.Fleets].Draft.Add(item.After.Dup());var job=new BatchJob{Mode=RunMode.Online,Items=[item]};var executor=new OperationsBatchExecutor(api,w);
             await executor.ExecuteAsync(job,()=>{persisted=item.CreateCompleted&&item.RemoteId=="4";return Task.CompletedTask;},default);
             Check(item.State==ItemState.Unknown&&persisted&&h.Calls==3);
             await executor.ExecuteAsync(job,()=>Task.CompletedTask,default);Check(item.State==ItemState.Succeeded&&h.Calls==4&&w.Resources[ResourceKind.Fleets].Draft[0].Get("ID")=="4");
@@ -132,7 +132,7 @@ static class ApiScenarios
                 r=>{Check(r.Method==HttpMethod.Delete);return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent));},
                 r=>Task.FromResult(ScriptedHttp.Json("{}",HttpStatusCode.NotFound))]);
             var api=Adapter(w,h);var row=Parse(api,ResourceKind.Airports,"{\"id\":101,\"airline_id\":7,\"icao\":\"EGLL\",\"iata\":\"LHR\",\"name\":\"London\"}");
-            w.Resources[ResourceKind.Airports].Draft.Add(row.Copy());var item=new ChangeItem{Resource=ResourceKind.Airports,Kind=ChangeKind.Delete,Before=row.Copy(),After=row.Copy()};
+            w.Resources[ResourceKind.Airports].Draft.Add(row.Dup());var item=new ChangeItem{Resource=ResourceKind.Airports,Kind=ChangeKind.Delete,Before=row.Dup(),After=row.Dup()};
             await new OperationsBatchExecutor(api,w).ExecuteAsync(new(){Items=[item]},()=>Task.CompletedTask,default);Check(item.State==ItemState.Succeeded&&item.WriteAccepted&&w.VerifiedOperations.Contains("Airports:Delete")&&item.DeletionVerification?.Outcome=="ApiInvisible");
         });
         await test("Online update conflict sends no PUT and persists structured status",async()=>
@@ -153,7 +153,7 @@ static class ApiScenarios
             var w=new Workspace{AirlineId="7"};var api=Adapter(w);var row=Parse(api,ResourceKind.Fleets,"{\"id\":4,\"airline_id\":7,\"name\":\"机型\",\"code\":\"B738\",\"type\":\"pax\"}");
             var change=Edit(ResourceKind.Fleets,row,"Name","测试");var csv=new CsvAdapter();var before=csv.Export(ResourceKind.Fleets,[change]).Single();
             var loc=new LocalizationService();loc.SetLanguage("en-US");Check(loc.Get("ApiMoveFleet").Contains("Change only the aircraft Fleet ID"));Check(before.SequenceEqual(csv.Export(ResourceKind.Fleets,[change]).Single()));
-            change.After.Identity=null;change.After.RawApiJson=null;Check(before.SequenceEqual(csv.Export(ResourceKind.Fleets,[change]).Single()));
+            change.After=change.After.WithIdentity(null).WithRawApiJson(null);Check(before.SequenceEqual(csv.Export(ResourceKind.Fleets,[change]).Single()));
         }));
     }
 }

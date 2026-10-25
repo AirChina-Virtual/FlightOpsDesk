@@ -13,14 +13,14 @@ static class LifecycleScenarios
     const string Fleet="""{"id":4,"airline_id":7,"name":"Old"}""";
     static OperationsAdapter Api(Workspace w,AuditHttp h)=>new(new OperationsTransport(new HttpClient(h),OperationsAdapter.BaseUri,Guid.NewGuid().ToString(),new TokenProvider(_=>Task.FromResult(new AccessToken("test",DateTimeOffset.UtcNow.AddHours(1)))),InstantTime.Requests()),w);
     static DataRow Parse(OperationsAdapter a,ResourceKind k,string raw){using var d=JsonDocument.Parse(raw);return a.FromJson(k,d.RootElement);}
-    static ChangeItem Routing(string code)=>new(){Resource=ResourceKind.Routings,Kind=ChangeKind.Create,After=new(){Fields=new(){["Departure Airport (ICAO/IATA)"]=code,["Arrival Airport (ICAO/IATA)"]=code,["Route String"]="DCT"}},Fields=new(){["Departure Airport (ICAO/IATA)"]=new(FieldIntent.Set,code),["Arrival Airport (ICAO/IATA)"]=new(FieldIntent.Set,code),["Route String"]=new(FieldIntent.Set,"DCT")}};
+    static ChangeItem Routing(string code)=>new(){Resource=ResourceKind.Routings,Kind=ChangeKind.Create,After=new(){Fields = new Dictionary<string, string> {["Departure Airport (ICAO/IATA)"]=code,["Arrival Airport (ICAO/IATA)"]=code,["Route String"]="DCT"}},Fields=new(){["Departure Airport (ICAO/IATA)"]=new(FieldIntent.Set,code),["Arrival Airport (ICAO/IATA)"]=new(FieldIntent.Set,code),["Route String"]=new(FieldIntent.Set,"DCT")}};
     public static async Task Run(Func<string,Func<Task>,Task> test)
     {
         foreach(var mode in new[]{"success","read-failure","cancel","save-failure"})
             await test("Full refresh swaps identity index atomically: "+mode,async()=>
             {
                 var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=Api(w,h);
-                var old=Parse(a,ResourceKind.Airports,OldAirport);w.Resources[ResourceKind.Airports].Snapshot.Add(old.Copy());w.Resources[ResourceKind.Airports].Draft.Add(old.Copy());
+                var old=Parse(a,ResourceKind.Airports,OldAirport);w.Resources[ResourceKind.Airports].Snapshot.Add(old.Dup());w.Resources[ResourceKind.Airports].Draft.Add(old.Dup());
                 using var ct=new CancellationTokenSource();var serialized=w.Serialize();string? saved=null;
                 h.Next=(r,token)=>
                 {
@@ -52,7 +52,7 @@ static class LifecycleScenarios
             await test("Paused task rotates credentials and resumes in the same VA: "+unknown,async()=>
             {
                 var w=new Workspace{AirlineId="7",Mode=RunMode.Online,LocalRouteTimes=true,InstanceUrl=OperationsAdapter.BaseUri.AbsoluteUri};
-                var h=new AuditHttp();var a=Api(w,h);var before=Parse(a,ResourceKind.Fleets,Fleet);var after=before.Copy();after.Fields["Name"]="New";
+                var h=new AuditHttp();var a=Api(w,h);var before=Parse(a,ResourceKind.Fleets,Fleet);var after=before.With("Name","New");
                 var item=new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Update,Before=before,After=after,State=unknown?ItemState.Unknown:ItemState.Pending,Fields=new(){["Name"]=new(FieldIntent.Set,"New")}};
                 var job=new BatchJob{Mode=RunMode.Online,Items=[item]};w.Jobs.Add(job);
                 h.Next=(r,ct)=>new(HttpStatusCode.Unauthorized){Content=new StringContent("{}")};
@@ -93,10 +93,10 @@ static class LifecycleScenarios
         {
             var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=Api(w,h);
             const string aircraft="""{"id":8,"airline_id":7,"fleet_id":4,"name":"Plane"}""";
-            var before=Parse(a,ResourceKind.Aircraft,aircraft);w.Resources[ResourceKind.Aircraft].Snapshot.Add(before.Copy());w.Resources[ResourceKind.Aircraft].Draft.Add(before.Copy());
+            var before=Parse(a,ResourceKind.Aircraft,aircraft);w.Resources[ResourceKind.Aircraft].Snapshot.Add(before.Dup());w.Resources[ResourceKind.Aircraft].Draft.Add(before.Dup());
             var deleted=false;h.Next=(r,ct)=>
             {if(r.Method==HttpMethod.Delete){deleted=true;return new(HttpStatusCode.NoContent);}return deleted?new(HttpStatusCode.NotFound){Content=new StringContent("{}")}:Json("{\"data\":"+aircraft+"}");};
-            var item=new ChangeItem{Resource=ResourceKind.Aircraft,Kind=ChangeKind.Delete,Before=before,After=before.Copy()};item.After.Fields["_delete"]="TRUE";
+            var item=new ChangeItem{Resource=ResourceKind.Aircraft,Kind=ChangeKind.Delete,Before=before,After=before.With("_delete","TRUE")};
             await new OperationsBatchExecutor(a,w).ExecuteAsync(new(){Items=[item]},()=>Task.CompletedTask,default);Check(item.State==ItemState.Succeeded);
             var calls=h.Methods.Count;
             try{await a.FindAsync(ResourceKind.Aircraft,"8",default);throw new Exception("Deleted aircraft cached");}catch(InvalidOperationException e){Check(MessageErrors.Describe(e).Code=="ApiRefreshFirst");}

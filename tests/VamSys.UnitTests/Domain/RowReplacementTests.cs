@@ -1,92 +1,141 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using VamSys.Core;
 
 namespace VamSys.UnitTests;
 
-/// <summary>A5: draft rows are replaced, never edited in place. In Debug builds a row that sits in a ResourceData list is frozen.</summary>
+/// <summary>
+/// A5/R4: a DataRow is immutable after construction, enforced by the compiler in every configuration; draft rows are
+/// replaced by edited copies, never edited in place (the change journal detects edits by row-object identity).
+/// </summary>
 public class RowReplacementTests
 {
     static readonly ResourceKind Kind = ResourceKind.Fleets;
     static readonly string Key = Schemas.All[Kind].Key;
 
-    static DataRow Row(string key, string name = "n")
-    {
-        var row = new DataRow();
-        row.Fields[Key] = key;
-        row.Fields["Name"] = name;
-        row.Fields["_delete"] = "FALSE";
-        return row;
-    }
+    static DataRow Row(string key, string name = "n") =>
+        new DataRow.Builder { [Key] = key, ["Name"] = name, ["_delete"] = "FALSE" }.ToRow();
 
     // A draft equal to its snapshot, like a freshly refreshed resource.
-    static ResourceData Resource(params DataRow[] rows) => new() { Snapshot = rows.Select(r => r.Copy()).ToList(), Draft = [.. rows] };
+    static ResourceData Resource(params DataRow[] rows) => new() { Snapshot = rows.Select(r => r.Dup()).ToList(), Draft = [.. rows] };
 
-    static void ExpectGuard(Action write)
+    [Fact]
+    public void No_public_member_can_modify_a_row_after_construction()
     {
-        var error = Record.Exception(write);
-        if (DataRow.GuardEnabled)
-            Assert.IsType<InvalidOperationException>(error);
-        else
-            Assert.Null(error);
+        foreach (var property in typeof(DataRow).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            var setter = property.SetMethod;
+            if (setter is null)
+                continue;
+            Assert.True(setter.ReturnParameter.GetRequiredCustomModifiers().Contains(typeof(IsExternalInit)), $"{property.Name} must be init-only");
+        }
+        var fields = typeof(DataRow).GetProperty(nameof(DataRow.Fields))!.PropertyType;
+        Assert.Equal(typeof(IReadOnlyDictionary<string, string>), fields);
+        var ignorable = new[] { "Get", "With", "Without", "WithIdentity", "WithRawApiJson", "WithLocalId", "ToBuilder", "FieldEntries", "SameContent", "ToString", "Equals", "GetHashCode", "GetType" };
+        Assert.Empty(typeof(DataRow).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
+            .Where(m => !m.IsSpecialName && !ignorable.Contains(m.Name)).Select(m => m.Name));
+        Assert.Empty(typeof(DataRow).GetFields(BindingFlags.Public | BindingFlags.Instance));
     }
 
     [Fact]
-    public void Guard_is_compiled_only_into_debug_builds()
+    public void The_fields_view_cannot_be_turned_back_into_a_mutable_dictionary()
     {
-#if DEBUG
-        Assert.True(DataRow.GuardEnabled);
-#else
-        Assert.False(DataRow.GuardEnabled);
-#endif
+        var row = Row("1");
+        Assert.False(row.Fields is IDictionary<string, string>);
+        Assert.False(row.Fields is System.Collections.IDictionary);
+        Assert.False(row.Fields is ICollection<KeyValuePair<string, string>>);
+        Assert.Same(row.Fields, row.Fields);
     }
 
     [Fact]
-    public void Rows_placed_in_a_list_reject_property_writes()
+    public void Initialization_copies_the_supplied_dictionary()
     {
-        var data = Resource(Row("1"));
-        var row = data.Draft[0];
+        var source = new Dictionary<string, string> { ["a"] = "1" };
+        var row = new DataRow { Fields = source };
+        source["a"] = "changed";
+        source["b"] = "2";
 
-        Assert.Equal(DataRow.GuardEnabled, row.HasBeenFrozen());
-        ExpectGuard(() => row.Fields = new());
-        ExpectGuard(() => row.Identity = new("1", "c"));
-        ExpectGuard(() => row.RawApiJson = "{}");
-        ExpectGuard(() => row.LocalId = Guid.NewGuid());
+        Assert.Equal("1", row.Get("a"));
+        Assert.Single(row.Fields);
     }
 
     [Fact]
-    public void An_indexer_write_to_a_frozen_row_is_caught_by_the_next_edit()
+    public void With_methods_return_edited_copies_and_leave_the_original_untouched()
     {
-        var data = Resource(Row("1"));
-        var row = data.Draft[0];
-        row.Fields["Name"] = "sneaky";
+        var original = Row("1");
+        var edited = original.With("Name", "x");
+        var several = original.With(new Dictionary<string, string> { ["Name"] = "y", ["Extra"] = "e" });
+        var identified = original.WithIdentity(new("9", "c"));
+        var raw = original.WithRawApiJson("{}");
+        var removed = original.Without("Name");
+        var moved = original.WithLocalId(Guid.NewGuid());
 
-        ExpectGuard(() => data.Edit([row.LocalId], () => { }));
+        Assert.Equal("n", original.Get("Name"));
+        Assert.Null(original.Identity);
+        Assert.Null(original.RawApiJson);
+        Assert.False(original.Fields.ContainsKey("Extra"));
+        Assert.Equal("x", edited.Get("Name"));
+        Assert.Equal("y", several.Get("Name"));
+        Assert.Equal("e", several.Get("Extra"));
+        Assert.Equal("9", identified.Identity!.RemoteId);
+        Assert.Equal("{}", raw.RawApiJson);
+        Assert.False(removed.Fields.ContainsKey("Name"));
+        Assert.NotEqual(original.LocalId, moved.LocalId);
+        foreach (var copy in new[] { edited, several, identified, raw, removed })
+        {
+            Assert.NotSame(original, copy);
+            Assert.Equal(original.LocalId, copy.LocalId);
+        }
+        Assert.Equal(original.Fields.Keys, identified.Fields.Keys);
+        Assert.Equal(original.Fields.Keys, edited.Fields.Keys);
     }
 
     [Fact]
-    public void An_in_place_write_inside_an_edit_is_rejected()
+    public void A_builder_hands_its_fields_to_exactly_one_row()
     {
-        var data = Resource(Row("1"));
-        var row = data.Draft[0];
+        var builder = new DataRow.Builder { Identity = new("1", "c"), RawApiJson = "{}" };
+        builder["a"] = "1";
+        builder.Set("b", "2").Remove("a");
+        var row = builder.ToRow();
 
-        ExpectGuard(() => data.Edit([row.LocalId], () => row.Fields["Name"] = "changed"));
+        Assert.Equal(["b"], row.Fields.Keys);
+        Assert.Equal("1", row.Identity!.RemoteId);
+        Assert.Throws<InvalidOperationException>(() => builder.ToRow());
+        Assert.Throws<InvalidOperationException>(() => builder["c"] = "3");
+        var fromRow = row.ToBuilder();
+        fromRow["b"] = "changed";
+        Assert.Equal("2", row.Get("b"));
+        Assert.Equal(row.LocalId, fromRow.ToRow().LocalId);
     }
 
     [Fact]
-    public void Copies_are_editable_and_replace_the_row_through_the_edit_path()
+    public void Serialization_keeps_property_order_and_deserializes_into_immutable_rows()
+    {
+        var row = new DataRow.Builder(Guid.Parse("11111111-1111-1111-1111-111111111111")) { Identity = new("7", "c", "f"), RawApiJson = "{\"x\":1}" }
+            .Set("z", "1").Set("a", "").ToRow();
+
+        var json = JsonSerializer.Serialize(row);
+
+        Assert.Equal("{\"LocalId\":\"11111111-1111-1111-1111-111111111111\",\"Identity\":{\"RemoteId\":\"7\",\"ConnectionId\":\"c\",\"ParentFleetId\":\"f\"},\"RawApiJson\":\"{\\u0022x\\u0022:1}\",\"Fields\":{\"z\":\"1\",\"a\":\"\"}}", json);
+        var back = JsonSerializer.Deserialize<DataRow>(json)!;
+        Assert.True(DataRow.SameContent(row, back));
+        Assert.Equal(["z", "a"], back.Fields.Keys);
+        Assert.Equal(json, JsonSerializer.Serialize(back));
+    }
+
+    [Fact]
+    public void Copies_replace_the_row_through_the_edit_path()
     {
         var data = Resource(Row("1"));
         var original = data.Draft[0];
-        var copy = original.Copy();
-        Assert.False(copy.HasBeenFrozen());
-        copy.Fields["Name"] = "changed";
+        var copy = original.With("Name", "changed");
 
         data.Edit([original.LocalId], () => data.ReplaceDraftRows([copy]));
 
         Assert.Same(copy, data.Draft[0]);
         Assert.Equal("n", original.Get("Name"));
         Assert.Equal("changed", data.Draft[0].Get("Name"));
-        Assert.Equal(DataRow.GuardEnabled, copy.HasBeenFrozen());
         Assert.Single(data.Undo);
         data.UndoEdit();
         Assert.Equal("n", data.Draft[0].Get("Name"));
@@ -95,35 +144,14 @@ public class RowReplacementTests
     }
 
     [Fact]
-    public void Rows_added_inside_an_edit_are_frozen_afterwards()
-    {
-        var data = Resource();
-        var added = Row("2");
-
-        data.Edit([added.LocalId], () => data.Draft.Add(added), structural: true);
-
-        Assert.Equal(DataRow.GuardEnabled, added.HasBeenFrozen());
-    }
-
-    [Fact]
-    public void Shallow_copies_keep_frozen_rows_and_verify_them()
+    public void Shallow_copies_share_the_immutable_rows()
     {
         var data = Resource(Row("1"));
         var copy = data.ShallowCopy();
+
         Assert.Same(data.Draft[0], copy.Draft[0]);
-
-        data.Draft[0].Fields["Name"] = "sneaky";
-        ExpectGuard(() => data.ShallowCopy());
-    }
-
-    [Fact]
-    public void The_frozen_state_is_not_serialized()
-    {
-        var plain = Row("1");
-        var frozen = Resource(plain.Copy()).Draft[0];
-
-        Assert.Equal(JsonSerializer.Serialize(plain.Copy()), JsonSerializer.Serialize(frozen));
-        Assert.DoesNotContain("rozen", JsonSerializer.Serialize(frozen), StringComparison.OrdinalIgnoreCase);
+        copy.Draft[0] = copy.Draft[0].With("Name", "other");
+        Assert.Equal("n", data.Draft[0].Get("Name"));
     }
 
     [Fact]
@@ -131,8 +159,7 @@ public class RowReplacementTests
     {
         var data = Resource(Row("1", "old"), Row("2", "keep"));
         var before = data.Draft.ToArray();
-        var incoming = Row("1", "new");
-        incoming.Fields["Extra"] = "x";
+        var incoming = Row("1", "new").With("Extra", "x");
         var added = Row("3");
 
         CsvAdapter.Import(Kind, data, [incoming, added], baseline: false);

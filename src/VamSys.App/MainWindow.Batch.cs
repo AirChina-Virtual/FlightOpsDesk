@@ -119,7 +119,7 @@ public sealed partial class MainWindow
         var selection = BatchSelection.Capture(SelectedRows(), restore: true);
         if (selection.Eligible.Count == 0)
         { Status(() => L("BatchNothing")); return; }
-        var changes = selection.Eligible.Select(r => { var copy = r.Copy(); copy.Fields["_delete"] = "FALSE"; return copy; }).ToArray();
+        var changes = selection.Eligible.Select(r => r.With("_delete", "FALSE")).ToArray();
         if (!await Confirm(L("Text_A6926595CE"), BatchPreview(selection, "_delete", changes), L("Confirm")))
             return;
         deletions.Restore(Data, changes.Select(r => r.LocalId));

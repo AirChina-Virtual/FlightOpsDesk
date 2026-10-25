@@ -36,8 +36,8 @@ static class JournalBenchmark
         var data = w.Resources[ResourceKind.Routes];
         for (var n = 0; n < Rows; n++)
         {
-            var row = new DataRow { Identity = new((n + 1).ToString(), "7"), Fields = new() { ["ID"] = (n + 1).ToString(), ["Flight Number"] = "AC" + n, ["Callsign"] = "ACA" + n, ["Remarks"] = "benchmark", ["Tags"] = "" } };
-            data.Snapshot.Add(row.Copy());
+            var row = new DataRow { Identity = new((n + 1).ToString(), "7"), Fields = new Dictionary<string, string> { ["ID"] = (n + 1).ToString(), ["Flight Number"] = "AC" + n, ["Callsign"] = "ACA" + n, ["Remarks"] = "benchmark", ["Tags"] = "" } };
+            data.Snapshot.Add(row.Dup());
             data.Draft.Add(row);
         }
         data.Columns = [.. data.Draft[0].Fields.Keys];
@@ -72,7 +72,7 @@ static class JournalBenchmark
         var dir = StorageScenarios.Temp();
         var store = new WorkspaceStore(dir);
         var w = new Workspace { Name = "Jobs", AirlineId = "7", Mode = RunMode.Online };
-        ChangeItem Item(int n) => new() { Kind = ChangeKind.Update, State = ItemState.Succeeded, RemoteId = n.ToString(), Message = "done " + n, After = new DataRow { Fields = new() { ["ID"] = n.ToString(), ["Name"] = "n" + n } } };
+        ChangeItem Item(int n) => new() { Kind = ChangeKind.Update, State = ItemState.Succeeded, RemoteId = n.ToString(), Message = "done " + n, After = new DataRow { Fields = new Dictionary<string, string> { ["ID"] = n.ToString(), ["Name"] = "n" + n } } };
         for (var j = 0; j < 1000; j++)
             w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [.. Enumerable.Range(0, 20).Select(Item)] });
         w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [.. Enumerable.Range(0, 20000).Select(Item)] });
@@ -109,8 +109,7 @@ static class JournalBenchmark
                 var saver = Saver.For(mode, store, w);
                 var data = w.Resources[ResourceKind.Routes];
                 // Warm up the code paths once (JIT, statement cache) with a tiny save so the case measures the save itself.
-                var warm = data.Draft[Rows - 1].Copy();
-                warm.Fields["Remarks"] = "warm";
+                var warm=data.Draft[Rows - 1].With("Remarks","warm");
                 data.Edit([warm.LocalId], () => data.ReplaceDraftRows([warm]));
                 await saver.Rows();
                 if (counting)
@@ -121,14 +120,14 @@ static class JournalBenchmark
                 {
                     case "batch edit 200 rows":
                     {
-                        var copies = data.Draft.Skip(1000).Take(200).Select(r => { var c = r.Copy(); c.Fields["Remarks"] = "batch edited"; return c; }).ToArray();
+                        var copies = data.Draft.Skip(1000).Take(200).Select(r => { var c=r.With("Remarks","batch edited"); return c; }).ToArray();
                         data.Edit(copies.Select(r => r.LocalId), () => data.ReplaceDraftRows(copies));
                         result = await Measure(name, dir, w, 1, saver.Rows, counting);
                         break;
                     }
                     case "add one row":
                     {
-                        var row = new DataRow { Fields = new() { ["ID"] = "", ["Flight Number"] = "NEW", ["Callsign"] = "", ["Remarks"] = "", ["Tags"] = "" } };
+                        var row = new DataRow { Fields = new Dictionary<string, string> { ["ID"] = "", ["Flight Number"] = "NEW", ["Callsign"] = "", ["Remarks"] = "", ["Tags"] = "" } };
                         data.Edit([row.LocalId], () => data.Draft.Add(row), structural: true);
                         data.Columns = data.Columns.Concat(row.Fields.Keys).Distinct().ToList();
                         result = await Measure(name, dir, w, 1, saver.Rows, counting);
@@ -141,8 +140,7 @@ static class JournalBenchmark
                             foreach (var conflict in data.Conflicts.ToArray())
                             {
                                 var row = data.FindDraftRow(conflict.RowId)!;
-                                var replacement = row.Copy();
-                                replacement.Fields[conflict.Field] = conflict.Remote ?? "";
+                                var replacement=row.With(conflict.Field,conflict.Remote ?? "");
                                 data.Edit([row.LocalId], () => data.ReplaceDraftRows([replacement]), newStep: false);
                                 data.Conflicts.Remove(conflict);
                                 // Before the journal the dialog saved after every conflict; now it saves when it ends.
@@ -163,7 +161,7 @@ static class JournalBenchmark
                     }
                     case "job submit save":
                     {
-                        w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [.. Enumerable.Range(0, 200).Select(n => new ChangeItem { After = data.Draft[n].Copy(), Message = "item " + n })] });
+                        w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [.. Enumerable.Range(0, 200).Select(n => new ChangeItem { After = data.Draft[n].Dup(), Message = "item " + n })] });
                         result = await Measure(name, dir, w, 1, saver.Jobs, counting);
                         break;
                     }

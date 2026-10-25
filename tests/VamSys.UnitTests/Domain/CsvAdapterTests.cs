@@ -240,7 +240,6 @@ public class CsvAdapterTests
         CsvAdapter.Import(Airports, data, rows, true);
 
         Assert.Equal(Snapshot(data.Snapshot), Snapshot(data.Draft));
-        Assert.NotSame(data.Snapshot[0], data.Draft[0]);
         Assert.Empty(data.Undo);
         Assert.Empty(data.Redo);
         Assert.NotNull(data.SnapshotAt);
@@ -327,9 +326,9 @@ public class CsvAdapterTests
     [Fact]
     public void Patch_import_matches_an_airport_by_its_api_alias_but_keeps_the_identified_code()
     {
-        var baseline = Row(("ICAO/IATA", "EGLL"), ("Name", "Hub"));
-        baseline.Identity = new("101", "7");
-        baseline.RawApiJson = """{"icao":"EGLL","iata":"LHR"}""";
+        var baseline = Row(("ICAO/IATA", "EGLL"), ("Name", "Hub"))
+            .WithIdentity(new("101", "7"))
+            .WithRawApiJson("""{"icao":"EGLL","iata":"LHR"}""");
         var data = Baseline(Airports, baseline);
 
         CsvAdapter.Import(Airports, data, [Row(("ICAO/IATA", "LHR"), ("Name", "Heathrow"))], false);

@@ -28,7 +28,7 @@ public sealed record RowImage(Guid LocalId, ResourceIdentity? Identity, string? 
             || image.FieldOrder.Length != row.Fields.Count)
             return false;
         var orderIndex = 0;
-        foreach (var field in row.Fields)
+        foreach (var field in row.FieldEntries())
             if (field.Key != image.FieldOrder[orderIndex++])
                 return false;
         foreach (var field in image.Fields)
@@ -206,13 +206,10 @@ public sealed partial class ResourceData
     {
         var keys = ids.Distinct().ToArray();
         var before = keys.ToDictionary(id => id, id => FindDraftRow(id) is { } row ? RowImage.Capture(row) : null);
-        FreezeAll(keys.Select(FindDraftRow).OfType<DataRow>());
         ImmutableArray<Guid>? order = structural ? [.. Draft.Select(r => r.LocalId)] : null;
         try
         { mutate(); }
         finally { if (structural || replaceRows) InvalidateDraftIndex(); }
-        // Debug builds: rows still in the draft must be unchanged since they were frozen; added rows become frozen.
-        FreezeAll(keys.Select(FindDraftRow).OfType<DataRow>());
         var changes = keys.Select(id => new RowEdit(id, before[id], FindDraftRow(id) is { } row ? RowImage.Capture(row) : null)).Where(r => !RowImage.Same(r.Before, r.After)).ToArray();
         ImmutableArray<Guid>? nextOrder = structural ? [.. Draft.Select(r => r.LocalId)] : null;
         if (newStep)

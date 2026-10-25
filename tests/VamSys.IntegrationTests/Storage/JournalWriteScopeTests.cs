@@ -20,9 +20,9 @@ public class JournalWriteScopeTests : IDisposable
         store = new WorkspaceStore(dir.Path);
         for (var n = 0; n < 300; n++)
         {
-            var row = new DataRow { Identity = new((n + 1).ToString(), "7"), Fields = new() { ["ID"] = (n + 1).ToString(), ["Callsign"] = "ACA" + n, ["Remarks"] = "" } };
+            var row = new DataRow { Identity = new((n + 1).ToString(), "7"), Fields = new Dictionary<string, string> { ["ID"] = (n + 1).ToString(), ["Callsign"] = "ACA" + n, ["Remarks"] = "" } };
             Routes.Draft.Add(row);
-            Routes.Snapshot.Add(row.Copy());
+            Routes.Snapshot.Add(row.Dup());
         }
         Routes.Columns = ["ID", "Callsign", "Remarks"];
         w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [new ChangeItem { State = ItemState.Succeeded }] });
@@ -37,7 +37,7 @@ public class JournalWriteScopeTests : IDisposable
 
     void EditRows(int count, string value = "batch", int skip = 10)
     {
-        var copies = Routes.Draft.Skip(skip).Take(count).Select(r => { var c = r.Copy(); c.Fields["Remarks"] = value; return c; }).ToArray();
+        var copies = Routes.Draft.Skip(skip).Take(count).Select(r => r.With("Remarks", value)).ToArray();
         Routes.Edit(copies.Select(r => r.LocalId), () => Routes.ReplaceDraftRows(copies));
     }
 
@@ -62,7 +62,7 @@ public class JournalWriteScopeTests : IDisposable
     [Fact]
     public async Task Adding_one_row_inserts_one_row_and_updates_the_column_list()
     {
-        var row = new DataRow { Fields = new() { ["ID"] = "", ["Callsign"] = "NEW", ["Remarks"] = "", ["Extra"] = "x" } };
+        var row = new DataRow { Fields = new Dictionary<string, string> { ["ID"] = "", ["Callsign"] = "NEW", ["Remarks"] = "", ["Extra"] = "x" } };
         Routes.Edit([row.LocalId], () => Routes.Draft.Add(row), structural: true);
         Routes.Columns = Routes.Columns.Concat(row.Fields.Keys).Distinct().ToList();
         await store.SaveChangesAsync(w);
@@ -202,8 +202,7 @@ public class JournalWriteScopeTests : IDisposable
         foreach (var conflict in Routes.Conflicts.ToArray())
         {
             var row = Routes.FindDraftRow(conflict.RowId)!;
-            var copy = row.Copy();
-            copy.Fields["Callsign"] = conflict.Remote!;
+            var copy = row.With("Callsign", conflict.Remote!);
             Routes.Edit([row.LocalId], () => Routes.ReplaceDraftRows([copy]), newStep: false);
             Routes.Conflicts.Remove(conflict);
         }
@@ -246,8 +245,7 @@ public class JournalWriteScopeTests : IDisposable
     {
         var loaded = store.Load(w.Id);
         Assert.True(loaded.Journal().IsTracking(loaded.StorageRevision));
-        var copy = loaded.Resources[ResourceKind.Routes].Draft[3].Copy();
-        copy.Fields["Remarks"] = "loaded";
+        var copy = loaded.Resources[ResourceKind.Routes].Draft[3].With("Remarks", "loaded");
         loaded.Resources[ResourceKind.Routes].ReplaceDraftRows([copy]);
         await store.SaveChangesAsync(loaded);
         Assert.Equal("Journal", store.LastSave!.Kind);
@@ -257,8 +255,7 @@ public class JournalWriteScopeTests : IDisposable
         var other = store.Load(w.Id);
         await store.SaveAsync(other);
         Assert.False(loaded.Journal().IsTracking(other.StorageRevision));
-        var again = loaded.Resources[ResourceKind.Routes].Draft[4].Copy();
-        again.Fields["Remarks"] = "stale";
+        var again = loaded.Resources[ResourceKind.Routes].Draft[4].With("Remarks", "stale");
         loaded.Resources[ResourceKind.Routes].ReplaceDraftRows([again]);
         var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => store.SaveChangesAsync(loaded));
         Assert.Equal("StorageStale", MessageErrors.Describe(error).Code);
@@ -285,8 +282,7 @@ public class JournalWriteScopeTests : IDisposable
     {
         var job = w.Jobs[0];
         var item = job.Items[0];
-        var updated = Routes.Draft[0].Copy();
-        updated.Fields["Callsign"] = "REBASED";
+        var updated = Routes.Draft[0].With("Callsign", "REBASED");
         item.Resource = ResourceKind.Routes;
         item.After = updated;
         var delta = new ResourceRebaseDelta(ResourceKind.Routes, updated.LocalId, new(RowMutationKind.Upsert, updated), new(RowMutationKind.Upsert, updated), DateTimeOffset.UnixEpoch, false, null);
@@ -320,7 +316,7 @@ public class JournalWriteScopeTests : IDisposable
         var loaded = store.Load(w.Id);
         var data = loaded.Resources[ResourceKind.Routes];
         Assert.Equal(299, data.Snapshot.Count);
-        data.Snapshot.Add(new DataRow { Fields = new() { ["ID"] = "9999" } });
+        data.Snapshot.Add(new DataRow { Fields = new Dictionary<string, string> { ["ID"] = "9999" } });
         await store.SaveChangesAsync(loaded);
         Assert.Equal("Journal", store.LastSave!.Kind);
         Assert.Equal(store.Load(w.Id).Serialize(), loaded.Serialize());
@@ -379,13 +375,11 @@ public class JournalWriteScopeTests : IDisposable
     {
         var first = store.Load(w.Id);
         var second = store.Load(w.Id);
-        var copy = first.Resources[ResourceKind.Routes].Draft[0].Copy();
-        copy.Fields["Remarks"] = "first";
+        var copy = first.Resources[ResourceKind.Routes].Draft[0].With("Remarks", "first");
         first.Resources[ResourceKind.Routes].ReplaceDraftRows([copy]);
         await store.SaveChangesAsync(first);
 
-        var other = second.Resources[ResourceKind.Routes].Draft[1].Copy();
-        other.Fields["Remarks"] = "second";
+        var other = second.Resources[ResourceKind.Routes].Draft[1].With("Remarks", "second");
         second.Resources[ResourceKind.Routes].ReplaceDraftRows([other]);
         var before = StoredState.Dump(dir.Path, withRevision: true);
         var error = await Assert.ThrowsAnyAsync<InvalidOperationException>(() => store.SaveChangesAsync(second));
@@ -421,7 +415,7 @@ public class JournalWriteScopeTests : IDisposable
     {
         Routes.Conflicts.Add(new(Routes.Draft[0].LocalId, "Callsign", "a", "b", "c"));
         EditRows(3);
-        w.Resources[ResourceKind.Fleets].Draft.Add(new DataRow { Fields = new() { ["ID"] = "1" } });
+        w.Resources[ResourceKind.Fleets].Draft.Add(new DataRow { Fields = new Dictionary<string, string> { ["ID"] = "1" } });
         w.Jobs.Add(new BatchJob { Items = [new ChangeItem(), new ChangeItem()] });
         await store.SaveChangesAsync(w);
         var loaded = store.Load(w.Id);

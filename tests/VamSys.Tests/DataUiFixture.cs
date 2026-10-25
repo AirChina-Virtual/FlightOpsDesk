@@ -20,12 +20,12 @@ static class DataUiFixture
         var rows=new List<DataRow>(count);
         for(var n=0;n<count;n++)
         {
-            var row=new DataRow(); foreach(var field in Schemas.All[ResourceKind.Routes].Columns)row.Fields[field]="";
-            foreach(var (field,value) in new (string,string)[]{("ID",n.ToString()),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Type","jumpseat"),("Callsign","QA"+n.ToString("D5")),("Flight Number",n.ToString("D5")),("Fleet IDs","1"),("Start Date","2026-10-01 00:00:00"),("End Date","2027-10-01 00:00:00"),("Departure Time (HH:MM)","10:00"),("Arrival Time (HH:MM)","12:00"),("Remarks","row "+n),("Tags","performance"),("Is Hidden","FALSE"),("Altitude","33000"),("Cost Index","AUTO"),("_delete","FALSE")})row.Fields[field]=value;
-            rows.Add(row);
+            var row=new DataRow.Builder(); foreach(var field in Schemas.All[ResourceKind.Routes].Columns)row[field]="";
+            foreach(var (field,value) in new (string,string)[]{("ID",n.ToString()),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Type","jumpseat"),("Callsign","QA"+n.ToString("D5")),("Flight Number",n.ToString("D5")),("Fleet IDs","1"),("Start Date","2026-10-01 00:00:00"),("End Date","2027-10-01 00:00:00"),("Departure Time (HH:MM)","10:00"),("Arrival Time (HH:MM)","12:00"),("Remarks","row "+n),("Tags","performance"),("Is Hidden","FALSE"),("Altitude","33000"),("Cost Index","AUTO"),("_delete","FALSE")})row[field]=value;
+            rows.Add(row.ToRow());
         }
         var data=workspace.Resources[ResourceKind.Routes]; CsvAdapter.Import(ResourceKind.Routes,data,rows,true);
-        for(var n=0;n<20;n++){var row=data.Draft[n];data.Edit([row.LocalId],()=>row.Fields["Internal Remarks"]="changed "+n);}
+        for(var n=0;n<20;n++){var row=data.Draft[n];data.Edit([row.LocalId],()=>data.ReplaceDraftRows([row.With("Internal Remarks","changed "+n)]));}
         var store=new WorkspaceStore(directory);store.Save(workspace);store.SaveLanguage("en-US");
         Console.WriteLine($"Seeded {count} routes with all fields and 20 history steps");
     }

@@ -15,16 +15,14 @@ public class SnapshotMergerTests
 
     static DataRow Remote(string id, params (string Field, string Value)[] fields)
     {
-        var row = Row([("ID", id), .. fields]);
-        row.Identity = new(id, "7");
-        return row;
+        return Row([("ID", id), .. fields]).WithIdentity(new(id, "7"));
     }
 
     // A refreshed fleet whose draft may differ from its snapshot: original / mine as given, then the remote brings theirs.
     static (ResourceData Data, DataRow Local) Existing(string original, string mine)
     {
         var baseline = Remote("1", ("Name", original));
-        var data = new ResourceData { Snapshot = [baseline.Copy()], Draft = [baseline.With("Name", mine)] };
+        var data = new ResourceData { Snapshot = [baseline.Dup()], Draft = [baseline.With("Name", mine)] };
         return (data, data.Draft[0]);
     }
 
@@ -59,7 +57,7 @@ public class SnapshotMergerTests
     public void Each_field_is_decided_on_its_own()
     {
         var baseline = Remote("1", ("Name", "n"), ("Remarks", "r"), ("Type Code", "t"));
-        var data = new ResourceData { Snapshot = [baseline.Copy()], Draft = [baseline.With("Name", "mine")] };
+        var data = new ResourceData { Snapshot = [baseline.Dup()], Draft = [baseline.With("Name", "mine")] };
 
         SnapshotMerger.Merge(Fleets, data, [Remote("1", ("Name", "n"), ("Remarks", "theirs"), ("Type Code", "t"))]);
 
@@ -73,7 +71,7 @@ public class SnapshotMergerTests
     public void Columns_that_exist_only_in_the_draft_are_kept()
     {
         var baseline = Remote("1", ("Name", "n"), ("CSV only", "x"));
-        var data = new ResourceData { Snapshot = [baseline.Copy()], Draft = [baseline.Copy()] };
+        var data = new ResourceData { Snapshot = [baseline.Dup()], Draft = [baseline.Dup()] };
 
         SnapshotMerger.Merge(Fleets, data, [Remote("1", ("Name", "n"))]);
 
@@ -121,7 +119,7 @@ public class SnapshotMergerTests
     public void A_row_deleted_remotely_and_marked_for_deletion_locally_just_disappears()
     {
         var baseline = Remote("1", ("Name", "n"));
-        var data = new ResourceData { Snapshot = [baseline.Copy()], Draft = [baseline.With("_delete", "TRUE")] };
+        var data = new ResourceData { Snapshot = [baseline.Dup()], Draft = [baseline.With("_delete", "TRUE")] };
 
         SnapshotMerger.Merge(Fleets, data, []);
 
@@ -135,7 +133,7 @@ public class SnapshotMergerTests
     public void A_local_deletion_conflicts_only_when_the_remote_row_changed_meanwhile(string remoteName, bool conflict)
     {
         var baseline = Remote("1", ("Name", "n"));
-        var data = new ResourceData { Snapshot = [baseline.Copy()], Draft = [baseline.With("_delete", "TRUE")] };
+        var data = new ResourceData { Snapshot = [baseline.Dup()], Draft = [baseline.With("_delete", "TRUE")] };
 
         SnapshotMerger.Merge(Fleets, data, [Remote("1", ("Name", remoteName))]);
 
@@ -197,9 +195,8 @@ public class SnapshotMergerTests
     public void Rows_are_matched_by_remote_id_even_when_the_key_column_differs()
     {
         var baseline = Remote("1", ("Name", "n"));
-        var data = new ResourceData { Snapshot = [baseline.Copy()], Draft = [baseline.Copy()] };
-        var renumbered = Remote("1", ("Name", "n"));
-        renumbered.Fields["ID"] = "000";
+        var data = new ResourceData { Snapshot = [baseline.Dup()], Draft = [baseline.Dup()] };
+        var renumbered = Remote("1", ("Name", "n")).With("ID", "000");
 
         SnapshotMerger.Merge(Fleets, data, [renumbered]);
 
@@ -211,10 +208,9 @@ public class SnapshotMergerTests
 
     static DataRow RemoteAirport(string id, string icao, string iata, string name = "Hub")
     {
-        var row = Row(("ICAO/IATA", icao), ("Name", name));
-        row.Identity = new(id, "7");
-        row.RawApiJson = $$"""{"id":{{id}},"icao":"{{icao}}","iata":"{{iata}}","name":"{{name}}"}""";
-        return row;
+        return Row(("ICAO/IATA", icao), ("Name", name))
+            .WithIdentity(new(id, "7"))
+            .WithRawApiJson($$"""{"id":{{id}},"icao":"{{icao}}","iata":"{{iata}}","name":"{{name}}"}""");
     }
 
     [Fact]

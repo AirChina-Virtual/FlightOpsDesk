@@ -37,9 +37,7 @@ public sealed class BatchExecutor(IResourceReader reader, IResourceWriter writer
                     if (string.IsNullOrEmpty(key))
                     { item.State = ItemState.Unknown; item.SetMessage(Messages.Define("Text_3BFE500D9C")); await persist(); continue; }
                     var found = await reader.FindAsync(item.Resource, key, ct);
-                    var recoveryExpected = item.After.Copy();
-                    if (item.RemoteId != null)
-                        recoveryExpected.Fields[Schemas.All[item.Resource].Key] = item.RemoteId;
+                    var recoveryExpected = item.RemoteId != null ? item.After.With(Schemas.All[item.Resource].Key, item.RemoteId) : item.After;
                     if (item.Kind == ChangeKind.Delete ? found is null : found != null && EqualFields(found, recoveryExpected))
                     { item.State = ItemState.Succeeded; item.SetMessage(Messages.Define("Text_A65DECDE8F")); }
                     else
@@ -65,8 +63,9 @@ public sealed class BatchExecutor(IResourceReader reader, IResourceWriter writer
                         var dependency = job.Items.FirstOrDefault(i => LocalReference.TryParse(token, out var localId) && i.After.LocalId == localId);
                         return dependency?.State == ItemState.Succeeded && dependency.RemoteId != null ? dependency.RemoteId : throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_4B53041E43")), Messages.Define("Text_4B53041E43"));
                     });
-                    item.After.Fields[f] = string.Join(',', resolved);
-                    item.Fields[f] = new(FieldIntent.Set, item.After.Fields[f]);
+                    var joined = string.Join(',', resolved);
+                    item.After = item.After.With(f, joined);
+                    item.Fields[f] = new(FieldIntent.Set, joined);
                 }
                 item.State = ItemState.Running;
                 item.SetMessage(Messages.Define("Text_DCC1A22D9E"));
@@ -75,9 +74,7 @@ public sealed class BatchExecutor(IResourceReader reader, IResourceWriter writer
                 await persist(); // Persist returned identity before read-back.
                 key = item.RemoteId ?? key;
                 var verified = await reader.FindAsync(item.Resource, key, ct);
-                var expected = item.After.Copy();
-                if (item.RemoteId != null)
-                    expected.Fields[Schemas.All[item.Resource].Key] = item.RemoteId;
+                var expected = item.RemoteId != null ? item.After.With(Schemas.All[item.Resource].Key, item.RemoteId) : item.After;
                 if (item.Kind == ChangeKind.Delete ? verified is null : verified != null && EqualFields(verified, expected))
                 { item.State = ItemState.Succeeded; item.SetMessage(Messages.Define("Text_631F4DBEC2")); }
                 else

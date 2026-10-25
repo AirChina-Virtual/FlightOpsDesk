@@ -85,7 +85,7 @@ static class PerformanceScenarios
             {
                 var clock=new TestTime();var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=Api(w,h,clock);Parse(a,ResourceKind.Airports,Airport);
                 var remote=new Dictionary<int,string>{[50]="OLD"};h.Next=Server(remote,()=>{});
-                var before=Parse(a,kind,Remote(50,"OLD"));var after=before.Copy();after.Fields[text]="MID";
+                var before=Parse(a,kind,Remote(50,"OLD"));var after=before.With(text,"MID");
                 var update=new ChangeItem{Resource=kind,Kind=ChangeKind.Update,Before=before,After=after,Fields=new(){[text]=new(FieldIntent.Set,"MID")}};
                 var items=new List<ChangeItem>{New("FIRST"),update,New("OLD"),New("MID")};
                 await clock.Drive(new OperationsBatchExecutor(a,w).ExecuteAsync(new(){Items=items},()=>Task.CompletedTask,default));
@@ -111,7 +111,7 @@ static class PerformanceScenarios
                     var target=oracle.Keys.Where(k=>k<1000&&!updated.Contains(k)).ToList();
                     if(random.Next(5)==0&&target.Count>0)
                     {
-                        var id=target[random.Next(target.Count)];updated.Add(id);var before=Parse(a,ResourceKind.Routes,Json(id,oracle[id]));var after=before.Copy();var flight=Flight();after.Fields["Flight Number"]=flight;
+                        var id=target[random.Next(target.Count)];updated.Add(id);var before=Parse(a,ResourceKind.Routes,Json(id,oracle[id]));var flight=Flight();var after=before.With("Flight Number",flight);
                         items.Add(new(){Resource=ResourceKind.Routes,Kind=ChangeKind.Update,Before=before,After=after,Fields=new(){["Flight Number"]=new(FieldIntent.Set,flight)}});
                         oracle[id]=(oracle[id].Dep,oracle[id].Arr,flight);expected.Add(true);continue;
                     }
@@ -192,7 +192,7 @@ static class PerformanceScenarios
             foreach(var mode in new[]{"departure","arrival","second-page","self","empty","failure"})
             {
                 var clock=new TestTime();var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=Api(w,h,clock);var airport=Parse(a,ResourceKind.Airports,Airport);
-                var item=new ChangeItem{Resource=ResourceKind.Airports,Kind=ChangeKind.Delete,Before=airport,After=airport.Copy()};
+                var item=new ChangeItem{Resource=ResourceKind.Airports,Kind=ChangeKind.Delete,Before=airport,After=airport.Dup()};
                 var raw=RouteJson(ResourceKind.Routes);
                 h.Next=(r,ct)=>
                 {
@@ -216,7 +216,7 @@ static class PerformanceScenarios
             var clock=new TestTime();var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=Api(w,h,clock);var fleet=Parse(a,ResourceKind.Fleets,Fleet);
             h.Next=(r,ct)=>
             {if(r.RequestUri!.AbsolutePath.EndsWith("fleet/4/aircraft"))return Json(Page(""));Check(Query(r)=="?filter[fleet_id]=4");return Json(Page(RouteJson(ResourceKind.Routes)));};
-            var task=a.HasDeletionDependenciesAsync(new(){Resource=ResourceKind.Fleets,Kind=ChangeKind.Delete,Before=fleet,After=fleet.Copy()},default);await clock.Drive(task);Check(task.Result&&h.Methods.Count==2);
+            var task=a.HasDeletionDependenciesAsync(new(){Resource=ResourceKind.Fleets,Kind=ChangeKind.Delete,Before=fleet,After=fleet.Dup()},default);await clock.Drive(task);Check(task.Result&&h.Methods.Count==2);
         });
         await test("Airport lookups stay exact across snapshot and cache changes while planning 1,000 routes over 3,000 airports",async()=>
         {
@@ -247,7 +247,7 @@ static class PerformanceScenarios
             foreach(var fail in new[]{true,false})
             {
                 var clock=new TestTime();var w=new Workspace{AirlineId="7"};var h=new AuditHttp();var a=Api(w,h,clock);
-                var fleets=w.Resources[ResourceKind.Fleets];var local=new DataRow{Fields=new(){["Name"]="Local"}};
+                var fleets=w.Resources[ResourceKind.Fleets];var local=new DataRow{Fields = new Dictionary<string, string> {["Name"]="Local"}};
                 fleets.Draft.Add(local);fleets.Edit([],()=>{});var draft=fleets.Draft;var undo=fleets.Undo.Count;
                 var fleetLists=0;var aircraftLists=new List<string>();
                 h.Next=(r,ct)=>
@@ -269,8 +269,8 @@ static class PerformanceScenarios
             var data=new ResourceData();var incoming=new List<DataRow>();
             for(var i=0;i<20000;i++)
             {
-                var id=(1+i).ToString();var remote=new DataRow{Identity=new(id,"7"),Fields=new(){["ID"]=id,["Name"]="R"+i}};
-                var baseline=remote.Copy();data.Snapshot.Add(baseline);data.Draft.Add(baseline.Copy());incoming.Add(remote.Copy());
+                var id=(1+i).ToString();var remote=new DataRow{Identity=new(id,"7"),Fields = new Dictionary<string, string> {["ID"]=id,["Name"]="R"+i}};
+                var baseline=remote.Dup();data.Snapshot.Add(baseline);data.Draft.Add(baseline.Dup());incoming.Add(remote.Dup());
             }
             foreach(var row in data.Draft.Take(5000))data.Conflicts.Add(new(row.LocalId,"Name","a","b","c"));
             data.Conflicts.Add(data.Conflicts[0]);data.Conflicts.Add(new(Guid.NewGuid(),"Name","a","b","c"));
@@ -343,8 +343,8 @@ static class PerformanceScenarios
         foreach(var undo in new[]{0,3})
         {
             var w=new Workspace{Name="Synthetic performance workspace",AirlineId="7"};var data=w.Resources[ResourceKind.Routes];
-            data.Snapshot=Enumerable.Range(1,20000).Select(i=>new DataRow{Identity=new(i.ToString(),"7"),RawApiJson=RouteJson(ResourceKind.Routes,"AC123"),Fields=new(){["ID"]=i.ToString(),["Departure Airport (ICAO/IATA)"]="EGLL",["Arrival Airport (ICAO/IATA)"]="EGLL",["Flight Number"]="AC123",["Remarks"]=new string('x',100)}}).ToList();
-            data.Draft=data.Snapshot.Select(r=>r.Copy()).ToList();for(var n=0;n<undo;n++){var row=data.Draft[n];data.Edit([row.LocalId],()=>row.Fields["Remarks"]="history "+n);}
+            data.Snapshot=Enumerable.Range(1,20000).Select(i=>new DataRow{Identity=new(i.ToString(),"7"),RawApiJson=RouteJson(ResourceKind.Routes,"AC123"),Fields = new Dictionary<string, string> {["ID"]=i.ToString(),["Departure Airport (ICAO/IATA)"]="EGLL",["Arrival Airport (ICAO/IATA)"]="EGLL",["Flight Number"]="AC123",["Remarks"]=new string('x',100)}}).ToList();
+            data.Draft=data.Snapshot.Select(r=>r.Dup()).ToList();for(var n=0;n<undo;n++){var row=data.Draft[n];data.Edit([row.LocalId],()=>data.ReplaceDraftRows([row.With("Remarks","history "+n)]));}
             var store=new WorkspaceStore(Path.Combine(directory,"storage-"+undo));using var run=PerformanceRun.Begin(w.Id,Guid.NewGuid());store.Save(w);run.Finish("Completed");run.TryWrite(directory);
             saves.Add(new{UndoSnapshots=undo,Rows=20000,run.SaveAttempts,run.SaveSuccesses,run.SaveFailures,run.JsonBytes,run.SerializationMs,run.SqliteMs});
         }

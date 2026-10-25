@@ -146,7 +146,7 @@ public class DeletionServiceTests
         var w = FleetWorkspace(out var fleet);
         var token = reference == "local" ? LocalReference.Format(fleet.LocalId) : reference;
         if (reference == "unresolved:1")
-            w.Resources[ResourceKind.Fleets].Draft = [w.Resources[ResourceKind.Fleets].Draft[0].Copy().WithIdentity("1")];
+            w.Resources[ResourceKind.Fleets].Draft = [w.Resources[ResourceKind.Fleets].Draft[0].WithIdentity("1")];
         w.Resources[ResourceKind.Aircraft].Draft = [Row(("ID", "2"), ("Fleet ID", token))];
 
         var issues = Service.Preview(w, ResourceKind.Fleets, [w.Resources[ResourceKind.Fleets].Draft[0].LocalId]).Issues;
@@ -190,9 +190,9 @@ public class DeletionServiceTests
     public void An_airport_is_in_use_under_its_codes_its_remote_id_and_its_api_aliases(string reference)
     {
         var w = new Workspace();
-        var airport = Row(("ICAO/IATA", "EGLL"), ("Name", "Heathrow"));
-        airport.Identity = new("101", "7");
-        airport.RawApiJson = """{"id":101,"icao":"EGLL","iata":"LHR"}""";
+        var airport = Row(("ICAO/IATA", "EGLL"), ("Name", "Heathrow"))
+            .WithIdentity(new("101", "7"))
+            .WithRawApiJson("""{"id":101,"icao":"EGLL","iata":"LHR"}""");
         CsvAdapter.Import(ResourceKind.Airports, w.Resources[ResourceKind.Airports], [airport], true);
         w.Resources[ResourceKind.Routes].Draft = [Row(("ID", "1"), ("Departure Airport (ICAO/IATA)", reference))];
 
@@ -265,5 +265,5 @@ public class DeletionServiceTests
 
 static class DeletionTestExtensions
 {
-    public static DataRow WithIdentity(this DataRow row, string remoteId) { row.Identity = new(remoteId, "7"); return row; }
+    public static DataRow WithIdentity(this DataRow row, string remoteId) => row.WithIdentity(new ResourceIdentity(remoteId, "7"));
 }

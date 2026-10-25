@@ -30,7 +30,7 @@ internal sealed class CandidateIndex
         var id = row.Identity!.RemoteId;
         var unique = keys.ToHashSet(CandidateSignature.Equality);
         Remove(id);
-        rows[id] = (row.Copy(), unique);
+        rows[id] = (row, unique);
         foreach (var key in unique)
         {
             if (!signatures.TryGetValue(key, out var ids))

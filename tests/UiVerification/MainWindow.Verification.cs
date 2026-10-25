@@ -65,14 +65,14 @@ public sealed partial class MainWindow
             }
             case "data-state":RootGrid.UpdateLayout();return DataVerificationState();
             case "review-fixture":
-                workspace.Resources[ResourceKind.Fleets].Draft[0].Fields["Name"] = "QA reviewed fleet";
-                workspace.Resources[ResourceKind.Airports].Draft[0].Fields["Name"] = "QA reviewed airport";
+                { var fleets = workspace.Resources[ResourceKind.Fleets].Draft; fleets[0] = fleets[0].With("Name", "QA reviewed fleet"); }
+                { var airports = workspace.Resources[ResourceKind.Airports].Draft; airports[0] = airports[0].With("Name", "QA reviewed airport"); }
                 await Save(); Navigation.SelectedItem = Navigation.MenuItems[3]; Render(); await reviewLoad; RootGrid.UpdateLayout();
                 return ReviewVerificationState();
             case "review-state":await reviewLoad;return ReviewVerificationState();
             case "review-stale":
             {
-                workspace.Resources[ResourceKind.Fleets].Draft[0].Fields["Name"] = "QA changed after review";
+                { var fleets = workspace.Resources[ResourceKind.Fleets].Draft; fleets[0] = fleets[0].With("Name", "QA changed after review"); }
                 var result = await ConfirmWorkspaceSubmission(workspace.Mode);
                 await reviewLoad; RootGrid.UpdateLayout();
                 return new { refreshed = result is null, state = ReviewVerificationState(), status = StatusLabel.Text };
@@ -216,7 +216,7 @@ public sealed partial class MainWindow
         {
             // Changes the first N route drafts in memory only; the review page plans and validates every resource.
             var routes=workspace.Resources[ResourceKind.Routes].Draft;var count=Math.Min(int.Parse(command[13..]),routes.Count);
-            for(var n=0;n<count;n++)routes[n].Fields["Remarks"]="review "+n;
+            for(var n=0;n<count;n++)routes[n]=routes[n].With("Remarks","review "+n);
             InvalidateDataViews();
             var plans=new List<double>();var keys=new List<double>();var renders=new List<double>();var renderStalls=new List<double>();
             var checks=new List<double>();var checkStalls=new List<double>();var checkPauses=new List<double>();var checkAllocations=new List<long>();int entries=0,rows=0;bool current=true;
@@ -262,7 +262,7 @@ public sealed partial class MainWindow
         if(command.StartsWith("data-mark-deleted:"))
         {
             // Marks a shown row deleted in memory only, then rebinds it as a page refresh would.
-            var view=visible[int.Parse(command[18..])];view.Row.Fields["_delete"]="TRUE";view.Rebind(view.Row);RootGrid.UpdateLayout();
+            var view=visible[int.Parse(command[18..])];var marked=view.Row.With("_delete","TRUE");Data.ReplaceDraftRows([marked]);view.Rebind(marked);RootGrid.UpdateLayout();
             return new{id=view.Row.LocalId,readOnly=view.Cells.Where(c=>c.Field!="_delete").All(c=>c.IsReadOnly)};
         }
         if(command.StartsWith("data-page-input:")){pageJump!.Text=command[16..];RestoreDataSelection();return DataVerificationState();}

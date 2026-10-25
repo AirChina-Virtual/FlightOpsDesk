@@ -53,7 +53,7 @@ static class UiInteractionScenarios
             w.Resources[ResourceKind.Aircraft].Draft.Add(Row(("Fleet ID", "local:" + fleet.LocalId)));
             WorkspaceReviewPlan Build() => ReviewPlanBuilder.Build(new ChangePlanner().PlanWorkspace(w), RunMode.Online, true, new HashSet<string>(), _ => { });
             var original = Build(); Check(original.ContentKey() == Build().ContentKey(), "Random IDs invalidated equivalent review");
-            fleet.Fields["Name"] = "B"; Check(original.ContentKey() != Build().ContentKey(), "Changed field was not detected");
+            w.Resources[ResourceKind.Fleets].ReplaceDraftRows([fleet.With("Name", "B")]); Check(original.ContentKey() != Build().ContentKey(), "Changed field was not detected");
             var changes = new ChangePlanner().PlanWorkspace(w);
             var before = ReviewPlanBuilder.Build(changes, RunMode.Online, true, new HashSet<string>(), _ => { }).ContentKey();
             changes.Single(c => c.Resource == ResourceKind.Aircraft).Dependencies.Clear();
@@ -98,7 +98,7 @@ static class UiInteractionScenarios
             var draft = Row(("Name", "new"), ("_delete", "TRUE"));
             var deleted = Row(("ID", "1"), ("_delete", "TRUE")); var active = Row(("ID", "2"));
             var w = new Workspace(); var data = w.Resources[ResourceKind.Aircraft];
-            data.Draft = [draft, deleted, active]; data.Snapshot = [deleted.Copy(), active.Copy()];
+            data.Draft = [draft, deleted, active]; data.Snapshot = [deleted.Dup(), active.Dup()];
             var selection = BatchSelection.ForDeletion(data.Draft, data.Snapshot);
             Check(selection.Eligible.Count == 2 && selection.Skipped == 1, "Deletion eligibility changed");
             var service = new DeletionService(); var plan = service.Preview(w, ResourceKind.Aircraft, selection.Eligible.Select(r => r.LocalId));

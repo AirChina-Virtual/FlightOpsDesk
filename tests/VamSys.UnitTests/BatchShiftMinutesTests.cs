@@ -11,9 +11,7 @@ public class BatchShiftMinutesTests
 
     static DataRow Row(string field, string value)
     {
-        var row = new DataRow();
-        row.Fields[field] = value;
-        return row;
+        return new DataRow { Fields = new Dictionary<string, string> { [field] = value } };
     }
 
     static BatchEditPreview Shift(string minutes, string field, params DataRow[] rows)
