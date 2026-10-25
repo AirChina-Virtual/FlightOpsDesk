@@ -123,23 +123,26 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
             BinaryPrimitives.WriteInt32LittleEndian(target, written);
             used -= target.Length - 4 - written;
         }
-        public void Fields(Dictionary<string, string>? fields)
+        public void Fields(IReadOnlyDictionary<string, string>? fields)
         {
             if (fields is null)
             { Int(-1); return; }
             Int(fields.Count);
-            foreach (var name in Sorted(fields.Keys))
+            foreach (var name in Sorted(fields))
             { Text(name); Text(fields[name]); }
         }
         // One reused buffer instead of a sorted copy per row; valid until the next call.
         string[] names = new string[32];
-        public ArraySegment<string> Sorted(ICollection<string> keys)
+        public ArraySegment<string> Sorted(IReadOnlyDictionary<string, string> fields)
         {
-            if (names.Length < keys.Count)
-                names = new string[keys.Count * 2];
-            keys.CopyTo(names, 0);
-            Array.Sort(names, 0, keys.Count, StringComparer.Ordinal);
-            return new(names, 0, keys.Count);
+            var count = fields.Count;
+            if (names.Length < count)
+                names = new string[count * 2];
+            var next = 0;
+            foreach (var key in fields.Keys)
+                names[next++] = key;
+            Array.Sort(names, 0, count, StringComparer.Ordinal);
+            return new(names, 0, count);
         }
         public ArraySegment<string> Sorted(PlannedChange change)
         {

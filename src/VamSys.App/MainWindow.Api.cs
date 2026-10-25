@@ -116,9 +116,7 @@ public sealed partial class MainWindow
                     return;
                 if (choice == ContentDialogResult.Secondary)
                 {
-                    var replacement = row.Copy();
-                    if (conflict.Field != "*")
-                        replacement.Fields[conflict.Field] = conflict.Remote ?? "";
+                    var replacement = conflict.Field != "*" ? row.With(conflict.Field, conflict.Remote ?? "") : row;
                     data.Edit([row.LocalId], () => { if (conflict.Field == "*") data.Draft.Remove(row); else data.ReplaceDraftRows([replacement]); }, newStep: false, structural: conflict.Field == "*");
                 }
                 data.Conflicts.Remove(conflict);

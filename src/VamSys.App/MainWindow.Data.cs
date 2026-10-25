@@ -320,8 +320,7 @@ public sealed partial class MainWindow
                     var key = currentId + ":" + field;
                     var newStep = lastEditedCell != key;
                     // Rows are replaced, never edited in place: the view follows the replacement.
-                    var replacement = current.Copy();
-                    replacement.Fields[field] = value;
+                    var replacement = current.With(field, value);
                     data.Edit([currentId], () => data.ReplaceDraftRows([replacement]), newStep: newStep);
                     view!.ReplaceRow(replacement);
                     current = replacement;

@@ -290,7 +290,7 @@ public sealed partial class MainWindow : Window
         actions.PrimaryCommands.Add(BatchCommand(() => L("Text_E306752B35"), Symbol.Edit, EditRules, "active"));
         actions.PrimaryCommands.Add(Command(() => L("Text_48A195CA7E"), Symbol.View, () => { Navigation.SelectedItem = Navigation.MenuItems[3]; return Task.CompletedTask; }));
         actions.PrimaryCommands.Add(Command(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts, !busy && Data.Conflicts.Count > 0));
-        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!closeState.IsOpen || busy) return; var r = new DataRow(); foreach (var f in Schemas.All[resource].Columns) r.Fields[f] = f == "_delete" ? "FALSE" : ""; Data.Edit([r.LocalId], () => Data.Draft.Add(r), structural: true); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
+        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!closeState.IsOpen || busy) return; var rowBuilder = new DataRow.Builder(); foreach (var f in Schemas.All[resource].Columns) rowBuilder[f] = f == "_delete" ? "FALSE" : ""; var r = rowBuilder.ToRow(); Data.Edit([r.LocalId], () => Data.Draft.Add(r), structural: true); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
         // Kept for every resource and shown only where it applies, since the page outlives a resource switch.
         fleetCommand = BatchCommand(() => L("Text_95DD1FDDFE"), Symbol.Edit, () => resource is ResourceKind.Aircraft or ResourceKind.Routes ? ChooseFleets(null) : Task.CompletedTask, "active");
         fleetCommand.Visibility = resource is ResourceKind.Aircraft or ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
@@ -481,20 +481,18 @@ public sealed partial class MainWindow : Window
                     data.Draft.RemoveAll(r => r.LocalId == item.After.LocalId && Schemas.Deleted(r));
                 else
                 {
-                    var updated = item.After.Copy();
-                    if (item.RemoteId != null)
-                        updated.Fields[Schemas.All[item.Resource].Key] = item.RemoteId;
-                    data.Snapshot.Add(updated.Copy());
+                    var updated = item.RemoteId != null ? item.After.With(Schemas.All[item.Resource].Key, item.RemoteId) : item.After;
+                    data.Snapshot.Add(updated);
                     var index = data.FindDraftPosition(updated.LocalId);
                     if (index >= 0)
                     {
                         // Preserve edits made after a recovered job was submitted; only rebase identity/references.
-                        var current = data.Draft[index].Copy();
-                        current.Fields[Schemas.All[item.Resource].Key] = updated.Get(Schemas.All[item.Resource].Key);
+                        var current = data.Draft[index].ToBuilder();
+                        current[Schemas.All[item.Resource].Key] = updated.Get(Schemas.All[item.Resource].Key);
                         foreach (var field in Schemas.ReferenceFields(item.Resource))
                             if (LocalReference.ContainsLocal(current.Get(field)))
-                                current.Fields[field] = updated.Get(field);
-                        data.ReplaceDraftRows([current]);
+                                current[field] = updated.Get(field);
+                        data.ReplaceDraftRows([current.ToRow()]);
                     }
                 }
                 item.Rebased = true;
@@ -555,10 +553,13 @@ public sealed partial class MainWindow : Window
         var w = new Workspace { Name = L("DemoWorkspace", ("time", DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture))), Mode = RunMode.Demo };
         void Add(ResourceKind k, params (string, string)[] fields)
         {
-            var r = new DataRow { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
-            r.Fields["_delete"] = "FALSE";
+            var builder = new DataRow.Builder(fields.Length + 1);
+            foreach (var (name, text) in fields)
+                builder[name] = text;
+            builder["_delete"] = "FALSE";
+            var r = builder.ToRow();
             w.Resources[k].Draft.Add(r);
-            w.Resources[k].Snapshot.Add(r.Copy());
+            w.Resources[k].Snapshot.Add(r);
             w.Resources[k].Columns = w.Resources[k].Columns.Concat(r.Fields.Keys).Distinct().ToList();
             w.Resources[k].SnapshotAt = DateTimeOffset.UtcNow;
         }
