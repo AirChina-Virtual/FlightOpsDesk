@@ -72,7 +72,7 @@ public sealed class ChangePlanner : IChangePlanner
         {
             baseline.TryGetValue(row.LocalId, out var before);
             changed.Clear();
-            foreach (var field in row.Fields)
+            foreach (var field in row.FieldEntries())
                 if (Changed(field, before))
                     changed.Add(field.Key);
             var delete = Schemas.Deleted(row);
@@ -84,7 +84,7 @@ public sealed class ChangePlanner : IChangePlanner
         }
     }
     static bool Changed(KeyValuePair<string, string> field, DataRow? baseline)
-        => field.Key != "_delete" && (baseline is null || !baseline.Fields.TryGetValue(field.Key, out var old) || old != field.Value);
+        => field.Key != "_delete" && (baseline is null || !baseline.FieldEntries().TryGetValue(field.Key, out var old) || old != field.Value);
 
     public static ChangeKind? GetChangeKind(DataRow row, DataRow? baseline)
     {
@@ -92,7 +92,7 @@ public sealed class ChangePlanner : IChangePlanner
             return baseline is null ? null : ChangeKind.Delete;
         if (baseline is null)
             return ChangeKind.Create;
-        foreach (var field in row.Fields)
+        foreach (var field in row.FieldEntries())
             if (Changed(field, baseline))
                 return ChangeKind.Update;
         return null;

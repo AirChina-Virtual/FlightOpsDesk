@@ -18,7 +18,7 @@ Domain 不引用其他产品项目。文件、网络、环境目录和日志写�
 
 | 文件／类型 | 具体作用 |
 |---|---|
-| DataRow.cs | 数据行：构造后不可变（LocalId／Identity／RawApiJson 仅 init，Fields 为只读视图，对象初始化器会复制传入的字典），编译器在 Debug 与 Release 下同样强制，变更日志按行对象引用识别替换所依赖的前提因此不再依赖 Debug 守卫。改行只有副本方式：With(字段, 值)／With(多个字段)／Without／WithIdentity／WithRawApiJson／WithLocalId，或 ToBuilder() 得到可变的 DataRow.Builder（ToRow() 只能调用一次并零拷贝移交字段字典；导入、FromJson、历史回放等热路径每行只建一次）。SameContent 按内容比较 |
+| DataRow.cs | 数据行：构造后不可变（`LocalId`／`Identity`／`RawApiJson` 仅 init，`Fields` 为只读视图，对象初始化器会复制传入的字典），编译器在 Debug 与 Release 下同样强制，变更日志按行对象引用识别替换所依赖的前提因此不再依赖 Debug 守卫。改行只有副本方式：`With(字段, 值)`／`With(多个字段)`／`Without`／`WithIdentity`／`WithRawApiJson`／`WithLocalId`，或 `ToBuilder()` 得到可变的 `DataRow.Builder`（`ToRow()` 只能调用一次并零拷贝移交字段字典；导入、`FromJson`、历史回放等热路径每行只建一次）。`FieldEntries()` 是不分配内存的只读结构视图，供逐行遍历的热路径使用（对 `Fields` 做 `foreach` 会为每行装箱一个枚举器）。`SameContent` 按内容比较 |
 | Models.cs | 定义工作区、数据行、修改清单、任务状态，以及各部分调用时使用的接口 |
 | IndependentApiEvidence.cs、ApiEvidence.cs | 固定契约下的独立实测字段范围、能力键、结构化诊断及可选删除核对证据；与工作区软件回读标记分开 |
 | Schemas.cs | 列出五类数据的字段及填写要求 |

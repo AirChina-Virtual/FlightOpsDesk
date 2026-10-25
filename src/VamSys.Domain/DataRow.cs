@@ -38,6 +38,20 @@ public sealed class DataRow
     }
 
     public string Get(string key) => fields.GetValueOrDefault(key, "");
+    /// <summary>Allocation-free read-only access for hot loops (<c>foreach</c> over <see cref="Fields"/> boxes an enumerator per row).</summary>
+    public RowFields FieldEntries() => new(fields);
+
+    /// <summary>Read-only struct view of a row's fields with non-allocating enumeration.</summary>
+    public readonly struct RowFields
+    {
+        readonly Dictionary<string, string> source;
+        internal RowFields(Dictionary<string, string> source) => this.source = source;
+        public int Count => source.Count;
+        public Dictionary<string, string>.KeyCollection Keys => source.Keys;
+        public bool ContainsKey(string key) => source.ContainsKey(key);
+        public bool TryGetValue(string key, out string value) => source.TryGetValue(key, out value!);
+        public Dictionary<string, string>.Enumerator GetEnumerator() => source.GetEnumerator();
+    }
 
     /// <summary>A copy with one field set.</summary>
     public DataRow With(string field, string value)

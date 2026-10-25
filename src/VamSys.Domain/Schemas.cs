@@ -81,7 +81,7 @@ public static class Schemas
                 Add(r, schema.Key, Messages.Define("Text_783B7A2935"));
             if (before is null && schema.Key == "ID" && Key(kind, r) != "")
                 Add(r, "ID", Messages.Define("Text_0D4C574F60"));
-            foreach (var (f, v) in r.Fields)
+            foreach (var (f, v) in r.FieldEntries())
             {
                 if (v == "")
                     continue;

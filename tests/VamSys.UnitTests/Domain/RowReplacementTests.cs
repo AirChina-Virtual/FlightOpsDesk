@@ -32,7 +32,7 @@ public class RowReplacementTests
         }
         var fields = typeof(DataRow).GetProperty(nameof(DataRow.Fields))!.PropertyType;
         Assert.Equal(typeof(IReadOnlyDictionary<string, string>), fields);
-        var ignorable = new[] { "Get", "With", "Without", "WithIdentity", "WithRawApiJson", "WithLocalId", "ToBuilder", "SameContent", "ToString", "Equals", "GetHashCode", "GetType" };
+        var ignorable = new[] { "Get", "With", "Without", "WithIdentity", "WithRawApiJson", "WithLocalId", "ToBuilder", "FieldEntries", "SameContent", "ToString", "Equals", "GetHashCode", "GetType" };
         Assert.Empty(typeof(DataRow).GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Where(m => !m.IsSpecialName && !ignorable.Contains(m.Name)).Select(m => m.Name));
         Assert.Empty(typeof(DataRow).GetFields(BindingFlags.Public | BindingFlags.Instance));

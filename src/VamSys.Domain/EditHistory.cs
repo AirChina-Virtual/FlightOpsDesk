@@ -28,7 +28,7 @@ public sealed record RowImage(Guid LocalId, ResourceIdentity? Identity, string? 
             || image.FieldOrder.Length != row.Fields.Count)
             return false;
         var orderIndex = 0;
-        foreach (var field in row.Fields)
+        foreach (var field in row.FieldEntries())
             if (field.Key != image.FieldOrder[orderIndex++])
                 return false;
         foreach (var field in image.Fields)
