@@ -52,13 +52,12 @@ public sealed class OperationsServerValueResolver(OperationsAdapter api, Workspa
         candidate.Rebased = true;
         candidate.RecoveryCandidateId = null;
         candidate.RemoteId = current.Identity!.RemoteId;
-        candidate.After.Identity = current.Identity;
+        candidate.After = candidate.After.WithIdentity(current.Identity);
         candidate.ManualResolution = new("AcceptServerValue", DateTimeOffset.UtcNow, candidate.ReadbackDetails?.Status, true);
         candidate.SetMessage(Messages.Define(item.Kind == ChangeKind.Delete ? "ApiAcceptedServerRecord" : "ApiAcceptedServerValue"));
         var data = workspace.Resources[item.Resource];
         var local = item.After.LocalId;
-        var snapshot = current.Copy();
-        snapshot.LocalId = local;
+        var snapshot = current.WithLocalId(local);
         var baseline = data.Snapshot.FirstOrDefault(r => r.LocalId == local) ?? item.Before;
         var draft = data.FindDraftRow(local);
         var conflicts = new List<MergeConflict>();
@@ -72,11 +71,11 @@ public sealed class OperationsServerValueResolver(OperationsAdapter api, Workspa
         { await writer.WriteAsync(new(CheckpointKind.Rebase, header, candidate, Delta: delta), CancellationToken.None); }
         catch (Exception error) { throw new PersistenceException(error); }
         data.Snapshot.RemoveAll(r => r.LocalId == local);
-        data.Snapshot.Add(snapshot.Copy());
+        data.Snapshot.Add(snapshot);
         if (draft != null)
-            data.ReplaceDraftRows([rebased.Copy()]);
+            data.ReplaceDraftRows([rebased]);
         else
-            data.Draft.Add(rebased.Copy());
+            data.Draft.Add(rebased);
         data.Conflicts = allConflicts;
         data.ClearHistory(invalidateIndex: draft == null);
         data.SnapshotAt = delta.SnapshotAt;
@@ -91,19 +90,19 @@ public sealed class OperationsServerValueResolver(OperationsAdapter api, Workspa
     // record as it is now and drops the deletion marker.
     static DataRow Rebase(ChangeItem item, DataRow? draft, DataRow? baseline, DataRow server, List<MergeConflict> conflicts)
     {
-        var result = server.Copy();
         if (draft == null)
-            return result;
+            return server;
+        var result = server.ToBuilder();
         foreach (var (field, mine) in draft.Fields)
         {
             if (!server.Fields.TryGetValue(field, out var theirs))
-            { result.Fields[field] = mine; continue; }
+            { result[field] = mine; continue; }
             if (item.Kind == ChangeKind.Delete || field == "ID" || OperationsAdapter.Equivalent(field, mine, theirs))
                 continue;
             var original = baseline?.Get(field);
             if (item.Fields.ContainsKey(field) || baseline == null || mine != original)
-            { result.Fields[field] = mine; conflicts.Add(new(draft.LocalId, field, original, mine, theirs)); }
+            { result[field] = mine; conflicts.Add(new(draft.LocalId, field, original, mine, theirs)); }
         }
-        return result;
+        return result.ToRow();
     }
 }

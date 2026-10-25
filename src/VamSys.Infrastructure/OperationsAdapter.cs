@@ -37,12 +37,12 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         else
             throw Block("ApiInvalid", "airline_id");
         string? parent = kind == ResourceKind.Aircraft ? value.GetProperty("fleet_id").ToString() : null;
-        var row = new DataRow { Identity = new(id, airline, parent), RawApiJson = value.GetRawText() };
-        row.Fields["_delete"] = "FALSE";
+        var row = new DataRow.Builder(16) { Identity = new(id, airline, parent), RawApiJson = value.GetRawText() };
+        row["_delete"] = "FALSE";
         if (kind != ResourceKind.Airports)
-            row.Fields["ID"] = id;
+            row["ID"] = id;
         else
-            row.Fields["ICAO/IATA"] = value.TryGetProperty("icao", out var icao) && icao.ValueKind == JsonValueKind.String ? icao.GetString()! : Value(value.GetProperty("iata"));
+            row["ICAO/IATA"] = value.TryGetProperty("icao", out var icao) && icao.ValueKind == JsonValueKind.String ? icao.GetString()! : Value(value.GetProperty("iata"));
         foreach (var spec in WireFields(kind))
         if (value.TryGetProperty(spec.Wire!, out var v))
         {
@@ -52,10 +52,10 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
                 text = text[..5];
             if (spec.Type == FieldType.Date && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
                 text = date.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-            row.Fields[field] = text;
+            row[field] = text;
         }
         if (parent != null)
-            row.Fields["Fleet ID"] = parent;
+            row["Fleet ID"] = parent;
         if (kind is ResourceKind.Routes or ResourceKind.Routings)
         {
             foreach (var side in new[] { "Departure", "Arrival" })
@@ -63,13 +63,14 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
                 var wire = side.ToLowerInvariant() + (kind == ResourceKind.Routes ? "_id" : "_airport_id");
                 var airportId = value.GetProperty(wire).ToString();
                 var airport = Known(ResourceKind.Airports, airportId);
-                row.Fields[side + " Airport (ICAO/IATA)"] = airport?.Get("ICAO/IATA") ?? "unresolved:" + airportId;
+                row[side + " Airport (ICAO/IATA)"] = airport?.Get("ICAO/IATA") ?? "unresolved:" + airportId;
             }
         }
-        known[(kind, id)] = row;
+        var result = row.ToRow();
+        known[(kind, id)] = result;
         if (kind == ResourceKind.Airports)
             knownAirportsVersion++;
-        return row;
+        return result;
     }
     string? Owner(JsonElement value)
     {
@@ -334,7 +335,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
         return saved;
     }
     // A create's POST targets the collection even after the response stored the new identity.
-    static DataRow Unsaved(DataRow row) { var copy = row.Copy(); copy.Identity = null; return copy; }
+    static DataRow Unsaved(DataRow row) => row.WithIdentity(null);
     static ApiStep ToStep(BatchStep s) => new(new HttpMethod(s.Method), s.Path, s.Body.ToDictionary(p => p.Key, p => (object?)p.Value));
     public List<ApiStep> PreviewPlan(ChangeItem c) { var steps = Plan(c, true); ValidateParameterPreview(c); return steps; }
     List<ApiStep> Plan(ChangeItem c, bool preview)
@@ -555,7 +556,7 @@ public sealed partial class OperationsAdapter(OperationsTransport transport, Wor
                 }
                 var created = FromJson(change.Resource, response.RootElement);
                 change.RemoteId = created.Identity!.RemoteId;
-                change.After.Identity = created.Identity;
+                change.After = change.After.WithIdentity(created.Identity);
                 change.CreateCompleted = true;
                 record.RemoteId = change.RemoteId;
             }

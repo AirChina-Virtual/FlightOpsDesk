@@ -31,13 +31,13 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api, Workspace wor
             if (item.Resource == ResourceKind.Fleets)
                 api.InvalidateParameters();
             if (writer == null)
-            { ApplyRebase(workspace, item, verified); api.ConfirmCandidate(item, verified, queries); if (verified == null && (item.RemoteId ?? item.Before?.Identity?.RemoteId) is string id) api.Forget(item.Resource, id); return; }
+            { var rebased = ApplyRebase(workspace, item, verified); api.ConfirmCandidate(item, rebased, queries); if (verified == null && (item.RemoteId ?? item.Before?.Identity?.RemoteId) is string id) api.Forget(item.Resource, id); return; }
             var original = workspace.Resources[item.Resource];
             var current = original.FindDraftRow(item.After.LocalId);
-            var data = new ResourceData { Draft = current == null ? [] : [current.Copy()], SnapshotAt = original.SnapshotAt };
+            var data = new ResourceData { Draft = current == null ? [] : [current], SnapshotAt = original.SnapshotAt };
             var staged = workspace.StageResource(item.Resource, data);
             var stagedItem = System.Text.Json.JsonSerializer.Deserialize<ChangeItem>(System.Text.Json.JsonSerializer.Serialize(item))!;
-            ApplyRebase(staged, stagedItem, verified?.Copy());
+            ApplyRebase(staged, stagedItem, verified);
             var delta = new ResourceRebaseDelta(item.Resource, item.After.LocalId,
                 new(verified == null ? RowMutationKind.Delete : RowMutationKind.Upsert, data.Snapshot.FirstOrDefault()),
                 new(current == null ? RowMutationKind.Keep : data.Draft.Count == 0 ? RowMutationKind.Delete : RowMutationKind.Upsert, data.Draft.FirstOrDefault()),
@@ -107,8 +107,9 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api, Workspace wor
                     if (!tokens.Any(LocalReference.IsLocal))
                         continue;
                     var resolved = tokens.Select(t => LocalReference.IsLocal(t) ? (LocalReference.TryParse(t, out var localId) ? job.Items.Single(d => d.After.LocalId == localId).RemoteId : null) ?? throw OperationsAdapter.Block("ApiRefreshFirst") : t);
-                    item.After.Fields[field] = string.Join(',', resolved);
-                    item.Fields[field] = new(FieldIntent.Set, item.After.Fields[field]);
+                    var joined = string.Join(',', resolved);
+                    item.After = item.After.With(field, joined);
+                    item.Fields[field] = new(FieldIntent.Set, joined);
                 }
                 var id = item.CanProposeRecoveryId ? item.EditableRecoveryId : item.RemoteId ?? item.Before?.Identity?.RemoteId;
                 if (recovering)
@@ -292,7 +293,8 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api, Workspace wor
                 step.Path = "{created}";
         }
     }
-    static void ApplyRebase(Workspace workspace, ChangeItem item, DataRow? verified)
+    // Returns the verified row as stored in the snapshot (carrying the draft row's id and any draft-only columns), or null after a delete.
+    static DataRow? ApplyRebase(Workspace workspace, ChangeItem item, DataRow? verified)
     {
         var data = workspace.Resources[item.Resource];
         data.Snapshot.RemoveAll(r => r.LocalId == item.After.LocalId);
@@ -304,25 +306,31 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api, Workspace wor
         else
         {
             item.RemoteId = verified.Identity!.RemoteId;
-            item.After.Identity = verified.Identity;
+            item.After = item.After.WithIdentity(verified.Identity);
             if (item.Kind == ChangeKind.Create)
                 item.CreateCompleted = true;
             item.RecoveryCandidateId = null;
-            verified.LocalId = item.After.LocalId;
-            var current = data.FindDraftRow(verified.LocalId);
+            var localId = item.After.LocalId;
+            var current = data.FindDraftRow(localId);
             if (current != null)
             {
-                current = current.Copy();
+                var edited = current.ToBuilder();
                 foreach (var field in verified.Fields.Keys)
                     if (field == "ID" || current.Get(field) == item.After.Get(field) || LocalReference.ContainsLocal(current.Get(field)))
-                        current.Fields[field] = verified.Get(field);
-                current.Identity = verified.Identity;
-                current.RawApiJson = verified.RawApiJson;
-                foreach (var p in current.Fields.Where(p => !verified.Fields.ContainsKey(p.Key)))
-                    verified.Fields[p.Key] = p.Value;
-                data.ReplaceDraftRows([current]);
+                        edited[field] = verified.Get(field);
+                edited.Identity = verified.Identity;
+                edited.RawApiJson = verified.RawApiJson;
+                var replacement = edited.ToRow();
+                var stored = verified.ToBuilder();
+                stored.LocalId = localId;
+                foreach (var p in replacement.Fields.Where(p => !verified.Fields.ContainsKey(p.Key)))
+                    stored[p.Key] = p.Value;
+                verified = stored.ToRow();
+                data.ReplaceDraftRows([replacement]);
             }
-            data.Snapshot.Add(verified.Copy());
+            else
+                verified = verified.WithLocalId(localId);
+            data.Snapshot.Add(verified);
         }
         item.Rebased = true;
         item.State = ItemState.Succeeded;
@@ -332,5 +340,6 @@ public sealed class OperationsBatchExecutor(OperationsAdapter api, Workspace wor
         var operation = ApiOperationPolicy.Key(item);
         if (!workspace.VerifiedOperations.Contains(operation))
             workspace.VerifiedOperations.Add(operation);
+        return verified;
     }
 }

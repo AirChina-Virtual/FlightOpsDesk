@@ -84,7 +84,7 @@ public sealed partial class OperationsAdapter
             if (pair.Kind == item.Resource)
                 rows.RemoveAll(r => r.Identity!.RemoteId == id);
             if (row != null && keys.Length > 0 && session.Pairs.TryGetValue((item.Resource, keys[0].Departure, keys[0].Arrival), out var current))
-                current.Add(row.Copy());
+                current.Add(row);
         }
         session.Release(item);
     }
@@ -102,14 +102,14 @@ public sealed partial class OperationsAdapter
         var seen = new HashSet<string>();
         if (session.Confirmed.TryGetValue(item.Resource, out var confirmed))
             foreach (var row in confirmed.Find(signature))
-            { ct.ThrowIfCancellationRequested(); if (seen.Add(row.Identity!.RemoteId)) yield return row.Copy(); }
+            { ct.ThrowIfCancellationRequested(); if (seen.Add(row.Identity!.RemoteId)) yield return row; }
         if (item.Resource is ResourceKind.Routes or ResourceKind.Routings)
         {
             var pair = (item.Resource, signature.Departure, signature.Arrival);
             if (session.Pairs.TryGetValue(pair, out var cached))
             {
                 foreach (var row in cached)
-                { ct.ThrowIfCancellationRequested(); if (seen.Add(row.Identity!.RemoteId)) yield return row.Copy(); }
+                { ct.ThrowIfCancellationRequested(); if (seen.Add(row.Identity!.RemoteId)) yield return row; }
                 yield break;
             }
             var suffix = item.Resource == ResourceKind.Routes ? "_id" : "_airport_id";
@@ -121,7 +121,7 @@ public sealed partial class OperationsAdapter
             // Rows still stream so an early duplicate stops paging; only a fully read pair is cached.
             var complete = new List<DataRow>();
             await foreach (var row in ReadFiltered(item.Resource, Collection(item.Resource), filters, ct))
-            { complete.Add(row.Copy()); if (seen.Add(row.Identity!.RemoteId)) yield return row; }
+            { complete.Add(row); if (seen.Add(row.Identity!.RemoteId)) yield return row; }
             ct.ThrowIfCancellationRequested();
             session.Bind(workspace.Id, workspace.AirlineId);
             session.Pairs[pair] = complete;
@@ -139,7 +139,7 @@ public sealed partial class OperationsAdapter
             PerformanceRun.Current?.IndexBuilt();
         }
         foreach (var row in rows.Find(signature))
-        { ct.ThrowIfCancellationRequested(); if (seen.Add(row.Identity!.RemoteId)) yield return row.Copy(); }
+        { ct.ThrowIfCancellationRequested(); if (seen.Add(row.Identity!.RemoteId)) yield return row; }
     }
 
     public async IAsyncEnumerable<(ResourceKind Kind, DataRow Row)> ReadDependencyCandidatesAsync(ChangeItem item, [EnumeratorCancellation] CancellationToken ct)
@@ -175,8 +175,7 @@ public sealed partial class OperationsAdapter
         if (service.CheckReferences(workspace, item.Resource, new HashSet<Guid> { item.After.LocalId }).Count > 0)
             return true;
         var context = new Workspace { AirlineId = workspace.AirlineId };
-        var target = (item.Before ?? item.After).Copy();
-        target.LocalId = item.After.LocalId;
+        var target = (item.Before ?? item.After).WithLocalId(item.After.LocalId);
         context.Resources[item.Resource].Draft.Add(target);
         await foreach (var (kind, row) in ReadDependencyCandidatesAsync(item, ct))
         {
