@@ -7,7 +7,7 @@ public sealed partial class MainWindow
 {
     async Task VerifyTaskDeletions(BatchJob job)
     {
-        TaskSubmission.RequireExecution(workspace, job, RunMode.Online, gate.CanRunTask);
+        submission.RequireExecution(job, RunMode.Online, gate.CanRunTask);
         await Work(async () =>
         {
             running = new();

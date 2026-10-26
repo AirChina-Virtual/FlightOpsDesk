@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window
     readonly ImportExportService importExport;
     readonly BatchEditService batch;
     readonly ReviewService reviews;
+    readonly SubmissionService submission;
     readonly DiagnosticsService diagnostics;
     Workspace workspace => session.Workspace;
     IUserSettings settings => storage;
@@ -43,6 +44,7 @@ public sealed partial class MainWindow : Window
         importExport = new(session, online);
         batch = new(session);
         reviews = new(session, online);
+        submission = new(session);
         diagnostics = new(session, ApiDiagnosticExport.Serialize);
         InitializeLanguage();
         tableDensity = settings.LoadTableDensity();
@@ -343,7 +345,7 @@ public sealed partial class MainWindow : Window
     Task StartDemo() => SubmitWorkspace(RunMode.Demo);
     async Task ExecuteDemo(BatchJob job)
     {
-        TaskSubmission.RequireExecution(workspace, job, RunMode.Demo,
+        submission.RequireExecution(job, RunMode.Demo,
             gate.CanRunTask);
         await Work(async () =>
         {

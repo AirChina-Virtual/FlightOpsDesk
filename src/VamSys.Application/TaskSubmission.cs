@@ -1,6 +1,4 @@
-using VamSys.Core;
-
-namespace VamSys.App;
+namespace VamSys.Core;
 
 // This handoff is shared by online and demo submission. Only the job saved by this
 // explicit submission is started; loading a workspace never drains Pending jobs.

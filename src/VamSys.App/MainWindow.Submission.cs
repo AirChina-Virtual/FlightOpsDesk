@@ -4,14 +4,9 @@ namespace VamSys.App;
 
 public sealed partial class MainWindow
 {
-    async Task SubmitWorkspace(RunMode mode)
-    {
-        if (!CanEditData() || workspace.Mode != mode)
-            return;
-        await TaskSubmission.SubmitAsync(workspace, mode, LocalOperation,
-            () => ConfirmWorkspaceSubmission(mode), session.SaveJobsAsync, session.SavedJobIsDurable, SelectTasksForSubmission,
-            () => workspace, job => mode == RunMode.Online ? ExecuteApi(job) : ExecuteDemo(job));
-    }
+    Task SubmitWorkspace(RunMode mode)
+        => submission.SubmitAsync(mode, gate.CanEdit, LocalOperation, () => ConfirmWorkspaceSubmission(mode), SelectTasksForSubmission,
+            job => mode == RunMode.Online ? ExecuteApi(job) : ExecuteDemo(job));
 
     void SelectTasksForSubmission()
     {

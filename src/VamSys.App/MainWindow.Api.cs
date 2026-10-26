@@ -80,7 +80,7 @@ public sealed partial class MainWindow
     Task StartApi() => SubmitWorkspace(RunMode.Online);
     async Task ExecuteApi(BatchJob job)
     {
-        TaskSubmission.RequireExecution(workspace, job, RunMode.Online,
+        submission.RequireExecution(job, RunMode.Online,
             gate.CanRunTask);
         await Work(async () =>
         {
