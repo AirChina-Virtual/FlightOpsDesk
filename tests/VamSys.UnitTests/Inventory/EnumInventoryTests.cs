@@ -11,6 +11,9 @@ namespace VamSys.UnitTests.Inventory;
 /// </summary>
 public partial class EnumInventoryTests
 {
+    // Enums that were declared in the WinUI app and now live in the application project.
+    static readonly Dictionary<string, string> MovedFromApp = new() { ["VamSys.Core.ReviewDisposition"] = "src/VamSys.App/ReviewPlanBuilder.cs" };
+
     static IEnumerable<string> Describe(Assembly assembly)
     {
         // This inventory locks persisted enum names/numbers, not physical assembly placement.
@@ -19,6 +22,14 @@ public partial class EnumInventoryTests
             ? "VamSys.Core" : assembly.GetName().Name;
         foreach (var type in assembly.GetTypes().Where(t => t.IsEnum))
         {
+            // Moved out of the app assembly by R4: keep the R0 provenance the expected file records.
+            if (MovedFromApp.TryGetValue(type.FullName!, out var declaredIn))
+            {
+                yield return $"VamSys.App(source):{type.Name} => declared in {declaredIn}";
+                foreach (var name in Enum.GetNames(type))
+                    yield return $"VamSys.App(source):{type.Name}.{name} => {Convert.ToDecimal(Enum.Parse(type, name), System.Globalization.CultureInfo.InvariantCulture)}";
+                continue;
+            }
             var underlying = Enum.GetUnderlyingType(type).Name;
             var flags = type.GetCustomAttribute<FlagsAttribute>() != null ? " [Flags]" : "";
             var visibility = type.IsVisible ? "public" : "non-public";

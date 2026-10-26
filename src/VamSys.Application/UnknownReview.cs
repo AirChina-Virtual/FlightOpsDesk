@@ -1,6 +1,4 @@
-using VamSys.Core;
-
-namespace VamSys.App;
+namespace VamSys.Core;
 
 // Item IDs are captured once; each step re-reads the job, so items an earlier step resolved
 // or replaced are skipped or reviewed in their current form. Recovery runs once, after all

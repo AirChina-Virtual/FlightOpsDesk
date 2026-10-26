@@ -13,6 +13,5 @@
     <ProjectReference Include="../../src/VamSys.Storage/VamSys.Storage.csproj" AdditionalProperties="VamSysTestSupport=true" />
     <ProjectReference Include="../../src/VamSys.Infrastructure/VamSys.Infrastructure.csproj" AdditionalProperties="VamSysTestSupport=true" />
   </ItemGroup>
-  <ItemGroup><Compile Include="../../src/VamSys.App/BatchEditPreview.cs" Link="BatchEditPreview.cs" /><Compile Include="../../src/VamSys.App/ReviewPlanBuilder.cs" Link="ReviewPlanBuilder.cs" /></ItemGroup>
   <ItemGroup><Using Include="Xunit" /></ItemGroup>
 </Project>

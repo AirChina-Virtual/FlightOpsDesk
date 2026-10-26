@@ -28,10 +28,10 @@ public sealed partial class MainWindow
         EventHandler<object>? firstFrame=null;
         firstFrame=(_,_)=>{Microsoft.UI.Xaml.Media.CompositionTarget.Rendering-=firstFrame;verificationFirstFrameMs=(DateTime.Now-processStarted).TotalMilliseconds;};
         Microsoft.UI.Xaml.Media.CompositionTarget.Rendering+=firstFrame;
-        typeof(VamSys.Infrastructure.WorkspaceStore).GetProperty("Barrier",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.SetValue(store,(Action<string>)(p=>{
+        storage.Inner.GetType().GetProperty("Barrier",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.SetValue(storage.Inner,(Action<string>)(p=>{
             if(p=="Draft:AfterCommit")Interlocked.Increment(ref verificationDraftCommits);
             if(p=="Full:AfterCommit")Interlocked.Increment(ref verificationFullCommits);
-            if(p!="Full:BeforeCommit"||!verificationArmed||closeState.State!=WindowCloseState.Saving)return;
+            if(p!="Full:BeforeCommit"||!verificationArmed||gate.Closing.State!=WindowCloseState.Saving)return;
             verificationArmed=false;verificationSaves++;verificationEntered=true;
             if(!verificationRelease.Wait(TimeSpan.FromSeconds(45)))throw new TimeoutException("QA close barrier");
             if(verificationFail)throw new IOException("QA injected close save failure");
@@ -81,12 +81,12 @@ public sealed partial class MainWindow
             case "data-batch-dialog":
                 verificationLocalTask = EditRules();
                 await Task.Delay(80);
-                return new { locked = localOperation && !CanEditData() && !Navigation.IsEnabled && !WorkspacePicker.IsEnabled && !ResourcePicker.IsEnabled && !PageHost.IsEnabled };
+                return new { locked = gate.LocalOperationActive && !CanEditData() && !Navigation.IsEnabled && !WorkspacePicker.IsEnabled && !ResourcePicker.IsEnabled && !PageHost.IsEnabled };
             case "dialog-cancel":
             {
                 (verificationDialog ?? throw new InvalidOperationException("No QA dialog is open")).Hide();
                 if (verificationLocalTask != null) await verificationLocalTask;
-                return new { unlocked = !localOperation && CanEditData(), state = DataVerificationState() };
+                return new { unlocked = !gate.LocalOperationActive && CanEditData(), state = DataVerificationState() };
             }
             case "data-edit-rebound":
             {
@@ -135,7 +135,7 @@ public sealed partial class MainWindow
             {
                 // The same synchronous load the constructor and workspace switch run on the UI thread.
                 var samples=new List<double>();var allocations=new List<long>();
-                for(var n=0;n<3;n++){var bytes=GC.GetAllocatedBytesForCurrentThread();var timer=Stopwatch.StartNew();_=store.Load(workspace.Id);samples.Add(timer.Elapsed.TotalMilliseconds);allocations.Add(GC.GetAllocatedBytesForCurrentThread()-bytes);}
+                for(var n=0;n<3;n++){var bytes=GC.GetAllocatedBytesForCurrentThread();var timer=Stopwatch.StartNew();_=storage.Load(workspace.Id);samples.Add(timer.Elapsed.TotalMilliseconds);allocations.Add(GC.GetAllocatedBytesForCurrentThread()-bytes);}
                 return new{samples,allocatedBytes=allocations};
             }
             case "memory":
@@ -149,7 +149,7 @@ public sealed partial class MainWindow
             {
                 // One round trip: save and leave the large workspace, then save the empty one and reload the data page.
                 var home=workspace.Id;
-                if(verificationSwitchTarget is null){var target=new Workspace{Name="QA switch target"};store.Save(target);verificationSwitchTarget=target.Id;ReloadWorkspaces();}
+                if(verificationSwitchTarget is null){var target=new Workspace{Name="QA switch target"};storage.Save(target);verificationSwitchTarget=target.Id;ReloadWorkspaces();}
                 var away=Stopwatch.StartNew();await SwitchWorkspace(verificationSwitchTarget.Value);await dataQueryTask;RootGrid.UpdateLayout();away.Stop();
                 var back=Stopwatch.StartNew();await SwitchWorkspace(home);await dataQueryTask;RootGrid.UpdateLayout();back.Stop();
                 ReloadWorkspaces();
@@ -161,9 +161,9 @@ public sealed partial class MainWindow
             case "release":verificationRelease.Set();return new{released=true};
             case "fail":verificationFail=true;verificationRelease.Set();return new{released=true};
             case "action":await UserAction(()=>{verificationActions++;return Task.CompletedTask;});return new{actions=verificationActions};
-            case "state":return new{state=closeState.State.ToString(),idle=interactiveOperations==0&&!busy&&!localOperation&&!querying&&dialogs==0,workspaceName=workspace.Name,entered=verificationEntered,saves=verificationSaves,actions=verificationActions,enabled=Navigation.IsEnabled,name=workspace.Resources[ResourceKind.Fleets].Draft.FirstOrDefault()?.Get("Name"),undo=Data.Undo.Count,redo=Data.Redo.Count,draftSaves=verificationDraftCommits,fullSaves=verificationFullCommits};
+            case "state":return new{state=gate.Closing.State.ToString(),idle=gate.IsIdle,workspaceName=workspace.Name,entered=verificationEntered,saves=verificationSaves,actions=verificationActions,enabled=Navigation.IsEnabled,name=workspace.Resources[ResourceKind.Fleets].Draft.FirstOrDefault()?.Get("Name"),undo=Data.Undo.Count,redo=Data.Redo.Count,draftSaves=verificationDraftCommits,fullSaves=verificationFullCommits};
             case "workspace-away":
-                var other=new Workspace{Name="QA other"};store.Save(other);ReloadWorkspaces();WorkspacePicker.SelectedItem=((List<WorkspaceChoice>)WorkspacePicker.ItemsSource).Single(w=>w.Id==other.Id);return new{requested=true};
+                var other=new Workspace{Name="QA other"};storage.Save(other);ReloadWorkspaces();WorkspacePicker.SelectedItem=((List<WorkspaceChoice>)WorkspacePicker.ItemsSource).Single(w=>w.Id==other.Id);return new{requested=true};
             case "workspace-back":
                 WorkspacePicker.SelectedItem=((List<WorkspaceChoice>)WorkspacePicker.ItemsSource).First(w=>w.Id!=workspace.Id);return new{requested=true};
             case "tasks":Navigation.SelectedItem=Navigation.MenuItems[4];Render();return new{jobs=taskModels.Count,builds=taskPageBuilds};
@@ -314,7 +314,7 @@ public sealed partial class MainWindow
         while(deadline.Elapsed<TimeSpan.FromSeconds(10))
         {
             RootGrid.UpdateLayout();
-            if(!querying&&shownState?.Model.Total>0&&table?.ContainerFromIndex(0)!=null&&FindVisual<EditableCell>(table)!=null)return;
+            if(!gate.QueryInProgress&&shownState?.Model.Total>0&&table?.ContainerFromIndex(0)!=null&&FindVisual<EditableCell>(table)!=null)return;
             await Task.Delay(50);
             await dataQueryTask;
         }
@@ -329,7 +329,7 @@ public sealed partial class MainWindow
         return new { rows=visible.Count,cells=visible.Sum(r=>r.Cells.Count),columns=DisplayColumns().Count,
             hasEditors=table!=null&&FindVisual<EditableCell>(table)!=null,textBoxes=table is null?0:CountVisual<TextBox>(table),total=shownState?.Model.Total,page=shownState?.Model.Page,pages=shownState?.Model.PageCount,
             pageSize=shownState?.Model.PageSize,selected=shownState?.Model.Selected.Count,selectedRows=SelectedRows().Take(10).Select(r=>r.Get("ID")).ToArray(),
-            first=visible.FirstOrDefault()?.Row.Get("ID"),last=visible.LastOrDefault()?.Row.Get("ID"),builds=dataPageBuilds,rowBuilds=dataRowBuilds,queryBuilds=shownState?.Model.QueryBuilds,querying,
+            first=visible.FirstOrDefault()?.Row.Get("ID"),last=visible.LastOrDefault()?.Row.Get("ID"),builds=dataPageBuilds,rowBuilds=dataRowBuilds,queryBuilds=shownState?.Model.QueryBuilds,querying=gate.QueryInProgress,
             density=tableDensity,actualRowHeight=realized.FirstOrDefault().Height,viewport=scroll?.ViewportHeight,fullVisibleRows=realized.Count(r=>r.Top>=0&&r.Top+r.Height<=scroll!.ViewportHeight),
             vertical=scroll?.VerticalOffset,horizontal=horizontalTable?.HorizontalOffset,anchor=FirstVisibleDataRow()?.Id,
             windowWidth=RootGrid.ActualWidth,windowHeight=RootGrid.ActualHeight,rasterizationScale=RootGrid.XamlRoot?.RasterizationScale,

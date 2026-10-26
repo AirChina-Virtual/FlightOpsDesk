@@ -32,6 +32,8 @@
 | ../../tests/UiVerification/MainWindow.Verification.cs | 只编译进 QA 版本：窗口控制、故障注入和测量命令；正式程序不包含此文件 |
 | Assets | SVG、PNG 和多尺寸 ICO 图标 |
 
+R4 起，保存、状态判断和业务流程在 Application 的服务中；本项目的 WorkspaceStoreAdapter、OnlineGateway、DemoEngine 把存储、在线连接和演示引擎接到端口上，MainWindow*.cs 只保留界面代码。下文的 Save() 即 WorkspaceSession.SaveAsync。
+
 ## 修改代码时要保留的行为
 
 **保存。** 编辑单元格后，700 毫秒内没有新的输入就自动保存，并且只写被编辑的行（`SaveEdits`）。只替换已有行的撤销或重做，也通过 `SaveEdits` 保存这些行和撤销栈顺序。其他会修改数据的操作，都必须在修改后立即调用 `Save()`；这是“数据库与内存一致”的保证，新增修改数据的操作时不能只依赖自动保存。`Save()` 现在是变更日志保存：由 `Workspace.Journal()` 比较数据库记录与内存，只写发生了变化的行、字段定义、冲突、任务和头部，也一并写入尚未保存的单元格编辑；什么都没变就什么都不写。保存时机不变，变的只是写入的字节数。关闭窗口和切换工作区同样调用 `Save()`，没有改动时不产生任何写入。只记录任务或连接状态、不改动任何行的保存，用 `Save(dataChanged: false, JournalScope.Jobs)`（只写任务）或 `JournalScope.Header`（只写工作区头部，如连接 API），这样不会让数据页失效，也不会写行；范围之外的待写变化留在日志里。原地修改任务或条目的代码（重置失败条目、演示执行器、演示收尾）必须先 `workspace.Journal().TouchJob(job)`，这是快速路径，漏标记时状态指纹也会让日志发现任务状态变化；经过 `store.CheckpointWriter` 的写入自动标记。冲突处理只在内存里应用，对话结束或取消时保存一次。确认任务是否已保存用 `store.JobExists`，导出诊断用 `store.LoadJob`，维护预览用 `store.CountRows`，都不加载整个工作区。

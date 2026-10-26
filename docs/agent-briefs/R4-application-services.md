@@ -47,4 +47,9 @@
 
 ## 结果（由子代理填写）
 
-不超过 20 行：做了什么、提交列表、检查结果、关键数字、未完成或有风险的地方。
+做了什么：新增 InteractionGate、WorkspaceSession（含存储/自动保存端口）、Diagnostics/Maintenance/ImportExport/BatchEdit/Connection/Conflict/Review/Submission/TaskRecovery 服务和 DemoRunner；存储、在线、演示引擎经 Application 端口，由 App 的 WorkspaceStoreAdapter、OnlineGateway、DemoEngine 适配。BatchEditPreview、ReviewPlanBuilder、TaskSubmission、UnknownReview 移入 Application（VamSys.Core 命名空间）。
+提交：f1309c0 InteractionGate；82a415a WorkspaceSession+Maintenance；诊断导出；5a45d1a 在线端口/连接/冲突/参数；85e425d 导入导出；2810d83 批量编辑；711b522 审阅；2030a1c 提交交接；最后一个提交为任务恢复+DemoRunner+架构测试+文档（git log 查看）。
+检查：Quick 全部通过（单元 1140、集成 149）；QA 包 publish 成功；按指示未跑 Full，也未删任何旧场景。
+数字：MainWindow*.cs 共 2666 行 -> 2276 行；MainWindow*.cs 不再含 WorkspaceStore、7 个标志位和 Infrastructure 业务调用（仅 xaml.cs/Maintenance.cs 留有无用 using）；新增单元测试约 150 项；ArchitectureBoundaryTests 已加 Application 不引用 WinUI/SQLite/HttpClient 一条。
+清单：Enums.txt 预期文件不变，EnumInventoryTests 里加了 ReviewDisposition 迁移的来源映射；资源键清单不变（服务只返回结果对象，状态文案键仍在 UI 的 L(...) 里）。
+风险/注意：(1) 为让文件迁移后能编译，改了 tests/VamSys.Tests 等 3 个测试项目的 csproj 链接和 5 个测试文件的 using VamSys.App，未改任何旧场景。(2) 保持原行为：连接/导出/批量编辑等先改内存再保存，保存失败时内存已变（测试只断言数据库未变且待保存编辑被还原）。(3) 在线执行的性能记录现在只含执行器时间，不含此前的页面切换，位于 OnlineGateway。(4) 新增 InteractionGate 查询用名称区分（CanEdit 等），MainWindow 保留 Work/LocalOperation 的控件开关代码。(5) QA 验证文件 MainWindow.Verification.cs 只改了调用点（gate、storage）。

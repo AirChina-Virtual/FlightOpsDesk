@@ -1,5 +1,4 @@
 using VamSys.Core;
-using VamSys.Infrastructure;
 
 namespace VamSys.App;
 
@@ -7,7 +6,7 @@ public sealed partial class MainWindow
 {
     async Task VerifyTaskDeletions(BatchJob job)
     {
-        TaskSubmission.RequireExecution(workspace, job, RunMode.Online, closeState.IsOpen && !busy && !localOperation && !querying);
+        submission.RequireExecution(job, RunMode.Online, gate.CanRunTask);
         await Work(async () =>
         {
             running = new();
@@ -15,14 +14,8 @@ public sealed partial class MainWindow
             {
                 Navigation.SelectedItem = Navigation.MenuItems[4];
                 Render();
-                await new OperationsDeletionVerifier(Api(), workspace).VerifyAsync(job,
-                    new AppCheckpointWriter(this, store.CheckpointWriter(workspace)), running.Token, NotifyTask);
+                await recovery.VerifyDeletionsAsync(job, NotifyTask, running.Token);
                 Status(() => L("ApiDeleteCheckDone"));
-            }
-            catch (PersistenceException)
-            {
-                ReloadAfterCheckpointFailure();
-                throw;
             }
             finally { running.Dispose(); running = null; }
         });

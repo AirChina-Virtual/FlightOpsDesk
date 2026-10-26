@@ -89,8 +89,7 @@ public sealed partial class MainWindow
         taskIndex.Clear();
         pendingTaskItems.Clear();
         // Each session's adapter holds the instance it was created for; a reload gets a new one anyway.
-        if (apiSessions.Remove(previous.Id, out var session))
-            session.Client.Dispose();
+        online.Release(previous.Id);
     }
     UIElement GetSettingsPage()
     {

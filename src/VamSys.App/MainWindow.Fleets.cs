@@ -9,13 +9,14 @@ public sealed partial class MainWindow
 {
     Task ChooseFleets(DataRow? single) => LocalOperation(async () =>
     {
-        var selection = BatchSelection.Capture(single is null ? SelectedRows() : new List<DataRow> { single });
-        var rows = selection.Eligible;
-        if (rows.Count == 0)
+        var start = batch.BeginFleetAssignment(resource, single is null ? SelectedRows() : new List<DataRow> { single });
+        if (start is null)
         { Status(() => L("BatchNothing")); return; }
-        var field = FleetAssignmentService.Field(resource);
-        var initial = rows.Count == 1 ? FleetAssignmentService.Tokens(rows[0].Get(field)) : new List<string>();
-        var options = fleets.Options(workspace, rows.SelectMany(r => FleetAssignmentService.Tokens(r.Get(field))));
+        var selection = start.Selection;
+        var rows = selection.Eligible;
+        var field = start.Field;
+        var initial = start.Initial;
+        var options = start.Options;
         var summary = Text(() => "");
         var choices = new List<FleetOptionViewModel>();
         void Changed(FleetOptionViewModel choice)
@@ -40,7 +41,7 @@ public sealed partial class MainWindow
         if (!await Confirm(resource == ResourceKind.Aircraft ? L("Text_F1439C5A73") : L("Text_F042305012"),
             new ScrollViewer { MaxHeight = Math.Max(160, RootGrid.ActualHeight - 220), Content = Stack(BatchTargets(selection, single != null), mode, search, list, summary) }, L("Text_5C250CFB41")))
             return;
-        var preview = fleets.Preview(workspace, resource, rows, choices.Where(c => c.Selected).Select(c => c.Option.Token), (FleetAssignmentMode)mode.SelectedIndex);
+        var preview = batch.PreviewFleets(resource, rows, choices.Where(c => c.Selected).Select(c => c.Option.Token), (FleetAssignmentMode)mode.SelectedIndex);
         if (preview.Issues.Count > 0)
         { await Confirm(L("Text_7B23705C3B"), new ScrollViewer { MaxHeight = 350, Content = Text(() => string.Join("\n", preview.Issues.Take(60).Select(i => L(i.Description)))) }, L("Text_3FD47EDCE4")); return; }
         if (preview.Rows.Count == 0)
@@ -50,26 +51,22 @@ public sealed partial class MainWindow
         var before = rows.ToDictionary(r => r.LocalId);
         if (!await Confirm(L("Text_D1482F496E"), new ListView { MaxHeight = 380, Header = Text(() => BatchScope(selection, preview.Rows.Count)), ItemsSource = preview.Rows.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n{Label(before[r.LocalId].Get(field))} → {Label(r.Get(field))}").ToList() }, L("Text_2354C137CE")))
             return;
-        fleets.Apply(Data, preview);
-        await Save();
+        await batch.ApplyFleetsAsync(resource, preview);
         Status(() => BatchScope(selection, preview.Rows.Count));
     });
-
     Task RetireSelected() => LocalOperation(async () =>
     {
-        if (resource != ResourceKind.Routes)
+        if (batch.ProposeRetire(resource, SelectedRows()) is not { } proposal)
             return;
-        var selection = BatchSelection.Capture(SelectedRows());
+        var selection = proposal.Selection;
         if (selection.Eligible.Count == 0)
         { Status(() => L("BatchNothing")); return; }
-        var end = DateTime.UtcNow.AddDays(-2).ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
-        var preview = BatchEditPreview.Rule(selection, new(RuleKind.Set, "End Date", end));
+        var preview = proposal.Preview!;
         if (preview.Changes.Count == 0)
         { Status(() => BatchScope(selection, 0)); return; }
         if (!await Confirm(L("Text_B80DA74EC5"), BatchPreview(selection, preview.Field, preview.Changes), L("Text_52D4945C25")))
             return;
-        preview.Apply(Data);
-        await Save();
+        await batch.ApplyEditAsync(resource, preview);
         Status(() => BatchScope(selection, preview.Changes.Count));
     });
 }

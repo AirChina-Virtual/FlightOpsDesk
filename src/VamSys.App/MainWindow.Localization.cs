@@ -17,7 +17,7 @@ public sealed partial class MainWindow
     string EnumText(Enum value) => L("Enum_" + value.GetType().Name + "_" + value);
     void InitializeLanguage()
     {
-        localization.SetLanguage(store.LoadLanguage());
+        localization.SetLanguage(settings.LoadLanguage());
         localization.MissingResource += key =>
         {
             try
@@ -81,7 +81,7 @@ public sealed partial class MainWindow
             if (language == localization.Language)
                 return Task.CompletedTask;
             try
-            { store.SaveLanguage(language); }
+            { settings.SaveLanguage(language); }
             catch { picker.SelectedIndex = localization.Language == "en-US" ? 1 : 0; throw; }
             localization.SetLanguage(language);
             return Task.CompletedTask;

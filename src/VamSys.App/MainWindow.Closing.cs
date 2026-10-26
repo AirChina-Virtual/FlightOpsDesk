@@ -3,11 +3,9 @@ namespace VamSys.App;
 
 public sealed partial class MainWindow
 {
-    readonly WindowCloseController closeState = new();
-    int interactiveOperations, dialogs;
     void FreezeClosing(bool frozen)
     {
-        autosave.Stop();
+        session.CancelAutosave();
         CancelDataQuery();
         RefreshDataAvailability();
         Navigation.IsEnabled = !frozen;
@@ -21,11 +19,9 @@ public sealed partial class MainWindow
     }
     async Task UserAction(Func<Task> action)
     {
-        if (!closeState.IsOpen)
+        using var running = gate.TryBeginUserAction();
+        if (running is null)
             return;
-        interactiveOperations++;
-        try
-        { await Guard(action); }
-        finally { interactiveOperations--; }
+        await Guard(action);
     }
 }

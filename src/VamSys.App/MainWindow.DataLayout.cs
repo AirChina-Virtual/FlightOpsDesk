@@ -89,7 +89,7 @@ public sealed partial class MainWindow
     {
         if (!CanEditData() || target == tableDensity)
             return;
-        store.SaveTableDensity(target); // Preserve the current view if persistence fails.
+        settings.SaveTableDensity(target); // Preserve the current view if persistence fails.
         CapturePageState();
         var state = CurrentDataState;
         var anchor = FirstVisibleDataRow();

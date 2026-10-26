@@ -11,7 +11,7 @@ public sealed partial class MainWindow
 {
     Workspace? dataPageOwner;
     ResourceKind dataPageResource;
-    bool querying, restoringDataSelection;
+    bool restoringDataSelection;
     CancellationTokenSource? dataQueryCancellation;
     long dataQueryGeneration;
     Task dataQueryTask = Task.CompletedTask;
@@ -47,7 +47,7 @@ public sealed partial class MainWindow
         if (ReferenceEquals(dataPageOwner, workspace) && dataPageResource == resource && shownDataPage != null)
         {
             RefreshDataAvailability();
-            if (CurrentDataState.Model.IsDirty && !busy && !querying)
+            if (CurrentDataState.Model.IsDirty && gate.CanLoadOnShow)
                 StartDataQuery();
             return shownDataPage;
         }
@@ -69,7 +69,7 @@ public sealed partial class MainWindow
             ShowDataPageRows(false);
             RestoreDataOffsets(state);
         }
-        else if (!busy)
+        else if (gate.CanLoadOnBuild)
             StartDataQuery();
         RefreshDataAvailability();
         return content;
@@ -188,13 +188,13 @@ public sealed partial class MainWindow
         dataQueryGeneration++;
         dataQueryCancellation?.Cancel();
         dataQueryCancellation = null;
-        querying = false;
-        BusyRing.IsActive = busy;
+        gate.SetQuerying(false);
+        BusyRing.IsActive = gate.ShowsWorkProgress;
         RefreshDataAvailability();
     }
     async Task LoadRowsAsync(string search, int filter, string? sort)
     {
-        if (!closeState.IsOpen || busy || localOperation || table is null)
+        if (!gate.CanStartQuery || table is null)
             return;
         CancelDataQuery();
         var cancellation = new CancellationTokenSource();
@@ -205,7 +205,7 @@ public sealed partial class MainWindow
         var kind = resource;
         var source = Data;
         var state = CurrentDataState;
-        querying = true;
+        gate.SetQuerying(true);
         BusyRing.IsActive = true;
         RefreshDataAvailability();
         try
@@ -235,7 +235,7 @@ public sealed partial class MainWindow
                 return;
             tableBaseline = baseline;
             tableConflicts = source.Conflicts.Select(c => c.RowId).ToHashSet();
-            tableFleetLabels = fleets.Options(owner).ToDictionary(o => o.Token, StringComparer.OrdinalIgnoreCase);
+            tableFleetLabels = batch.FleetOptions(owner).ToDictionary(o => o.Token, StringComparer.OrdinalIgnoreCase);
             state.Baseline = tableBaseline;
             state.Conflicts = tableConflicts;
             state.FleetLabels = tableFleetLabels;
@@ -256,13 +256,13 @@ public sealed partial class MainWindow
             if (generation == dataQueryGeneration)
             {
                 dataQueryCancellation = null;
-                querying = false;
-                BusyRing.IsActive = busy;
+                gate.SetQuerying(false);
+                BusyRing.IsActive = gate.ShowsWorkProgress;
                 RefreshDataAvailability();
             }
         }
     }
-    bool CanEditData() => closeState.IsOpen && !busy && !localOperation && !querying && !storageBlocked;
+    bool CanEditData() => gate.CanEdit;
     void ShowDataPageRows(bool resetVertical)
     {
         if (table is null || shownState is null)
@@ -329,8 +329,7 @@ public sealed partial class MainWindow
                     if (changeCounts.TryGetValue(data, out var count))
                         changeCounts[data] = count + (after != null ? 1 : 0) - (before != null ? 1 : 0);
                     view?.Cells.FirstOrDefault(c => c.Field == "_delete")?.RefreshLanguage();
-                    edits.Cell(owner, link.Kind, currentId);
-                    SaveSoon();
+                    session.RecordCellEdit(owner, link.Kind, currentId);
                     Status(() => L("Text_75141EDE81"));
                 })
                 {
@@ -511,7 +510,7 @@ public sealed partial class MainWindow
         if (clearSelection != null)
             clearSelection.IsEnabled = enabled && model.Selected.Count > 0;
         if (queryCancel != null)
-            queryCancel.Visibility = querying ? Visibility.Visible : Visibility.Collapsed;
+            queryCancel.Visibility = gate.QueryInProgress ? Visibility.Visible : Visibility.Collapsed;
         if (pageSummary != null)
         {
             pageSummary.Text = $"{model.Page} / {model.PageCount}";
