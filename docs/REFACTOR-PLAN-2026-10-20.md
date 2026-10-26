@@ -240,6 +240,8 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **出口：** `MainWindow` 不含业务判断；全部回归与 `test-v3-verification-ui`、`test-recovery-ui`、`test-settings-save-ui` 通过。
 
+**进度（2026-10-25，refactor/r0 2270a96）：** `DataRow` 改为不可变（只能创建时赋值，修改用 `With`／`Builder` 生成新行），正式版也由编译器保证，去掉了 Debug 守卫；5 万行规划分配 132→52 MB。`InteractionGate` 取代 7 个分散的状态标志，`WorkspaceSession` 接管保存锁、待保存编辑、自动保存和切换工作区；拆出维护、诊断、导入导出、批量编辑、连接、冲突、审阅、提交、任务恢复服务和 `DemoRunner`；`MainWindow*.cs` 2666→2276 行，不再引用存储和这些标志。新增约 150 项单元测试。剩余：页面里的 `Work`／本地操作控件开关随 R6 处理；`ReviewDisposition` 的枚举清单仍用旧位置映射，待旧测试清理时改为如实记录；本阶段的窗口脚本验收尚未运行。详见 [简报结果](agent-briefs/R4-application-services.md)。
+
 ### R5 API 层重构
 
 新项目 `VamSys.Api`，从最底层的 HTTP 往上逐层重建。每一层单独可测，上层只依赖下层接口。
@@ -258,6 +260,8 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 5. **缓存。** 按行缓存从 `RawApiJson` 解析出的少量字段（B8）。
 
 **验收：** 请求金样逐字节一致、请求次数一致；进程终止测试通过；`test-api-ui-20k` 通过。演示是否改为共用在线流水线属于行为变化，见 R-D6。
+
+**进度（2026-10-25）：** 第 1–5 项完成，仍在 `VamSys.Infrastructure` 内（`Transport/`、`Api/`、`Api/Pipeline/`），没有另建 `VamSys.Api` 项目。`OperationsAdapter` 677→115 行、`OperationsBatchExecutor` 345→17 行，只剩外观；写入路径在类型上拿不到重试策略，并有反射测试兜底。请求金样逐字节不变、请求次数不变；新增单元测试约 420 项、集成测试约 70 项。`SocketsHttpHandler`（B10）未改。`test-api-ui-20k` 和旧测试中的传输、适配器场景清理尚未做。详见 [简报结果](agent-briefs/R5-adapter-executor.md)。
 
 ### R6 界面重构
 
