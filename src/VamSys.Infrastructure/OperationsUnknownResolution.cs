@@ -17,7 +17,7 @@ public static class OperationsPendingDiscard
         {
             if (!ApiOperationPolicy.CanDiscardUnsent(job.Items[n]))
                 continue;
-            var candidate = System.Text.Json.JsonSerializer.Deserialize<ChangeItem>(System.Text.Json.JsonSerializer.Serialize(job.Items[n]))!;
+            var candidate = JobCheckpoint.Clone(job.Items[n]);
             candidate.State = ItemState.Failed;
             candidate.SetMessage(Messages.Define("ApiDiscardedUnsent"));
             positions.Add(n);
@@ -25,11 +25,8 @@ public static class OperationsPendingDiscard
         }
         if (candidates.Count == 0)
             return 0;
-        var header = new BatchJob { Id = job.Id, Created = job.Created, Mode = job.Mode, Items = job.Items };
-        header.SetStatus(JobStatus.NeedsAttention, Messages.Define("Text_E9008C53CF"));
-        try
-        { await writer.WriteAsync(new(CheckpointKind.Task, header, Items: candidates), CancellationToken.None); }
-        catch (Exception error) { throw new PersistenceException(error); }
+        var header = JobCheckpoint.Header(job, JobStatus.NeedsAttention, Messages.Define("Text_E9008C53CF"));
+        await JobCheckpoint.WriteAsync(writer, new(CheckpointKind.Task, header, Items: candidates));
         for (var n = 0; n < positions.Count; n++)
             job.Items[positions[n]] = candidates[n];
         job.StatusCode = header.StatusCode;
@@ -52,22 +49,16 @@ public sealed class OperationsUnknownResolver(OperationsAdapter api, Workspace w
         if (job.Mode != RunMode.Online || workspace.Mode != RunMode.Online || !workspace.Jobs.Contains(job) || !job.Items.Contains(item) || !CanCheck(item))
             throw OperationsAdapter.Block("ApiUnknown");
         await api.EnsureReadConnectionAsync(ct);
-        var candidate = System.Text.Json.JsonSerializer.Deserialize<ChangeItem>(System.Text.Json.JsonSerializer.Serialize(item))!;
+        var candidate = JobCheckpoint.Clone(item);
         if (!await api.ProveNotAppliedAsync(candidate, ct))
             return false;
         foreach (var step in candidate.ApiSteps.Where(s => s.State == BatchStepState.InFlight))
             step.State = BatchStepState.Prepared;
         candidate.State = ItemState.Failed;
         candidate.SetMessage(Messages.Define("ApiNotAppliedVerified"));
-        var header = new BatchJob { Id = job.Id, Created = job.Created, Mode = job.Mode, Items = job.Items };
-        header.SetStatus(JobStatus.NeedsAttention, Messages.Define("Text_E9008C53CF"));
-        try
-        { await writer.WriteAsync(new(CheckpointKind.Task, header, candidate), CancellationToken.None); }
-        catch (Exception error) { throw new PersistenceException(error); }
-        job.Items[job.Items.IndexOf(item)] = candidate;
-        job.StatusCode = header.StatusCode;
-        job.Status = header.Status;
-        job.Description = header.Description;
+        var header = JobCheckpoint.Header(job, JobStatus.NeedsAttention, Messages.Define("Text_E9008C53CF"));
+        await JobCheckpoint.WriteAsync(writer, new(CheckpointKind.Task, header, candidate));
+        JobCheckpoint.Replace(job, item, candidate, header);
         return true;
     }
 }

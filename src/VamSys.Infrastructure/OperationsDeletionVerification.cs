@@ -17,35 +17,32 @@ public sealed class OperationsDeletionVerifier(OperationsAdapter api, Workspace 
     {
         if (job.Mode != RunMode.Online || workspace.Mode != RunMode.Online || !workspace.Jobs.Contains(job) || !job.Items.Contains(item) || item.State != ItemState.Unknown || !item.WriteAccepted || !IndependentApiEvidence.IsSoftDelete(item))
             throw OperationsAdapter.Block("ApiUnknown");
-        if (workspace.AirlineId is not { } owner || item.Before?.Identity is not { } original || item.After.Identity is not { } target
-            || original.ConnectionId != owner || target.ConnectionId != owner || original.RemoteId != target.RemoteId || item.Before!.LocalId != item.After.LocalId)
-            throw OperationsAdapter.Block("ApiWrongVa");
+        var original = RequireSameRecord(item);
         ct.ThrowIfCancellationRequested();
-        var candidate = System.Text.Json.JsonSerializer.Deserialize<ChangeItem>(System.Text.Json.JsonSerializer.Serialize(item))!;
+        var candidate = JobCheckpoint.Clone(item);
         candidate.State = ItemState.ManuallyConfirmed;
         candidate.Rebased = true;
         candidate.SetMessage(Messages.Define("ApiManualResult"));
         if (candidate.DeletionVerification is { } evidence)
             candidate.DeletionVerification = evidence with { WasManuallyConfirmed = true };
-        var header = new BatchJob { Id = job.Id, Created = job.Created, Mode = job.Mode, Items = job.Items };
-        header.SetStatus(JobStatus.NeedsAttention, Messages.Define("ApiManualResult"));
+        var header = JobCheckpoint.Header(job, JobStatus.NeedsAttention, Messages.Define("ApiManualResult"));
         var data = workspace.Resources[item.Resource];
         var delta = new ResourceRebaseDelta(item.Resource, item.After.LocalId, new(RowMutationKind.Delete),
             new(data.FindDraftRow(item.After.LocalId) is { } draft && Schemas.Deleted(draft) ? RowMutationKind.Delete : RowMutationKind.Keep),
             DateTimeOffset.UtcNow, true, null);
-        try
-        { await writer.WriteAsync(new(CheckpointKind.Rebase, header, candidate, Delta: delta), CancellationToken.None); }
-        catch (Exception error) { throw new PersistenceException(error); }
-        data.Snapshot.RemoveAll(r => r.LocalId == item.After.LocalId);
-        if (delta.Draft.Action == RowMutationKind.Delete)
-            data.Draft.RemoveAll(r => r.LocalId == item.After.LocalId);
-        data.ClearHistory(invalidateIndex: delta.Draft.Action == RowMutationKind.Delete);
-        data.SnapshotAt = delta.SnapshotAt;
-        job.Items[job.Items.IndexOf(item)] = candidate;
-        job.StatusCode = header.StatusCode;
-        job.Status = header.Status;
-        job.Description = header.Description;
+        await JobCheckpoint.WriteAsync(writer, new(CheckpointKind.Rebase, header, candidate, Delta: delta));
+        JobCheckpoint.ApplyRemoval(data, delta);
+        JobCheckpoint.Replace(job, item, candidate, header);
         api.Forget(item.Resource, original.RemoteId);
+    }
+
+    // The item's record belongs to this workspace's VA and the before and after rows describe the same record.
+    ResourceIdentity RequireSameRecord(ChangeItem item)
+    {
+        if (workspace.AirlineId is not { } owner || item.Before?.Identity is not { } original || item.After.Identity is not { } target
+            || original.ConnectionId != owner || target.ConnectionId != owner || original.RemoteId != target.RemoteId || item.Before!.LocalId != item.After.LocalId)
+            throw OperationsAdapter.Block("ApiWrongVa");
+        return original;
     }
 
     // A soft delete the server never answered (timeout or 5xx) has no write receipt, so neither the
@@ -57,17 +54,14 @@ public sealed class OperationsDeletionVerifier(OperationsAdapter api, Workspace 
     {
         if (job.Mode != RunMode.Online || workspace.Mode != RunMode.Online || !workspace.Jobs.Contains(job) || !job.Items.Contains(item) || !CanConfirmWithoutReceipt(item))
             throw OperationsAdapter.Block("ApiUnknown");
-        if (workspace.AirlineId is not { } owner || item.Before?.Identity is not { } original || item.After.Identity is not { } target
-            || original.ConnectionId != owner || target.ConnectionId != owner || original.RemoteId != target.RemoteId || item.Before!.LocalId != item.After.LocalId)
-            throw OperationsAdapter.Block("ApiWrongVa");
-        return original;
+        return RequireSameRecord(item);
     }
-    static ChangeItem Clone(ChangeItem item) => System.Text.Json.JsonSerializer.Deserialize<ChangeItem>(System.Text.Json.JsonSerializer.Serialize(item))!;
+
     public async Task<NoReceiptReview> InspectWithoutReceiptAsync(BatchJob job, ChangeItem item, CancellationToken ct)
     {
         var original = RequireNoReceipt(job, item);
         await api.EnsureReadConnectionAsync(ct);
-        var candidate = Clone(item);
+        var candidate = JobCheckpoint.Clone(item);
         var found = await api.FindRow(item.Resource, item.After, original.RemoteId, ct);
         api.RecordDeletionVerification(candidate, found);
         if (candidate.ReadbackDetails is { } read)
@@ -75,6 +69,7 @@ public sealed class OperationsDeletionVerifier(OperationsAdapter api, Workspace 
         var unchanged = found != null && api.Matches(candidate, found, candidate.Before!, true);
         return new(item, candidate, found, unchanged, found == null ? [] : api.BeforeDifferences(candidate, found));
     }
+
     public async Task<bool> ConfirmWithoutReceiptAsync(BatchJob job, ChangeItem item, IBatchCheckpointWriter writer, CancellationToken ct)
     {
         var review = await InspectWithoutReceiptAsync(job, item, ct);
@@ -83,13 +78,14 @@ public sealed class OperationsDeletionVerifier(OperationsAdapter api, Workspace 
         await ConfirmWithoutReceiptAsync(job, review, writer);
         return true;
     }
+
     public async Task MarkUnchangedAsync(BatchJob job, NoReceiptReview review, IBatchCheckpointWriter writer)
     {
         var item = review.Item;
         RequireNoReceipt(job, item);
         if (!review.CanMarkUnchanged)
             throw OperationsAdapter.Block("ApiUnknown");
-        var candidate = Clone(review.Candidate);
+        var candidate = JobCheckpoint.Clone(review.Candidate);
         // Like a proven not-applied write: the step returns to prepared so the item no longer counts as unresolved.
         foreach (var step in candidate.ApiSteps.Where(s => s.State == BatchStepState.InFlight))
             step.State = BatchStepState.Prepared;
@@ -99,23 +95,18 @@ public sealed class OperationsDeletionVerifier(OperationsAdapter api, Workspace 
         candidate.ManualResolution = new("SoftDeleteUnchanged", now, status, false);
         candidate.State = ItemState.Failed;
         candidate.SetMessage(Messages.Define("ApiSoftDeleteUnchanged"));
-        var header = new BatchJob { Id = job.Id, Created = job.Created, Mode = job.Mode, Items = job.Items };
-        header.SetStatus(JobStatus.NeedsAttention, Messages.Define("Text_E9008C53CF"));
-        try
-        { await writer.WriteAsync(new(CheckpointKind.Task, header, candidate), CancellationToken.None); }
-        catch (Exception error) { throw new PersistenceException(error); }
-        job.Items[job.Items.IndexOf(item)] = candidate;
-        job.StatusCode = header.StatusCode;
-        job.Status = header.Status;
-        job.Description = header.Description;
+        var header = JobCheckpoint.Header(job, JobStatus.NeedsAttention, Messages.Define("Text_E9008C53CF"));
+        await JobCheckpoint.WriteAsync(writer, new(CheckpointKind.Task, header, candidate));
+        JobCheckpoint.Replace(job, item, candidate, header);
     }
+
     public async Task ConfirmWithoutReceiptAsync(BatchJob job, NoReceiptReview review, IBatchCheckpointWriter writer)
     {
         var item = review.Item;
         var original = RequireNoReceipt(job, item);
         if (!review.CanConfirmDeleted)
             throw OperationsAdapter.Block("ApiUnknown");
-        var candidate = Clone(review.Candidate);
+        var candidate = JobCheckpoint.Clone(review.Candidate);
         var now = DateTimeOffset.UtcNow;
         var status = candidate.ReadbackDetails?.Status;
         candidate.DeletionVerification = new("ManualWithoutWriteReceipt", now, item.DiagnosticDetails?.Status, status, true);
@@ -123,26 +114,17 @@ public sealed class OperationsDeletionVerifier(OperationsAdapter api, Workspace 
         candidate.State = ItemState.ManuallyConfirmed;
         candidate.Rebased = true;
         candidate.SetMessage(Messages.Define("ApiManualDeleteNoReceipt"));
-        var header = new BatchJob { Id = job.Id, Created = job.Created, Mode = job.Mode, Items = job.Items };
-        header.SetStatus(JobStatus.NeedsAttention, Messages.Define("ApiManualResult"));
+        var header = JobCheckpoint.Header(job, JobStatus.NeedsAttention, Messages.Define("ApiManualResult"));
         var data = workspace.Resources[item.Resource];
         var delta = new ResourceRebaseDelta(item.Resource, item.After.LocalId, new(RowMutationKind.Delete),
             new(data.FindDraftRow(item.After.LocalId) is { } draft && Schemas.Deleted(draft) ? RowMutationKind.Delete : RowMutationKind.Keep), now, true, null);
-        try
-        { await writer.WriteAsync(new(CheckpointKind.Rebase, header, candidate, Delta: delta), CancellationToken.None); }
-        catch (Exception error) { throw new PersistenceException(error); }
-        data.Snapshot.RemoveAll(r => r.LocalId == item.After.LocalId);
-        if (delta.Draft.Action == RowMutationKind.Delete)
-            data.Draft.RemoveAll(r => r.LocalId == item.After.LocalId);
-        data.ClearHistory(invalidateIndex: delta.Draft.Action == RowMutationKind.Delete);
-        data.SnapshotAt = delta.SnapshotAt;
-        job.Items[job.Items.IndexOf(item)] = candidate;
-        job.StatusCode = header.StatusCode;
-        job.Status = header.Status;
-        job.Description = header.Description;
+        await JobCheckpoint.WriteAsync(writer, new(CheckpointKind.Rebase, header, candidate, Delta: delta));
+        JobCheckpoint.ApplyRemoval(data, delta);
+        JobCheckpoint.Replace(job, item, candidate, header);
         api.Forget(item.Resource, original.RemoteId);
     }
 
+    // Reads every soft delete that is Unknown or was confirmed by hand and, where the record is provably invisible, completes it.
     public async Task VerifyAsync(BatchJob job, IBatchCheckpointWriter writer, CancellationToken ct, Action<BatchProgress>? progress = null)
     {
         if (job.Mode != RunMode.Online || workspace.Mode != RunMode.Online || !workspace.Jobs.Contains(job))
@@ -154,7 +136,7 @@ public sealed class OperationsDeletionVerifier(OperationsAdapter api, Workspace 
         foreach (var item in job.Items.Where(IndependentApiEvidence.CanCheckDeletion).ToArray())
         {
             ct.ThrowIfCancellationRequested();
-            var candidate = System.Text.Json.JsonSerializer.Deserialize<ChangeItem>(System.Text.Json.JsonSerializer.Serialize(item))!;
+            var candidate = JobCheckpoint.Clone(item);
             var id = item.RemoteId ?? item.Before?.Identity?.RemoteId;
             if (id is null || item.Before?.Identity?.ConnectionId != workspace.AirlineId || item.After.Identity?.RemoteId != id)
                 continue;
@@ -208,9 +190,7 @@ public sealed class OperationsDeletionVerifier(OperationsAdapter api, Workspace 
                 new(remove ? RowMutationKind.Delete : RowMutationKind.Keep),
                 new(remove && data.FindDraftRow(item.After.LocalId) is { } draft && Schemas.Deleted(draft) ? RowMutationKind.Delete : RowMutationKind.Keep),
                 data.SnapshotAt ?? DateTimeOffset.UtcNow, remove, ApiOperationPolicy.Key(candidate)) : null;
-            try
-            { await writer.WriteAsync(new(delta is null ? CheckpointKind.Task : CheckpointKind.Rebase, staged, candidate, Delta: delta), CancellationToken.None); }
-            catch (Exception error) { throw new PersistenceException(error); }
+            await JobCheckpoint.WriteAsync(writer, new(delta is null ? CheckpointKind.Task : CheckpointKind.Rebase, staged, candidate, Delta: delta));
             if (delta != null)
             {
                 if (delta.Snapshot.Action == RowMutationKind.Delete)

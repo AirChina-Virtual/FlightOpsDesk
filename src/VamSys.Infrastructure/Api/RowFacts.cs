@@ -23,11 +23,9 @@ internal sealed class RowFacts
     {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
-        var aliases = new List<string>(2);
-        foreach (var key in new[] { "icao", "iata" })
-            if (root.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(v.GetString()))
-                aliases.Add(v.GetString()!);
-        Aliases = aliases.ToArray();
+        var icao = Alias(root, "icao");
+        var iata = Alias(root, "iata");
+        Aliases = icao is null ? (iata is null ? [] : [iata]) : (iata is null ? [icao] : [icao, iata]);
         DepartureId = Text(root, "departure_id");
         ArrivalId = Text(root, "arrival_id");
         DepartureAirportId = Text(root, "departure_airport_id");
@@ -38,6 +36,10 @@ internal sealed class RowFacts
             if (root.TryGetProperty(TemporalWires[n], out var t))
                 temporal[n] = (true, t.ValueKind == JsonValueKind.String, t.ToString());
     }
+
+    // A code the server sent as non-blank text.
+    static string? Alias(JsonElement root, string name)
+        => root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(v.GetString()) ? v.GetString() : null;
 
     static string? Text(JsonElement root, string name) => root.TryGetProperty(name, out var v) ? v.ToString() : null;
 

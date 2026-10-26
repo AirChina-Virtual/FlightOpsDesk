@@ -1,4 +1,3 @@
-using System.Text.Json;
 using VamSys.Core;
 
 namespace VamSys.Infrastructure;
@@ -37,7 +36,7 @@ internal sealed class ItemCompletion(JobRun run)
         var current = original.FindDraftRow(item.After.LocalId);
         var data = new ResourceData { Draft = current == null ? [] : [current], SnapshotAt = original.SnapshotAt };
         var staged = workspace.StageResource(item.Resource, data);
-        var stagedItem = JsonSerializer.Deserialize<ChangeItem>(JsonSerializer.Serialize(item))!;
+        var stagedItem = JobCheckpoint.Clone(item);
         ApplyRebase(staged, stagedItem, verified, null);
         var delta = new ResourceRebaseDelta(item.Resource, item.After.LocalId,
             new(verified == null ? RowMutationKind.Delete : RowMutationKind.Upsert, data.Snapshot.FirstOrDefault()),

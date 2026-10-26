@@ -29,7 +29,7 @@ public sealed class OperationsServerValueResolver(OperationsAdapter api, Workspa
     {
         Require(job, item);
         await api.EnsureReadConnectionAsync(ct);
-        var candidate = System.Text.Json.JsonSerializer.Deserialize<ChangeItem>(System.Text.Json.JsonSerializer.Serialize(item))!;
+        var candidate = JobCheckpoint.Clone(item);
         var current = await api.FindResult(candidate, Id(candidate), ct);
         api.RecordReadback(candidate, current);
         if (candidate.ReadbackDetails is { } read)
@@ -47,7 +47,7 @@ public sealed class OperationsServerValueResolver(OperationsAdapter api, Workspa
         if (!review.CanAccept)
             throw OperationsAdapter.Block("ApiUnknown");
         var current = review.Current!;
-        var candidate = System.Text.Json.JsonSerializer.Deserialize<ChangeItem>(System.Text.Json.JsonSerializer.Serialize(review.Candidate))!;
+        var candidate = JobCheckpoint.Clone(review.Candidate);
         candidate.State = ItemState.ManuallyConfirmed;
         candidate.Rebased = true;
         candidate.RecoveryCandidateId = null;
@@ -63,13 +63,10 @@ public sealed class OperationsServerValueResolver(OperationsAdapter api, Workspa
         var conflicts = new List<MergeConflict>();
         var rebased = Rebase(item, draft, baseline, snapshot, conflicts);
         var allConflicts = data.Conflicts.Where(c => c.RowId != local).Concat(conflicts).ToList();
-        var header = new BatchJob { Id = job.Id, Created = job.Created, Mode = job.Mode, Items = job.Items };
-        header.SetStatus(JobStatus.NeedsAttention, Messages.Define("ApiManualResult"));
+        var header = JobCheckpoint.Header(job, JobStatus.NeedsAttention, Messages.Define("ApiManualResult"));
         var delta = new ResourceRebaseDelta(item.Resource, local, new(RowMutationKind.Upsert, snapshot), new(RowMutationKind.Upsert, rebased),
             DateTimeOffset.UtcNow, true, null, allConflicts);
-        try
-        { await writer.WriteAsync(new(CheckpointKind.Rebase, header, candidate, Delta: delta), CancellationToken.None); }
-        catch (Exception error) { throw new PersistenceException(error); }
+        await JobCheckpoint.WriteAsync(writer, new(CheckpointKind.Rebase, header, candidate, Delta: delta));
         data.Snapshot.RemoveAll(r => r.LocalId == local);
         data.Snapshot.Add(snapshot);
         if (draft != null)
@@ -79,10 +76,7 @@ public sealed class OperationsServerValueResolver(OperationsAdapter api, Workspa
         data.Conflicts = allConflicts;
         data.ClearHistory(invalidateIndex: draft == null);
         data.SnapshotAt = delta.SnapshotAt;
-        job.Items[job.Items.IndexOf(item)] = candidate;
-        job.StatusCode = header.StatusCode;
-        job.Status = header.Status;
-        job.Description = header.Description;
+        JobCheckpoint.Replace(job, item, candidate, header);
     }
 
     // The draft follows the server except where the user's values differ from it: values sent by this
