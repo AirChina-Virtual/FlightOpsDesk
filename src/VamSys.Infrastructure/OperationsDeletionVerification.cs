@@ -2,47 +2,6 @@ using VamSys.Core;
 
 namespace VamSys.Infrastructure;
 
-public sealed partial class OperationsAdapter
-{
-    internal bool RecordDeletionVerification(ChangeItem item, DataRow? current)
-    {
-        RecordReadback(item, current);
-        var id = item.RemoteId ?? item.Before?.Identity?.RemoteId;
-        var relative = id is null ? null : Collection(item.Resource) + "/" + id;
-        var absolute = relative is null ? null : BaseUri.AbsolutePath + relative;
-        var write = item.DiagnosticDetails;
-        var read = item.ReadbackDetails;
-        var step = item.ApiSteps.Count == 1 ? item.ApiSteps[0] : null;
-        var proof = IndependentApiEvidence.Covers(item, ApiContracts.Sha256) && IndependentApiEvidence.IsSoftDelete(item)
-            && item.WriteAccepted && item.Before?.Identity is { } identity && identity.ConnectionId == ConnectionId
-            && identity.RemoteId == id && item.Before.LocalId == item.After.LocalId && item.After.Identity?.RemoteId == id && item.After.Identity.ConnectionId == ConnectionId
-            && SessionAirlineId == ConnectionId
-            && step is { Method: "DELETE", State: BatchStepState.ResponseReceived } && step.Path == relative && step.Body.Count == 0
-            && write is { Method: "DELETE", Status: 204 } && write.Path == absolute
-            && step.StartedAt is not null && step.FinishedAt is not null && step.FinishedAt >= step.StartedAt
-            && write.StartedAt >= step.StartedAt && write.FinishedAt >= write.StartedAt && write.FinishedAt <= step.FinishedAt
-            && read is { Method: "GET", Status: 404 } && read.Path == absolute && read.StartedAt >= write.FinishedAt;
-        var outcome = proof && current is null ? "ApiInvisible" : current is not null ? "StillReadable" : "MissingWriteEvidence";
-        item.DeletionVerification = new(outcome, transport.UtcNow, write?.Status, read?.Status,
-            item.State == ItemState.ManuallyConfirmed || item.DeletionVerification?.WasManuallyConfirmed == true);
-        if (proof && current is null)
-            item.VerificationDifferences = [];
-        return proof && current is null;
-    }
-    // For display only; whether the record is unchanged is decided by Matches(before: true).
-    internal List<ApiFieldDifference> BeforeDifferences(ChangeItem item, DataRow current)
-        => WireFields(item.Resource).Select(f => f.Csv).Where(f => !Equivalent(f, item.Before?.Get(f) ?? "", current.Get(f)))
-            .Select(f => new ApiFieldDifference(f, item.Before?.Get(f), current.Get(f))).ToList();
-    internal async Task EnsureReadConnectionAsync(CancellationToken ct)
-    {
-        if (SessionAirlineId == ConnectionId)
-            return;
-        await IdentifyAirlineAsync(ct);
-        if (SessionAirlineId != ConnectionId)
-            throw Block("ApiConnectFirst");
-    }
-}
-
 // What a read-only GET found for a soft delete without a write receipt. Candidate is the item with the read evidence.
 public sealed record NoReceiptReview(ChangeItem Item, ChangeItem Candidate, DataRow? Current, bool MatchesBefore, IReadOnlyList<ApiFieldDifference> Differences)
 {

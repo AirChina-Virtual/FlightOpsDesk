@@ -1,51 +1,60 @@
+using System.Globalization;
 using System.Text.Json;
 using VamSys.Core;
+using static VamSys.Infrastructure.ApiErrors;
 
 namespace VamSys.Infrastructure;
 
-public sealed partial class OperationsAdapter
+// The airline parameters (approved callsign / flight number prefixes) a new fleet or a scheduled route is checked
+// against. They are read once per session and only used for preview and preflight; the server decides in the end.
+internal sealed class AirlineParameters(ApiContext ctx)
 {
     AirlineParameter[]? parameters;
     string? parameterConnection;
     readonly HashSet<string> preflightFleets = [];
-    public bool HasParameterMetadata => parameters != null && parameterConnection == ConnectionId;
-    public void InvalidateParameters() { parameters = null; parameterConnection = null; preflightFleets.Clear(); }
-    public async Task<IReadOnlyList<AirlineParameter>> ReadParametersAsync(CancellationToken ct, bool force = false)
+
+    public bool HasMetadata => parameters != null && parameterConnection == ctx.ConnectionId;
+    public void Invalidate() { parameters = null; parameterConnection = null; preflightFleets.Clear(); }
+
+    public async Task<IReadOnlyList<AirlineParameter>> ReadAsync(CancellationToken ct, bool force = false)
     {
-        if (!force && HasParameterMetadata)
+        if (!force && HasMetadata)
             return parameters!;
-        var owner = ConnectionId;
+        var owner = ctx.ConnectionId;
         var rows = new List<AirlineParameter>();
         try
         {
-            await foreach (var value in transport.ReadPagesAsync(new(BaseUri, "parameters"), ct))
+            await foreach (var value in ctx.Transport.ReadPagesAsync(new(OperationsAdapter.BaseUri, "parameters"), ct))
             {
                 if (value.TryGetProperty("airline_id", out var va) && va.ToString() != owner)
                     throw Block("ApiWrongVa");
-                var id = PositiveId(value.GetProperty("id").ToString()).ToString(System.Globalization.CultureInfo.InvariantCulture);
-                rows.Add(new(id, owner, Value(value.GetProperty("icao_code")), Value(value.GetProperty("iata_code")),
+                var id = PositiveId(value.GetProperty("id").ToString()).ToString(CultureInfo.InvariantCulture);
+                rows.Add(new(id, owner, CellText(value.GetProperty("icao_code")), CellText(value.GetProperty("iata_code")),
                     value.GetProperty("approved").GetBoolean(), value.GetProperty("restricted").GetBoolean(),
-                    value.GetProperty("fleet_ids").EnumerateArray().Select(v => PositiveId(v.ToString()).ToString(System.Globalization.CultureInfo.InvariantCulture)).ToArray()));
+                    value.GetProperty("fleet_ids").EnumerateArray().Select(v => PositiveId(v.ToString()).ToString(CultureInfo.InvariantCulture)).ToArray()));
             }
-            if (rows.Select(p => p.Id).Distinct().Count() != rows.Count || owner != ConnectionId)
+            if (rows.Select(p => p.Id).Distinct().Count() != rows.Count || owner != ctx.ConnectionId)
                 throw Block("ApiWrongVa");
             parameterConnection = owner;
             parameters = rows.ToArray();
             return parameters;
         }
-        catch (ApiAccessException error) when (error.Status == 403) { InvalidateParameters(); throw Block("ApiParametersUnavailable"); }
-        catch { InvalidateParameters(); throw; }
+        catch (ApiAccessException error) when (error.Status == 403) { Invalidate(); throw Block("ApiParametersUnavailable"); }
+        catch { Invalidate(); throw; }
     }
-    public bool NeedsParameterPreflight(ChangeItem item) => item.Kind != ChangeKind.Delete && (
+
+    public bool NeedsPreflight(ChangeItem item) => item.Kind != ChangeKind.Delete && (
         item.Resource == ResourceKind.Fleets && item.Kind == ChangeKind.Create && (item.RequiresAirlineParameter || item.After.Get("Parameter IDs") != "")
         || item.Resource == ResourceKind.Routes && item.After.Get("Type") == "scheduled"
             && (item.Kind == ChangeKind.Create || item.Fields.Keys.Any(f => f is "Fleet IDs" or "Callsign" or "Flight Number" or "Type")));
 
-    public void ValidateParameterPreview(ChangeItem item)
+    // Offline check against the parameters already read: a new fleet names one approved, unrestricted parameter; a scheduled
+    // route's callsign and flight number start with the prefixes of a parameter that is linked to each of its fleets.
+    public void ValidatePreview(ChangeItem item)
     {
-        if (!NeedsParameterPreflight(item))
+        if (!NeedsPreflight(item))
             return;
-        if (!HasParameterMetadata)
+        if (!HasMetadata)
             throw Block("ApiParametersUnavailable");
         var allowed = parameters!.Where(p => p.Approved && !p.Restricted).ToArray();
         if (item.Resource == ResourceKind.Fleets)
@@ -58,10 +67,10 @@ public sealed partial class OperationsAdapter
         foreach (var token in FleetAssignmentService.Tokens(item.After.Get("Fleet IDs")))
         {
             var local = LocalReference.IsLocal(token);
-            var fleet = local ? LocalDraft(ResourceKind.Fleets, token) : Known(ResourceKind.Fleets, token);
+            var fleet = local ? ctx.Identity.LocalDraft(ResourceKind.Fleets, token) : ctx.Identity.Known(ResourceKind.Fleets, token);
             if (fleet == null || Schemas.Deleted(fleet))
                 throw Block("ApiInvalid", "Fleet IDs");
-            CheckConnection(fleet);
+            ctx.CheckConnection(fleet);
             var linked = FleetAssignmentService.Tokens(fleet.Get("Parameter IDs"));
             var explicitRelation = false;
             if (fleet.RawApiJson is string raw)
@@ -73,36 +82,17 @@ public sealed partial class OperationsAdapter
                     Messages.Define("ApiPrefixDenied", ("fleet", fleet.Get("Name")), ("callsign", item.After.Get("Callsign")), ("flight", item.After.Get("Flight Number"))));
         }
     }
-    public async Task PreflightParametersAsync(ChangeItem item, CancellationToken ct)
+
+    // Reads the parameters (and the fleets a route names, once each) and validates the item against them.
+    public async Task PreflightAsync(ChangeItem item, CancellationToken ct)
     {
-        if (!NeedsParameterPreflight(item))
+        if (!NeedsPreflight(item))
             return;
-        await ReadParametersAsync(ct);
+        await ReadAsync(ct);
         if (item.Resource == ResourceKind.Routes)
             foreach (var id in FleetAssignmentService.Tokens(item.After.Get("Fleet IDs")))
                 if (!preflightFleets.Contains(id))
-                { if (await FindAsync(ResourceKind.Fleets, id, ct) == null) throw Block("ApiInvalid", "Fleet IDs"); preflightFleets.Add(id); }
-        ValidateParameterPreview(item);
-    }
-
-    internal void RecordReadback(ChangeItem item, DataRow? current)
-    {
-        if (transport.LastResponse is { } response)
-            item.ReadbackDetails = current?.RawApiJson is string body
-            ? transport.DescribeReadback(response with { Phase = "Verifying" }, body) : response with { Phase = "Verifying" };
-        item.VerificationDifferences = VerifyReadback(item, current, item.After, item.ApiExpectedValues ?? new Dictionary<string, JsonElement>()).Differences;
-    }
-    internal void RecordPreflight(ChangeItem item, DataRow? current)
-    {
-        string? Timestamp(DataRow? row)
-        {
-            if (row?.RawApiJson is not string text)
-                return null;
-            using var json = JsonDocument.Parse(text);
-            return json.RootElement.TryGetProperty("updated_at", out var value) ? value.ToString() : null;
-        }
-        item.PreflightComparison = new(Timestamp(item.Before), Timestamp(current), WireFields(item.Resource).Select(f => f.Csv)
-            .Where(f => !Equivalent(f, item.Before?.Get(f) ?? "", current?.Get(f) ?? ""))
-            .Select(f => new ApiFieldDifference(f, item.Before?.Get(f), current?.Get(f))).ToArray());
+                { if (await ctx.Reader.FindAsync(ResourceKind.Fleets, id, ct) == null) throw Block("ApiInvalid", "Fleet IDs"); preflightFleets.Add(id); }
+        ValidatePreview(item);
     }
 }

@@ -2,42 +2,6 @@ using VamSys.Core;
 
 namespace VamSys.Infrastructure;
 
-public sealed partial class OperationsAdapter
-{
-    // A legacy two-step create whose POST was answered and whose later steps never reached the
-    // server may finish them. The record is never posted again.
-    internal static bool CanResumeCreate(ChangeItem item) => item.Kind == ChangeKind.Create && item.CreateCompleted && !item.WriteAccepted
-        && item.RemoteId != null && item.ApiSteps.Count > 1 && item.ApiSteps[0].State == BatchStepState.ResponseReceived
-        && item.ApiSteps.Skip(1).All(s => s.State == BatchStepState.Prepared);
-
-    // The created record must still hold every value the answered POST sent.
-    internal bool MatchesCreated(ChangeItem item, DataRow current)
-    {
-        CheckConnection(current);
-        CheckConnection(item.After);
-        return VerifyReadback(item, current, item.After, ExpectedValues([ToStep(item.ApiSteps[0])])).Passed;
-    }
-
-    // Read-only proof that an Unknown write did not take effect: a create has no remote record
-    // matching its duplicate rule; an update or hard delete still reads exactly as before.
-    internal async Task<bool> ProveNotAppliedAsync(ChangeItem item, CancellationToken ct)
-    {
-        if (item.Kind == ChangeKind.Create)
-        {
-            await foreach (var existing in ReadDuplicateCandidatesAsync(item, new CandidateQuerySession(), ct))
-                if (IsDuplicate(item, existing))
-                    return false;
-            return true;
-        }
-        var id = item.RemoteId ?? item.Before?.Identity?.RemoteId;
-        if (item.Before is null || id is null)
-            return false;
-        var current = await FindRow(item.Resource, item.Before, id, ct);
-        RecordReadback(item, current);
-        return current != null && Matches(item, current, item.Before, true);
-    }
-}
-
 // Gives a stopped online job's never-sent items a way out without contacting the server. They become
 // Failed, not Skipped: every executor, including older releases, skips Failed items, while Resume
 // processes Skipped items again. Their drafts stay, so the changes can be reviewed and submitted again.
