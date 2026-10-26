@@ -18,12 +18,11 @@
 | Transport/TransportExceptions.cs | `ApiResponseException`、`RequestNotSentException` |
 | Transport/ApiDiagnostics.cs | 结构化错误、脱敏、正文限制和诊断导出；OAuth 正文不进入证据 |
 | OperationsParameters.cs | 参数只读查询、会话缓存、批准前缀预检与字段差异证据 |
-| OperationsAdapter.cs | 把修改转换成 API 请求，读取返回数据，检查记录是否正确以及修改是否成功 |
-| OperationsMovement.cs | 单独 fleet_id PATCH、目标机队预检、目标父路径回读及旧步骤校验 |
+| OperationsAdapter.cs | 只剩外观：把调用转给 Api/ 下的组件（ResourceMapper、RequestPlanner、ContractValidator、StepWriter、ReadbackVerifier、DuplicateFinder、IdentityIndex、DeletionVerifier、UnknownResolver、MovementVerifier、AirlineParameters、SnapshotRefresher）；RowFacts 按行缓存 RawApiJson 中的别名、端点 ID、原始时间 |
+| Api/Pipeline/ | 执行流水线：ExecutionPipeline 依次调用预检、判重、写入、回读、恢复、失败处理和检查点各段；条目字典 ItemIndex 与快照按位置删除 SnapshotPositions |
 | OperationsDeletionVerification.cs | 软删除 204／404 证明、纯 GET 历史核对与提交后生效的人工确认；不执行 Pending 写入 |
-| OperationsQueries.cs | 按页读取数据，查找可能与准备新增的记录重复的内容 |
 | CandidateIndex.cs | 按 ID、名称或注册号等信息快速查找记录；同名的不同记录都保留 |
-| OperationsBatchExecutor.cs | 逐条提交修改，保存每一步的进度；中断后先核对结果，再更新本地数据 |
+| OperationsBatchExecutor.cs | 只剩两个入口，转交 ExecutionPipeline |
 | DemoService.cs | 提供带有演示标记的测试数据；连接真实服务器失败时不会偷偷切换到演示 |
 | ApiContracts.cs | 契约版本与哈希、未验证适配器 |
 
