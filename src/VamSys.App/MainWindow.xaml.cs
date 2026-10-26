@@ -12,7 +12,7 @@ namespace VamSys.App;
 public sealed partial class MainWindow : Window
 {
     readonly WorkspaceStoreAdapter storage = WorkspaceStoreAdapter.OpenDefault();
-    readonly CsvAdapter csv = new(); readonly ChangePlanner planner = new();
+    readonly ChangePlanner planner = new();
     readonly FleetAssignmentService fleets = new(); readonly DeletionService deletions = new();
     ResourceKind resource = ResourceKind.Routes;
     readonly InteractionGate gate = new();
@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window
     readonly MaintenanceService maintenance;
     readonly ConnectionService connection;
     readonly ConflictService conflicts;
+    readonly ImportExportService importExport;
     readonly DiagnosticsService diagnostics;
     Workspace workspace => session.Workspace;
     IUserSettings settings => storage;
@@ -39,6 +40,7 @@ public sealed partial class MainWindow : Window
         maintenance = new(session, online);
         connection = new(session, online);
         conflicts = new(session);
+        importExport = new(session, online);
         diagnostics = new(session, ApiDiagnosticExport.Serialize);
         InitializeLanguage();
         tableDensity = settings.LoadTableDensity();
@@ -335,99 +337,9 @@ public sealed partial class MainWindow : Window
             leading.Add(FleetAssignmentService.Field(resource));
         return leading.Concat(Data.Columns.Count == 0 ? Schemas.All[resource].Columns : Data.Columns).Distinct().ToList();
     }
-    async Task Validate()
-    {
-        if (workspace.Mode == RunMode.Online)
-        {
-            var messages = new List<string>();
-            foreach (var item in planner.PlanWorkspace(workspace).Where(c => c.Resource == resource))
-                try
-                { Api().PreviewPlan(item); }
-                catch (Exception e) { messages.Add(L(MessageErrors.Describe(e))); }
-            if (Data.Conflicts.Count > 0)
-                messages.Add(L("ApiConflict"));
-            await Confirm(L("Text_38833A8579"), Scroll(Text(() => messages.Count == 0 ? L("Text_AA9F647A82") : string.Join("\n", messages))), L("Text_3FD47EDCE4"));
-            return;
-        }
-        await Work(async () =>
-        {
-            var issues = await Task.Run(() => Schemas.Validate(workspace, resource));
-            Status(() => issues.Count == 0 ? L("Text_AA9F647A82") : L("Text_8EEF5FE8E6", ("arg0", issues.Count)));
-            if (issues.Count > 0)
-                await Confirm(L("Text_38833A8579"), Scroll(Text(() => string.Join("\n", issues.Take(100).Select(i => L("Text_7560F012B2", ("arg0", Data.Draft.FindIndex(r => r.LocalId == i.RowId) + 1), ("arg1", i.Field), ("arg2", L(i.Description))))))), L("Text_3FD47EDCE4"));
-        });
-    }
     UIElement ImportPage() => Stack(Text(() => L("Text_D030C51D78"), 16),
         Text(() => L("Text_3618171B0A")), Text(() => L("WeightCsvHint")),
         Button(() => L("Text_5A2BBDEA04"), ImportCsv), Button(() => L("ApiRefresh"), RefreshApi));
-    async Task ImportCsv()
-    {
-        if (!gate.CanAct)
-            return;
-        var picker = new FileOpenPicker();
-        picker.FileTypeFilter.Add(".csv");
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
-        var file = await picker.PickSingleFileAsync();
-        if (file is null)
-            return;
-        await Work(async () =>
-        {
-            var parsed = await Task.Run(async () => csv.Parse(await File.ReadAllTextAsync(file.Path, Encoding.UTF8)));
-            var mapping = new StackPanel { Spacing = 8 };
-            var boxes = new Dictionary<string, TextBox>();
-            foreach (var h in parsed.Headers)
-            { var box = new TextBox { Header = h, Text = h }; boxes[h] = box; mapping.Children.Add(box); }
-            var baseline = new CheckBox { IsChecked = workspace.Mode != RunMode.Online && Data.SnapshotAt is null, IsEnabled = workspace.Mode != RunMode.Online }.Localize(localization, "Content", () => L("Text_B91DE02936"));
-            var panel = Stack(Text(() => L("Text_42F0F930C9", ("arg0", parsed.Rows.Count))), Text(() => L("WeightCsvHint")), baseline,
-                new ScrollViewer { Content = mapping, MaxHeight = 280 }, Text(() => L("Text_793A76BFEA") + string.Join("\n", parsed.Rows.Take(3).Select(r => string.Join(" | ", r).Truncate(240)))));
-            if (!await Confirm(L("Text_E0FDE3C5CB"), panel, L("Text_C9B2630A18")))
-                return;
-            if (baseline.IsChecked == true && Data.Draft.Count > 0 && !await Confirm(L("Text_885B15B2F5"), Text(() => L("Text_5B5C523423")), L("Text_131B13AA26")))
-                return;
-            var rows = csv.Map(parsed, boxes.ToDictionary(p => p.Key, p => p.Value.Text.Trim()));
-            var duplicates = rows.Where(r => Schemas.Key(resource, r) != "").GroupBy(r => Schemas.Key(resource, r)).Any(g => g.Count() > 1);
-            if (duplicates)
-                throw new FormatException(L("Text_3BCC8B750F"));
-            CsvAdapter.Import(resource, Data, rows, baseline.IsChecked == true);
-            await Save();
-            var issues = await Task.Run(() => Schemas.Validate(workspace, resource));
-            Render();
-            Status(() => L("Text_D84A9B1171", ("arg0", rows.Count), ("arg1", issues.Count)));
-        });
-    }
-    async Task<bool> ValidateForSubmit(ResourceKind kind)
-    {
-        var issues = await Task.Run(() => Schemas.Validate(workspace, kind));
-        if (issues.Count == 0)
-            return true;
-        await Confirm(L("Text_75843F167F"), Scroll(Text(() => string.Join("\n", issues.Take(60).Select(i => L("Text_7560F012B2", ("arg0", workspace.Resources[kind].Draft.FindIndex(r => r.LocalId == i.RowId) + 1), ("arg1", i.Field), ("arg2", L(i.Description))))))), L("Text_3FD47EDCE4"));
-        return false;
-    }
-    Task ExportCsv(ResourceKind kind) => LocalOperation(async () =>
-    {
-        if (!gate.CanAct)
-            return;
-        if (!await ValidateForSubmit(kind))
-            return;
-        var changes = planner.Plan(kind, workspace.Resources[kind]);
-        if (changes.Count == 0)
-        { Status(() => L("Text_90484F47B3")); return; }
-        if (changes.Any(i => i.Kind == ChangeKind.Delete) && !await Confirm(L("Text_5D6042B30E"), Text(() => L("Text_B83678AC3A", ("arg0", changes.Count(i => i.Kind == ChangeKind.Delete)))), L("Text_6B20B383BC")))
-            return;
-        var picker = new FolderPicker();
-        picker.FileTypeFilter.Add("*");
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
-        var folder = await picker.PickSingleFolderAsync();
-        if (folder is null)
-            return;
-        var parts = await Task.Run(() => csv.Export(kind, changes));
-        var prefix = $"{kind}-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..6]}";
-        for (int i = 0; i < parts.Count; i++)
-            await File.WriteAllBytesAsync(Path.Combine(folder.Path, $"{prefix}-{i + 1}.csv"), parts[i]);
-        workspace.Jobs.Add(new BatchJob { Mode = RunMode.Offline, Items = changes, Description = Messages.Define("Text_D964132351", ("arg0", parts.Count), ("arg1", folder.Path)), StatusCode = JobStatus.AwaitingImport, Status = Messages.Define("Text_D964132351", ("arg0", parts.Count), ("arg1", folder.Path)) });
-        await Save(dataChanged: false, JournalScope.Jobs);
-        Status(() => L("Text_B680DD9FD1", ("arg0", parts.Count)));
-    });
     Task StartDemo() => SubmitWorkspace(RunMode.Demo);
     async Task ExecuteDemo(BatchJob job)
     {
