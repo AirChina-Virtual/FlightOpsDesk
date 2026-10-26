@@ -12,7 +12,6 @@ namespace VamSys.App;
 public sealed partial class MainWindow : Window
 {
     readonly WorkspaceStoreAdapter storage = WorkspaceStoreAdapter.OpenDefault();
-    readonly ChangePlanner planner = new();
     ResourceKind resource = ResourceKind.Routes;
     readonly InteractionGate gate = new();
     readonly DispatcherAutosaveTimer autosave = new(WorkspaceSession.AutosaveInterval);
@@ -23,6 +22,7 @@ public sealed partial class MainWindow : Window
     readonly ConflictService conflicts;
     readonly ImportExportService importExport;
     readonly BatchEditService batch;
+    readonly ReviewService reviews;
     readonly DiagnosticsService diagnostics;
     Workspace workspace => session.Workspace;
     IUserSettings settings => storage;
@@ -42,6 +42,7 @@ public sealed partial class MainWindow : Window
         conflicts = new(session);
         importExport = new(session, online);
         batch = new(session);
+        reviews = new(session, online);
         diagnostics = new(session, ApiDiagnosticExport.Serialize);
         InitializeLanguage();
         tableDensity = settings.LoadTableDensity();

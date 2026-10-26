@@ -43,8 +43,7 @@ public sealed partial class MainWindow
         foreach (var key in dataStates.Keys.Where(k => k.Item1 == owner).ToArray())
             dataStates.Remove(key);
         taskScroll.Remove(owner);
-        reviewGeneration++;
-        reviewPlan = null;
+        reviews.Invalidate();
         reviewRows = [];
     }
 }

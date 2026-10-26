@@ -10,24 +10,13 @@ namespace VamSys.App;
 
 public sealed partial class MainWindow
 {
-    WorkspaceReviewPlan? reviewPlan;
     IReadOnlyList<ReviewDisplayRow> reviewRows = [];
-    Guid reviewWorkspace;
-    string? reviewAirline;
-    RunMode reviewMode;
+    WorkspaceReviewPlan? reviewPlan => reviews.Shown?.Plan;
 
-    WorkspaceReviewPlan BuildReviewPlan() => CaptureReviewPlan()();
-    // Reads the window state on the UI thread; the returned work only reads the captured workspace and
-    // may run on a worker while the UI is locked (no edits, jobs or navigation). It also computes the content key.
-    Func<WorkspaceReviewPlan> CaptureReviewPlan()
+    WorkspaceReviewPlan BuildReviewPlan() => reviews.Build();
+    sealed class WindowWorkerLock(MainWindow owner) : IWorkerLock
     {
-        var w = workspace;
-        var mode = w.Mode;
-        var verified = w.VerifiedOperations.ToHashSet(StringComparer.Ordinal);
-        var onlineSession = online.Connected(w.Id);
-        var connected = onlineSession != null;
-        Action<ChangeItem>? preview = connected ? c => onlineSession!.PreviewPlan(c) : null;
-        return () => ReviewPlanBuilder.BuildForWorkspace(planner, w, mode, connected, verified, preview);
+        public Task<T> RunAsync<T>(Func<T> work) => owner.WhileLocked(work);
     }
     // Locks edits and navigation while a worker reads the workspace. Nested locks keep the outermost
     // state: an enclosing LocalOperation stays locked when this one ends.
@@ -59,7 +48,6 @@ public sealed partial class MainWindow
     string ReviewChangeText(PlannedChange item) => $"{EnumText(item.Kind)} · {Schemas.Key(item.Resource, item.After)}\n" +
         (item.Kind == ChangeKind.Delete ? L("Text_5ABD08A949") : string.Join("；", item.Fields().Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key, localization)}: {item.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}")));
 
-    long reviewGeneration;
     Task reviewLoad = Task.CompletedTask;
     // The page appears at once; the plan is built on a worker and the page filled when it is ready.
     UIElement ReviewPage()
@@ -67,19 +55,16 @@ public sealed partial class MainWindow
         var host = new Grid();
         var waiting = Row(new ProgressRing { IsActive = true, Width = 20, Height = 20 }, Text(() => L("ReviewPreparing")));
         host.Children.Add(waiting);
-        var generation = ++reviewGeneration;
+        var generation = reviews.BeginLoad();
         var owner = workspace;
         var airline = workspace.AirlineId;
         var mode = workspace.Mode;
         reviewLoad = UserAction(async () =>
         {
-            var plan = await WhileLocked(CaptureReviewPlan());
-            if (generation != reviewGeneration || !ReferenceEquals(owner, workspace) || !ReferenceEquals(PageHost.Content, host))
+            var plan = await WhileLocked(reviews.Capture());
+            if (!reviews.IsCurrent(generation) || !ReferenceEquals(owner, workspace) || !ReferenceEquals(PageHost.Content, host))
                 return;
-            reviewPlan = plan;
-            reviewWorkspace = owner.Id;
-            reviewAirline = airline;
-            reviewMode = mode;
+            reviews.Show(plan, owner.Id, airline, mode);
             host.Children.Clear();
             host.Children.Add(ReviewContent(plan));
         });
@@ -168,28 +153,18 @@ public sealed partial class MainWindow
     }
 
     // The shown plan when the live workspace still yields the same review; otherwise the page is refreshed.
-    // The live plan is rebuilt on a worker; the shown plan's key was computed when it was built.
     async Task<WorkspaceReviewPlan?> CurrentReviewPlan(RunMode mode)
     {
-        // The worker also builds the shown plan's submission items, so the UI thread never has to.
-        var build = CaptureReviewPlan();
-        var shown = reviewPlan;
-        var current = await WhileLocked(() =>
-        {
-            var plan = build();
-            if (shown is not null && shown.Blockers.Count == 0 && plan.Blockers.Count == 0 && shown.ContentKey() == plan.ContentKey())
-                _ = shown.SubmitItems;
-            return plan;
-        });
-        if (reviewPlan is null || reviewWorkspace != workspace.Id || reviewAirline != workspace.AirlineId || reviewMode != mode || reviewPlan.ContentKey() != current.ContentKey())
+        var check = await reviews.CheckCurrentAsync(mode, new WindowWorkerLock(this));
+        if (check.Changed)
         {
             Render();
             Status(() => L("ReviewChanged"));
             return null;
         }
-        if (current.Blockers.Count > 0 || current.SubmitCount == 0)
-        { Render(); return null; }
-        return reviewPlan;
+        if (check.Plan is null)
+            Render();
+        return check.Plan;
     }
     async Task<List<ChangeItem>?> ConfirmWorkspaceSubmission(RunMode mode)
     {

@@ -4,6 +4,5 @@
   <ItemGroup><PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" /><Compile Include="../../src/VamSys.App/TaskViewModels.cs" Link="TaskViewModels.cs" /><Compile Include="../../src/VamSys.App/DataTableViewModel.cs" Link="DataTableViewModel.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/VamSys.App/ViewModels.cs" Link="ViewModels.cs" /></ItemGroup>
   <ItemGroup><None Update="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
-  <ItemGroup><Compile Include="../../src/VamSys.App/ReviewPlanBuilder.cs" Link="ReviewPlanBuilder.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/VamSys.App/TaskSubmission.cs" Link="TaskSubmission.cs" /><Compile Include="../../src/VamSys.App/UnknownReview.cs" Link="UnknownReview.cs" /></ItemGroup>
 </Project>

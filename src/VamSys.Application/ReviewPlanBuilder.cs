@@ -2,9 +2,8 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using VamSys.Core;
 
-namespace VamSys.App;
+namespace VamSys.Core;
 
 public enum ReviewDisposition { Ready, Deferred, Blocked, AwaitingConnection }
 /// <summary>A reviewed change. <see cref="Planned"/> refers to the workspace's rows and the changed fields only;

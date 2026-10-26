@@ -18,7 +18,7 @@ public sealed partial class MainWindow
         // Navigate ignores SelectionChanged while LocalOperation owns the lock.
         // Set the page explicitly so its final Render cannot rebuild ReviewPage.
         page = "tasks";
-        reviewGeneration++;
+        reviews.Invalidate(forget: false);
         Navigation.SelectedItem = Navigation.MenuItems[4];
     }
 }
