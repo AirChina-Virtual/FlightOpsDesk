@@ -18,7 +18,10 @@ public sealed partial class MainWindow : Window
     readonly InteractionGate gate = new();
     readonly DispatcherAutosaveTimer autosave = new(WorkspaceSession.AutosaveInterval);
     readonly WorkspaceSession session;
+    readonly OnlineGateway online;
     readonly MaintenanceService maintenance;
+    readonly ConnectionService connection;
+    readonly ConflictService conflicts;
     readonly DiagnosticsService diagnostics;
     Workspace workspace => session.Workspace;
     IUserSettings settings => storage;
@@ -32,7 +35,10 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         session = new(storage, gate, autosave);
         session.DataInvalidated += InvalidateDataViews;
-        maintenance = new(session);
+        online = new(storage);
+        maintenance = new(session, online);
+        connection = new(session, online);
+        conflicts = new(session);
         diagnostics = new(session, ApiDiagnosticExport.Serialize);
         InitializeLanguage();
         tableDensity = settings.LoadTableDensity();
@@ -172,7 +178,7 @@ public sealed partial class MainWindow : Window
     async Task SwitchWorkspace(Guid id)
     {
         CancelDataQuery();
-        await UserAction(async () => { await session.SwitchWorkspaceAsync(id); if (apiSessions.Remove(id, out var previous)) previous.Client.Dispose(); Render(); });
+        await UserAction(async () => { await session.SwitchWorkspaceAsync(id); online.Release(id); Render(); });
     }
     void ResourceChanged(object sender, SelectionChangedEventArgs e)
     { if (!ready || !gate.CanSwitchContext) return; CancelDataQuery(); resource = (ResourceKind)ResourcePicker.SelectedIndex; Render(); }
@@ -489,8 +495,7 @@ public sealed partial class MainWindow : Window
                 await session.SaveConnectionSettingsAsync(clientId.Text, secret.Password, url.Text, local.IsChecked == true);
                 clientId.Text = workspace.ClientId ?? "";
                 secret.Password = "";
-                if (apiSessions.Remove(workspace.Id, out var previous))
-                    previous.Client.Dispose();
+                online.Release(workspace.Id);
                 Status(() => L("Text_DEADA9F3CC"));
             }), Button(() => L("ApiUpdateCredentials"), async () =>
             {
@@ -499,8 +504,7 @@ public sealed partial class MainWindow : Window
                 await session.UpdateCredentialsAsync(clientId.Text, secret.Password);
                 clientId.Text = workspace.ClientId ?? "";
                 secret.Password = "";
-                if (apiSessions.Remove(workspace.Id, out var previous))
-                    previous.Client.Dispose();
+                online.Release(workspace.Id);
                 Status(() => L("ApiCredentialsUpdated"));
             }, gate.CanRequestOnline), Text(() => L("ApiCredentialsHelp")), Button(() => L("ApiConnect"), ConnectApi), Button(() => L("ApiRefresh"), RefreshApi),
             Text(() => L("ApiCapability")), Text(() => L("ApiIndependentScope")), Text(() => L("ApiVerified", ("operations", string.Join(", ", workspace.VerifiedOperations)))),

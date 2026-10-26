@@ -1,8 +1,8 @@
 namespace VamSys.Core;
 
-// Backup and clear of the open workspace: save first so the backup holds everything, show what will go, then run it
+// The read-only airline parameters, and backup and clear of the open workspace: save first so the backup holds everything, show what will go, then run it
 // under the save lock. A failed backup keeps the live state; a failure after the commit is reconciled with the database.
-public sealed class MaintenanceService(WorkspaceSession session)
+public sealed class MaintenanceService(WorkspaceSession session, IOnlineGateway online)
 {
     // Saves the workspace and returns what clearing would remove. Throws when clearing is not safe
     // (unresolved writes or unfinished tasks).
@@ -45,5 +45,40 @@ public sealed class MaintenanceService(WorkspaceSession session)
             throw;
         }
         finally { session.SaveLock.Release(); }
+    }
+
+    // Reads the airline parameters again; returns how many there are.
+    public async Task<int> LoadParametersAsync()
+    {
+        if (session.Workspace.Mode != RunMode.Online)
+            throw ApplicationBlocks.Block("ApiConnectFirst");
+        var parameters = await online.Session(session.Workspace).ReadParametersAsync(CancellationToken.None, true);
+        return parameters.Count;
+    }
+
+    // The parameters a new fleet may use. Only a new row can choose one, and only while online.
+    public async Task<IReadOnlyList<AirlineParameter>> ChoosableParametersAsync(DataRow row)
+    {
+        if (row.Identity != null)
+            throw ApplicationBlocks.Block("ApiParameterCreateOnly");
+        if (session.Workspace.Mode != RunMode.Online)
+            throw ApplicationBlocks.Block("ApiConnectFirst");
+        var parameters = await online.Session(session.Workspace).ReadParametersAsync(CancellationToken.None, true);
+        var choices = parameters.Where(p => p.Approved && !p.Restricted).ToList();
+        if (choices.Count == 0)
+            throw ApplicationBlocks.Block("ApiParameterRequired");
+        return choices;
+    }
+
+    // Puts the chosen parameter on the row and saves. False when the row already had it.
+    public async Task<bool> AssignParameterAsync(ResourceKind kind, DataRow row, string id)
+    {
+        if (id == row.Get("Parameter IDs"))
+            return false;
+        var data = session.Workspace.Resources[kind];
+        var replacement = row.With("Parameter IDs", id);
+        data.Edit([row.LocalId], () => data.ReplaceDraftRows([replacement]));
+        await session.SaveAsync();
+        return true;
     }
 }

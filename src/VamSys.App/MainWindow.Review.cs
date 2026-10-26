@@ -24,8 +24,9 @@ public sealed partial class MainWindow
         var w = workspace;
         var mode = w.Mode;
         var verified = w.VerifiedOperations.ToHashSet(StringComparer.Ordinal);
-        var connected = apiSessions.TryGetValue(w.Id, out var session) && session.Api.SessionAirlineId != null;
-        Action<ChangeItem>? preview = connected ? c => session.Api.PreviewPlan(c) : null;
+        var onlineSession = online.Connected(w.Id);
+        var connected = onlineSession != null;
+        Action<ChangeItem>? preview = connected ? c => onlineSession!.PreviewPlan(c) : null;
         return () => ReviewPlanBuilder.BuildForWorkspace(planner, w, mode, connected, verified, preview);
     }
     // Locks edits and navigation while a worker reads the workspace. Nested locks keep the outermost

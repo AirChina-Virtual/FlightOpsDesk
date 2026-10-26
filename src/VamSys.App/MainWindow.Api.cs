@@ -8,20 +8,8 @@ namespace VamSys.App;
 
 public sealed partial class MainWindow
 {
-    readonly Dictionary<Guid, (HttpClient Client, OperationsAdapter Api)> apiSessions = [];
-    OperationsAdapter Api()
-    {
-        if (apiSessions.TryGetValue(workspace.Id, out var session))
-            return session.Api;
-        var raw = storage.LoadSecret(workspace.Id) ?? throw OperationsAdapter.Block("ApiConnectFirst");
-        var credentials = JsonSerializer.Deserialize<OperationsCredentials>(raw) ?? throw OperationsAdapter.Block("ApiConnectFirst");
-        var client = OperationsTransport.CreateHttpClient();
-        // Conservative global pool also covers clients whose airline is not identified yet.
-        var transport = new OperationsTransport(client, OperationsAdapter.BaseUri, "operations-shared", TokenProvider.ClientCredentials(client, credentials));
-        var api = new OperationsAdapter(transport, workspace);
-        apiSessions[workspace.Id] = (client, api);
-        return api;
-    }
+    // The operations adapter behind the connection; the task recovery flows still use it directly.
+    OperationsAdapter Api() => online.Adapter(workspace);
     async Task ConnectApi()
     {
         if (!gate.CanRequestOnline)
@@ -31,16 +19,7 @@ public sealed partial class MainWindow
             running = new();
             try
             {
-                // A documented list call checks the token, permissions and airline identity.
-                if (!await Api().IdentifyAirlineAsync(running.Token))
-                    throw OperationsAdapter.Block("ApiConnectFirst");
-                workspace.ConnectedAt = DateTimeOffset.UtcNow;
-                workspace.Mode = RunMode.Online;
-                if (workspace.ContractHash != ApiContracts.Sha256)
-                    workspace.VerifiedOperations.Clear();
-                workspace.ContractHash = ApiContracts.Sha256;
-                await Save(dataChanged: false, JournalScope.Header);
-                var parameters = await ReadOptionalParameters(running.Token);
+                var parameters = await connection.ConnectAsync(running.Token);
                 Status(() => L("ApiConnected", ("id", workspace.AirlineId ?? "?")) + (parameters ? "" : "\n" + L("ApiParametersUnavailable")));
             }
             finally { running.Dispose(); running = null; }
@@ -50,21 +29,14 @@ public sealed partial class MainWindow
     {
         if (!gate.CanRequestOnline)
             return;
-        if (workspace.Mode != RunMode.Online)
+        if (!connection.CanRefresh())
         { Navigation.SelectedItem = Navigation.MenuItems[5]; Status(() => L("ApiConnectFirst")); return; }
-        if (ApiOperationPolicy.HasOpenOnlineItems(workspace))
-            throw OperationsAdapter.Block("ApiPendingJob");
         await Work(async () =>
         {
             running = new();
             try
             {
-                var api = Api();
-                await api.RefreshSnapshotsAsync(async staged =>
-                {
-                    await session.SaveStagedAsync(staged);
-                }, running.Token, (kind, count) => Status(() => L("ApiLoading", ("resource", L(Schemas.All[kind].Name)), ("count", count))));
-                var parameters = await ReadOptionalParameters(running.Token);
+                var parameters = await connection.RefreshAsync((kind, count) => Status(() => L("ApiLoading", ("resource", L(Schemas.All[kind].Name)), ("count", count))), running.Token);
                 Status(() => L("ApiRefreshed", ("count", workspace.Resources.Sum(p => p.Value.Conflicts.Count))) + (parameters ? "" : "\n" + L("ApiParametersUnavailable")));
             }
             finally { running.Dispose(); running = null; }
@@ -72,54 +44,28 @@ public sealed partial class MainWindow
     }
     Task ResolveApiConflicts() => ResolveConflicts([resource]);
     Task ResolveWorkspaceConflicts() => ResolveConflicts(Enum.GetValues<ResourceKind>());
-    // Every choice is applied in memory at once; the changes are saved a single time when the dialogs end or are cancelled.
-    Task ResolveConflicts(IEnumerable<ResourceKind> kinds) => LocalOperation(async () =>
+    Task ResolveConflicts(IEnumerable<ResourceKind> kinds) => LocalOperation(() => conflicts.ResolveAsync(kinds, ChooseConflict));
+    async Task<ConflictChoice> ChooseConflict(ConflictPrompt prompt)
     {
-        var changed = false;
-        try
-        { await ResolveConflictsInMemory(kinds, () => changed = true); }
-        finally
-        { if (changed) await Save(); }
-    });
-    async Task ResolveConflictsInMemory(IEnumerable<ResourceKind> kinds, Action markChanged)
-    {
-        foreach (var kind in kinds)
+        var (kind, row, conflict) = (prompt.Kind, prompt.Row, prompt.Conflict);
+        var content = Stack(Text(() => L(Schemas.All[kind].Name) + " · " + Schemas.Key(kind, row) + " · " + conflict.Field),
+            Text(() => L("ApiConflictValues", ("old", conflict.Original ?? "∅"), ("local", conflict.Local ?? "∅"), ("remote", conflict.Remote ?? "∅"))));
+        var dialog = new ContentDialog
         {
-            var data = workspace.Resources[kind];
-            foreach (var conflict in data.Conflicts.ToArray())
-            {
-                var row = data.FindDraftRow(conflict.RowId);
-                if (row is null)
-                { data.Conflicts.Remove(conflict); markChanged(); continue; }
-                var content = Stack(Text(() => L(Schemas.All[kind].Name) + " · " + Schemas.Key(kind, row) + " · " + conflict.Field),
-                    Text(() => L("ApiConflictValues", ("old", conflict.Original ?? "∅"), ("local", conflict.Local ?? "∅"), ("remote", conflict.Remote ?? "∅"))));
-                var dialog = new ContentDialog
-                {
-                    XamlRoot = Content.XamlRoot,
-                    Title = L("ApiConflict"),
-                    Content = content,
-                    PrimaryButtonText = L("ApiKeepLocal"),
-                    SecondaryButtonText = L("ApiUseRemote"),
-                    CloseButtonText = L("Text_2CD0F3BE87"),
-                    DefaultButton = ContentDialogButton.Close,
-                    IsPrimaryButtonEnabled = conflict.Field != "*"
-                };
-                ContentDialogResult choice;
-                using (gate.BeginDialog())
-                    choice = await dialog.ShowAsync();
-                if (choice == ContentDialogResult.None)
-                    return;
-                if (choice == ContentDialogResult.Secondary)
-                {
-                    var replacement = conflict.Field != "*" ? row.With(conflict.Field, conflict.Remote ?? "") : row;
-                    data.Edit([row.LocalId], () => { if (conflict.Field == "*") data.Draft.Remove(row); else data.ReplaceDraftRows([replacement]); }, newStep: false, structural: conflict.Field == "*");
-                }
-                data.Conflicts.Remove(conflict);
-                markChanged();
-            }
-        }
-    }
-    string ApiReview(ChangeItem change)
+            XamlRoot = Content.XamlRoot,
+            Title = L("ApiConflict"),
+            Content = content,
+            PrimaryButtonText = L("ApiKeepLocal"),
+            SecondaryButtonText = L("ApiUseRemote"),
+            CloseButtonText = L("Text_2CD0F3BE87"),
+            DefaultButton = ContentDialogButton.Close,
+            IsPrimaryButtonEnabled = prompt.CanKeepLocal
+        };
+        ContentDialogResult choice;
+        using (gate.BeginDialog())
+            choice = await dialog.ShowAsync();
+        return choice == ContentDialogResult.None ? ConflictChoice.Stop : choice == ContentDialogResult.Secondary ? ConflictChoice.UseRemote : ConflictChoice.KeepLocal;
+    }    string ApiReview(ChangeItem change)
     {
         var text = $"{L(Schemas.All[change.Resource].Name)} · {EnumText(change.Kind)} · {Schemas.Key(change.Resource, change.After)}\n" +
             string.Join("; ", change.Fields.Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key, localization)}: {change.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}"));
@@ -167,8 +113,7 @@ public sealed partial class MainWindow
     }
     void ReloadAfterCheckpointFailure()
     {
-        if (apiSessions.Remove(workspace.Id, out var failed))
-            failed.Client.Dispose();
+        online.Release(workspace.Id);
         session.ReloadAfterCheckpointFailure();
     }
     async Task ReviewUnknown(BatchJob job)
