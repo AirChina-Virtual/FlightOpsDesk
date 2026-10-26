@@ -44,4 +44,10 @@
 
 ## 结果（由子代理填写）
 
-不超过 20 行：做了什么、提交列表、检查结果、关键数字、未完成或有风险的地方。
+- 做了什么：OperationsAdapter 拆为 Api/ 下的 ResourceMapper、RequestPlanner（按资源）、ContractValidator、StepWriter、ReadbackVerifier、DuplicateFinder 等、IdentityIndex、DeletionVerifier、UnknownResolver、MovementVerifier、AirlineParameters、SnapshotRefresher、RowFacts（按行缓存）；执行器拆为 Api/Pipeline（预检、判重、写入、回读、恢复、失败处理、检查点，Id/LocalId 字典，快照按位置删除）。外观接口不变。
+- 提交：dbc560d（组件）、0372c8c（流水线）、c40d6be（人工核对辅助）、29eb58b、e5038c6 及最后一次测试与文档提交。
+- 行数（总行）：OperationsAdapter.cs 677→115，OperationsBatchExecutor.cs 345→17。
+- 检查：每次提交前 check-all Quick 全绿（单元 848、集成 187），请求金样逐字节不变；仅 CapabilityKeys.txt 一行路径变化（:Read 随刷新移到 SnapshotRefresher.cs）。按指示未跑 Full、未删旧场景。
+- 新测试：单元 Api 目录 247 项（其中 202 项在拆分前代码上同样通过），集成 38 项（超时、5xx、429、401、保存失败、中断后恢复）。
+- 分配量：--benchmark-core/review 不经过适配器，未重跑；改前 5 万变更审阅在线 77.16 MiB、演示 56.80 MiB。适配器 5 万行微基准：再次冲突检查 63.3→35.5 MiB，规划 86.7→78.6 MiB，映射 130.7 MiB 不变。
+- 风险：Full 与 Debug 构建未验证；其他资源的特殊列名保持原行为（TryPlanForeignColumn）。

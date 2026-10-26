@@ -131,3 +131,7 @@ Program.cs 的 “401/403 pauses batch without sending later rows” 断言的�
 - 单元测试：74 项 → 404 项（含 1 项因产品缺口跳过）；Release 与 Debug 均通过。集成测试 50 项（49 通过、1 跳过）未变；金样与清单期望文件未变。
 - 分析器警告基线：198 → 186（旧运行器 CA1307 −11、CA1310 −1），新测试没有增加任何警告。
 - R3 变更日志（第 3、4 项）：单元测试 +26 项（ChangeJournalTests，Release 与 Debug 通过），集成测试 +29 项（JournalWriteScopeTests 21 项、JournalEquivalenceTests 8 个种子），旧运行器仍为 240 项（未删除旧场景）；存储、请求、CSV 金样没有重新生成，逐字节不变；`Enums.txt` 清单为新增的 `JournalScope`、`ChangeMode` 手工增加 10 行。
+
+- R5 适配器拆分：F15–F17、I01–I04、I07、I11、I13 的新增覆盖在 tests/VamSys.UnitTests/Api 与 tests/VamSys.IntegrationTests/Api（映射、规划、回读、判重、删除核对、未知恢复、读取、写入顺序、流水线各段失败路径）；旧场景未删除。
+
+- R5 适配器拆分：F15–F17、I01–I04、I07、I11、I13 的新增覆盖在 tests/VamSys.UnitTests/Api 与 tests/VamSys.IntegrationTests/Api（映射、规划、回读、判重、删除核对、未知恢复、读取、写入顺序、流水线各段失败路径）；旧场景未删除。
