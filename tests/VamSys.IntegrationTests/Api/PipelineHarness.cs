@@ -40,7 +40,7 @@ internal static class PipelineHarness
     public sealed class RecordingWriter(GoldenWorld world) : IBatchCheckpointWriter
     {
         public readonly List<(CheckpointKind Kind, int Requests, ItemState? State, BatchCheckpoint Checkpoint)> Written = [];
-        public Func<BatchCheckpoint, Exception?>? Failure;
+        public Func<BatchCheckpoint, Exception?>? Failure { get; set; }
 
         public Task WriteAsync(BatchCheckpoint checkpoint, CancellationToken ct)
         {
