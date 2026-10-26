@@ -19,6 +19,7 @@ public sealed partial class MainWindow : Window
     readonly DispatcherAutosaveTimer autosave = new(WorkspaceSession.AutosaveInterval);
     readonly WorkspaceSession session;
     readonly MaintenanceService maintenance;
+    readonly DiagnosticsService diagnostics;
     Workspace workspace => session.Workspace;
     IUserSettings settings => storage;
     string page = "workspace"; bool ready; string? lastEditedCell;
@@ -32,6 +33,7 @@ public sealed partial class MainWindow : Window
         session = new(storage, gate, autosave);
         session.DataInvalidated += InvalidateDataViews;
         maintenance = new(session);
+        diagnostics = new(session, ApiDiagnosticExport.Serialize);
         InitializeLanguage();
         tableDensity = settings.LoadTableDensity();
         tableTemplates = new();
