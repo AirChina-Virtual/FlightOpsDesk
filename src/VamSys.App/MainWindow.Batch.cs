@@ -6,7 +6,6 @@ namespace VamSys.App;
 
 public sealed partial class MainWindow
 {
-    bool localOperation;
     AppBarButton BatchCommand(Func<string> label, Symbol icon, Func<Task> action, string target)
     {
         var button = Command(label, icon, action);
@@ -37,9 +36,9 @@ public sealed partial class MainWindow
     }
     async Task LocalOperation(Func<Task> action)
     {
-        if (!CanEditData())
+        var scope = gate.TryBeginLocal();
+        if (scope is null)
             return;
-        localOperation = true;
         Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = false;
         PageHost.IsEnabled = false;
         BusyRing.IsActive = true;
@@ -53,15 +52,13 @@ public sealed partial class MainWindow
         finally
         {
             // A review worker started inside this operation still reads the workspace: it unlocks when done.
-            if (reviewLocks > 0)
-                reviewLockOwnsState = true;
-            else
+            scope.Dispose();
+            if (scope.Released)
             {
-                localOperation = false;
-                Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = closeState.IsOpen;
-                PageHost.IsEnabled = closeState.IsOpen;
+                Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = gate.ControlsEnabled;
+                PageHost.IsEnabled = gate.ControlsEnabled;
             }
-            BusyRing.IsActive = busy || querying || reviewLocks > 0;
+            BusyRing.IsActive = gate.ShowsProgress;
             Render();
         }
     }

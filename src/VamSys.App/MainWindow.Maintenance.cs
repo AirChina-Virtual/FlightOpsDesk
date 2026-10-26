@@ -76,7 +76,7 @@ public sealed partial class MainWindow
                     var persisted = store.Load(owner);
                     workspace = persisted; workspace.Mode = RunMode.Offline; if (apiSessions.Remove(owner, out var session)) session.Client.Dispose(); ClearMaintenanceViewState(owner); InvalidateDataViews(); }
             }
-            catch { storageBlocked = true; }
+            catch { gate.BlockStorage(); }
             throw;
         }
         finally { saveGate.Release(); }

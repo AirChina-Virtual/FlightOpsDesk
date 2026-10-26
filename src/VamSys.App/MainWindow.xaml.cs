@@ -15,7 +15,8 @@ public sealed partial class MainWindow : Window
     readonly CsvAdapter csv = new(); readonly ChangePlanner planner = new();
     readonly FleetAssignmentService fleets = new(); readonly DeletionService deletions = new();
     Workspace workspace = new(); ResourceKind resource = ResourceKind.Routes;
-    string page = "workspace"; bool ready, busy, storageBlocked; string? lastEditedCell;
+    readonly InteractionGate gate = new();
+    string page = "workspace"; bool ready; string? lastEditedCell;
     ListView? table; List<RowViewModel> visible = []; AppBarButton? fleetCommand, retireCommand;
     CancellationTokenSource? running;
     readonly SemaphoreSlim saveGate = new(1);
@@ -47,21 +48,21 @@ public sealed partial class MainWindow : Window
         ResourcePicker.ItemsSource = Enum.GetValues<ResourceKind>().Select(k => L(Schemas.All[k].Name)).ToList();
         ResourcePicker.SelectedIndex = (int)resource;
         ReloadWorkspaces();
-        autosave.Tick += async (_, _) => { autosave.Stop(); await Guard(async () => { await SaveEdits(); if (!busy) Status(() => L("Text_11584EAAA5")); }); };
+        autosave.Tick += async (_, _) => { autosave.Stop(); await Guard(async () => { await SaveEdits(); if (!gate.WorkInProgress) Status(() => L("Text_11584EAAA5")); }); };
         AppWindow.Closing += async (_, e) =>
         {
-            if (closeState.State == WindowCloseState.Closed)
+            if (gate.HasClosed)
                 return;
             e.Cancel = true;
-            if (!closeState.IsOpen)
+            if (!gate.IsOpen)
                 return;
-            if (busy || localOperation || interactiveOperations > 0 || dialogs > 0)
+            if (gate.CloseBlockedByActivity)
             { Status(() => L("CloseBlocked")); return; }
             try
             {
-                var closed = await closeState.RequestAsync(false, async () =>
+                var closed = await gate.Closing.RequestAsync(false, async () =>
                 {
-                    if (!storageBlocked)
+                    if (!gate.StorageBlocked)
                         await Save();
                 }, FreezeClosing);
                 if (closed)
@@ -108,7 +109,7 @@ public sealed partial class MainWindow : Window
         await saveGate.WaitAsync();
         var taken = scope == JournalScope.All ? edits.Take() : null;
         try
-        { if (storageBlocked) throw OperationsAdapter.Block("StorageReload"); await store.SaveChangesAsync(workspace, scope); }
+        { gate.ThrowIfStorageBlocked(); await store.SaveChangesAsync(workspace, scope); }
         catch { if (taken != null) edits.Restore(taken); throw; }
         finally { saveGate.Release(); }
     }
@@ -119,15 +120,14 @@ public sealed partial class MainWindow : Window
         var taken = edits.Take();
         try
         {
-            if (storageBlocked)
-                throw OperationsAdapter.Block("StorageReload");
+            gate.ThrowIfStorageBlocked();
             if (!taken.CanSaveRows(workspace) || !await store.TrySaveDraftRowsAsync(workspace, taken.Changes))
                 await store.SaveChangesAsync(workspace);
         }
         catch { edits.Restore(taken); throw; }
         finally { saveGate.Release(); }
     }
-    void SaveSoon() { if (!closeState.IsOpen) return; autosave.Stop(); autosave.Start(); }
+    void SaveSoon() { if (!gate.CanStartUserAction) return; autosave.Stop(); autosave.Start(); }
     async Task Guard(Func<Task> operation)
     {
         try
@@ -136,30 +136,28 @@ public sealed partial class MainWindow : Window
     }
     async Task Work(Func<Task> operation)
     {
-        if (!closeState.IsOpen || busy || localOperation)
+        var work = gate.TryBeginWork();
+        if (work is null)
             return;
-        if (storageBlocked)
-            throw OperationsAdapter.Block("StorageReload");
         var pendingSave = autosave.IsEnabled;
         autosave.Stop();
-        busy = true;
         BusyRing.IsActive = true;
         WorkspacePicker.IsEnabled = false;
         ResourcePicker.IsEnabled = false;
         try
         { if (pendingSave) await SaveEdits(); await operation(); }
-        finally { busy = false; BusyRing.IsActive = false; WorkspacePicker.IsEnabled = true; ResourcePicker.IsEnabled = true; Render(); }
+        finally { work.Dispose(); BusyRing.IsActive = false; WorkspacePicker.IsEnabled = true; ResourcePicker.IsEnabled = true; Render(); }
     }
     Button Button(Func<string> label, Func<Task> action, bool enabled = true)
     {
         var b = new Button { IsEnabled = enabled }.Localize(localization, "Content", () => label());
-        b.Click += async (_, _) => { if (!querying && !localOperation) await UserAction(action); };
+        b.Click += async (_, _) => { if (gate.CanInvokeCommand) await UserAction(action); };
         return b;
     }
     AppBarButton Command(Func<string> label, Symbol icon, Func<Task> action, bool enabled = true)
     {
         var button = new AppBarButton { Icon = new SymbolIcon(icon), IsEnabled = enabled }.Localize(localization, "Label", () => label());
-        button.Click += async (_, _) => { if (!querying && !localOperation) await UserAction(action); };
+        button.Click += async (_, _) => { if (gate.CanInvokeCommand) await UserAction(action); };
         return button;
     }
     static StackPanel Stack(params UIElement[] children) { var s = new StackPanel { Spacing = 12 }; foreach (var c in children) s.Children.Add(c); return s; }
@@ -170,25 +168,25 @@ public sealed partial class MainWindow : Window
     async Task<bool> Confirm(string title, UIElement content, string? primary = null)
     {
         var d = new ContentDialog { XamlRoot = Content.XamlRoot, Title = title, Content = content, PrimaryButtonText = primary ?? L("Confirm"), CloseButtonText = L("Text_2CD0F3BE87"), DefaultButton = ContentDialogButton.Close };
-        dialogs++;
+        using var open = gate.BeginDialog();
         ObserveDialog(d, true);
         try
         { return await d.ShowAsync() == ContentDialogResult.Primary; }
-        finally { ObserveDialog(d, false); dialogs--; }
+        finally { ObserveDialog(d, false); }
     }
     // A secondary action is shown only when its label is given.
     async Task<ContentDialogResult> Choose(string title, UIElement content, string primary, string? secondary)
     {
         var d = new ContentDialog { XamlRoot = Content.XamlRoot, Title = title, Content = content, PrimaryButtonText = primary, SecondaryButtonText = secondary ?? "", CloseButtonText = L("Text_2CD0F3BE87"), DefaultButton = ContentDialogButton.Close };
-        dialogs++;
+        using var open = gate.BeginDialog();
         ObserveDialog(d, true);
         try
         { return await d.ShowAsync(); }
-        finally { ObserveDialog(d, false); dialogs--; }
+        finally { ObserveDialog(d, false); }
     }
     void Navigate(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        if (!ready || !closeState.IsOpen || localOperation)
+        if (!ready || !gate.CanNavigate)
             return;
         CancelDataQuery();
         page = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString() ?? "workspace";
@@ -196,7 +194,7 @@ public sealed partial class MainWindow : Window
     }
     async void WorkspaceChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!ready || !closeState.IsOpen || busy || localOperation || WorkspacePicker.SelectedItem is not WorkspaceChoice choice || choice.Id == workspace.Id)
+        if (!ready || !gate.CanSwitchContext || WorkspacePicker.SelectedItem is not WorkspaceChoice choice || choice.Id == workspace.Id)
             return;
         await SwitchWorkspace(choice.Id);
     }
@@ -206,7 +204,7 @@ public sealed partial class MainWindow : Window
         await UserAction(async () => { autosave.Stop(); await Save(); workspace = store.Load(id); if (apiSessions.Remove(id, out var previous)) previous.Client.Dispose(); if (workspace.Mode == RunMode.Online) workspace.Mode = RunMode.Offline; Render(); });
     }
     void ResourceChanged(object sender, SelectionChangedEventArgs e)
-    { if (!ready || !closeState.IsOpen || busy || localOperation) return; CancelDataQuery(); resource = (ResourceKind)ResourcePicker.SelectedIndex; Render(); }
+    { if (!ready || !gate.CanSwitchContext) return; CancelDataQuery(); resource = (ResourceKind)ResourcePicker.SelectedIndex; Render(); }
     void Render()
     {
         if (!ready)
@@ -234,14 +232,14 @@ public sealed partial class MainWindow : Window
         return Scroll(Stack(Text(() => L("Text_2C33D5F7DE")),
             Row(Button(() => L("Text_946897D107"), async () =>
             {
-                if (!closeState.IsOpen || busy)
+                if (!gate.CanAct)
                     return;
                 var name = new TextBox { Text = L("Text_A818AFCD80"), MaxLength = 80 }.Localize(localization, "Header", () => L("Text_8DCC576817"));
                 if (await Confirm(L("Text_CDD0362664"), name) && !string.IsNullOrWhiteSpace(name.Text))
                 { await Save(); workspace = new Workspace { Name = name.Text.Trim() }; await Save(); ReloadWorkspaces(); Render(); }
             }), Button(() => L("Text_57D4E0340D"), async () =>
             {
-                if (!closeState.IsOpen || busy)
+                if (!gate.CanAct)
                     return;
                 await Save();
                 workspace = DemoWorkspace();
@@ -286,11 +284,11 @@ public sealed partial class MainWindow : Window
         grid.Children.Add(new ScrollViewer { Content = toolbar, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled });
         var actions = new CommandBar { DefaultLabelPosition = CommandBarDefaultLabelPosition.Right, HorizontalContentAlignment = HorizontalAlignment.Left, IsDynamicOverflowEnabled = true };
         dataActions = actions;
-        actions.PrimaryCommands.Add(Command(() => L("ApiRefresh"), Symbol.Refresh, RefreshApi, !busy));
+        actions.PrimaryCommands.Add(Command(() => L("ApiRefresh"), Symbol.Refresh, RefreshApi, gate.CanRequestOnline));
         actions.PrimaryCommands.Add(BatchCommand(() => L("Text_E306752B35"), Symbol.Edit, EditRules, "active"));
         actions.PrimaryCommands.Add(Command(() => L("Text_48A195CA7E"), Symbol.View, () => { Navigation.SelectedItem = Navigation.MenuItems[3]; return Task.CompletedTask; }));
-        actions.PrimaryCommands.Add(Command(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts, !busy && Data.Conflicts.Count > 0));
-        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!closeState.IsOpen || busy) return; var rowBuilder = new DataRow.Builder(); foreach (var f in Schemas.All[resource].Columns) rowBuilder[f] = f == "_delete" ? "FALSE" : ""; var r = rowBuilder.ToRow(); Data.Edit([r.LocalId], () => Data.Draft.Add(r), structural: true); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
+        actions.PrimaryCommands.Add(Command(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts, gate.CanRequestOnline && Data.Conflicts.Count > 0));
+        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!gate.CanAct) return; var rowBuilder = new DataRow.Builder(); foreach (var f in Schemas.All[resource].Columns) rowBuilder[f] = f == "_delete" ? "FALSE" : ""; var r = rowBuilder.ToRow(); Data.Edit([r.LocalId], () => Data.Draft.Add(r), structural: true); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
         // Kept for every resource and shown only where it applies, since the page outlives a resource switch.
         fleetCommand = BatchCommand(() => L("Text_95DD1FDDFE"), Symbol.Edit, () => resource is ResourceKind.Aircraft or ResourceKind.Routes ? ChooseFleets(null) : Task.CompletedTask, "active");
         fleetCommand.Visibility = resource is ResourceKind.Aircraft or ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
@@ -331,7 +329,7 @@ public sealed partial class MainWindow : Window
     // Replaced rows keep the applied query order, as cell edits do; only those rows are refreshed.
     async Task MoveHistory(bool undo)
     {
-        if (!closeState.IsOpen || busy)
+        if (!gate.CanAct)
             return;
         var kind = resource;
         var source = Data;
@@ -391,7 +389,7 @@ public sealed partial class MainWindow : Window
         Button(() => L("Text_5A2BBDEA04"), ImportCsv), Button(() => L("ApiRefresh"), RefreshApi));
     async Task ImportCsv()
     {
-        if (!closeState.IsOpen || busy)
+        if (!gate.CanAct)
             return;
         var picker = new FileOpenPicker();
         picker.FileTypeFilter.Add(".csv");
@@ -434,7 +432,7 @@ public sealed partial class MainWindow : Window
     }
     Task ExportCsv(ResourceKind kind) => LocalOperation(async () =>
     {
-        if (!closeState.IsOpen || busy)
+        if (!gate.CanAct)
             return;
         if (!await ValidateForSubmit(kind))
             return;
@@ -461,7 +459,7 @@ public sealed partial class MainWindow : Window
     async Task ExecuteDemo(BatchJob job)
     {
         TaskSubmission.RequireExecution(workspace, job, RunMode.Demo,
-            closeState.IsOpen && !busy && !localOperation && !querying);
+            gate.CanRunTask);
         await Work(async () =>
         {
             running = new CancellationTokenSource();
@@ -519,7 +517,7 @@ public sealed partial class MainWindow : Window
         return Scroll(Stack(LanguagePicker(), Text(() => L("ApiSettings"), 20), Text(() => L("ApiSettingsHelp")), url, clientId, secret, local,
             Button(() => L("Text_760143E568"), async () =>
             {
-                if (!closeState.IsOpen || busy)
+                if (!gate.CanAct)
                     return;
                 await saveGate.WaitAsync();
                 try
@@ -532,7 +530,7 @@ public sealed partial class MainWindow : Window
                 Status(() => L("Text_DEADA9F3CC"));
             }), Button(() => L("ApiUpdateCredentials"), async () =>
             {
-                if (!closeState.IsOpen || busy)
+                if (!gate.CanAct)
                     return;
                 await saveGate.WaitAsync();
                 try
@@ -543,7 +541,7 @@ public sealed partial class MainWindow : Window
                 if (apiSessions.Remove(workspace.Id, out var previous))
                     previous.Client.Dispose();
                 Status(() => L("ApiCredentialsUpdated"));
-            }, !busy), Text(() => L("ApiCredentialsHelp")), Button(() => L("ApiConnect"), ConnectApi), Button(() => L("ApiRefresh"), RefreshApi),
+            }, gate.CanRequestOnline), Text(() => L("ApiCredentialsHelp")), Button(() => L("ApiConnect"), ConnectApi), Button(() => L("ApiRefresh"), RefreshApi),
             Text(() => L("ApiCapability")), Text(() => L("ApiIndependentScope")), Text(() => L("ApiVerified", ("operations", string.Join(", ", workspace.VerifiedOperations)))),
             Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"))),
             Button(() => L("ApiParametersLoad"), LoadParameters), Text(() => L("MaintenanceTitle"), 18), Button(() => L("BackupClear"), BackupAndClearWorkspace)));

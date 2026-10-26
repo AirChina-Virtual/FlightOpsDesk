@@ -36,13 +36,13 @@ public sealed partial class MainWindow
             if (taskIndex.ContainsKey(job.Id))
                 continue;
             TaskJobViewModel? vm = null;
-            vm = new(job, localization, () => !busy && closeState.IsOpen, () => workspace.Mode,
+            vm = new(job, localization, () => gate.CanAct, () => workspace.Mode,
                 () => UserAction(() => TaskDetails(vm!)),
                 () => UserAction(() => ReviewUnknown(job)),
                 () => UserAction(() => job.Mode == RunMode.Online ? ExecuteApi(job) : ExecuteDemo(job)),
                 () => UserAction(async () =>
                 {
-                    if (busy || !closeState.IsOpen)
+                    if (!gate.CanAct)
                         return;
                     var reset = job.Items.Where(i => i.State == ItemState.Failed).ToList();
                     foreach (var i in reset)
@@ -96,7 +96,7 @@ public sealed partial class MainWindow
         if (!ReferenceEquals(tasksOwner, workspace))
             return;
         if (taskCancel != null)
-            taskCancel.IsEnabled = running != null && closeState.IsOpen;
+            taskCancel.IsEnabled = running != null && gate.ControlsEnabled;
         foreach (var vm in taskModels)
             vm.RefreshHeader();
     }
@@ -160,7 +160,7 @@ public sealed partial class MainWindow
     // Local only: never-sent items are saved as Failed before the task in memory changes.
     async Task DiscardUnsent(BatchJob job)
     {
-        if (busy || !closeState.IsOpen || job.Mode != RunMode.Online)
+        if (!gate.CanAct || job.Mode != RunMode.Online)
             return;
         var ids = job.Items.Where(ApiOperationPolicy.CanDiscardUnsent).Select(i => i.Id).ToList();
         if (ids.Count == 0 || !await Confirm(L("ApiDiscardPending"), Text(() => L("ApiDiscardConfirm", ("count", ids.Count))), L("ApiDiscardPending")))

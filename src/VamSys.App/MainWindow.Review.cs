@@ -30,13 +30,11 @@ public sealed partial class MainWindow
     }
     // Locks edits and navigation while a worker reads the workspace. Nested locks keep the outermost
     // state: an enclosing LocalOperation stays locked when this one ends.
-    int reviewLocks; bool reviewLockOwnsState;
     async Task<T> WhileLocked<T>(Func<T> work)
     {
-        if (reviewLocks++ == 0 && !localOperation)
+        var scope = gate.BeginReviewLock();
+        if (scope.TookLocal)
         {
-            reviewLockOwnsState = true;
-            localOperation = true;
             Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = PageHost.IsEnabled = false;
             BusyRing.IsActive = true;
             RefreshDataAvailability();
@@ -45,12 +43,11 @@ public sealed partial class MainWindow
         { return await Task.Run(work); }
         finally
         {
-            if (--reviewLocks == 0 && reviewLockOwnsState)
+            scope.Dispose();
+            if (scope.ReleasedLocal)
             {
-                reviewLockOwnsState = false;
-                localOperation = false;
-                Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = PageHost.IsEnabled = closeState.IsOpen;
-                BusyRing.IsActive = busy || querying;
+                Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = PageHost.IsEnabled = gate.ControlsEnabled;
+                BusyRing.IsActive = gate.ShowsProgress;
                 RefreshDataAvailability();
             }
         }
@@ -105,7 +102,7 @@ public sealed partial class MainWindow
         header.Children.Add(Actions(
             Button(() => L(workspace.Mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit"), workspace.Mode == RunMode.Demo ? StartDemo : StartApi,
                 CanEditData() && plan.SubmitCount > 0 && workspace.Mode != RunMode.Offline),
-            Button(() => L("ApiConflicts", ("count", conflicts)), ResolveWorkspaceConflicts, !busy && !localOperation && conflicts > 0)));
+            Button(() => L("ApiConflicts", ("count", conflicts)), ResolveWorkspaceConflicts, gate.CanResolveConflicts && conflicts > 0)));
         var rows = new List<ReviewDisplayRow>();
         foreach (var kind in Enum.GetValues<ResourceKind>())
         {

@@ -24,7 +24,7 @@ public sealed partial class MainWindow
     }
     async Task ConnectApi()
     {
-        if (busy)
+        if (!gate.CanRequestOnline)
             return;
         await Work(async () =>
         {
@@ -48,7 +48,7 @@ public sealed partial class MainWindow
     }
     async Task RefreshApi()
     {
-        if (busy)
+        if (!gate.CanRequestOnline)
             return;
         if (workspace.Mode != RunMode.Online)
         { Navigation.SelectedItem = Navigation.MenuItems[5]; Status(() => L("ApiConnectFirst")); return; }
@@ -107,11 +107,9 @@ public sealed partial class MainWindow
                     DefaultButton = ContentDialogButton.Close,
                     IsPrimaryButtonEnabled = conflict.Field != "*"
                 };
-                dialogs++;
                 ContentDialogResult choice;
-                try
-                { choice = await dialog.ShowAsync(); }
-                finally { dialogs--; }
+                using (gate.BeginDialog())
+                    choice = await dialog.ShowAsync();
                 if (choice == ContentDialogResult.None)
                     return;
                 if (choice == ContentDialogResult.Secondary)
@@ -140,7 +138,7 @@ public sealed partial class MainWindow
     async Task ExecuteApi(BatchJob job)
     {
         TaskSubmission.RequireExecution(workspace, job, RunMode.Online,
-            closeState.IsOpen && !busy && !localOperation && !querying);
+            gate.CanRunTask);
         await Work(async () =>
         {
             running = new();
@@ -177,7 +175,7 @@ public sealed partial class MainWindow
             failed.Client.Dispose();
         try
         { workspace = store.Load(workspace.Id); workspace.Mode = RunMode.Offline; }
-        catch { storageBlocked = true; }
+        catch { gate.BlockStorage(); }
     }
     sealed class AppCheckpointWriter(MainWindow owner, IBatchCheckpointWriter inner) : IBatchCheckpointWriter
     {
@@ -185,13 +183,13 @@ public sealed partial class MainWindow
         {
             await owner.saveGate.WaitAsync(ct);
             try
-            { if (owner.storageBlocked) throw OperationsAdapter.Block("StorageReload"); await inner.WriteAsync(checkpoint, ct); }
+            { owner.gate.ThrowIfStorageBlocked(); await inner.WriteAsync(checkpoint, ct); }
             finally { owner.saveGate.Release(); }
         }
     }
     async Task ReviewUnknown(BatchJob job)
     {
-        if (!closeState.IsOpen || busy || job.Mode != RunMode.Online || workspace.Mode == RunMode.Demo)
+        if (!gate.CanAct || job.Mode != RunMode.Online || workspace.Mode == RunMode.Demo)
             return;
         await UnknownReview.RunAsync(job, item => ReviewUnknownItem(job, item), () => ExecuteApi(job));
         Render();

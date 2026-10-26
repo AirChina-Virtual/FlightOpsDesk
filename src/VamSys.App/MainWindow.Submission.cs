@@ -18,7 +18,7 @@ public sealed partial class MainWindow
         // If storage cannot be read, keep the job and block further saves until reload.
         try
         { return store.JobExists(workspace.Id, job.Id); }
-        catch { storageBlocked = true; return true; }
+        catch { gate.BlockStorage(); return true; }
     }
 
     void SelectTasksForSubmission()
