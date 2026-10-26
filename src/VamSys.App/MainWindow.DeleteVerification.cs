@@ -1,5 +1,4 @@
 using VamSys.Core;
-using VamSys.Infrastructure;
 
 namespace VamSys.App;
 
@@ -15,14 +14,8 @@ public sealed partial class MainWindow
             {
                 Navigation.SelectedItem = Navigation.MenuItems[4];
                 Render();
-                await new OperationsDeletionVerifier(Api(), workspace).VerifyAsync(job,
-                    session.CheckpointWriter(), running.Token, NotifyTask);
+                await recovery.VerifyDeletionsAsync(job, NotifyTask, running.Token);
                 Status(() => L("ApiDeleteCheckDone"));
-            }
-            catch (PersistenceException)
-            {
-                ReloadAfterCheckpointFailure();
-                throw;
             }
             finally { running.Dispose(); running = null; }
         });

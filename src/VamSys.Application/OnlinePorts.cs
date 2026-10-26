@@ -40,6 +40,10 @@ public interface IOnlineGateway
     // Drops the session of a workspace (new credentials, a reload, a switch).
     void Release(Guid workspaceId);
     string ContractHash { get; }
+    // The address of the operations API, shown on the settings page.
+    string EndpointUrl { get; }
+    // Marks the never-sent items of a stopped online job as failed without contacting the server; returns how many.
+    Task<int> DiscardUnsentAsync(Workspace workspace, BatchJob job, IBatchCheckpointWriter writer);
     // Which recovery a stored Unknown item can take, decided from the item alone.
     bool CanVerifyNotApplied(ChangeItem item);
     bool CanConfirmWithoutReceipt(ChangeItem item);

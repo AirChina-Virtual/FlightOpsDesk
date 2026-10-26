@@ -44,13 +44,7 @@ public sealed partial class MainWindow
                 {
                     if (!gate.CanAct)
                         return;
-                    var reset = job.Items.Where(i => i.State == ItemState.Failed).ToList();
-                    foreach (var i in reset)
-                        i.State = ItemState.Pending;
-                    // The items were changed in place, so the job has to be marked for the journal.
-                    workspace.Journal().TouchJob(job);
-                    await Save(dataChanged: false, JournalScope.Jobs);
-                    foreach (var i in reset)
+                    foreach (var i in await demo.ResetFailedAsync(job))
                         vm!.Update(i.Id);
                     await ExecuteDemo(job);
                 }), () => UserAction(() => ExportTaskDiagnostics(job.Id)), () => UserAction(() => VerifyTaskDeletions(job)), () => UserAction(() => DiscardUnsent(job)));
@@ -162,15 +156,13 @@ public sealed partial class MainWindow
     {
         if (!gate.CanAct || job.Mode != RunMode.Online)
             return;
-        var ids = job.Items.Where(ApiOperationPolicy.CanDiscardUnsent).Select(i => i.Id).ToList();
+        var ids = recovery.DiscardableItems(job);
         if (ids.Count == 0 || !await Confirm(L("ApiDiscardPending"), Text(() => L("ApiDiscardConfirm", ("count", ids.Count))), L("ApiDiscardPending")))
             return;
         var count = 0;
         await Work(async () =>
         {
-            try
-            { count = await VamSys.Infrastructure.OperationsPendingDiscard.DiscardAsync(workspace, job, session.CheckpointWriter()); }
-            catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
+            count = await recovery.DiscardUnsentAsync(job);
         });
         foreach (var id in ids)
             NotifyTask(new(workspace.Id, job.Id, id, id == ids[^1]));

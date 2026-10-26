@@ -24,6 +24,8 @@ public sealed partial class MainWindow : Window
     readonly BatchEditService batch;
     readonly ReviewService reviews;
     readonly SubmissionService submission;
+    readonly TaskRecoveryService recovery;
+    readonly DemoRunner demo;
     readonly DiagnosticsService diagnostics;
     Workspace workspace => session.Workspace;
     IUserSettings settings => storage;
@@ -45,6 +47,8 @@ public sealed partial class MainWindow : Window
         batch = new(session);
         reviews = new(session, online);
         submission = new(session);
+        recovery = new(session, online);
+        demo = new(session, DemoEngine.Create);
         diagnostics = new(session, ApiDiagnosticExport.Serialize);
         InitializeLanguage();
         tableDensity = settings.LoadTableDensity();
@@ -345,47 +349,12 @@ public sealed partial class MainWindow : Window
     Task StartDemo() => SubmitWorkspace(RunMode.Demo);
     async Task ExecuteDemo(BatchJob job)
     {
-        submission.RequireExecution(job, RunMode.Demo,
-            gate.CanRunTask);
+        submission.RequireExecution(job, RunMode.Demo, gate.CanRunTask);
         await Work(async () =>
         {
             running = new CancellationTokenSource();
-            var demo = new DemoService(workspace);
-            foreach (var history in workspace.Jobs.Where(j => j.Mode == RunMode.Demo))
-                demo.RestoreSuccessful(history);
-            Navigation.SelectedItem = Navigation.MenuItems[4];
-            Render();
-            // The executor changes the job and its items in place and asks for a save after every item: only the job is written.
-            await new BatchExecutor(demo, demo).ExecuteAsync(job, async () => { workspace.Journal().TouchJob(job); await Save(dataChanged: false, JournalScope.Jobs); }, running.Token, item => NotifyTask(new(workspace.Id, job.Id, item?.Id, job.StatusCode != JobStatus.Running)));
-            // Rebase only verified successful rows, keeping failures and unrelated drafts intact.
-            foreach (var item in job.Items.Where(i => i.State == ItemState.Succeeded && !i.Rebased))
-            {
-                var data = workspace.Resources[item.Resource];
-                data.Snapshot.RemoveAll(r => r.LocalId == item.After.LocalId);
-                if (item.Kind == ChangeKind.Delete)
-                    data.Draft.RemoveAll(r => r.LocalId == item.After.LocalId && Schemas.Deleted(r));
-                else
-                {
-                    var updated = item.RemoteId != null ? item.After.With(Schemas.All[item.Resource].Key, item.RemoteId) : item.After;
-                    data.Snapshot.Add(updated);
-                    var index = data.FindDraftPosition(updated.LocalId);
-                    if (index >= 0)
-                    {
-                        // Preserve edits made after a recovered job was submitted; only rebase identity/references.
-                        var current = data.Draft[index].ToBuilder();
-                        current[Schemas.All[item.Resource].Key] = updated.Get(Schemas.All[item.Resource].Key);
-                        foreach (var field in Schemas.ReferenceFields(item.Resource))
-                            if (LocalReference.ContainsLocal(current.Get(field)))
-                                current[field] = updated.Get(field);
-                        data.ReplaceDraftRows([current.ToRow()]);
-                    }
-                }
-                item.Rebased = true;
-                data.SnapshotAt = DateTimeOffset.UtcNow;
-                data.ClearHistory(invalidateIndex: item.Kind == ChangeKind.Delete);
-            }
-            workspace.Journal().TouchJob(job);
-            await Save();
+            await demo.RunAsync(job, running.Token, () => { Navigation.SelectedItem = Navigation.MenuItems[4]; Render(); },
+                item => NotifyTask(new(workspace.Id, job.Id, item?.Id, job.StatusCode != JobStatus.Running)));
             foreach (var item in job.Items)
                 NotifyTask(new(workspace.Id, job.Id, item.Id));
             FlushTasks();
@@ -394,10 +363,9 @@ public sealed partial class MainWindow : Window
             Render();
             Status(() => L("Text_B64A075682") + JobText(job));
         });
-    }
-    UIElement SettingsPage()
+    }    UIElement SettingsPage()
     {
-        var url = new TextBox { Text = OperationsAdapter.BaseUri.AbsoluteUri, IsReadOnly = true, MaxWidth = 650, HorizontalAlignment = HorizontalAlignment.Stretch }.Localize(localization, "Header", () => L("Text_0251B89662"));
+        var url = new TextBox { Text = online.EndpointUrl, IsReadOnly = true, MaxWidth = 650, HorizontalAlignment = HorizontalAlignment.Stretch }.Localize(localization, "Header", () => L("Text_0251B89662"));
         var clientId = new TextBox { Header = "Client ID", Text = workspace.ClientId ?? "", MaxWidth = 650, HorizontalAlignment = HorizontalAlignment.Stretch };
         var secret = new PasswordBox { MaxWidth = 650, HorizontalAlignment = HorizontalAlignment.Stretch }.Localize(localization, "Header", () => L("Text_86032C09C5"));
         var local = new CheckBox { IsChecked = workspace.LocalRouteTimes }.Localize(localization, "Content", () => L("Text_92BD49D337"));
@@ -425,31 +393,7 @@ public sealed partial class MainWindow : Window
             Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"))),
             Button(() => L("ApiParametersLoad"), LoadParameters), Text(() => L("MaintenanceTitle"), 18), Button(() => L("BackupClear"), BackupAndClearWorkspace)));
     }
-    Workspace DemoWorkspace()
-    {
-        var w = new Workspace { Name = L("DemoWorkspace", ("time", DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture))), Mode = RunMode.Demo };
-        void Add(ResourceKind k, params (string, string)[] fields)
-        {
-            var builder = new DataRow.Builder(fields.Length + 1);
-            foreach (var (name, text) in fields)
-                builder[name] = text;
-            builder["_delete"] = "FALSE";
-            var r = builder.ToRow();
-            w.Resources[k].Draft.Add(r);
-            w.Resources[k].Snapshot.Add(r);
-            w.Resources[k].Columns = w.Resources[k].Columns.Concat(r.Fields.Keys).Distinct().ToList();
-            w.Resources[k].SnapshotAt = DateTimeOffset.UtcNow;
-        }
-        Add(ResourceKind.Airports, ("ICAO/IATA", "ZBAA"), ("Name", "北京首都"));
-        Add(ResourceKind.Airports, ("ICAO/IATA", "ZSPD"), ("Name", "上海浦东"));
-        Add(ResourceKind.Fleets, ("ID", "1"), ("Name", "Boeing 737-800"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "pax"), ("Max Passengers", "189"));
-        Add(ResourceKind.Fleets, ("ID", "2"), ("Name", "Airbus A320"), ("Type Code", "A320"), ("Type (pax/cargo/...)", "pax"), ("Max Passengers", "180"));
-        Add(ResourceKind.Aircraft, ("ID", "10"), ("Name", "Boeing 737-800"), ("Registration", "B-DEMO"), ("Fleet ID", "1"));
-        Add(ResourceKind.Routings, ("ID", "20"), ("Departure Airport (ICAO/IATA)", "ZBAA"), ("Arrival Airport (ICAO/IATA)", "ZSPD"), ("Route String", "DCT"));
-        for (int i = 0; i < 12; i++)
-            Add(ResourceKind.Routes, ("ID", (100 + i).ToString()), ("Departure Airport (ICAO/IATA)", i % 2 == 0 ? "ZBAA" : "ZSPD"), ("Arrival Airport (ICAO/IATA)", i % 2 == 0 ? "ZSPD" : "ZBAA"), ("Type", "scheduled"), ("Callsign", "DEM" + (100 + i)), ("Flight Number", "DM" + (100 + i)), ("Fleet IDs", "1"), ("Departure Time (HH:MM)", $"{6 + i:00}:30"), ("Arrival Time (HH:MM)", $"{8 + i:00}:45"), ("Tags", "演示"));
-        return w;
-    }
+    Workspace DemoWorkspace() => DemoWorkspaceFactory.Create(L("DemoWorkspace", ("time", DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture))));
 }
 static class StringExtensions
 {

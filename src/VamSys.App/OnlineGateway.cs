@@ -10,6 +10,7 @@ public sealed class OnlineGateway(WorkspaceStoreAdapter storage) : IOnlineGatewa
     readonly Dictionary<Guid, (HttpClient Client, OperationsSession Session)> sessions = [];
 
     public string ContractHash => ApiContracts.Sha256;
+    public string EndpointUrl => OperationsAdapter.BaseUri.AbsoluteUri;
 
     public IOnlineSession Session(Workspace workspace)
     {
@@ -24,8 +25,6 @@ public sealed class OnlineGateway(WorkspaceStoreAdapter storage) : IOnlineGatewa
         sessions[workspace.Id] = (client, session);
         return session;
     }
-    // The operations adapter behind a workspace's session, for the app code that has not moved to the services yet.
-    internal OperationsAdapter Adapter(Workspace workspace) => ((OperationsSession)Session(workspace)).Api;
     public IOnlineSession? Connected(Guid workspaceId)
         => sessions.TryGetValue(workspaceId, out var existing) && existing.Session.AirlineId != null ? existing.Session : null;
     public void Release(Guid workspaceId)
@@ -41,7 +40,6 @@ public sealed class OnlineGateway(WorkspaceStoreAdapter storage) : IOnlineGatewa
 
     sealed class OperationsSession(OperationsAdapter api, Workspace workspace) : IOnlineSession
     {
-        public OperationsAdapter Api => api;
         public string? AirlineId => api.SessionAirlineId;
         public Task<bool> IdentifyAirlineAsync(CancellationToken ct) => api.IdentifyAirlineAsync(ct);
         public Task RefreshSnapshotsAsync(Func<Workspace, Task> persist, CancellationToken ct, Action<ResourceKind, int>? progress)

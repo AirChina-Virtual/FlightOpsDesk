@@ -1,15 +1,11 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using System.Text.Json;
 using VamSys.Core;
-using VamSys.Infrastructure;
 
 namespace VamSys.App;
 
 public sealed partial class MainWindow
 {
-    // The operations adapter behind the connection; the task recovery flows still use it directly.
-    OperationsAdapter Api() => online.Adapter(workspace);
     async Task ConnectApi()
     {
         if (!gate.CanRequestOnline)
@@ -69,190 +65,98 @@ public sealed partial class MainWindow
     {
         var text = $"{L(Schemas.All[change.Resource].Name)} · {EnumText(change.Kind)} · {Schemas.Key(change.Resource, change.After)}\n" +
             string.Join("; ", change.Fields.Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key, localization)}: {change.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}"));
-        try
-        {
-            if (change.Dependencies.Count > 0)
-                return text + "\n" + L("ApiDependent", ("count", change.Dependencies.Count));
-            return text + "\n" + string.Join(" → ", Api().Plan(change).Select(s => $"{s.Method} {s.Path}"));
-        }
-        catch (Exception e) { return text + "\n" + L(MessageErrors.Describe(e)); }
+        var plan = recovery.Describe(change);
+        if (plan.Dependencies > 0)
+            return text + "\n" + L("ApiDependent", ("count", plan.Dependencies));
+        if (plan.Error is { } error)
+            return text + "\n" + L(error);
+        return text + "\n" + string.Join(" → ", plan.Steps);
     }
     Task StartApi() => SubmitWorkspace(RunMode.Online);
     async Task ExecuteApi(BatchJob job)
     {
-        submission.RequireExecution(job, RunMode.Online,
-            gate.CanRunTask);
+        submission.RequireExecution(job, RunMode.Online, gate.CanRunTask);
         await Work(async () =>
         {
             running = new();
-            using var performance = PerformanceRun.Begin(workspace.Id, job.Id);
-            using var cancellation = running.Token.Register(performance.MarkCancellation);
-            var outcome = "Failed";
             try
             {
                 Navigation.SelectedItem = Navigation.MenuItems[4];
                 Render();
-                await new OperationsBatchExecutor(Api(), workspace).ExecuteAsync(job, session.CheckpointWriter(), running.Token, progress: NotifyTask);
-                outcome = job.StatusCode.ToString();
+                await recovery.ExecuteAsync(job, NotifyTask, running.Token);
                 Status(() => JobText(job));
-            }
-            catch (PersistenceException)
-            {
-                ReloadAfterCheckpointFailure();
-                throw;
             }
             finally
             {
-                performance.Finish(outcome);
-                var directory = AppPaths.DataDirectory;
-                performance.TryWrite(Path.Combine(directory, "performance"));
                 running.Dispose();
                 running = null;
             }
         });
     }
-    void ReloadAfterCheckpointFailure()
-    {
-        online.Release(workspace.Id);
-        session.ReloadAfterCheckpointFailure();
-    }
     async Task ReviewUnknown(BatchJob job)
     {
-        if (!gate.CanAct || job.Mode != RunMode.Online || workspace.Mode == RunMode.Demo)
-            return;
-        await UnknownReview.RunAsync(job, item => ReviewUnknownItem(job, item), () => ExecuteApi(job));
+        await recovery.ReviewUnknownAsync(job, gate.CanAct, new RecoveryDialogs(this), () => ExecuteApi(job));
         Render();
     }
-    // Returns true when a recovery ID was saved and the online job should be read back.
-    async Task<bool> ReviewUnknownItem(BatchJob job, ChangeItem item)
+
+    // The task recovery dialogs and the window state around the server reads they need.
+    sealed class RecoveryDialogs(MainWindow owner) : IRecoveryUi
     {
-        var notApplied = workspace.Mode == RunMode.Online && OperationsUnknownResolver.CanCheck(item) ? L("ApiVerifyNotApplied") : null;
-        string Help() => notApplied == null ? "" : "\n" + L("ApiNotAppliedHelp");
-        if (item.CanProposeRecoveryId)
+        public Task RunReadAsync(Func<CancellationToken, Task> read) => owner.Work(async () =>
         {
+            owner.running = new();
+            try
+            { await read(owner.running.Token); }
+            finally { owner.running.Dispose(); owner.running = null; }
+        });
+        public void ItemChanged(BatchJob job, ChangeItem item) => owner.NotifyTask(new(owner.workspace.Id, job.Id, item.Id, true));
+        public async Task<RecoveryIdAnswer> AskRecoveryIdAsync(ChangeItem item, bool online, bool canVerifyNotApplied)
+        {
+            var notApplied = canVerifyNotApplied ? owner.L("ApiVerifyNotApplied") : null;
+            string Help() => notApplied == null ? "" : "\n" + owner.L("ApiNotAppliedHelp");
             var id = new TextBox { Header = "Remote ID", Text = item.EditableRecoveryId ?? "" };
-            var choice = await Choose(L("ApiUnknownReview"), Stack(Text(() => ApiReview(item)), Text(() => L("ApiRecoverId") + Help()), id), L(workspace.Mode == RunMode.Online ? "ApiCheckRemote" : "ApiSaveCandidate"), notApplied);
-            if (choice == ContentDialogResult.Secondary)
-            { await VerifyNotApplied(job, item); return false; }
-            if (choice != ContentDialogResult.Primary)
-                return false;
-            var candidate = JsonSerializer.Deserialize<ChangeItem>(JsonSerializer.Serialize(item))!;
-            candidate.ProposeRecoveryId(id.Text);
-            await session.CheckpointWriter().WriteAsync(new(CheckpointKind.Task, job, candidate), CancellationToken.None);
-            job.Items[job.Items.IndexOf(item)] = candidate;
-            NotifyTask(new(workspace.Id, job.Id, candidate.Id, true));
-            if (workspace.Mode == RunMode.Online)
-                return true;
-            Status(() => L("ApiCandidateSaved"));
+            var choice = await owner.Choose(owner.L("ApiUnknownReview"), Stack(owner.Text(() => owner.ApiReview(item)), owner.Text(() => owner.L("ApiRecoverId") + Help()), id), owner.L(online ? "ApiCheckRemote" : "ApiSaveCandidate"), notApplied);
+            return choice == ContentDialogResult.Secondary ? new(null, true) : choice == ContentDialogResult.Primary ? new(id.Text, false) : RecoveryIdAnswer.Cancel;
+        }
+        public Task<bool> ConfirmManualDeleteAsync(ChangeItem item)
+            => owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L("ApiManualDelete", ("id", item.RemoteId ?? item.After.Identity?.RemoteId))), owner.L("ApiManualConfirm"));
+        static string Differences(IReadOnlyList<ApiFieldDifference> differences) => string.Join("\n", differences.Select(d => $"{d.Field}: {d.Expected ?? "∅"} → {d.Actual ?? "∅"}"));
+        public Task ShowStillReadableAsync(ChangeItem item, NoReceiptInspection review)
+        {
+            var id = item.RemoteId ?? item.After.Identity?.RemoteId;
+            var differences = Differences(review.Differences);
+            return owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L("ApiNoReceiptStillReadable", ("id", id)) + "\n" + differences), owner.L("Text_3FD47EDCE4"));
+        }
+        public Task<bool> ConfirmNoReceiptAsync(ChangeItem item, NoReceiptInspection review, bool deleted)
+        {
+            var id = item.RemoteId ?? item.After.Identity?.RemoteId;
+            return owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L(deleted ? "ApiConfirmNoReceipt" : "ApiSoftDeleteUnchangedHelp", ("id", id))), owner.L(deleted ? "ApiManualConfirm" : "ApiMarkNotApplied"));
+        }
+        public Task ShowCannotAcceptAsync(ChangeItem item, ServerValueInspection review)
+            => owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L(review.HasCurrent ? "ApiAcceptNowMatches" : "ApiAcceptMissing") + "\n" + owner.ApiReview(item)), owner.L("Text_3FD47EDCE4"));
+        public Task<bool> ConfirmAcceptAsync(ChangeItem item, ServerValueInspection review)
+        {
+            var differences = Differences(review.Differences);
+            string Help() => item.Kind == ChangeKind.Delete ? owner.L("ApiAcceptDeleteHelp", ("id", review.CurrentRemoteId)) : owner.L("ApiAcceptServerHelp");
+            return owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.ApiReview(item) + "\n" + Help() + "\n" + differences), owner.L("ApiAcceptServerValue"));
+        }
+        public async Task<bool> ShowUnknownAsync(ChangeItem item, bool canVerifyNotApplied)
+        {
+            if (canVerifyNotApplied)
+                return await owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L("ApiUnknown") + "\n" + owner.ApiReview(item) + "\n" + owner.L("ApiNotAppliedHelp")), owner.L("ApiVerifyNotApplied"));
+            await owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L("ApiUnknown") + "\n" + owner.ApiReview(item)), owner.L("Text_3FD47EDCE4"));
             return false;
         }
-        if (workspace.Mode == RunMode.Online && item.Kind == ChangeKind.Delete && item.WriteAccepted && item.Resource is ResourceKind.Airports or ResourceKind.Routes)
+        public void Report(RecoveryOutcome outcome)
         {
-            if (!await Confirm(L("ApiUnknownReview"), Text(() => L("ApiManualDelete", ("id", item.RemoteId ?? item.After.Identity?.RemoteId))), L("ApiManualConfirm")))
-                return false;
-            try
-            { await new OperationsDeletionVerifier(Api(), workspace).ConfirmManuallyAsync(job, item, session.CheckpointWriter(), CancellationToken.None); }
-            catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
-            NotifyTask(new(workspace.Id, job.Id, item.Id, true));
-            return false;
+            if (outcome == RecoveryOutcome.CandidateSaved)
+                owner.Status(() => owner.L("ApiCandidateSaved"));
+            else if (outcome == RecoveryOutcome.NotAppliedVerified || outcome == RecoveryOutcome.NotAppliedUnproven)
+                owner.Status(() => owner.L(outcome == RecoveryOutcome.NotAppliedVerified ? "ApiNotAppliedVerified" : "ApiNotAppliedUnproven"));
+            else if (outcome == RecoveryOutcome.DeletedWithoutReceipt || outcome == RecoveryOutcome.UnchangedWithoutReceipt)
+                owner.Status(() => owner.L(outcome == RecoveryOutcome.DeletedWithoutReceipt ? "ApiManualDeleteNoReceipt" : "ApiSoftDeleteUnchanged"));
+            else if (outcome == RecoveryOutcome.ServerRecordAccepted || outcome == RecoveryOutcome.ServerValueAccepted)
+                owner.Status(() => owner.L(outcome == RecoveryOutcome.ServerRecordAccepted ? "ApiAcceptedServerRecord" : "ApiAcceptedServerValue"));
         }
-        if (workspace.Mode == RunMode.Online && OperationsDeletionVerifier.CanConfirmWithoutReceipt(item))
-        {
-            await ReviewDeleteWithoutReceipt(job, item);
-            return false;
-        }
-        if (workspace.Mode == RunMode.Online && OperationsServerValueResolver.CanAccept(item))
-        {
-            await AcceptServerValue(job, item);
-            return false;
-        }
-        if (notApplied != null)
-        {
-            if (await Confirm(L("ApiUnknownReview"), Text(() => L("ApiUnknown") + "\n" + ApiReview(item) + Help()), notApplied))
-                await VerifyNotApplied(job, item);
-            return false;
-        }
-        await Confirm(L("ApiUnknownReview"), Text(() => L("ApiUnknown") + "\n" + ApiReview(item)), L("Text_3FD47EDCE4"));
-        return false;
-    }
-    // A soft delete without a write receipt: GET once, then let the user confirm what the read shows.
-    // 404 confirms the deletion; a record that reads exactly as before the change can be marked not
-    // applied after a reminder; any other record stays Unknown. Nothing is ever resent.
-    async Task ReviewDeleteWithoutReceipt(BatchJob job, ChangeItem item)
-    {
-        var verifier = new OperationsDeletionVerifier(Api(), workspace);
-        NoReceiptReview? review = null;
-        await Work(async () =>
-        {
-            running = new();
-            try
-            { review = await verifier.InspectWithoutReceiptAsync(job, item, running.Token); }
-            finally { running.Dispose(); running = null; }
-        });
-        if (review == null)
-            return;
-        var id = item.RemoteId ?? item.After.Identity?.RemoteId;
-        if (!review.CanConfirmDeleted && !review.CanMarkUnchanged)
-        {
-            var differences = string.Join("\n", review.Differences.Select(d => $"{d.Field}: {d.Expected ?? "∅"} → {d.Actual ?? "∅"}"));
-            await Confirm(L("ApiUnknownReview"), Text(() => L("ApiNoReceiptStillReadable", ("id", id)) + "\n" + differences), L("Text_3FD47EDCE4"));
-            return;
-        }
-        var deleted = review.CanConfirmDeleted;
-        if (!await Confirm(L("ApiUnknownReview"), Text(() => L(deleted ? "ApiConfirmNoReceipt" : "ApiSoftDeleteUnchangedHelp", ("id", id))), L(deleted ? "ApiManualConfirm" : "ApiMarkNotApplied")))
-            return;
-        var writer = session.CheckpointWriter();
-        try
-        { if (deleted) await verifier.ConfirmWithoutReceiptAsync(job, review, writer); else await verifier.MarkUnchangedAsync(job, review, writer); }
-        catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
-        NotifyTask(new(workspace.Id, job.Id, item.Id, true));
-        Status(() => L(deleted ? "ApiManualDeleteNoReceipt" : "ApiSoftDeleteUnchanged"));
-    }
-    // Read-only: GET the record and show every difference; only an explicit confirmation saves the
-    // server's current value as manually confirmed. Nothing is ever resent.
-    async Task AcceptServerValue(BatchJob job, ChangeItem item)
-    {
-        var resolver = new OperationsServerValueResolver(Api(), workspace);
-        ServerValueReview? review = null;
-        await Work(async () =>
-        {
-            running = new();
-            try
-            { review = await resolver.InspectAsync(job, item, running.Token); }
-            finally { running.Dispose(); running = null; }
-        });
-        if (review == null)
-            return;
-        if (!review.CanAccept)
-        {
-            await Confirm(L("ApiUnknownReview"), Text(() => L(review.Current == null ? "ApiAcceptMissing" : "ApiAcceptNowMatches") + "\n" + ApiReview(item)), L("Text_3FD47EDCE4"));
-            return;
-        }
-        var differences = string.Join("\n", review.Differences.Select(d => $"{d.Field}: {d.Expected ?? "∅"} → {d.Actual ?? "∅"}"));
-        string Help() => item.Kind == ChangeKind.Delete ? L("ApiAcceptDeleteHelp", ("id", review.Current!.Identity!.RemoteId)) : L("ApiAcceptServerHelp");
-        if (!await Confirm(L("ApiUnknownReview"), Text(() => ApiReview(item) + "\n" + Help() + "\n" + differences), L("ApiAcceptServerValue")))
-            return;
-        try
-        { await resolver.AcceptAsync(job, review, session.CheckpointWriter()); }
-        catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
-        NotifyTask(new(workspace.Id, job.Id, item.Id, true));
-        Status(() => L(item.Kind == ChangeKind.Delete ? "ApiAcceptedServerRecord" : "ApiAcceptedServerValue"));
-    }
-    // Read-only: a proven item becomes Failed and keeps its draft; otherwise nothing changes.
-    async Task VerifyNotApplied(BatchJob job, ChangeItem item)
-    {
-        bool? proven = null;
-        await Work(async () =>
-        {
-            running = new();
-            try
-            { proven = await new OperationsUnknownResolver(Api(), workspace).ResolveNotAppliedAsync(job, item, session.CheckpointWriter(), running.Token); }
-            catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
-            finally { running.Dispose(); running = null; }
-        });
-        if (proven is not bool result)
-            return;
-        NotifyTask(new(workspace.Id, job.Id, item.Id, true));
-        Status(() => L(result ? "ApiNotAppliedVerified" : "ApiNotAppliedUnproven"));
     }
 }

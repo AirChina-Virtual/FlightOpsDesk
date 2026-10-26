@@ -92,6 +92,7 @@ public sealed class FakeOnline : IOnlineGateway
     public readonly List<Guid> Released = [];
     public bool NoCredentials;
     public string ContractHash { get; set; } = "hash-1";
+    public string EndpointUrl => "https://example.test/api/";
     public bool VerifyNotApplied, NoReceiptAllowed, ServerValueAllowed;
     public int Discarded = 2;
     public Exception? DiscardError;
