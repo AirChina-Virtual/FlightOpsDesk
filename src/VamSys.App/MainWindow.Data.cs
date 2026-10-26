@@ -235,7 +235,7 @@ public sealed partial class MainWindow
                 return;
             tableBaseline = baseline;
             tableConflicts = source.Conflicts.Select(c => c.RowId).ToHashSet();
-            tableFleetLabels = fleets.Options(owner).ToDictionary(o => o.Token, StringComparer.OrdinalIgnoreCase);
+            tableFleetLabels = batch.FleetOptions(owner).ToDictionary(o => o.Token, StringComparer.OrdinalIgnoreCase);
             state.Baseline = tableBaseline;
             state.Conflicts = tableConflicts;
             state.FleetLabels = tableFleetLabels;

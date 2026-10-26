@@ -84,18 +84,17 @@ public sealed partial class MainWindow
 
     Task DeleteSelected() => LocalOperation(async () =>
     {
-        var selection = BatchSelection.ForDeletion(SelectedRows(), Data.Snapshot);
-        if (selection.Eligible.Count == 0)
+        var proposal = batch.ProposeDelete(resource, SelectedRows());
+        var selection = proposal.Selection;
+        if (proposal.NothingToDo)
         { Status(() => L("BatchNothing")); return; }
-        var plan = deletions.Preview(workspace, resource, selection.Eligible.Select(r => r.LocalId));
-        if (plan.Issues.Count > 0)
+        if (proposal.Issues.Count > 0)
         {
-            await Confirm(L("Text_FD6D0919A9"), new ListView { MaxHeight = 350, ItemsSource = plan.Issues.Select(i => L(i.Description)).ToArray() }, L("Text_3FD47EDCE4"));
+            await Confirm(L("Text_FD6D0919A9"), new ListView { MaxHeight = 350, ItemsSource = proposal.Issues.Select(i => L(i.Description)).ToArray() }, L("Text_3FD47EDCE4"));
             return;
         }
-        var ids = plan.RemoveDrafts.Concat(plan.MarkExisting).ToHashSet();
-        if (ids.Count == 0)
-        { Status(() => L("BatchNothing")); return; }
+        var plan = proposal.Plan!;
+        var ids = proposal.Ids;
         var preview = new ListView
         {
             MaxHeight = 360,
@@ -105,33 +104,31 @@ public sealed partial class MainWindow
         };
         if (!await Confirm(L("Text_948725D00E"), preview, L("Text_A3EA3C17B4")))
             return;
-        deletions.Apply(workspace, plan);
-        await Save();
+        await batch.ApplyDeleteAsync(proposal);
         Status(() => BatchScope(selection, ids.Count));
     });
 
     Task RestoreSelected() => LocalOperation(async () =>
     {
-        var selection = BatchSelection.Capture(SelectedRows(), restore: true);
-        if (selection.Eligible.Count == 0)
+        var proposal = batch.ProposeRestore(SelectedRows());
+        var selection = proposal.Selection;
+        if (proposal.Changes.Count == 0)
         { Status(() => L("BatchNothing")); return; }
-        var changes = selection.Eligible.Select(r => r.With("_delete", "FALSE")).ToArray();
-        if (!await Confirm(L("Text_A6926595CE"), BatchPreview(selection, "_delete", changes), L("Confirm")))
+        if (!await Confirm(L("Text_A6926595CE"), BatchPreview(selection, "_delete", proposal.Changes), L("Confirm")))
             return;
-        deletions.Restore(Data, changes.Select(r => r.LocalId));
-        await Save();
-        Status(() => BatchScope(selection, changes.Length));
+        await batch.ApplyRestoreAsync(resource, proposal);
+        Status(() => BatchScope(selection, proposal.Changes.Count));
     });
 
     Task EditRules() => LocalOperation(async () =>
     {
-        var selection = BatchSelection.Capture(SelectedRows());
+        var selection = batch.Capture(SelectedRows());
         if (selection.Eligible.Count == 0)
         { Status(() => L("BatchNothing")); return; }
-        var field = new ComboBox { ItemsSource = DisplayColumns().Where(f => f is not "_delete" and not "Fleet ID" and not "Fleet IDs").ToArray(), SelectedIndex = 0, MinWidth = 300 }
+        var field = new ComboBox { ItemsSource = batch.RuleFields(DisplayColumns()), SelectedIndex = 0, MinWidth = 300 }
             .Localize(localization, "Header", () => L("Text_86F623E5CC"));
         string[] keys = ["Text_A30D395090", "Text_5B7341C2D6", "Text_795CBFF909", "Text_6FE8FC1819", "Text_FAC7E021A1", "Text_E79453E164", "Text_6797F1B017"];
-        var kinds = Enum.GetValues<RuleKind>().Where(k => k != RuleKind.Retire || resource == ResourceKind.Routes).ToArray();
+        var kinds = batch.RuleKinds(resource);
         var kind = new ComboBox { SelectedIndex = 0 }.Localize(localization, "Header", () => L("Text_ED31FBB483"))
             .Localize(localization, "ItemsSource", () => kinds.Select(k => L(keys[(int)k])).ToArray());
         kind.SelectionChanged += (_, _) => field.IsEnabled = kind.SelectedIndex >= 0 && kinds[kind.SelectedIndex] != RuleKind.Retire;
@@ -141,15 +138,14 @@ public sealed partial class MainWindow
             return;
         var rule = new EditRule(kinds[kind.SelectedIndex], field.SelectedItem!.ToString()!, value.Text, find.Text);
         // UI mutation remains locked while the copies are processed off-thread.
-        var preview = await Task.Run(() => BatchEditPreview.Rule(selection, rule));
+        var preview = await batch.PreviewRuleAsync(selection, rule);
         if (preview.Validation is { } invalid)
         { Status(() => L(invalid)); return; }
         if (preview.Changes.Count == 0)
         { Status(() => string.Join(" ", new[] { BatchScope(preview) }.Concat(preview.SkipReasons.Select(r => L(r))))); return; }
         if (!await Confirm(L("Text_AD86791376"), BatchPreview(selection, preview.Field, preview.Changes, preview.SkipReasons, preview.RuleSkips.Count), L("Text_2354C137CE")))
             return;
-        preview.Apply(Data);
-        await Save();
+        await batch.ApplyEditAsync(resource, preview);
         Status(() => BatchScope(preview));
     });
 }

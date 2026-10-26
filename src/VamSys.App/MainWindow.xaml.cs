@@ -13,7 +13,6 @@ public sealed partial class MainWindow : Window
 {
     readonly WorkspaceStoreAdapter storage = WorkspaceStoreAdapter.OpenDefault();
     readonly ChangePlanner planner = new();
-    readonly FleetAssignmentService fleets = new(); readonly DeletionService deletions = new();
     ResourceKind resource = ResourceKind.Routes;
     readonly InteractionGate gate = new();
     readonly DispatcherAutosaveTimer autosave = new(WorkspaceSession.AutosaveInterval);
@@ -23,6 +22,7 @@ public sealed partial class MainWindow : Window
     readonly ConnectionService connection;
     readonly ConflictService conflicts;
     readonly ImportExportService importExport;
+    readonly BatchEditService batch;
     readonly DiagnosticsService diagnostics;
     Workspace workspace => session.Workspace;
     IUserSettings settings => storage;
@@ -41,6 +41,7 @@ public sealed partial class MainWindow : Window
         connection = new(session, online);
         conflicts = new(session);
         importExport = new(session, online);
+        batch = new(session);
         diagnostics = new(session, ApiDiagnosticExport.Serialize);
         InitializeLanguage();
         tableDensity = settings.LoadTableDensity();
@@ -265,7 +266,7 @@ public sealed partial class MainWindow : Window
         actions.PrimaryCommands.Add(BatchCommand(() => L("Text_E306752B35"), Symbol.Edit, EditRules, "active"));
         actions.PrimaryCommands.Add(Command(() => L("Text_48A195CA7E"), Symbol.View, () => { Navigation.SelectedItem = Navigation.MenuItems[3]; return Task.CompletedTask; }));
         actions.PrimaryCommands.Add(Command(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts, gate.CanRequestOnline && Data.Conflicts.Count > 0));
-        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!gate.CanAct) return; var rowBuilder = new DataRow.Builder(); foreach (var f in Schemas.All[resource].Columns) rowBuilder[f] = f == "_delete" ? "FALSE" : ""; var r = rowBuilder.ToRow(); Data.Edit([r.LocalId], () => Data.Draft.Add(r), structural: true); Data.Columns = Data.Columns.Concat(r.Fields.Keys).Distinct().ToList(); await Save(); Render(); }));
+        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!gate.CanAct) return; await batch.AddRowAsync(resource); Render(); }));
         // Kept for every resource and shown only where it applies, since the page outlives a resource switch.
         fleetCommand = BatchCommand(() => L("Text_95DD1FDDFE"), Symbol.Edit, () => resource is ResourceKind.Aircraft or ResourceKind.Routes ? ChooseFleets(null) : Task.CompletedTask, "active");
         fleetCommand.Visibility = resource is ResourceKind.Aircraft or ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
@@ -313,7 +314,7 @@ public sealed partial class MainWindow : Window
         var stack = undo ? source.Undo : source.Redo;
         var current = DataViewCurrent();
         var changedBefore = current && stack.Count > 0 ? CountChanged(source, stack[^1].Rows.Select(r => r.LocalId)) : 0;
-        var move = undo ? source.UndoEdit() : source.RedoEdit();
+        var move = batch.MoveHistory(kind, undo);
         if (move.Moved)
         {
             if (move.ReplacedRows is { } rows)
@@ -322,10 +323,8 @@ public sealed partial class MainWindow : Window
                     RefreshReplacedRows(source, rows, changedBefore);
                 else
                     InvalidateDataViews();
-                await session.SaveReplacedRowsAsync(kind, rows);
             }
-            else
-                await Save();
+            await batch.SaveMoveAsync(kind, move);
         }
         Render();
         Status(() => L(undo ? "Text_E5CE954248" : "Text_1F00D27BEE"));

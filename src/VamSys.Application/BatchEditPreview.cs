@@ -1,7 +1,6 @@
 using System.Globalization;
-using VamSys.Core;
 
-namespace VamSys.App;
+namespace VamSys.Core;
 
 public sealed record BatchSelection(IReadOnlyList<DataRow> Selected, IReadOnlyList<DataRow> Eligible)
 {
