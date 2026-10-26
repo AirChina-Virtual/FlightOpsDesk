@@ -11,23 +11,29 @@ namespace VamSys.App;
 
 public sealed partial class MainWindow : Window
 {
-    readonly WorkspaceStore store = new(AppPaths.DataDirectory);
+    readonly WorkspaceStoreAdapter storage = WorkspaceStoreAdapter.OpenDefault();
     readonly CsvAdapter csv = new(); readonly ChangePlanner planner = new();
     readonly FleetAssignmentService fleets = new(); readonly DeletionService deletions = new();
-    Workspace workspace = new(); ResourceKind resource = ResourceKind.Routes;
+    ResourceKind resource = ResourceKind.Routes;
     readonly InteractionGate gate = new();
+    readonly DispatcherAutosaveTimer autosave = new(WorkspaceSession.AutosaveInterval);
+    readonly WorkspaceSession session;
+    readonly MaintenanceService maintenance;
+    Workspace workspace => session.Workspace;
+    IUserSettings settings => storage;
     string page = "workspace"; bool ready; string? lastEditedCell;
     ListView? table; List<RowViewModel> visible = []; AppBarButton? fleetCommand, retireCommand;
     CancellationTokenSource? running;
-    readonly SemaphoreSlim saveGate = new(1);
-    readonly DispatcherTimer autosave = new() { Interval = TimeSpan.FromMilliseconds(700) };
     ResourceData Data => workspace.Resources[resource];
 
     public MainWindow()
     {
         InitializeComponent();
+        session = new(storage, gate, autosave);
+        session.DataInvalidated += InvalidateDataViews;
+        maintenance = new(session);
         InitializeLanguage();
-        tableDensity = store.LoadTableDensity();
+        tableDensity = settings.LoadTableDensity();
         tableTemplates = new();
         cellTemplates = new(tableTemplates);
         BodyGrid.SizeChanged += (_, _) => UpdateDataHeaderLayout();
@@ -40,15 +46,11 @@ public sealed partial class MainWindow : Window
         RootGrid.ActualThemeChanged += (_, _) => UpdateCaptionTheme();
         RootGrid.Loaded += (_, _) => UpdateCaptionTheme();
         RootGrid.SizeChanged += (_, _) => { WorkspacePicker.Width = RootGrid.ActualWidth < 800 ? 140 : 230; AppTitleBar.Subtitle = RootGrid.ActualWidth < 1100 ? "" : L("Text_9750099F9F"); };
-        if (store.List().Count == 0)
-        { workspace.Name = L("Text_707DBE0213"); store.Save(workspace); }
-        workspace = store.Load(store.List()[0].Id);
-        if (workspace.Mode == RunMode.Online)
-            workspace.Mode = RunMode.Offline;
+        session.Open(L("Text_707DBE0213"));
         ResourcePicker.ItemsSource = Enum.GetValues<ResourceKind>().Select(k => L(Schemas.All[k].Name)).ToList();
         ResourcePicker.SelectedIndex = (int)resource;
         ReloadWorkspaces();
-        autosave.Tick += async (_, _) => { autosave.Stop(); await Guard(async () => { await SaveEdits(); if (!gate.WorkInProgress) Status(() => L("Text_11584EAAA5")); }); };
+        autosave.Tick += async (_, _) => await Guard(async () => { await session.AutosaveElapsedAsync(); if (!gate.WorkInProgress) Status(() => L("Text_11584EAAA5")); });
         AppWindow.Closing += async (_, e) =>
         {
             if (gate.HasClosed)
@@ -60,11 +62,7 @@ public sealed partial class MainWindow : Window
             { Status(() => L("CloseBlocked")); return; }
             try
             {
-                var closed = await gate.Closing.RequestAsync(false, async () =>
-                {
-                    if (!gate.StorageBlocked)
-                        await Save();
-                }, FreezeClosing);
+                var closed = await gate.Closing.RequestAsync(false, session.SaveForCloseAsync, FreezeClosing);
                 if (closed)
                     Close();
             }
@@ -93,41 +91,13 @@ public sealed partial class MainWindow : Window
     {
         bool wasReady = ready;
         ready = false;
-        WorkspacePicker.ItemsSource = store.List().Select(x => new WorkspaceChoice(x.Id, x.Name)).ToList();
+        WorkspacePicker.ItemsSource = session.ListWorkspaces().Select(x => new WorkspaceChoice(x.Id, x.Name)).ToList();
         WorkspacePicker.SelectedItem = ((List<WorkspaceChoice>)WorkspacePicker.ItemsSource).First(x => x.Id == workspace.Id);
         ready = wasReady;
     }
-    // Cell edits not yet saved. Every other change is followed by a journal save, which also covers these.
-    readonly DraftEdits edits = new();
-    // The journal save writes only what changed since the database last matched the workspace (nothing at all when
-    // nothing changed). dataChanged: false only for saves that record jobs or connection state and leave every row untouched;
-    // such saves pass a narrower scope, which leaves other pending changes (and the recorded cell edits) for later.
-    async Task Save(bool dataChanged = true, JournalScope scope = JournalScope.All)
-    {
-        if (dataChanged)
-            InvalidateDataViews();
-        await saveGate.WaitAsync();
-        var taken = scope == JournalScope.All ? edits.Take() : null;
-        try
-        { gate.ThrowIfStorageBlocked(); await store.SaveChangesAsync(workspace, scope); }
-        catch { if (taken != null) edits.Restore(taken); throw; }
-        finally { saveGate.Release(); }
-    }
-    // Autosave writes the edited rows and changed history steps, including same-cell continuations.
-    async Task SaveEdits()
-    {
-        await saveGate.WaitAsync();
-        var taken = edits.Take();
-        try
-        {
-            gate.ThrowIfStorageBlocked();
-            if (!taken.CanSaveRows(workspace) || !await store.TrySaveDraftRowsAsync(workspace, taken.Changes))
-                await store.SaveChangesAsync(workspace);
-        }
-        catch { edits.Restore(taken); throw; }
-        finally { saveGate.Release(); }
-    }
-    void SaveSoon() { if (!gate.CanStartUserAction) return; autosave.Stop(); autosave.Start(); }
+    Task Save(bool dataChanged = true, JournalScope scope = JournalScope.All) => session.SaveAsync(dataChanged, scope);
+    Task SaveEdits() => session.SaveEditsAsync();
+    void SaveSoon() => session.ScheduleAutosave();
     async Task Guard(Func<Task> operation)
     {
         try
@@ -139,8 +109,7 @@ public sealed partial class MainWindow : Window
         var work = gate.TryBeginWork();
         if (work is null)
             return;
-        var pendingSave = autosave.IsEnabled;
-        autosave.Stop();
+        var pendingSave = session.TakeAutosavePending();
         BusyRing.IsActive = true;
         WorkspacePicker.IsEnabled = false;
         ResourcePicker.IsEnabled = false;
@@ -201,7 +170,7 @@ public sealed partial class MainWindow : Window
     async Task SwitchWorkspace(Guid id)
     {
         CancelDataQuery();
-        await UserAction(async () => { autosave.Stop(); await Save(); workspace = store.Load(id); if (apiSessions.Remove(id, out var previous)) previous.Client.Dispose(); if (workspace.Mode == RunMode.Online) workspace.Mode = RunMode.Offline; Render(); });
+        await UserAction(async () => { await session.SwitchWorkspaceAsync(id); if (apiSessions.Remove(id, out var previous)) previous.Client.Dispose(); Render(); });
     }
     void ResourceChanged(object sender, SelectionChangedEventArgs e)
     { if (!ready || !gate.CanSwitchContext) return; CancelDataQuery(); resource = (ResourceKind)ResourcePicker.SelectedIndex; Render(); }
@@ -236,14 +205,12 @@ public sealed partial class MainWindow : Window
                     return;
                 var name = new TextBox { Text = L("Text_A818AFCD80"), MaxLength = 80 }.Localize(localization, "Header", () => L("Text_8DCC576817"));
                 if (await Confirm(L("Text_CDD0362664"), name) && !string.IsNullOrWhiteSpace(name.Text))
-                { await Save(); workspace = new Workspace { Name = name.Text.Trim() }; await Save(); ReloadWorkspaces(); Render(); }
+                { await session.ReplaceWithNewAsync(new Workspace { Name = name.Text.Trim() }); ReloadWorkspaces(); Render(); }
             }), Button(() => L("Text_57D4E0340D"), async () =>
             {
                 if (!gate.CanAct)
                     return;
-                await Save();
-                workspace = DemoWorkspace();
-                await Save();
+                await session.ReplaceWithNewAsync(DemoWorkspace());
                 ReloadWorkspaces();
                 Render();
             })), cards,
@@ -345,9 +312,7 @@ public sealed partial class MainWindow : Window
                     RefreshReplacedRows(source, rows, changedBefore);
                 else
                     InvalidateDataViews();
-                edits.Rows(workspace, kind, rows);
-                autosave.Stop();
-                await SaveEdits();
+                await session.SaveReplacedRowsAsync(kind, rows);
             }
             else
                 await Save();
@@ -519,10 +484,7 @@ public sealed partial class MainWindow : Window
             {
                 if (!gate.CanAct)
                     return;
-                await saveGate.WaitAsync();
-                try
-                { store.SaveConnectionSettings(workspace, clientId.Text, secret.Password, url.Text, local.IsChecked == true); }
-                finally { saveGate.Release(); }
+                await session.SaveConnectionSettingsAsync(clientId.Text, secret.Password, url.Text, local.IsChecked == true);
                 clientId.Text = workspace.ClientId ?? "";
                 secret.Password = "";
                 if (apiSessions.Remove(workspace.Id, out var previous))
@@ -532,10 +494,7 @@ public sealed partial class MainWindow : Window
             {
                 if (!gate.CanAct)
                     return;
-                await saveGate.WaitAsync();
-                try
-                { store.UpdateOperationsCredentials(workspace, clientId.Text, secret.Password); }
-                finally { saveGate.Release(); }
+                await session.UpdateCredentialsAsync(clientId.Text, secret.Password);
                 clientId.Text = workspace.ClientId ?? "";
                 secret.Password = "";
                 if (apiSessions.Remove(workspace.Id, out var previous))

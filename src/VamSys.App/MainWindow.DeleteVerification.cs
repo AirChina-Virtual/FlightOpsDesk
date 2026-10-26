@@ -16,7 +16,7 @@ public sealed partial class MainWindow
                 Navigation.SelectedItem = Navigation.MenuItems[4];
                 Render();
                 await new OperationsDeletionVerifier(Api(), workspace).VerifyAsync(job,
-                    new AppCheckpointWriter(this, store.CheckpointWriter(workspace)), running.Token, NotifyTask);
+                    session.CheckpointWriter(), running.Token, NotifyTask);
                 Status(() => L("ApiDeleteCheckDone"));
             }
             catch (PersistenceException)

@@ -47,39 +47,18 @@ public sealed partial class MainWindow
     });
     Task BackupAndClearWorkspace() => LocalOperation(async () =>
     {
-        await Save();
-        var owner = workspace.Id;
-        var preview = store.PreviewMaintenance(owner);
-        if (!preview.CanClear)
-            throw OperationsAdapter.Block("MaintenanceUnsafe");
+        var preview = await maintenance.PrepareBackupAsync();
         if (!await Confirm(L("BackupClear"), Text(() => L("BackupClearPreview", ("name", preview.Name), ("path", preview.DataDirectory),
             ("snapshots", preview.Snapshots), ("drafts", preview.Drafts), ("jobs", preview.Jobs), ("conflicts", preview.Conflicts), ("history", preview.HistorySteps))), L("Confirm")))
             return;
-        await saveGate.WaitAsync();
-        try
+        var result = await maintenance.BackupAndClearAsync(preview, owner =>
         {
-            var result = await store.BackupAndClearAsync(owner, preview.Revision);
-            workspace = result.Workspace;
-            if (apiSessions.Remove(owner, out var session))
-                session.Client.Dispose();
+            if (apiSessions.Remove(owner, out var api))
+                api.Client.Dispose();
             ClearMaintenanceViewState(owner);
             InvalidateDataViews();
-            Status(() => L("MaintenanceDone", ("path", result.Backup.DatabasePath)));
-        }
-        catch
-        {
-            try
-            {
-                // Reconcile only an ambiguous post-commit failure. A failed backup/transaction keeps live state intact.
-                if (store.CountRows(owner).Revision != preview.Revision)
-                {
-                    var persisted = store.Load(owner);
-                    workspace = persisted; workspace.Mode = RunMode.Offline; if (apiSessions.Remove(owner, out var session)) session.Client.Dispose(); ClearMaintenanceViewState(owner); InvalidateDataViews(); }
-            }
-            catch { gate.BlockStorage(); }
-            throw;
-        }
-        finally { saveGate.Release(); }
+        });
+        Status(() => L("MaintenanceDone", ("path", result.BackupDatabasePath)));
     });
     void ClearMaintenanceViewState(Guid owner)
     {

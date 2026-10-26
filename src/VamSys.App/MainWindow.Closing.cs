@@ -5,7 +5,7 @@ public sealed partial class MainWindow
 {
     void FreezeClosing(bool frozen)
     {
-        autosave.Stop();
+        session.CancelAutosave();
         CancelDataQuery();
         RefreshDataAvailability();
         Navigation.IsEnabled = !frozen;

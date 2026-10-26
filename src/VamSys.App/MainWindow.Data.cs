@@ -329,8 +329,7 @@ public sealed partial class MainWindow
                     if (changeCounts.TryGetValue(data, out var count))
                         changeCounts[data] = count + (after != null ? 1 : 0) - (before != null ? 1 : 0);
                     view?.Cells.FirstOrDefault(c => c.Field == "_delete")?.RefreshLanguage();
-                    edits.Cell(owner, link.Kind, currentId);
-                    SaveSoon();
+                    session.RecordCellEdit(owner, link.Kind, currentId);
                     Status(() => L("Text_75141EDE81"));
                 })
                 {

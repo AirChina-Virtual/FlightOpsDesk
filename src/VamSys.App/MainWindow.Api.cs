@@ -13,7 +13,7 @@ public sealed partial class MainWindow
     {
         if (apiSessions.TryGetValue(workspace.Id, out var session))
             return session.Api;
-        var raw = store.LoadSecret(workspace.Id) ?? throw OperationsAdapter.Block("ApiConnectFirst");
+        var raw = storage.LoadSecret(workspace.Id) ?? throw OperationsAdapter.Block("ApiConnectFirst");
         var credentials = JsonSerializer.Deserialize<OperationsCredentials>(raw) ?? throw OperationsAdapter.Block("ApiConnectFirst");
         var client = OperationsTransport.CreateHttpClient();
         // Conservative global pool also covers clients whose airline is not identified yet.
@@ -62,10 +62,7 @@ public sealed partial class MainWindow
                 var api = Api();
                 await api.RefreshSnapshotsAsync(async staged =>
                 {
-                    await saveGate.WaitAsync();
-                    try
-                    { await store.SaveAsync(staged); }
-                    finally { saveGate.Release(); }
+                    await session.SaveStagedAsync(staged);
                 }, running.Token, (kind, count) => Status(() => L("ApiLoading", ("resource", L(Schemas.All[kind].Name)), ("count", count))));
                 var parameters = await ReadOptionalParameters(running.Token);
                 Status(() => L("ApiRefreshed", ("count", workspace.Resources.Sum(p => p.Value.Conflicts.Count))) + (parameters ? "" : "\n" + L("ApiParametersUnavailable")));
@@ -149,7 +146,7 @@ public sealed partial class MainWindow
             {
                 Navigation.SelectedItem = Navigation.MenuItems[4];
                 Render();
-                await new OperationsBatchExecutor(Api(), workspace).ExecuteAsync(job, new AppCheckpointWriter(this, store.CheckpointWriter(workspace)), running.Token, progress: NotifyTask);
+                await new OperationsBatchExecutor(Api(), workspace).ExecuteAsync(job, session.CheckpointWriter(), running.Token, progress: NotifyTask);
                 outcome = job.StatusCode.ToString();
                 Status(() => JobText(job));
             }
@@ -170,22 +167,9 @@ public sealed partial class MainWindow
     }
     void ReloadAfterCheckpointFailure()
     {
-        autosave.Stop();
         if (apiSessions.Remove(workspace.Id, out var failed))
             failed.Client.Dispose();
-        try
-        { workspace = store.Load(workspace.Id); workspace.Mode = RunMode.Offline; }
-        catch { gate.BlockStorage(); }
-    }
-    sealed class AppCheckpointWriter(MainWindow owner, IBatchCheckpointWriter inner) : IBatchCheckpointWriter
-    {
-        public async Task WriteAsync(BatchCheckpoint checkpoint, CancellationToken ct)
-        {
-            await owner.saveGate.WaitAsync(ct);
-            try
-            { owner.gate.ThrowIfStorageBlocked(); await inner.WriteAsync(checkpoint, ct); }
-            finally { owner.saveGate.Release(); }
-        }
+        session.ReloadAfterCheckpointFailure();
     }
     async Task ReviewUnknown(BatchJob job)
     {
@@ -209,7 +193,7 @@ public sealed partial class MainWindow
                 return false;
             var candidate = JsonSerializer.Deserialize<ChangeItem>(JsonSerializer.Serialize(item))!;
             candidate.ProposeRecoveryId(id.Text);
-            await new AppCheckpointWriter(this, store.CheckpointWriter(workspace)).WriteAsync(new(CheckpointKind.Task, job, candidate), CancellationToken.None);
+            await session.CheckpointWriter().WriteAsync(new(CheckpointKind.Task, job, candidate), CancellationToken.None);
             job.Items[job.Items.IndexOf(item)] = candidate;
             NotifyTask(new(workspace.Id, job.Id, candidate.Id, true));
             if (workspace.Mode == RunMode.Online)
@@ -222,7 +206,7 @@ public sealed partial class MainWindow
             if (!await Confirm(L("ApiUnknownReview"), Text(() => L("ApiManualDelete", ("id", item.RemoteId ?? item.After.Identity?.RemoteId))), L("ApiManualConfirm")))
                 return false;
             try
-            { await new OperationsDeletionVerifier(Api(), workspace).ConfirmManuallyAsync(job, item, new AppCheckpointWriter(this, store.CheckpointWriter(workspace)), CancellationToken.None); }
+            { await new OperationsDeletionVerifier(Api(), workspace).ConfirmManuallyAsync(job, item, session.CheckpointWriter(), CancellationToken.None); }
             catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
             NotifyTask(new(workspace.Id, job.Id, item.Id, true));
             return false;
@@ -272,7 +256,7 @@ public sealed partial class MainWindow
         var deleted = review.CanConfirmDeleted;
         if (!await Confirm(L("ApiUnknownReview"), Text(() => L(deleted ? "ApiConfirmNoReceipt" : "ApiSoftDeleteUnchangedHelp", ("id", id))), L(deleted ? "ApiManualConfirm" : "ApiMarkNotApplied")))
             return;
-        var writer = new AppCheckpointWriter(this, store.CheckpointWriter(workspace));
+        var writer = session.CheckpointWriter();
         try
         { if (deleted) await verifier.ConfirmWithoutReceiptAsync(job, review, writer); else await verifier.MarkUnchangedAsync(job, review, writer); }
         catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
@@ -304,7 +288,7 @@ public sealed partial class MainWindow
         if (!await Confirm(L("ApiUnknownReview"), Text(() => ApiReview(item) + "\n" + Help() + "\n" + differences), L("ApiAcceptServerValue")))
             return;
         try
-        { await resolver.AcceptAsync(job, review, new AppCheckpointWriter(this, store.CheckpointWriter(workspace))); }
+        { await resolver.AcceptAsync(job, review, session.CheckpointWriter()); }
         catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
         NotifyTask(new(workspace.Id, job.Id, item.Id, true));
         Status(() => L(item.Kind == ChangeKind.Delete ? "ApiAcceptedServerRecord" : "ApiAcceptedServerValue"));
@@ -317,7 +301,7 @@ public sealed partial class MainWindow
         {
             running = new();
             try
-            { proven = await new OperationsUnknownResolver(Api(), workspace).ResolveNotAppliedAsync(job, item, new AppCheckpointWriter(this, store.CheckpointWriter(workspace)), running.Token); }
+            { proven = await new OperationsUnknownResolver(Api(), workspace).ResolveNotAppliedAsync(job, item, session.CheckpointWriter(), running.Token); }
             catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
             finally { running.Dispose(); running = null; }
         });

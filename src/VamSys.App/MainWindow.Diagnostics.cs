@@ -9,7 +9,7 @@ public sealed partial class MainWindow
 {
     Task ExportTaskDiagnostics(Guid jobId) => LocalOperation(async () =>
     {
-        var persisted = store.LoadJob(workspace.Id, jobId) ?? throw new InvalidOperationException("The task is not stored.");
+        var persisted = session.LoadJob(jobId) ?? throw new InvalidOperationException("The task is not stored.");
         var picker = new FileSavePicker { SuggestedFileName = $"FlightOps-diagnostic-{jobId:N}" };
         picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
         WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));

@@ -169,7 +169,7 @@ public sealed partial class MainWindow
         await Work(async () =>
         {
             try
-            { count = await VamSys.Infrastructure.OperationsPendingDiscard.DiscardAsync(workspace, job, new AppCheckpointWriter(this, store.CheckpointWriter(workspace))); }
+            { count = await VamSys.Infrastructure.OperationsPendingDiscard.DiscardAsync(workspace, job, session.CheckpointWriter()); }
             catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
         });
         foreach (var id in ids)

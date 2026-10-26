@@ -45,8 +45,7 @@ public sealed partial class MainWindow
         RefreshDataAvailability();
         try
         {
-            if (autosave.IsEnabled)
-            { autosave.Stop(); await SaveEdits(); }
+            await session.FlushAutosaveAsync();
             await action();
         }
         finally
