@@ -12,6 +12,7 @@
 
 ## 通用约束（所有简报都适用）
 
+0. **先读 [架构速览](../ARCHITECTURE.md)**，再只读简报“必读”里列出的文件；不要通读整个代码库。任务控制在约 30–60 步工具调用以内，做完就交回。
 1. **只在指定的工作树里工作**（`F:\vCCA\wt-<名称>`，分支见简报）。临时文件只放在该工作树的 `artifacts/scratch`。
 2. **工具：** dotnet 由 `scripts/check-all.ps1` 自动定位（工作树没有 `.tools` 时使用主检出 `F:\vCCA\vamsys\.tools\dotnet`）。git 用 `$git="$env:LOCALAPPDATA\GitHubDesktop\app-3.6.6\resources\app\git\cmd\git.exe"; function g { & $git -c safe.directory=* @args }`；不改全局配置，不推送，不用 `git stash`。
 3. **检查：** 每次提交前运行 `pwsh scripts/check-all.ps1`（快速档，约 1–2 分钟）；交回前运行一次 `pwsh scripts/check-all.ps1 -Mode Full`。两者都必须以 `ALL PASSED` 结束。工作树中旧测试比主检出少 1 项（缺 `artifacts/step5-v3-baseline`），属正常。

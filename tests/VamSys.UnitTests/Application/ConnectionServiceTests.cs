@@ -23,7 +23,7 @@ public class ConnectionServiceTests
         public Workspace Stored => Storage.Read(Session.Workspace.Id);
     }
 
-    static string Code(Exception e) => MessageErrors.Describe(e).Code;
+    static string? Code(Exception e) => MessageErrors.Describe(e).Code;
 
     [Fact]
     public async Task Connecting_goes_online_records_the_contract_and_saves_only_the_header()

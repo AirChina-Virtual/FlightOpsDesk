@@ -189,7 +189,7 @@ public class TaskRecoveryServiceTests
         Assert.Equal("123", f.Job.Items[1].RecoveryCandidateId);
         Assert.NotSame(first, f.Job.Items[0]);
         Assert.NotSame(second, f.Job.Items[1]);
-        Assert.Equal(2, f.UiScript.Calls.Count(c => c.StartsWith("changed")));
+        Assert.Equal(2, f.UiScript.Calls.Count(c => c.StartsWith("changed", StringComparison.Ordinal)));
         Assert.Equal(2, f.UiScript.Reported.Count(o => o == RecoveryOutcome.RecoverNow));
         Assert.Equal(true, f.UiScript.LastOnline);
     }

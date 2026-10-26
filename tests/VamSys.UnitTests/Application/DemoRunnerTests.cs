@@ -63,7 +63,7 @@ public class DemoRunnerTests
         routes.ReplaceDraftRows([row.With("Callsign", "CHANGED")]);
         var job = f.NewJob();
         Assert.Single(job.Items);
-        await f.Run(job);
+        await f.Run(job, TestContext.Current.CancellationToken);
         Assert.Equal(JobStatus.Completed, job.StatusCode);
         Assert.All(job.Items, i => { Assert.Equal(ItemState.Succeeded, i.State); Assert.True(i.Rebased); });
         Assert.Equal("CHANGED", routes.Snapshot.Single(r => r.LocalId == row.LocalId).Get("Callsign"));
@@ -80,7 +80,7 @@ public class DemoRunnerTests
         var f = new Fixture();
         f.W.Resources[ResourceKind.Routes].ReplaceDraftRows([f.W.Resources[ResourceKind.Routes].Draft[0].With("Callsign", "X")]);
         f.W.Resources[ResourceKind.Routes].ReplaceDraftRows([f.W.Resources[ResourceKind.Routes].Draft[1].With("Callsign", "Y")]);
-        await f.Run(f.NewJob());
+        await f.Run(f.NewJob(), TestContext.Current.CancellationToken);
         Assert.Equal("before", f.Events[0]);
         Assert.Equal(1, f.Events.Count(e => e == "before"));
         Assert.True(f.Events.Count(e => e == "progress") >= 2);
@@ -94,7 +94,7 @@ public class DemoRunnerTests
         var created = new DataRow { Fields = new Dictionary<string, string> { ["ICAO/IATA"] = "EGLL", ["Name"] = "London", ["_delete"] = "FALSE" } };
         airports.Draft.Add(created);
         var job = f.NewJob();
-        await f.Run(job);
+        await f.Run(job, TestContext.Current.CancellationToken);
         var item = Assert.Single(job.Items);
         Assert.Equal(ItemState.Succeeded, item.State);
         Assert.NotNull(item.RemoteId);
@@ -110,7 +110,7 @@ public class DemoRunnerTests
         var row = routes.Draft[0];
         routes.ReplaceDraftRows([row.With("_delete", "TRUE")]);
         var job = f.NewJob();
-        await f.Run(job);
+        await f.Run(job, TestContext.Current.CancellationToken);
         Assert.Equal(ItemState.Succeeded, Assert.Single(job.Items).State);
         Assert.DoesNotContain(routes.Snapshot, r => r.LocalId == row.LocalId);
         Assert.Null(routes.FindDraftRow(row.LocalId));
@@ -125,7 +125,7 @@ public class DemoRunnerTests
         routes.ReplaceDraftRows([row.With("Callsign", "PLANNED")]);
         var job = f.NewJob();
         routes.ReplaceDraftRows([routes.Draft[0].With("Callsign", "LATER")]);
-        await f.Run(job);
+        await f.Run(job, TestContext.Current.CancellationToken);
         Assert.Equal("PLANNED", routes.Snapshot.Single(r => r.LocalId == row.LocalId).Get("Callsign"));
         Assert.Equal("LATER", routes.FindDraftRow(row.LocalId)!.Get("Callsign"));
     }
@@ -157,7 +157,7 @@ public class DemoRunnerTests
         var original = routes.Snapshot.Single(r => r.LocalId == row.LocalId).Get("Callsign");
         var job = f.NewJob();
         f.Storage.FailSaves = true;
-        await Assert.ThrowsAsync<PersistenceException>(() => f.Run(job));
+        await Assert.ThrowsAsync<PersistenceException>(() => f.Run(job, TestContext.Current.CancellationToken));
         Assert.Equal(original, routes.Snapshot.Single(r => r.LocalId == row.LocalId).Get("Callsign"));
         Assert.All(job.Items, i => Assert.False(i.Rebased));
     }

@@ -151,8 +151,8 @@ public sealed class ImportExportServiceTests : IDisposable
         Assert.False(outcome.NothingChanged);
         Assert.Equal(1, outcome.Files);
         var file = Assert.Single(Directory.GetFiles(directory));
-        Assert.StartsWith("Airports-", Path.GetFileName(file));
-        Assert.Contains("EGLL", await File.ReadAllTextAsync(file));
+        Assert.StartsWith("Airports-", Path.GetFileName(file), StringComparison.Ordinal);
+        Assert.Contains("EGLL", await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken), StringComparison.Ordinal);
         var job = Assert.Single(session.Workspace.Jobs);
         Assert.Equal(JobStatus.AwaitingImport, job.StatusCode);
         Assert.Equal(RunMode.Offline, job.Mode);

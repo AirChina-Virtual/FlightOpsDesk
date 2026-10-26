@@ -170,6 +170,6 @@ public class ReviewServiceTests
         var before = f.Session.Workspace.Serialize();
         f.Service.Build();
         Assert.Equal(before, f.Session.Workspace.Serialize());
-        Assert.DoesNotContain(f.Storage.Calls, c => c.StartsWith("journal") || c == "rows");
+        Assert.DoesNotContain(f.Storage.Calls, c => c.StartsWith("journal", StringComparison.Ordinal) || c == "rows");
     }
 }

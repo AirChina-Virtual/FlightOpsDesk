@@ -34,10 +34,10 @@ public sealed class DiagnosticsServiceTests : IDisposable
         // The stored copy is exported, not the instance in memory.
         Assert.NotSame(stored, Assert.Single(serialized));
         Assert.Equal(stored.Id, serialized[0].Id);
-        var bytes = await File.ReadAllBytesAsync(path);
+        var bytes = await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken);
         Assert.Equal(Encoding.UTF8.GetPreamble(), bytes.Take(3));
         var hash = Convert.ToHexString(SHA256.HashData(bytes));
-        Assert.Equal(hash + "  evidence.json" + Environment.NewLine, await File.ReadAllTextAsync(path + ".sha256"));
+        Assert.Equal(hash + "  evidence.json" + Environment.NewLine, await File.ReadAllTextAsync(path + ".sha256", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -65,6 +65,6 @@ public sealed class DiagnosticsServiceTests : IDisposable
         await Assert.ThrowsAsync<DirectoryNotFoundException>(() => Service().ExportAsync(stored.Id, () => Task.FromResult<string?>(path)));
         Assert.False(File.Exists(path + ".sha256"));
         Assert.Equal(before, session.Workspace.Serialize());
-        Assert.DoesNotContain(storage.Calls, c => c.StartsWith("journal") || c == "rows" || c == "saveAll");
+        Assert.DoesNotContain(storage.Calls, c => c.StartsWith("journal", StringComparison.Ordinal) || c == "rows" || c == "saveAll");
     }
 }

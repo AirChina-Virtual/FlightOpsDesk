@@ -50,8 +50,8 @@ public class BatchEditServiceTests
         Assert.False(proposal.NothingToDo);
         Assert.Empty(proposal.Issues);
         Assert.Equal(2, proposal.Ids.Count);
-        Assert.Equal(1, proposal.Plan!.RemoveDrafts.Count);
-        Assert.Equal(1, proposal.Plan.MarkExisting.Count);
+        Assert.Single(proposal.Plan!.RemoveDrafts);
+        Assert.Single(proposal.Plan.MarkExisting);
         await f.Service.ApplyDeleteAsync(proposal);
         Assert.Null(f.Airports.FindDraftRow(added.LocalId));
         Assert.True(Schemas.Deleted(f.Airports.FindDraftRow(existing.LocalId)!));
@@ -144,7 +144,7 @@ public class BatchEditServiceTests
         await f.Service.ApplyEditAsync(ResourceKind.Airports, preview);
         Assert.Equal("same", f.Airports.FindDraftRow(a.LocalId)!.Get("Name"));
         Assert.Equal(1, f.Saves);
-        Assert.Equal(1, f.Airports.Undo.Count);
+        Assert.Single(f.Airports.Undo);
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public class BatchEditServiceTests
         var row = Assert.Single(f.Airports.Draft);
         Assert.Equal("FALSE", row.Get("_delete"));
         Assert.All(Schemas.All[ResourceKind.Airports].Columns, c => Assert.Contains(c, f.Airports.Columns));
-        Assert.Equal(1, f.Airports.Undo.Count);
+        Assert.Single(f.Airports.Undo);
         Assert.Equal(1, f.Saves);
     }
 
@@ -291,6 +291,6 @@ public class BatchEditServiceTests
         var move = f.Service.MoveHistory(ResourceKind.Airports, undo: true);
         Assert.False(move.Moved);
         await f.Service.SaveMoveAsync(ResourceKind.Airports, move);
-        Assert.Empty(f.Storage.Calls.Where(c => c is "rows" or "journal:All"));
+        Assert.DoesNotContain(f.Storage.Calls, c => c is "rows" or "journal:All");
     }
 }

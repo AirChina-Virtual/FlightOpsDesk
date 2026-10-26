@@ -50,7 +50,7 @@ public class MaintenanceServiceTests
         f.Storage.FailSaves = true;
         await Assert.ThrowsAsync<IOException>(() => f.Service.PrepareBackupAsync());
         Assert.Same(before, f.Session.Workspace);
-        Assert.DoesNotContain(f.Storage.Calls, c => c.StartsWith("backup"));
+        Assert.DoesNotContain(f.Storage.Calls, c => c.StartsWith("backup", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class MaintenanceServiceTests
         data.Draft.Add(row);
         Assert.True(await f.Service.AssignParameterAsync(ResourceKind.Fleets, row, "5"));
         Assert.Equal("5", data.FindDraftRow(row.LocalId)!.Get("Parameter IDs"));
-        Assert.Equal(1, data.Undo.Count);
+        Assert.Single(data.Undo);
         Assert.Equal("journal:All", f.Storage.Calls.Last());
         var calls = f.Storage.Calls.Count;
         Assert.False(await f.Service.AssignParameterAsync(ResourceKind.Fleets, data.FindDraftRow(row.LocalId)!, "5"));

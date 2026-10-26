@@ -35,7 +35,7 @@ public class SubmissionServiceTests
         }
     }
 
-    static string Code(Exception e) => MessageErrors.Describe(e).Code;
+    static string? Code(Exception e) => MessageErrors.Describe(e).Code;
 
     [Theory]
     [InlineData(RunMode.Online)]

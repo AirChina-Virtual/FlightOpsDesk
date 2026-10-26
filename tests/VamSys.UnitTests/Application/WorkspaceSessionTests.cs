@@ -23,7 +23,7 @@ public class WorkspaceSessionTests
 
     static DataRow Row(string name) => new() { Fields = new Dictionary<string, string> { ["Name"] = name } };
 
-    static string Code(Exception e) => MessageErrors.Describe(e).Code;
+    static string? Code(Exception e) => MessageErrors.Describe(e).Code;
 
     [Fact]
     public void Opening_an_empty_database_creates_the_default_workspace_and_a_stored_online_one_opens_offline()
@@ -216,7 +216,7 @@ public class WorkspaceSessionTests
         var first = f.Session.SaveAsync();
         await entered.Task;
         var second = f.Session.SaveConnectionSettingsAsync("client", "secret", "https://example.test/", true);
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         Assert.False(second.IsCompleted);
         Assert.DoesNotContain("settings", f.Storage.Calls);
         release.SetResult();

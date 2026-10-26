@@ -66,8 +66,32 @@ $common = @('-c', 'Release', '-p:RestoreLockedMode=true')
 $unit = Join-Path $root 'tests/VamSys.UnitTests/VamSys.UnitTests.csproj'
 $integration = Join-Path $root 'tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj'
 
-$ok = Step 'build-release' { & $dn build (Join-Path $root 'VamSys.slnx') @common -v:q } {
+$ok = Step 'build-release' { & $dn build (Join-Path $root 'VamSys.slnx') @common -v:m } {
     param($o) LastMatch $o '\d+ Error\(s\)' 'build finished' }
+
+# Quick warning gate: projects rebuilt by the build above report all their warnings, so a count above
+# docs/analyzer-baseline.txt is already visible here. Full mode re-checks everything with a clean rebuild.
+if ($ok)
+{
+    Step 'new-warnings' {
+        $log = Get-Content (Join-Path $logs "$($Mode.ToLowerInvariant())-build-release.log")
+        $rx = '^(?<file>.+?)\((?<line>\d+),(?<col>\d+)\): warning (?<rule>[A-Za-z]+\d+): .*\[(?<proj>[^\]]+\.csproj)\]\s*$'
+        $seen = [Collections.Generic.HashSet[string]]::new(); $counts = @{}
+        foreach ($l in $log)
+        {
+            $m = [regex]::Match($l, $rx)
+            if (-not $m.Success) { continue }
+            $proj = $m.Groups['proj'].Value.Replace($root, '').TrimStart('\', '/').Replace('\', '/')
+            if (-not $seen.Add("$proj|$($m.Groups['file'].Value)|$($m.Groups['line'].Value)|$($m.Groups['col'].Value)|$($m.Groups['rule'].Value)")) { continue }
+            $key = "$proj|$($m.Groups['rule'].Value)"; $counts[$key] = 1 + [int]$counts[$key]
+        }
+        $baseline = @{}
+        foreach ($l in Get-Content (Join-Path $root 'docs/analyzer-baseline.txt'))
+        { if ($l -notmatch '^\s*#' -and $l.Trim()) { $p = $l.Split('|'); $baseline["$($p[0])|$($p[1])"] = [int]$p[2] } }
+        $over = @($counts.GetEnumerator() | Where-Object { $_.Value -gt [int]$baseline[$_.Name] } | ForEach-Object { "$($_.Name) $($_.Value)>$([int]$baseline[$_.Name])" })
+        if ($over.Count -gt 0) { "NEW WARNINGS: $($over -join '; ')"; $global:LASTEXITCODE = 1 } else { 'none above baseline'; $global:LASTEXITCODE = 0 }
+    } { param($o) ($o | Select-Object -Last 1) } | Out-Null
+}
 if ($ok)
 {
     Step 'unit-release' { & $dn test --project $unit @common --no-build } { param($o) TestSummary $o } | Out-Null
@@ -84,7 +108,10 @@ if ($Mode -eq 'Full' -and $ok)
     Step 'legacy-runner' { & $dn run --project (Join-Path $root 'tests/VamSys.Tests/VamSys.Tests.csproj') @common } {
         param($o) LastMatch $o 'scenarios passed\.' 'no legacy summary found' } | Out-Null
     Step 'analyzer-baseline' { & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'check-analyzer-baseline.ps1') } {
-        param($o) LastMatch $o 'within baseline|NEW WARNINGS' 'no analyzer summary found' } | Out-Null
+        param($o)
+        # Show every rule over its baseline, not only the last one printed.
+        $new = @($o | Where-Object { $_ -match 'NEW WARNINGS' } | ForEach-Object { $_.Replace('NEW WARNINGS: ', '').Trim() })
+        if ($new.Count -gt 0) { 'NEW WARNINGS: ' + ($new -join '; ') } else { LastMatch $o 'within baseline' 'no analyzer summary found' } } | Out-Null
 }
 
 $failed = @($results | Where-Object { -not $_.Ok })
