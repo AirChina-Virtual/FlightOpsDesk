@@ -2,7 +2,8 @@
  One entry point for the checks every change must pass, with a one-line summary per step and a final verdict.
 
  -Mode Quick (default, run after each commit): Release build of the whole solution (App included), then all
-   unit tests and all integration tests (goldens, inventories, storage, transport) without rebuilding.
+   unit tests and the integration tests (goldens, inventories, storage, transport) except those marked
+   [Trait("Category", "Slow")], without rebuilding.
  -Mode Full (run once before handing work back): Quick, plus the same tests in Debug (row and guard checks),
    the legacy runner, and the analyzer baseline.
 
@@ -70,7 +71,9 @@ $ok = Step 'build-release' { & $dn build (Join-Path $root 'VamSys.slnx') @common
 if ($ok)
 {
     Step 'unit-release' { & $dn test --project $unit @common --no-build } { param($o) TestSummary $o } | Out-Null
-    Step 'integration-release' { & $dn test --project $integration @common --no-build } { param($o) TestSummary $o } | Out-Null
+    # Quick mode skips tests marked [Trait("Category", "Slow")]; Full mode runs them in both configurations.
+    $skipSlow = if ($Mode -eq 'Quick') { @('--', '--filter-not-trait', 'Category=Slow') } else { @() }
+    Step 'integration-release' { & $dn test --project $integration @common --no-build @skipSlow } { param($o) TestSummary $o } | Out-Null
 }
 
 if ($Mode -eq 'Full' -and $ok)

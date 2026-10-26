@@ -12,6 +12,8 @@ namespace VamSys.IntegrationTests.Storage;
 /// job changes and header changes are mixed in; an injected failure now and then must leave the database as it was and the
 /// following save must repair everything.
 /// </summary>
+// About three minutes; scripts/check-all.ps1 runs it only in Full mode.
+[Trait("Category", "Slow")]
 public class JournalEquivalenceTests
 {
     sealed class Run : IDisposable
