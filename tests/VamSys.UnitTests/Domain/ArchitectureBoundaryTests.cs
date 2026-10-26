@@ -30,6 +30,21 @@ public class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void Application_references_no_winui_sqlite_or_httpclient()
+    {
+        var application = typeof(BatchExecutor).Assembly;
+        Assert.DoesNotContain(application.GetReferencedAssemblies(), a => a.Name!.StartsWith("Microsoft.UI", StringComparison.Ordinal)
+            || a.Name.StartsWith("Microsoft.WinUI", StringComparison.Ordinal) || a.Name.StartsWith("Microsoft.Windows", StringComparison.Ordinal)
+            || a.Name.StartsWith("Microsoft.Data.Sqlite", StringComparison.Ordinal) || a.Name.StartsWith("SQLitePCL", StringComparison.Ordinal));
+        using var stream = File.OpenRead(application.Location);
+        using var pe = new PEReader(stream);
+        var metadata = pe.GetMetadataReader();
+        var types = metadata.TypeReferences.Select(h => metadata.GetTypeReference(h))
+            .Select(t => metadata.GetString(t.Namespace) + "." + metadata.GetString(t.Name)).ToList();
+        Assert.DoesNotContain(types, t => t is "System.Net.Http.HttpClient" or "System.Net.Http.HttpMessageInvoker" || t.StartsWith("Microsoft.UI.", StringComparison.Ordinal) || t.StartsWith("Microsoft.Data.Sqlite.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Storage_owns_sqlite_and_dpapi_and_references_only_domain_and_application()
     {
         var storage = typeof(WorkspaceStore).Assembly;
