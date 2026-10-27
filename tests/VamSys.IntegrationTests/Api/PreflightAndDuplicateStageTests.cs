@@ -272,4 +272,85 @@ public class PreflightAndDuplicateStageTests
         Assert.Equal(1, Calls(w).Count(c => c == "GET routes"));
         Assert.Equal(3, Count(w, "POST"));
     }
+
+    // ---- C11: what the old Audit and Reaudit scenarios checked and the tests above did not state --------------------
+
+    [Fact]
+    public async Task A_create_whose_candidate_read_fails_has_written_nothing_and_after_a_restart_is_posted_exactly_once()
+    {
+        var w = new GoldenWorld();
+        w.New(ResourceKind.Fleets, NewFleet("Brand new fleet"));
+        w.Remote.Intercept = r => r.Method == "GET" ? Status(500) : null;
+        var job = NewJob(w);
+        var saved = "";
+        await Execute(w, job, () => { saved = w.Workspace.Serialize(); return Task.CompletedTask; });
+        var item = job.Items.Single();
+        Assert.Equal(ItemState.Pending, item.State);
+        Assert.Null(item.RemoteId);
+        Assert.Null(item.ApiExpectedValues);
+        Assert.All(w.Remote.Server.Requests, r => Assert.Equal("GET", r.Method));
+
+        w.Remote.Intercept = null;
+        var (restored, api) = Restarted(w, saved);
+        var restoredItem = restored.Jobs.Single().Items.Single();
+        await new OperationsBatchExecutor(api, restored).ExecuteAsync(restored.Jobs.Single(), () => Task.CompletedTask, Ct);
+        Assert.Equal(ItemState.Succeeded, restoredItem.State);
+        Assert.Equal(1, Count(w, "POST"));
+    }
+
+    [Theory]
+    [InlineData("EGLL", true)]
+    [InlineData("lhr", true)]
+    [InlineData("EGSS", false)]
+    public async Task An_airport_create_is_refused_when_its_code_is_either_alias_of_a_known_airport_in_any_case_and_a_distinct_airport_is_created(string code, bool duplicate)
+    {
+        var w = new GoldenWorld();
+        w.New(ResourceKind.Airports, ("ICAO/IATA", code), ("Name", "Hub"));
+        await w.RunAsync();
+        var item = w.Job!.Items.Single();
+        if (duplicate)
+        {
+            Assert.Equal(ItemState.Failed, item.State);
+            Assert.Equal("ApiDuplicate", Code(item));
+            Assert.All(w.Remote.Server.Requests, r => Assert.Equal("GET", r.Method));
+        }
+        else
+        {
+            Assert.Equal(ItemState.Succeeded, item.State);
+            Assert.Equal(1, Count(w, "POST"));
+        }
+    }
+
+    [Theory]
+    [InlineData(ResourceKind.Routings)]
+    [InlineData(ResourceKind.Routes)]
+    public async Task A_route_or_routing_that_points_at_a_created_airport_completes_and_is_not_posted_again_after_a_restart(ResourceKind kind)
+    {
+        var w = new GoldenWorld();
+        // airport 101 stands for a create of this job that has succeeded already, so the reference to its local row resolves to its remote id
+        var airport = Draft(w, ResourceKind.Airports, "101");
+        var parent = new ChangeItem
+        {
+            Resource = ResourceKind.Airports, Kind = ChangeKind.Create, After = airport, State = ItemState.Succeeded, CreateCompleted = true, RemoteId = "101",
+            Fields = airport.Fields.ToDictionary(p => p.Key, p => new FieldChange(FieldIntent.Set, p.Value))
+        };
+        var reference = LocalReference.Format(airport.LocalId);
+        var draft = kind == ResourceKind.Routings
+            ? w.New(kind, (Dep, reference), (Arr, "EGCC"), ("Route String", "DCT"))
+            : w.New(kind, ("Type", "scheduled"), (Dep, reference), (Arr, "EGCC"), ("Callsign", "CAO777"), ("Flight Number", "CA777"), ("Fleet IDs", "4"));
+        var child = new ChangePlanner().PlanWorkspace(w.Workspace).Single();
+        child.Dependencies.Add(parent.Id);
+        var job = new BatchJob { Mode = RunMode.Online, Items = [parent, child] };
+        w.Workspace.Jobs.Add(job);
+        var saved = "";
+        await Execute(w, job, () => { saved = w.Workspace.Serialize(); return Task.CompletedTask; });
+
+        Assert.Equal(ItemState.Succeeded, child.State);
+        Assert.Equal(1, Count(w, "POST"));
+        Assert.Equal(child.RemoteId, w.Workspace.Resources[kind].FindDraftRow(draft.LocalId)!.Identity!.RemoteId);
+
+        var (restored, api) = Restarted(w, saved);
+        await new OperationsBatchExecutor(api, restored).ExecuteAsync(restored.Jobs.Single(), () => Task.CompletedTask, Ct);
+        Assert.Equal(1, Count(w, "POST"));
+    }
 }
