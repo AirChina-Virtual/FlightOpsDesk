@@ -1,15 +1,24 @@
 param()
+# Copies the sources into isolated folders, plants one known history bug in each copy and checks that the
+# history tests reject it. Neither the source tree nor any package is changed; copies and logs are kept for review.
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Split-Path $PSScriptRoot -Parent))
 $root=Join-Path $repo ('artifacts/history-mutations-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root|Out-Null
-Push-Location $repo
-try {$files=@(& rg --files src tests docs/contracts)+@('Directory.Build.props','global.json')}
-finally {Pop-Location}
+$dotnet=Join-Path $repo '.tools/dotnet/dotnet.exe'
+if(!(Test-Path $dotnet)){$dotnet=Join-Path (Split-Path $repo -Parent) 'vamsys/.tools/dotnet/dotnet.exe'}
+if(!(Test-Path $dotnet)){$dotnet='dotnet'}
+$files=@(foreach($top in 'src','tests','docs/contracts'){
+    Get-ChildItem (Join-Path $repo $top) -Recurse -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' } |
+        ForEach-Object { [IO.Path]::GetRelativePath($repo,$_.FullName) }
+})+@('Directory.Build.props','global.json','VamSys.slnx')
+$tests=@(
+    @{Project='tests/VamSys.UnitTests/VamSys.UnitTests.csproj';Class='VamSys.UnitTests.Domain.EditHistoryTests'},
+    @{Project='tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj';Class='VamSys.IntegrationTests.Storage.StorageHistoryTests'})
 foreach($name in @('missing-after','missing-redo-delete')) {
     $dir=Join-Path $root $name
     foreach($relative in $files){
-        if($relative -match '(^|[\\/])(bin|obj)([\\/]|$)'){continue}
         $target=Join-Path $dir $relative
         New-Item -ItemType Directory -Force -Path (Split-Path $target -Parent)|Out-Null
         Copy-Item -LiteralPath (Join-Path $repo $relative) -Destination $target
@@ -26,15 +35,18 @@ foreach($name in @('missing-after','missing-redo-delete')) {
     $source=[IO.File]::ReadAllText($path).Replace("`r`n","`n")
     if(!$source.Contains($old)){throw "Mutation anchor missing: $name"}
     [IO.File]::WriteAllText($path,$source.Replace($old,$new))
+    $rejected=$false
     Push-Location $dir
     try{
-        & "$repo/.tools/dotnet/dotnet.exe" build tests/VamSys.Tests -c Release -p:RestoreLockedMode=true -p:UseSharedCompilation=false -m:1 -nr:false *> (Join-Path $root "$name-build.log")
-        if($LASTEXITCODE -ne 0){throw "Mutation build failed: $name"}
-        & "$repo/.tools/dotnet/dotnet.exe" tests/VamSys.Tests/bin/Release/net10.0/VamSys.Tests.dll --history *> (Join-Path $root "$name.log")
-        $code=$LASTEXITCODE
+        foreach($t in $tests){
+            $log=Join-Path $root "$name-$([IO.Path]::GetFileNameWithoutExtension($t.Project)).log"
+            # A compile error is not a behaviour failure: only failed test cases count.
+            & $dotnet test --project $t.Project -c Release -p:RestoreLockedMode=true -- --filter-class $t.Class *> $log
+            $text=[IO.File]::ReadAllText($log)
+            if($text -match 'error CS\d+'){throw "Mutation build failed: $name (see $log)"}
+            if($text -match 'failed:\s*([1-9]\d*)'){$rejected=$true; Write-Output "  $name rejected by $($t.Class): $($Matches[1]) failed"}
+        }
     }finally{Pop-Location}
-    $log=[IO.File]::ReadAllText((Join-Path $root "$name.log"))
-    if($code -eq 0 -or $log.Contains('The build failed.') -or !$log.Contains('Unhandled exception.')){throw "Mutation did not produce a behavior failure: $name"}
-    Write-Output "PASS rejected $name; log: $root/$name.log"
+    if(!$rejected){throw "Mutation did not produce a behavior failure: $name"}
+    Write-Output "PASS rejected $name; logs: $root"
 }
-# Keep isolated sources and logs for review; neither source tree nor published package was changed.
