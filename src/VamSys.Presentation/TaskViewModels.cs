@@ -1,7 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VamSys.Core;
-namespace VamSys.App;
+namespace VamSys.Presentation;
 
 public sealed record TaskItemDisplay(Guid Id, ResourceKind Resource, string Key, ItemState State, bool Rebased, MessageDescriptor? Description, string Message, string? Diagnostic, string? Evidence = null, bool CanVerifyDeletion = false)
 {

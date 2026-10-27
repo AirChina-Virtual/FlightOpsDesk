@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using VamSys.Core;
 using CommunityToolkit.Mvvm.Input;
 
-namespace VamSys.App;
+namespace VamSys.Presentation;
 
 public sealed partial class CellViewModel : ObservableObject
 {

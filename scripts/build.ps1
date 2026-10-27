@@ -20,10 +20,9 @@ function Remove-PublishDirectory([string]$Path) {
 
 Push-Location $repo
 try {
-    # Tests reference a separately compiled Infrastructure with fault-injection support.
-    & $sdk build tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true -p:UseSharedCompilation=false -m:1 -nr:false
-    if ($LASTEXITCODE -ne 0) { throw 'Behavior test build failed' }
-    & $sdk run --no-build --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release
+    # Behavior gate: the quick check (Release build, new-warnings gate, unit and integration tests except Slow).
+    # It also builds the legacy runner, which the package check below runs with --no-build.
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'check-all.ps1') -Dotnet $sdk
     if ($LASTEXITCODE -ne 0) { throw 'Behavior tests failed' }
     $qa = $UiVerification.IsPresent.ToString().ToLowerInvariant()
     $properties = @('-m:1', '-nr:false', '-p:UseSharedCompilation=false', '-p:Platform=x64', '-p:RestoreLockedMode=true', "-p:UiVerification=$qa", "-p:VamSysTestSupport=$qa")

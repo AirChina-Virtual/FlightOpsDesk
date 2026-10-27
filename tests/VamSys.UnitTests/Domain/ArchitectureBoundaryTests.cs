@@ -45,6 +45,25 @@ public class ArchitectureBoundaryTests
     }
 
     [Fact]
+    public void Presentation_holds_the_view_models_and_builds_only_on_domain_and_application()
+    {
+        var presentation = typeof(VamSys.Presentation.CellViewModel).Assembly;
+        Assert.Equal("VamSys.Presentation", presentation.GetName().Name);
+        foreach (var type in new[] { typeof(VamSys.Presentation.RowViewModel), typeof(VamSys.Presentation.DataTableViewModel), typeof(VamSys.Presentation.TaskJobViewModel) })
+            Assert.Same(presentation, type.Assembly);
+        var references = presentation.GetReferencedAssemblies().Select(a => a.Name!).ToList();
+        Assert.All(references.Where(n => n.StartsWith("VamSys.", StringComparison.Ordinal)), n => Assert.Contains(n, new[] { "VamSys.Domain", "VamSys.Application" }));
+        Assert.DoesNotContain(references, n => n.StartsWith("Microsoft.UI", StringComparison.Ordinal) || n.StartsWith("Microsoft.WinUI", StringComparison.Ordinal)
+            || n.StartsWith("Microsoft.Windows", StringComparison.Ordinal) || n.StartsWith("Microsoft.Data.Sqlite", StringComparison.Ordinal) || n == "FlightOpsDesk");
+        using var stream = File.OpenRead(presentation.Location);
+        using var pe = new PEReader(stream);
+        var metadata = pe.GetMetadataReader();
+        var types = metadata.TypeReferences.Select(h => metadata.GetTypeReference(h))
+            .Select(t => metadata.GetString(t.Namespace) + "." + metadata.GetString(t.Name)).ToList();
+        Assert.DoesNotContain(types, t => t is "System.Net.Http.HttpClient" or "System.Net.Http.HttpMessageInvoker" || t.StartsWith("Microsoft.UI.", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Storage_owns_sqlite_and_dpapi_and_references_only_domain_and_application()
     {
         var storage = typeof(WorkspaceStore).Assembly;

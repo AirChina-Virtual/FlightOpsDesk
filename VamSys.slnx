@@ -5,6 +5,7 @@
     <Project Path="src/VamSys.Application/VamSys.Application.csproj" />
     <Project Path="src/VamSys.Storage/VamSys.Storage.csproj" />
     <Project Path="src/VamSys.Infrastructure/VamSys.Infrastructure.csproj" />
+    <Project Path="src/VamSys.Presentation/VamSys.Presentation.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj" />

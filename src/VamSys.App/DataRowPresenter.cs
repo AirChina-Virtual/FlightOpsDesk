@@ -16,7 +16,7 @@ public sealed partial class DataRowPresenter : StackPanel
     public DataRowPresenter() => Orientation = Orientation.Horizontal;
     void Present(RowViewModel? row)
     {
-        if (row?.Selector is not { } selector)
+        if (row?.CellTemplates is not DataTemplateSelector selector)
         { Children.Clear(); templates.Clear(); return; }
         var cells = row.Cells;
         for (var n = 0; n < cells.Count; n++)

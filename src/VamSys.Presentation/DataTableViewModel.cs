@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace VamSys.App;
+namespace VamSys.Presentation;
 
 // Immutable query input contains strings and scalar values only; no live DataRow
 // or Workspace is accessed by the worker thread.

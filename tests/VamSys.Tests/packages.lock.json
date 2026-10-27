@@ -3,8 +3,7 @@
   "dependencies": {
     "net10.0": {
       "CommunityToolkit.Mvvm": {
-        "type": "Direct",
-        "requested": "[8.4.2, )",
+        "type": "Transitive",
         "resolved": "8.4.2",
         "contentHash": "WadCzGEc2U+3e20avRLng4qNtt4zoOGWrdUISqJWrHe3/FSnrYjuM5Sb4yQb09LhkBXrrI4Zt3dLKgRMbItsrg=="
       },
@@ -73,6 +72,14 @@
           "VamSys.Application": "[1.0.0, )",
           "VamSys.Domain": "[1.0.0, )",
           "VamSys.Storage": "[1.0.0, )"
+        }
+      },
+      "vamsys.presentation": {
+        "type": "Project",
+        "dependencies": {
+          "CommunityToolkit.Mvvm": "[8.4.2, )",
+          "VamSys.Application": "[1.0.0, )",
+          "VamSys.Domain": "[1.0.0, )"
         }
       },
       "vamsys.storage": {

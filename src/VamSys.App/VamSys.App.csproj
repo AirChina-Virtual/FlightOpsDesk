@@ -25,6 +25,8 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <ProjectReference Include="../VamSys.Domain/VamSys.Domain.csproj" />
     <ProjectReference Include="../VamSys.Application/VamSys.Application.csproj" />
+    <ProjectReference Include="../VamSys.Presentation/VamSys.Presentation.csproj" />
+    <Using Include="VamSys.Presentation" />
     <ProjectReference Include="../VamSys.Storage/VamSys.Storage.csproj" />
     <ProjectReference Include="../VamSys.Infrastructure/VamSys.Infrastructure.csproj" />
   </ItemGroup>

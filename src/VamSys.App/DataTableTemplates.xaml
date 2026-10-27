@@ -1,25 +1,26 @@
 <ResourceDictionary x:Class="VamSys.App.DataTableTemplates"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:VamSys.App">
+    xmlns:local="using:VamSys.App"
+    xmlns:vm="using:VamSys.Presentation">
   <!-- Compiled bindings: no reflection when rows are realized, recycled or rebound. -->
-  <DataTemplate x:Key="RowTemplate" x:DataType="local:RowViewModel">
+  <DataTemplate x:Key="RowTemplate" x:DataType="vm:RowViewModel">
     <local:DataRowPresenter Row="{x:Bind}"/>
   </DataTemplate>
-  <DataTemplate x:Key="EditorTemplate" x:DataType="local:CellViewModel">
-    <local:EditableCell Cell="{x:Bind}" Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind Margin}" AutomationProperties.Name="{x:Bind Field}">
+  <DataTemplate x:Key="EditorTemplate" x:DataType="vm:CellViewModel">
+    <local:EditableCell Cell="{x:Bind}" Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind local:CellLayout.MarginFor(Compact)}" AutomationProperties.Name="{x:Bind Field}">
       <Border BorderThickness="1" CornerRadius="4" Padding="9,0" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" Background="{ThemeResource ControlFillColorDefaultBrush}">
         <TextBlock Text="{x:Bind VisibleText, Mode=OneWay}" Opacity="{x:Bind TextOpacity, Mode=OneWay}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
       </Border>
     </local:EditableCell>
   </DataTemplate>
-  <DataTemplate x:Key="FleetTemplate" x:DataType="local:CellViewModel">
-    <Button Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind Margin}" FontSize="14" Padding="8,2" HorizontalContentAlignment="Left"
+  <DataTemplate x:Key="FleetTemplate" x:DataType="vm:CellViewModel">
+    <Button Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind local:CellLayout.MarginFor(Compact)}" FontSize="14" Padding="8,2" HorizontalContentAlignment="Left"
         IsEnabled="{x:Bind IsEnabled, Mode=OneWay}" Command="{x:Bind ChooseFleet}" AutomationProperties.Name="{x:Bind FleetAutomationName, Mode=OneWay}">
       <TextBlock Text="{x:Bind DisplayValue, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
     </Button>
   </DataTemplate>
-  <DataTemplate x:Key="StatusTemplate" x:DataType="local:CellViewModel">
-    <TextBlock Width="{x:Bind Width}" Margin="{x:Bind Margin}" Padding="8,0" FontSize="14" VerticalAlignment="Center" Text="{x:Bind DisplayValue, Mode=OneWay}"/>
+  <DataTemplate x:Key="StatusTemplate" x:DataType="vm:CellViewModel">
+    <TextBlock Width="{x:Bind Width}" Margin="{x:Bind local:CellLayout.MarginFor(Compact)}" Padding="8,0" FontSize="14" VerticalAlignment="Center" Text="{x:Bind DisplayValue, Mode=OneWay}"/>
   </DataTemplate>
 </ResourceDictionary>
