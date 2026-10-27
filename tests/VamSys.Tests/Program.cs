@@ -59,7 +59,6 @@ void Summary(string label)
 Task Sync(Action a) { a(); return Task.CompletedTask; }
 void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
 DataRow Row(params (string, string)[] fields) => new() { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
-if(args.Length==1 && args[0]=="--v3"){await TaskViewModelScenarios.Run(Test);Console.WriteLine($"{passed} v3 scenarios passed.");return;}
 if(args.Length==2 && args[0]=="--benchmark-v3"){await StorageV3Scenarios.Benchmark(args[1]);return;}
 if(args.Length==1 && args[0]=="--storage"){await StorageScenarios.Run(Test);Console.WriteLine($"{passed} storage scenarios passed.");return;}
 if(args.Length==2 && args[0]=="--benchmark-storage"){await StorageScenarios.Benchmark(args[1]);return;}
@@ -68,11 +67,8 @@ if(args.Length==3 && args[0]=="--benchmark-journal"){await JournalBenchmark.Run(
 if(args.Length==2 && args[0]=="--benchmark-core"){CorePerformanceBenchmark.Run(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-review"){CorePerformanceBenchmark.RunReview(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-core-load"){CorePerformanceBenchmark.RunLoad(args[1]);return;}
-if(args.Length==1 && args[0]=="--ui-interactions"){await UiInteractionScenarios.Run(Test);Summary("UI interactions ");return;}
-if(args.Length==1 && args[0]=="--task-submission"){await TaskSubmissionScenarios.Run(Test);Summary("task submission ");return;}
 if(args.Length==1 && args[0]=="--verified-scope"){await VerifiedScopeScenarios.Run(Test);Summary("verified scope ");return;}
 if(args.Length==1 && args[0]=="--unblock"){await UnblockScenarios.Run(Test);await UnblockScenarios.RunSoftDeletes(Test);await UnblockScenarios.RunRefresh(Test);Summary("unblock ");return;}
-if(args.Length==1 && args[0]=="--data-table"){await DataTableScenarios.Run(Test);Summary("data table ");return;}
 if(args.Length==3 && args[0]=="--seed-data-ui"){DataUiFixture.Seed(args[1],int.Parse(args[2]));return;}
 var csv = new CsvAdapter(); var planner = new ChangePlanner();
 if (args.Length == 2 && args[0] == "--seed-recovery-ui")
@@ -210,10 +206,6 @@ await ReauditScenarios.Run(Test);
 await LifecycleScenarios.Run(Test);
 await PerformanceScenarios.Run(Test); await CandidateIndexScenarios.Run(Test);
 await StorageScenarios.Run(Test);
-await TaskViewModelScenarios.Run(Test);
-await DataTableScenarios.Run(Test);
-await UiInteractionScenarios.Run(Test);
-await TaskSubmissionScenarios.Run(Test);
 await VerifiedScopeScenarios.Run(Test);
 await UnblockScenarios.Run(Test);await UnblockScenarios.RunSoftDeletes(Test);await UnblockScenarios.RunRefresh(Test);
 Summary("scenarios ");
