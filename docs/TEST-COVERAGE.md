@@ -135,3 +135,4 @@ Program.cs 的 “401/403 pauses batch without sending later rows” 断言的�
 - R5 适配器拆分：F15–F17、I01–I04、I07、I11、I13 的新增覆盖在 tests/VamSys.UnitTests/Api 与 tests/VamSys.IntegrationTests/Api（映射、规划、回读、判重、删除核对、未知恢复、读取、写入顺序、流水线各段失败路径）；旧场景已删除（见 F15、I01、I04 行）。
 
 - R5 适配器拆分：F15–F17、I01–I04、I07、I11、I13 的新增覆盖在 tests/VamSys.UnitTests/Api 与 tests/VamSys.IntegrationTests/Api（映射、规划、回读、判重、删除核对、未知恢复、读取、写入顺序、流水线各段失败路径）；旧场景已删除（见 F15、I01、I04 行）。
+- C10 补证据（2026-10-26）：未知写入后经真实 `WorkspaceStore` 重启再恢复（10 种故障，含写入中途取消）→ IntegrationTests.Api.AuditRegressionTests.An_unknown_write_stays_unknown_across_a_restart_and_recovery_after_the_restart_never_writes，恢复全程写入数保持 1；跨航司机场参与 Routing 恢复 → AuditRegressionTests.Routing_recovery_with_ambiguous_foreign_or_unknown_airports_cannot_confirm_the_record("foreign")；草稿保存移交的旧断言已逐条对应到 Application.DraftEditsTests，新增 A_restored_hand_over_with_edits_in_two_resources_is_retried_in_full_and_the_flag_is_handed_on_once。C3 结果中点名的三处缺口和 C2 的移交项至此有直接测试；C3 其余按测试名对应的条目未逐条复核。
