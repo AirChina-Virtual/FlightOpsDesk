@@ -93,6 +93,74 @@ public class AuditRegressionTests
         Assert.Equal(1, Writes(w));
     }
 
+    OperationsAdapter ApiOver(GoldenWorld w, Workspace restored)
+    {
+        var requests = InstantTime.Requests();
+        var tokens = new TokenProvider(_ => Task.FromResult(new AccessToken("golden-token", requests.Clock.GetUtcNow().AddHours(1))), requests.Clock);
+        return new OperationsAdapter(new OperationsTransport(w.Remote.Server.CreateClient(), OperationsAdapter.BaseUri, "golden-va", tokens, requests), restored);
+    }
+
+    [Theory]
+    [InlineData("timeout")]
+    [InlineData("network")]
+    [InlineData("cancel")]
+    [InlineData("401")]
+    [InlineData("403")]
+    [InlineData("429")]
+    [InlineData("500")]
+    [InlineData("422")]
+    [InlineData("json")]
+    [InlineData("unexpected")]
+    public async Task An_unknown_write_stays_unknown_across_a_restart_and_recovery_after_the_restart_never_writes(string fault)
+    {
+        using var dir = TempDataDirectory.Create("vamsys-audit-");
+        var store = new WorkspaceStore(dir.Path);
+        var w = new GoldenWorld();
+        w.Remote.Intercept = r => r.Method == "PUT" ? Status(500) : null;
+        w.Edit(ResourceKind.Fleets, "4", ("Name", "renamed"));
+        await w.RunAsync("first run");
+        var item = w.Job!.Items.Single();
+        Assert.Equal(ItemState.Unknown, item.State);
+
+        // Recovery fails in some way; whatever it saved last is what a restart sees.
+        using var cancel = new CancellationTokenSource();
+        w.Remote.Intercept = r =>
+        {
+            if (r.Method != "GET")
+                return Status(500);
+            if (fault == "cancel")
+            {
+                cancel.Cancel();
+                throw new OperationCanceledException(cancel.Token);
+            }
+            return Fault(fault);
+        };
+        await Execute(w, w.Job, () => { store.Save(w.Workspace); return Task.CompletedTask; }, cancel.Token);
+        Assert.Equal(ItemState.Unknown, item.State);
+        if (fault is "401" or "403")
+            Assert.Equal(JobStatus.Paused, w.Job.StatusCode);
+        if (fault == "cancel")
+            Assert.Equal(JobStatus.Canceled, w.Job.StatusCode);
+        Assert.Equal(1, Writes(w));
+
+        // Restart: a new store reads the saved workspace and a new executor works on it.
+        var restored = new WorkspaceStore(dir.Path).Load(w.Workspace.Id);
+        var job = restored.Jobs.Single();
+        var restoredItem = job.Items.Single();
+        Assert.Equal(ItemState.Unknown, restoredItem.State);
+        var api = ApiOver(w, restored);
+
+        w.Remote.Intercept = r => r.Method == "GET" ? null : Status(500);
+        await new OperationsBatchExecutor(api, restored).ExecuteAsync(job, () => Task.CompletedTask, Ct);
+        Assert.Equal(ItemState.Unknown, restoredItem.State);
+        Assert.Equal(1, Writes(w));
+
+        w.Remote.Intercept = null;
+        w.Remote.Rows["fleet/4"]["name"] = "renamed";
+        await new OperationsBatchExecutor(api, restored).ExecuteAsync(job, () => Task.CompletedTask, Ct);
+        Assert.Equal(ItemState.Succeeded, restoredItem.State);
+        Assert.Equal(1, Writes(w));
+    }
     [Theory]
     [InlineData("running")]
     [InlineData("created")]
@@ -162,8 +230,9 @@ public class AuditRegressionTests
 
     [Theory]
     [InlineData("ambiguous")]
+    [InlineData("foreign")]
     [InlineData("missing")]
-    public async Task Routing_recovery_with_ambiguous_or_unknown_airports_cannot_confirm_the_record(string mode)
+    public async Task Routing_recovery_with_ambiguous_foreign_or_unknown_airports_cannot_confirm_the_record(string mode)
     {
         var w = new GoldenWorld(false);
         w.Remote.AddRow("routings/9", """{"id":9,"airline_id":7,"departure_airport_id":101,"arrival_airport_id":102,"route":"DCT"}""");
@@ -175,6 +244,13 @@ public class AuditRegressionTests
                 w.Workspace.Resources[ResourceKind.Airports].Snapshot.Add(row);
             }
         }
+        else if (mode == "foreign")
+        {
+            var airports = w.Workspace.Resources[ResourceKind.Airports].Snapshot;
+            foreach (var json in new[] { London, Gatwick })
+                airports.Add(Parse(w, ResourceKind.Airports, json));
+            airports[0] = airports[0].WithIdentity(new("101", "8"));
+        }
         else
         {
             foreach (var json in new[] { Gatwick })
@@ -183,7 +259,8 @@ public class AuditRegressionTests
         var item = Routing("LHR", "LGW");
         item.State = ItemState.Unknown;
         item.RemoteId = "9";
-        await Execute(w, JobOf(w, item));
+        // A fresh adapter, as the app builds one per run: the airport index is read from the snapshot when the adapter is created.
+        await new OperationsBatchExecutor(ApiOver(w, w.Workspace), w.Workspace).ExecuteAsync(JobOf(w, item), () => Task.CompletedTask, Ct);
         Assert.Equal(ItemState.Unknown, item.State);
         Assert.False(item.Rebased);
         Assert.Empty(w.Workspace.VerifiedOperations);
