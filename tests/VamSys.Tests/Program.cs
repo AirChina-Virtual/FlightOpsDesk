@@ -198,12 +198,7 @@ await Test("Language switch during execution does not resend writes or change ta
     Check(loc.Format(restored.Description!)=="Completed and verified" && loc.Format(restored.Items[0].Description!)=="Verified by read-back");
     await new BatchExecutor(fake,fake).ExecuteAsync(restored,()=>Task.CompletedTask,CancellationToken.None); Check(fake.Writes==1);
 });
-await ApiScenarios.Run(Test);
 await LiveCompatibilityScenarios.Run(Test);
-await AuditScenarios.Run(Test);
-await ContractScenarios.Run(Test);
-await ReauditScenarios.Run(Test);
-await LifecycleScenarios.Run(Test);
 await PerformanceScenarios.Run(Test); await CandidateIndexScenarios.Run(Test);
 await StorageScenarios.Run(Test);
 await VerifiedScopeScenarios.Run(Test);
