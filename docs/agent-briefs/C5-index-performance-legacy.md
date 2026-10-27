@@ -42,5 +42,5 @@
 - Seeded random route oracle：未逐项迁移，由 pair 缓存测试与 DuplicateFinderTests 的确定性用例覆盖（取舍，主会话可复核）。
 新增测试：UnitTests/Api/CandidateIndexSessionTests.cs（5）、DependencyReadAndScaleTests.cs（含 PerformanceMetricsTests，约 15）；IntegrationTests/Api/IndexReservationStageTests.cs（约 15）、DuplicateReadCountTests.cs（11）、SaveMetricsTests.cs（1）。
 保留：PerformanceScenarios.Benchmark／RouteBenchmark 与 CandidateIndexScenarios.Benchmark（--benchmark-performance 依赖）；去掉 --performance、--indexes 入口（Run 已删，docs/history 仅历史记录）。
-发现：恢复读取遇 401/403 时作业状态为 NeedsAttention 而非 Paused（旧场景断言 Paused）；新测试按现状断言，未改 src，请主会话确认是否预期。
+更正：此前 401/403 得到 NeedsAttention 是测试缺陷（被恢复的记录 airports/90 未注册，拦截器没被调用，实际收到 404）；注册该行后 401/403 均为 Paused，空响应体同样 Paused，无产品差异。
 提交：见 git log（Quick 档 ALL PASSED：单元 1441、集成 271）。

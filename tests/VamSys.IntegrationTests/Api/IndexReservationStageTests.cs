@@ -170,6 +170,8 @@ public class IndexReservationStageTests
             var row = new DataRow { Fields = new Dictionary<string, string> { ["ICAO/IATA"] = code, ["Name"] = "Hub" } };
             return new ChangeItem { Resource = ResourceKind.Airports, Kind = ChangeKind.Create, After = row, Fields = row.Fields.ToDictionary(p => p.Key, p => new FieldChange(FieldIntent.Set, p.Value)) };
         }
+        // the proposed record exists on the server, so that the interceptor sees the recovery read of it
+        w.Remote.AddRow("airports/90", """{"id":90,"airline_id":7,"icao":"KJFK","iata":"JFK","name":"Hub"}""");
         var unknown = NewAirport("KJFK");
         unknown.State = ItemState.Unknown;
         unknown.ProposeRecoveryId("90");
@@ -192,7 +194,7 @@ public class IndexReservationStageTests
             Assert.Equal(ItemState.Unknown, job.Items[0].State);
             Assert.Equal(ItemState.Pending, job.Items[1].State);
             Assert.All(w.Remote.Server.Requests, r => Assert.Equal("GET", r.Method));
-            Assert.Equal(JobStatus.NeedsAttention, job.StatusCode);
+            Assert.Equal(mode is "401" or "403" ? JobStatus.Paused : JobStatus.NeedsAttention, job.StatusCode);
             (workspace, api) = Restart(w, workspace);
             job = workspace.Jobs.Single();
         }
@@ -215,6 +217,24 @@ public class IndexReservationStageTests
         return (restored, new OperationsAdapter(new OperationsTransport(w.Remote.Server.CreateClient(), OperationsAdapter.BaseUri, "golden-va", tokens, requests), restored));
     }
 
+    [Theory]
+    [InlineData(401)]
+    [InlineData(403)]
+    public async Task A_recovery_read_rejected_with_an_empty_body_pauses_the_job_like_one_with_a_json_body(int status)
+    {
+        // real servers may answer a non-JSON or empty body to a rejected login; the job must still pause
+        var w = new GoldenWorld();
+        w.Remote.AddRow("airports/90", """{"id":90,"airline_id":7,"icao":"KJFK","iata":"JFK","name":"Hub"}""");
+        var row = new DataRow { Fields = new Dictionary<string, string> { ["ICAO/IATA"] = "KJFK", ["Name"] = "Hub" } };
+        var unknown = new ChangeItem { Resource = ResourceKind.Airports, Kind = ChangeKind.Create, After = row, State = ItemState.Unknown, Fields = row.Fields.ToDictionary(p => p.Key, p => new FieldChange(FieldIntent.Set, p.Value)) };
+        unknown.ProposeRecoveryId("90");
+        var job = new BatchJob { Items = [unknown] };
+        w.Workspace.Jobs.Add(job);
+        w.Remote.Intercept = _ => new FakeResponse((System.Net.HttpStatusCode)status, null);
+        await Run(w.Workspace, w.Api, job);
+        Assert.Equal(ItemState.Unknown, unknown.State);
+        Assert.Equal(JobStatus.Paused, job.StatusCode);
+    }
     // ---- rows saved by an earlier version -----------------------------------------------------------------------------
 
     [Fact]
