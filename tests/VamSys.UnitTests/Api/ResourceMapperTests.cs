@@ -148,6 +148,8 @@ public class ResourceMapperTests
         var kit = new ApiKit();
         var row = kit.Map(ResourceKind.Routes, ApiKit.Scheduled10);
         Assert.Equal("7", row.Identity!.ConnectionId);
+        // the record does not name the airline, so it cannot tell the session which one is connected
+        Assert.Null(kit.Api.SessionAirlineId);
     }
 
     [Fact]
@@ -155,6 +157,7 @@ public class ResourceMapperTests
     {
         var kit = new ApiKit(airline: null);
         Assert.Equal("ApiConnectFirst", ApiKit.BlockedWith(() => kit.Map(ResourceKind.Routes, ApiKit.Scheduled10)));
+        Assert.Null(kit.Workspace.AirlineId);
     }
 
     [Fact]

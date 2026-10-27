@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using VamSys.Core;
 using VamSys.Infrastructure;
+using VamSys.IntegrationTests.Golden.Requests;
 using VamSys.TestSupport;
 
 namespace VamSys.IntegrationTests.Storage;
@@ -109,5 +110,79 @@ public class CredentialSaveTests
         Assert.Equal("7", w.AirlineId);
         Assert.False(w.LocalRouteTimes);
         Assert.Equal(jobs, JsonSerializer.Serialize(w.Jobs));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_task_paused_by_a_rejected_login_survives_a_credentials_rotation_and_resumes_in_the_same_airline(bool unknown)
+    {
+        using var dir = TempDataDirectory.Create("vamsys-cred-");
+        var store = new WorkspaceStore(dir.Path);
+        var w = new GoldenWorld();
+        w.Workspace.LocalRouteTimes = true;
+        w.Workspace.InstanceUrl = OperationsAdapter.BaseUri.AbsoluteUri;
+        w.Edit(ResourceKind.Fleets, "4", ("Name", "renamed"));
+        if (unknown)
+        {
+            // the server applies the write, the answer is lost
+            w.Remote.Intercept = r =>
+            {
+                if (r.Method != "PUT")
+                    return null;
+                w.Remote.Respond(r);
+                throw new TimeoutException("simulated");
+            };
+            await w.RunAsync("first run");
+            Assert.Equal(ItemState.Unknown, w.Job!.Items.Single().State);
+        }
+        w.Remote.Intercept = _ => FakeResponse.WithStatus(401);
+        if (unknown)
+            await w.ResumeAsync("rejected login");
+        else
+            await w.RunAsync("rejected login");
+        var job = w.Job!;
+        Assert.Equal(JobStatus.Paused, job.StatusCode);
+        Assert.Equal(unknown ? ItemState.Unknown : ItemState.Pending, job.Items.Single().State);
+        var jobJson = JsonSerializer.Serialize(job);
+
+        store.Save(w.Workspace);
+        store.UpdateOperationsCredentials(w.Workspace, " updated-client ", "new-test-secret");
+        var creds = JsonSerializer.Deserialize<OperationsCredentials>(store.LoadSecret(w.Workspace.Id)!)!;
+        Assert.Equal("updated-client", creds.ClientId);
+        Assert.Equal("new-test-secret", creds.Secret);
+
+        // the program starts again: the task, the airline and the settings come back as they were
+        var restored = store.Load(w.Workspace.Id);
+        Assert.Equal("7", restored.AirlineId);
+        Assert.True(restored.LocalRouteTimes);
+        Assert.Equal(w.Workspace.InstanceUrl, restored.InstanceUrl);
+        Assert.Equal(RunMode.Offline, restored.Mode);
+        Assert.Equal(jobJson, JsonSerializer.Serialize(restored.Jobs.Single()));
+
+        string? tokenRequest = null;
+        using var tokenHandler = new Handler(r =>
+        {
+            tokenRequest = r.Content!.ReadAsStringAsync().Result;
+            return new(HttpStatusCode.OK) { Content = new StringContent("""{"access_token":"renewed","token_type":"Bearer","expires_in":3600}""") };
+        });
+        using var tokenHttp = new HttpClient(tokenHandler, false);
+        var api = new OperationsAdapter(new OperationsTransport(w.Remote.Server.CreateClient(), OperationsAdapter.BaseUri, Guid.NewGuid().ToString(),
+            TokenProvider.ClientCredentials(tokenHttp, creds), InstantTime.Requests()), restored);
+        w.Remote.Intercept = null;
+        var seen = w.Remote.Server.Requests.Count;
+        await foreach (var row in api.ReadAllAsync(ResourceKind.Fleets, TestContext.Current.CancellationToken))
+        { _ = row; break; }
+        Assert.Equal(restored.AirlineId, api.SessionAirlineId);
+
+        restored.Mode = RunMode.Online;
+        await new OperationsBatchExecutor(api, restored).ExecuteAsync(restored.Jobs.Single(), () => Task.CompletedTask, TestContext.Current.CancellationToken);
+        var after = w.Remote.Server.Requests.Skip(seen).ToArray();
+        Assert.Equal(ItemState.Succeeded, restored.Jobs.Single().Items.Single().State);
+        Assert.Contains("client_secret=new-test-secret", tokenRequest, StringComparison.Ordinal);
+        Assert.All(after, r => Assert.Equal("Bearer renewed", r.Header("Authorization")));
+        // a pending write is sent once, an unknown one only confirmed by reading
+        Assert.Equal(unknown ? 0 : 1, after.Count(r => r.Method == "PUT"));
+        Assert.Equal(1, w.Remote.Server.Requests.Count(r => r.Method == "PUT" && r.Path.EndsWith("/fleet/4", StringComparison.Ordinal)));
     }
 }

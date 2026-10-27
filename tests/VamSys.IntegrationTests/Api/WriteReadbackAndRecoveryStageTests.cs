@@ -427,4 +427,85 @@ public class WriteReadbackAndRecoveryStageTests
         Assert.Equal("DELETE", item.ApiSteps.Single().Method);
         Assert.Equal(204, item.DiagnosticDetails!.Status);
     }
+
+    // ---- C11: what the old Contract and Reaudit scenarios checked and the tests above did not state --------------------
+
+    [Fact]
+    public async Task A_rate_limited_create_goes_back_to_pending_with_nothing_created_and_is_posted_again_on_the_next_run()
+    {
+        var w = new GoldenWorld();
+        var limited = false;
+        w.Remote.Intercept = r => { if (r.Method != "POST" || limited) return null; limited = true; return RateLimited(); };
+        w.New(ResourceKind.Fleets, ("Name", "New"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "pax"), ("Parameter IDs", "1"));
+        await w.RunAsync("first run");
+        var item = w.Job!.Items.Single();
+        Assert.Equal(ItemState.Pending, item.State);
+        Assert.Equal("ApiRateLimited", Code(item));
+        Assert.False(item.CreateCompleted);
+        Assert.Null(item.RemoteId);
+        Assert.All(item.ApiSteps, s => Assert.Equal(BatchStepState.Prepared, s.State));
+        await w.ResumeAsync("second run");
+        Assert.Equal(ItemState.Succeeded, item.State);
+        Assert.Equal("90", item.RemoteId);
+        Assert.Equal(2, Count(w, "POST"));
+    }
+
+    [Fact]
+    public async Task A_created_route_whose_answer_cannot_be_read_in_full_keeps_its_id_across_a_restart_and_is_confirmed_without_a_second_post()
+    {
+        var w = new GoldenWorld();
+        // the server created route 9 but the answer carries nothing except the id
+        w.Remote.Intercept = r => r.Method == "POST" ? FakeResponse.WithStatus(201, """{"id":9}""") : null;
+        w.New(ResourceKind.Routes, ("Type", "scheduled"), ("Departure Airport (ICAO/IATA)", "EGLL"), ("Arrival Airport (ICAO/IATA)", "EGKK"),
+            ("Callsign", "CAO101"), ("Flight Number", "CA101"), ("Fleet IDs", "4"));
+        var job = NewJob(w);
+        var saved = "";
+        await Execute(w, job, () => { saved = w.Workspace.Serialize(); return Task.CompletedTask; });
+        var item = job.Items.Single();
+        Assert.Equal(ItemState.Unknown, item.State);
+        Assert.Equal("9", item.RemoteId);
+        Assert.True(item.CreateCompleted);
+
+        // the program starts again: the id is in the saved task and the record is only read
+        w.Remote.Intercept = null;
+        w.Remote.AddRow("routes/9", """{"id":9,"departure_id":101,"arrival_id":102,"type":"scheduled","callsign":"CAO101","flight_number":"CA101","fleet_ids":[4]}""");
+        var (restored, api) = Restarted(w, saved);
+        var restoredItem = restored.Jobs.Single().Items.Single();
+        Assert.Equal("9", restoredItem.RemoteId);
+        await new OperationsBatchExecutor(api, restored).ExecuteAsync(restored.Jobs.Single(), () => Task.CompletedTask, Ct);
+        Assert.Equal(ItemState.Succeeded, restoredItem.State);
+        Assert.Equal(1, Count(w, "POST"));
+    }
+
+    [Fact]
+    public async Task A_create_whose_read_back_is_rejected_stays_unknown_with_its_expectations_saved_before_the_post_and_is_confirmed_after_a_restart()
+    {
+        var w = new GoldenWorld();
+        w.Remote.Intercept = r => r.Method == "GET" && r.Path.EndsWith("/fleet/90", StringComparison.Ordinal) ? Status(422) : null;
+        w.New(ResourceKind.Fleets, ("Name", "Brand new"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "pax"), ("Parameter IDs", "1"));
+        var job = NewJob(w);
+        var saved = "";
+        var expectedBeforeFirstPost = new List<string>();
+        await Execute(w, job, () =>
+        {
+            saved = w.Workspace.Serialize();
+            var item = job.Items.Single();
+            if (Count(w, "POST") == 0 && item.State == ItemState.Running && item.ApiExpectedValues is { } expected)
+                expectedBeforeFirstPost = [.. expected.Keys.Order()];
+            return Task.CompletedTask;
+        });
+        var created = job.Items.Single();
+        Assert.Equal(ItemState.Unknown, created.State);
+        Assert.Equal("90", created.RemoteId);
+        Assert.Equal(["code", "name", "parameter_ids", "type"], expectedBeforeFirstPost);
+        Assert.Equal(1, Count(w, "POST"));
+
+        w.Remote.Intercept = null;
+        var (restored, api) = Restarted(w, saved);
+        var restoredItem = restored.Jobs.Single().Items.Single();
+        Assert.Equal(["code", "name", "parameter_ids", "type"], restoredItem.ApiExpectedValues!.Keys.Order());
+        await new OperationsBatchExecutor(api, restored).ExecuteAsync(restored.Jobs.Single(), () => Task.CompletedTask, Ct);
+        Assert.Equal(ItemState.Succeeded, restoredItem.State);
+        Assert.Equal(1, Count(w, "POST"));
+    }
 }

@@ -271,4 +271,88 @@ public class ResourceReaderTests
         kit.Server.On(HttpMethod.Get, "fleet/4/aircraft/8", ApiKit.Data(ApiKit.Aircraft8));
         Assert.Equal("Plane", (await kit.Api.FindAsync(ResourceKind.Aircraft, "8", Ct))!.Get("Name"));
     }
+
+    // ---- C11: what the old Contract and Lifecycle scenarios checked and the tests above did not state --------------------
+
+    [Fact]
+    public async Task A_refresh_asks_for_pages_of_100_with_reads_only_and_files_the_routes_without_an_airline_under_the_one_it_read()
+    {
+        var kit = Remote();
+        kit.Workspace.AirlineId = null;
+        await kit.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, Ct);
+        Assert.All(kit.Server.Requests, r =>
+        {
+            Assert.Equal("GET", r.Method);
+            Assert.Contains("page[size]=100", Uri.UnescapeDataString(r.PathAndQuery), StringComparison.Ordinal);
+        });
+        var route = kit.Workspace.Resources[ResourceKind.Routes].Snapshot.Single();
+        Assert.Equal("7", route.Identity!.ConnectionId);
+        Assert.Equal("EGLL", route.Get("Departure Airport (ICAO/IATA)"));
+        Assert.Equal("EGKK", route.Get("Arrival Airport (ICAO/IATA)"));
+        Assert.Equal("7", kit.Api.SessionAirlineId);
+    }
+
+    [Fact]
+    public async Task Records_of_another_airline_stop_a_read_and_leave_the_bound_airline_alone()
+    {
+        var kit = new ApiKit();
+        kit.Server.On(HttpMethod.Get, "fleet", FakeResponse.Ok(Page("", """{"id":4,"airline_id":8,"name":"Other"}""")));
+        var error = await Assert.ThrowsAnyAsync<Exception>(() => All(kit.Api.ReadAllAsync(ResourceKind.Fleets, Ct)));
+        Assert.Equal("ApiWrongVa", MessageErrors.Describe(error).Code);
+        Assert.Equal("7", kit.Workspace.AirlineId);
+        Assert.Null(kit.Api.SessionAirlineId);
+        Assert.All(kit.Server.Requests, r => Assert.Equal("GET", r.Method));
+    }
+
+    [Theory]
+    [InlineData("success")]
+    [InlineData("read-failure")]
+    [InlineData("cancel")]
+    [InlineData("save-failure")]
+    public async Task A_refresh_swaps_the_airport_index_together_with_the_workspace_or_not_at_all(string mode)
+    {
+        var kit = new ApiKit();
+        var old = kit.Map(ResourceKind.Airports, """{"id":101,"airline_id":7,"icao":"EGLL","iata":"LHR"}""");
+        kit.Workspace.Resources[ResourceKind.Airports].Snapshot.Add(old.Dup());
+        kit.Workspace.Resources[ResourceKind.Airports].Draft.Add(old.Dup());
+        var before = kit.Workspace.Serialize();
+        using var cts = new CancellationTokenSource();
+        kit.Server.On(HttpMethod.Get, "airports", FakeResponse.Ok(Page("", """{"id":103,"airline_id":7,"icao":"EGLL","iata":"LHR"}""", """{"id":102,"airline_id":7,"icao":"EGKK","iata":"LGW"}""")));
+        foreach (var path in new[] { "fleet", "routings", "routes" })
+            kit.Server.On(HttpMethod.Get, path, _ =>
+            {
+                if (mode == "read-failure")
+                    throw new TimeoutException("simulated");
+                if (mode != "cancel")
+                    return FakeResponse.Ok(Page(""));
+                cts.Cancel();
+                throw new OperationCanceledException(cts.Token);
+            });
+        string? saved = null;
+        var refresh = kit.Api.RefreshSnapshotsAsync(staged =>
+        {
+            if (mode == "save-failure")
+                throw new IOException("save failed");
+            saved = staged.Serialize();
+            return Task.CompletedTask;
+        }, cts.Token);
+        if (mode == "success")
+            await refresh;
+        else
+            await Assert.ThrowsAnyAsync<Exception>(() => refresh);
+
+        static ChangeItem Routing(string code) => ApiKit.Create(ResourceKind.Routings, ("Departure Airport (ICAO/IATA)", code), ("Arrival Airport (ICAO/IATA)", code), ("Route String", "DCT"));
+        Assert.Equal(mode == "success" ? 103L : 101L, kit.Api.Plan(Routing("LHR"))[0].Body["departure_airport_id"]);
+        if (mode == "success")
+        {
+            Assert.Equal(saved, kit.Workspace.Serialize());
+            // the id of the airport before the refresh is not an airport any more
+            Assert.ThrowsAny<InvalidOperationException>(() => kit.Api.Plan(Routing("101")));
+        }
+        else
+        {
+            Assert.Null(saved);
+            Assert.Equal(before, kit.Workspace.Serialize());
+        }
+    }
 }

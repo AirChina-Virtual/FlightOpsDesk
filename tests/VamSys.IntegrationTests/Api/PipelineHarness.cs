@@ -36,6 +36,15 @@ internal static class PipelineHarness
 
     public static string Code(ChangeItem item) => item.Description?.Code ?? "";
 
+    /// <summary>The program started again (C11): the workspace comes back from its saved form and a new adapter, without memory of the run, works on it.</summary>
+    public static (Workspace Workspace, OperationsAdapter Api) Restarted(GoldenWorld w, string saved)
+    {
+        var restored = Workspace.Deserialize(saved);
+        var requests = InstantTime.Requests();
+        var tokens = new TokenProvider(_ => Task.FromResult(new AccessToken("golden-token", requests.Clock.GetUtcNow().AddHours(1))), requests.Clock);
+        return (restored, new OperationsAdapter(new OperationsTransport(w.Remote.Server.CreateClient(), OperationsAdapter.BaseUri, "golden-va", tokens, requests), restored));
+    }
+
     /// <summary>A writer that records each checkpoint with the number of requests the server had seen when it was written.</summary>
     public sealed class RecordingWriter(GoldenWorld world) : IBatchCheckpointWriter
     {
