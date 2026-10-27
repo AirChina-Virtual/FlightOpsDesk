@@ -256,4 +256,19 @@ public class ResourceReaderTests
         Assert.Equal("7", kit.Workspace.AirlineId);
         Assert.Equal("7", kit.Api.SessionAirlineId);
     }
+
+    // ---- C11: assertions of the C3 scenarios that were only matched by test name ----------------------------------
+
+    [Fact]
+    public async Task Aircraft_rows_remember_their_fleet_and_a_single_aircraft_answers_in_data()
+    {
+        var kit = new ApiKit();
+        kit.Server.On(HttpMethod.Get, "fleet", FakeResponse.Ok(Page("", ApiKit.Fleet4)));
+        kit.Server.On(HttpMethod.Get, "fleet/4/aircraft", FakeResponse.Ok(Page("", ApiKit.Aircraft8)));
+        var rows = await All(kit.Api.ReadAllAsync(ResourceKind.Aircraft, Ct));
+        Assert.Equal("4", Assert.Single(rows).Identity!.ParentFleetId);
+
+        kit.Server.On(HttpMethod.Get, "fleet/4/aircraft/8", ApiKit.Data(ApiKit.Aircraft8));
+        Assert.Equal("Plane", (await kit.Api.FindAsync(ResourceKind.Aircraft, "8", Ct))!.Get("Name"));
+    }
 }
