@@ -204,10 +204,10 @@ static class StorageProcessScenarios
         });
         foreach(var boundary in new[]{"Migration:BeforeCommit","Migration:AfterCommit"})
         await test("Real process termination during v3 history migration: "+boundary,async()=>{
-            var dir=Temp();HistoryScenarios.FixedLegacy(dir,3);
-            await Launch(dir,HistoryScenarios.FixedId,new Remote(),m=>Match(m,boundary),"--draft-child");
+            var dir=Temp();FixedLegacy(dir,3);
+            await Launch(dir,FixedId,new Remote(),m=>Match(m,boundary),"--draft-child");
             using(var c=Open(dir))StorageScenarios.Check(Convert.ToInt32(Sql(c,"PRAGMA user_version"))==(boundary.EndsWith("AfterCommit")?4:3));
-            var store=new WorkspaceStore(dir);var d=store.Load(HistoryScenarios.FixedId).Resources[ResourceKind.Fleets];
+            var store=new WorkspaceStore(dir);var d=store.Load(FixedId).Resources[ResourceKind.Fleets];
             StorageScenarios.Check(d.Undo.Count==2&&d.Redo.Count==2&&d.Draft[0].Get("Name")=="current");d.UndoEdit();StorageScenarios.Check(d.Draft[0].Get("Name")=="start");
             d.RedoEdit();d.RedoEdit();StorageScenarios.Check(d.Draft[0].Get("Name")=="future1");
         });
