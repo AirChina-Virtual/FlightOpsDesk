@@ -3,5 +3,4 @@
   <ItemGroup><ProjectReference Include="../../src/VamSys.Storage/VamSys.Storage.csproj" AdditionalProperties="VamSysTestSupport=true" /><ProjectReference Include="../../src/VamSys.Infrastructure/VamSys.Infrastructure.csproj" AdditionalProperties="VamSysTestSupport=true" /></ItemGroup>
   <ItemGroup><PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" /><Compile Include="../../src/VamSys.App/TaskViewModels.cs" Link="TaskViewModels.cs" /><Compile Include="../../src/VamSys.App/DataTableViewModel.cs" Link="DataTableViewModel.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/VamSys.App/ViewModels.cs" Link="ViewModels.cs" /></ItemGroup>
-  <ItemGroup><None Update="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>
