@@ -1,8 +1,6 @@
-# VamSys.Tests — 检查功能、恢复和运行速度
+# VamSys.Tests — 窗口测试数据、断言、打包检查与基准入口
 
-这个项目按顺序执行一组自动检查，例如导入 CSV、修改记录或模拟请求超时。每项通过后输出 PASS；结果不符合预期时报错并停止。它是 net10.0 控制台程序，用下面的 `dotnet run` 命令运行，不使用 `dotnet test`。
-
-测试直接调用 Domain、Application 和 Infrastructure 中的实际代码。不依赖 WinUI 的界面逻辑直接链接 App 中的原文件，包括任务页模型、数据页查询与分页、行／单元格模型、审阅计划和批量预览。这样测试的就是程序真正使用的逻辑。
+这个项目原先按顺序执行旧的自动检查场景；这些场景已全部迁移到 `VamSys.UnitTests` 和 `VamSys.IntegrationTests`。现在它是一个 net10.0 控制台程序，只提供命令行入口：为窗口脚本准备数据（`--seed-*`）、重启后断言（`--assert-*`）、检查发布包（`--verify-*`）、运行基准（`--benchmark-*`）以及导出诊断回放。
 
 测试启用 `VamSysTestSupport=true` 引用 Infrastructure，并从 tests/TestSupport 链接存储故障注入和内部访问授权。这些依赖编译到 artifacts/test-build，正式构建不会复用；测试运行器本身仍在本项目的 bin/Release。
 
@@ -11,23 +9,17 @@
 从仓库根目录执行：
 
 ~~~powershell
-# 旧运行器全部自动检查（当前 271 项；没有 artifacts/step5-v3-baseline 时为 270 项）
-dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
-
-# 只运行其中一部分
-dotnet run --project tests/VamSys.Tests -c Release -- --storage            # 数据保存与行级保存
-
 # 基准，写入 JSON
 dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-core artifacts/core-performance/current.json
 dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-core-load artifacts/core-performance/current-load.json
 dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-v3 artifacts/v3-rebase
 ~~~
 
-剩余的旧场景正按 [TEST-COVERAGE.md](../../docs/TEST-COVERAGE.md) 逐步迁移；日常检查请使用 `scripts/check-all.ps1`。
+旧场景已全部迁移到 `VamSys.UnitTests`、`VamSys.IntegrationTests`（对应关系见 [TEST-COVERAGE.md](../../docs/TEST-COVERAGE.md)）；本程序不带参数运行时只提示用法并以退出码 2 结束。日常检查请使用 `scripts/check-all.ps1`。
 
-部分检查会调用 Windows 的密钥保护或启动额外进程，因此完整测试要在 Windows 上运行。测试数据都放在单独目录，不使用用户的真实数据。
+新测试项目中部分检查会调用 Windows 的密钥保护或启动额外进程，因此完整测试要在 Windows 上运行。测试数据都放在单独目录，不使用用户的真实数据。
 
-R0 起新增的 xUnit 项目独立运行，不计入旧运行器的项数（R2 删除领域层旧场景后，工作树中为 240 项，主检出多一项 v3 二进制检查）：`VamSys.UnitTests` 当前 404 项（含 1 项因产品缺口跳过），`VamSys.IntegrationTests` 当前 50 项。需求与新测试的对应见 [TEST-COVERAGE.md](../../docs/TEST-COVERAGE.md)。单元测试应分别用 Release、Debug 运行，以覆盖行守卫的两种编译配置。
+单元测试应分别用 Release、Debug 运行，以覆盖行守卫的两种编译配置。
 
 ~~~powershell
 dotnet run --project tests/VamSys.UnitTests -c Release -p:RestoreLockedMode=true
@@ -36,17 +28,16 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 ./scripts/check-analyzer-baseline.ps1
 ~~~
 
-真实数据库回归只读取隔离副本，需设置 `VAMSYS_REAL_DB_DIR` 和 `VAMSYS_REAL_DB_EXPECTED`，否则该项跳过。2026-10-22 的运行使用 R0 已保存副本的再复制目录，50 项集成测试没有跳过。旧清单保留 R0 的逻辑名称与源码路径，测试仅对明确搬迁的文件做路径映射；新增架构测试另查真实程序集，防止逻辑名称掩盖依赖变化。
+真实数据库回归只读取隔离副本，需设置 `VAMSYS_REAL_DB_DIR` 和 `VAMSYS_REAL_DB_EXPECTED`，否则该项跳过。
 
 ## 测试文件分工
 
 | 文件 | 验证重点 |
 |---|---|
-| Program.cs | 选择要运行的检查，处理命令参数，为窗口测试准备数据 |
+| Program.cs | 处理命令参数，为窗口测试准备数据；不带参数时提示用法并以退出码 2 结束 |
 | tests/VamSys.IntegrationTests/Fixtures/vcca-weight-20261020.json | 8 份保留的真实 API 响应回放：身份与追踪值脱敏，保留数值、null 和包装结构；仅在测试进程回放 |
 | CandidateIndexScenarios.cs | 仅保留基准入口 `CandidateIndexScenarios.Benchmark`（`--benchmark-*` 依赖）；其余检查已迁移到 xUnit 测试 |
-| StorageScenarios.cs、StorageV3Scenarios.cs | 只保留测试夹具、基准入口和实际 v3 二进制拒读 v4 的检查；其余已迁移到 `tests/VamSys.IntegrationTests/Storage` |
-| StorageProcessScenarios.cs | 强制结束正在执行的测试进程再重启，检查是否重复提交；也检查行级保存中途被结束 |
+| StorageScenarios.cs、StorageV3Scenarios.cs | 只保留窗口脚本和基准入口用的夹具与基准；场景已全部迁移到 `tests/VamSys.IntegrationTests/Storage` |
 | PerformanceScenarios.cs | 仅保留基准入口 `PerformanceScenarios.Benchmark`、`RouteBenchmark`（`--benchmark-performance` 依赖）；请求次数与查重速度检查已迁移到 xUnit 测试 |
 | CorePerformanceBenchmark.cs | 1 千／2 万／5 万行基准（规划对照、位置索引、局部回放的失败原子性已改由 `VamSys.UnitTests` 的领域测试覆盖） |
 | DataUiFixture.cs | `--seed-data-ui` 使用的窗口测试合成数据 |
@@ -62,13 +53,13 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 | `InstantTime` | 每次等待时，时钟直接跳到等待结束的时刻 | 按顺序执行的一般场景；用 `InstantTime.Requests()` 作为请求协调器传给 `OperationsTransport` |
 | `TestTime` | 只在测试调用 `Drive` 或 `Advance` 时前进 | 需要精确检查间隔、并发共享额度和排队取消的场景 |
 
-新写的 API 测试不要使用默认的共享协调器（系统时钟），否则会重新引入真实等待。每项测试耗时达到 1 秒时，PASS 行末尾会显示耗时；全部完成后输出总耗时和最慢的 5 项，整套约 30 秒。
+新写的 API 测试不要使用默认的共享协调器（系统时钟），否则会重新引入真实等待。
 
 编译服务不可用时，可先 `dotnet build tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true -p:UseSharedCompilation=false -m:1 -nr:false`，再直接运行 `dotnet tests/VamSys.Tests/bin/Release/net10.0/VamSys.Tests.dll`。`--export-diagnostic-replay <JSON路径>` 通过模拟 422/500 生成脱敏诊断与 SHA-256；该入口只在测试运行器，不进入正式包。
 
 ## 程序突然退出后的恢复
 
-一个测试进程扮演服务器并记住已完成的操作，另一个进程执行任务。测试会在发送请求、收到 ID、补充修改或保存结果等指定时刻，强制结束执行任务的进程；重新启动后，检查进度有没有丢失，已完成的操作有没有被重复提交。服务器是模拟的，不会修改真实 vaMSYS 数据。`--storage-child` 等参数由测试内部使用。
+一个测试进程扮演服务器并记住已完成的操作，另一个进程执行任务。测试会在发送请求、收到 ID、补充修改或保存结果等指定时刻，强制结束执行任务的进程；重新启动后，检查进度有没有丢失，已完成的操作有没有被重复提交。服务器是模拟的，不会修改真实 vaMSYS 数据。这些场景现在是 `tests/VamSys.IntegrationTests/Storage/ProcessTermination` 中的 xUnit 测试（标记 Slow），被结束的进程是 `tests/VamSys.ProcessChild`（参数 `storage`／`draft`），不再经过本运行器。
 
 ## 实际窗口检查
 

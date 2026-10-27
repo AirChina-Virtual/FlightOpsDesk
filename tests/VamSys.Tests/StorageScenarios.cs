@@ -6,8 +6,8 @@ using System.Text.Json.Nodes;
 using VamSys.Core;
 using VamSys.Infrastructure;
 
-// Shared storage fixtures and helpers of the legacy runner (used by the process-termination scenarios, the window scripts and the
-// benchmark entry points). Every other storage scenario now lives in tests/VamSys.IntegrationTests/Storage.
+// Shared storage fixtures and helpers of the legacy runner (used by the window scripts and the
+// benchmark entry points). Every storage scenario now lives in tests/VamSys.IntegrationTests/Storage (process termination: Storage/ProcessTermination).
 static class StorageScenarios
 {
     internal static void Check(bool ok,string message="Storage assertion failed"){if(!ok)throw new Exception(message);}
@@ -86,27 +86,6 @@ static class StorageScenarios
         Sql(c,"INSERT INTO workspaces VALUES($id,'fixed legacy',$j"+(version>=2?","+version:"")+")",("$id",FixedId.ToString()),("$j",root.ToJsonString()));
         Sql(c,"INSERT INTO secrets VALUES($id,X'010203');INSERT INTO app_settings VALUES('language','en-US');PRAGMA user_version="+version,("$id",FixedId.ToString()));
         if(version>=2)Sql(c,$"CREATE TRIGGER workspace_format_update BEFORE UPDATE ON workspaces WHEN NEW.format_version!={version} BEGIN SELECT RAISE(ABORT,'old format');END;CREATE TRIGGER workspace_format_insert BEFORE INSERT ON workspaces WHEN NEW.format_version!={version} BEGIN SELECT RAISE(ABORT,'old format');END;");
-    }
-    public static async Task Run(Func<string,Func<Task>,Task> test)
-    {
-        await V3BinaryRefusal(test);
-        await StorageProcessScenarios.Run(test);
-    }
-    // Needs the real v3 program kept in artifacts/step5-v3-baseline; it can only be started as a process, so it stays here.
-    static async Task V3BinaryRefusal(Func<string,Func<Task>,Task> test)
-    {
-        if(!File.Exists("artifacts/step5-v3-baseline/tests/VamSys.Tests.dll"))return;
-        await test("actual v3 binary refuses v4 database without changing it",async()=>{
-            var baseline=Path.GetFullPath("artifacts/step5-v3-baseline/tests/VamSys.Tests.dll");Check(File.Exists(baseline),"v3 baseline missing");
-            var dir=Temp();var store=new WorkspaceStore(dir);var w=Fixture();store.Save(w);using(var c=Open(dir))Sql(c,"PRAGMA wal_checkpoint(TRUNCATE)");
-            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-            var path=Path.Combine(dir,"workspaces.db");var before=File.ReadAllBytes(path);
-            var info=new ProcessStartInfo(Path.GetFullPath(".tools/dotnet/dotnet.exe")){UseShellExecute=false,CreateNoWindow=true,RedirectStandardError=true,RedirectStandardOutput=true};
-            foreach(var arg in new[]{baseline,"--assert-close-ui",dir})info.ArgumentList.Add(arg);
-            using var process=Process.Start(info)!;var error=process.StandardError.ReadToEndAsync();var output=process.StandardOutput.ReadToEndAsync();await process.WaitForExitAsync();
-            var log=await error+await output;Check(process.ExitCode!=0&&log.Contains("WorkspaceStore.Initialize(String directory)")&&log.Contains("WorkspaceStore.Schema.cs:line 15"),log);
-            Check(before.SequenceEqual(File.ReadAllBytes(path)),"old reader changed v4 database");
-        });
     }
     public static async Task Benchmark(string? output)
     {

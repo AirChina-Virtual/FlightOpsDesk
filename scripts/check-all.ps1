@@ -5,7 +5,7 @@
    unit tests and the integration tests (goldens, inventories, storage, transport) except those marked
    [Trait("Category", "Slow")], without rebuilding.
  -Mode Full (run once before handing work back): Quick, plus the same tests in Debug (row and guard checks),
-   the legacy runner, and the analyzer baseline.
+   and the analyzer baseline. (The legacy runner has no scenarios left; it only provides command-line entries.)
 
  Works from the main checkout and from worktrees: dotnet comes from -Dotnet, then $env:VAMSYS_DOTNET, then
  .tools/dotnet in this checkout, then .tools/dotnet in a sibling "vamsys" checkout, then PATH.
@@ -105,8 +105,6 @@ if ($Mode -eq 'Full' -and $ok)
     $debug = @('-c', 'Debug', '-p:RestoreLockedMode=true')
     Step 'unit-debug' { & $dn test --project $unit @debug } { param($o) TestSummary $o } | Out-Null
     Step 'integration-debug' { & $dn test --project $integration @debug } { param($o) TestSummary $o } | Out-Null
-    Step 'legacy-runner' { & $dn run --project (Join-Path $root 'tests/VamSys.Tests/VamSys.Tests.csproj') @common } {
-        param($o) LastMatch $o 'scenarios passed\.' 'no legacy summary found' } | Out-Null
     Step 'analyzer-baseline' { & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'check-analyzer-baseline.ps1') } {
         param($o)
         # Show every rule over its baseline, not only the last one printed.

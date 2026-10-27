@@ -6,8 +6,6 @@ if(args.Length >= 2 && args[0] is "--seed-storage-ui" or "--seed-task-ui" or "--
     DataUiFixture.RequireEmptyDirectory(args[1]);
 if(args.Length==2 && args[0] is "--verify-package" or "--verify-qa-package")
 {PackageChecks.Verify(args[1],args[0]=="--verify-qa-package");return;}
-if(args.Length==4 && args[0]=="--storage-child"){await StorageProcessScenarios.Child(args);return;}
-if(args.Length==4 && args[0]=="--draft-child"){await StorageProcessScenarios.DraftChild(args);return;}
 if(args.Length==3 && args[0]=="--seed-storage-ui")
 {
     Directory.CreateDirectory(args[1]);var w=StorageScenarios.Fixture();using var db=StorageScenarios.Legacy(args[1],w);
@@ -40,23 +38,8 @@ if(args.Length==4 && args[0]=="--assert-history-ui")
     d.UndoEdit();if(d.Draft[0].Get("Name")!=args[3])throw new Exception("Undo boundary lost");d.RedoEdit();if(d.Draft[0].Get("Name")!=args[2])throw new Exception("Redo boundary lost");
     Console.WriteLine("PASS restart restores complete last history step");return;
 }
-int passed = 0;
-var suite = Stopwatch.StartNew(); var durations = new List<(string Name, TimeSpan Elapsed)>();
-async Task Test(string name, Func<Task> test)
-{
-    var started = Stopwatch.GetTimestamp();
-    await test(); var elapsed = Stopwatch.GetElapsedTime(started); durations.Add((name, elapsed));
-    // Wall-clock waits belong in virtual time; slow scenarios are reported so they stay visible.
-    Console.WriteLine("PASS " + name + (elapsed >= TimeSpan.FromSeconds(1) ? $" ({elapsed.TotalSeconds:0.0} s)" : "")); passed++;
-}
-void Summary(string label)
-{
-    Console.WriteLine($"  Duration: {suite.Elapsed.TotalSeconds:0.0} s; slowest: " + string.Join("; ", durations.OrderByDescending(d => d.Elapsed).Take(5).Select(d => $"{d.Name} {d.Elapsed.TotalSeconds:0.0} s")));
-    Console.WriteLine($"{passed} {label}passed.");
-}
 DataRow Row(params (string, string)[] fields) => new() { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
 if(args.Length==2 && args[0]=="--benchmark-v3"){await StorageV3Scenarios.Benchmark(args[1]);return;}
-if(args.Length==1 && args[0]=="--storage"){await StorageScenarios.Run(Test);Console.WriteLine($"{passed} storage scenarios passed.");return;}
 if(args.Length==2 && args[0]=="--benchmark-storage"){await StorageScenarios.Benchmark(args[1]);return;}
 if(args.Length==1 && args[0]=="--benchmark-journal-jobs"){await JournalBenchmark.JobsCost();return;}
 if(args.Length==3 && args[0]=="--benchmark-journal"){await JournalBenchmark.Run(args[1],args[2]);return;}
@@ -87,6 +70,6 @@ if (args.Length == 2 && args[0] == "--seed-ui")
 if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await DiagnosticReplayExport.ExportDiagnostics(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-performance") {await PerformanceScenarios.Benchmark(args[1]);return;}
 
-await StorageScenarios.Run(Test);
-Summary("scenarios ");
-
+// All scenarios now live in VamSys.UnitTests and VamSys.IntegrationTests; only the command-line entries above remain.
+Console.Error.WriteLine("Unknown or missing command. See tests/VamSys.Tests/README.md for the command-line entries.");
+Environment.ExitCode = 2;

@@ -14,5 +14,16 @@
     <ProjectReference Include="../../src/VamSys.Infrastructure/VamSys.Infrastructure.csproj" AdditionalProperties="VamSysTestSupport=true" />
   </ItemGroup>
   <ItemGroup><Using Include="Xunit" /></ItemGroup>
+  <!-- The child process of the real-termination tests: built first, then copied to <output>/ProcessChild (run as `dotnet VamSys.ProcessChild.dll`). -->
+  <ItemGroup>
+    <ProjectReference Include="../VamSys.ProcessChild/VamSys.ProcessChild.csproj" ReferenceOutputAssembly="false" />
+    <Compile Include="../VamSys.ProcessChild/Wire.cs" Link="Storage/ProcessTermination/Wire.cs" />
+  </ItemGroup>
+  <Target Name="CopyProcessChild" AfterTargets="Build">
+    <ItemGroup>
+      <ProcessChildFile Include="../VamSys.ProcessChild/bin/$(Configuration)/$(TargetFramework)/**/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ProcessChildFile)" DestinationFiles="@(ProcessChildFile->'$(OutDir)ProcessChild/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
   <ItemGroup><None Update="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>

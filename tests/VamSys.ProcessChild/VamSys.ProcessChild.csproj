@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <!-- Child process of the real-termination tests: runs a task or a draft row save against a data directory and stops at storage barriers. -->
+  <ItemGroup>
+    <ProjectReference Include="../VamSys.TestSupport/VamSys.TestSupport.csproj" />
+    <ProjectReference Include="../../src/VamSys.Storage/VamSys.Storage.csproj" AdditionalProperties="VamSysTestSupport=true" />
+    <ProjectReference Include="../../src/VamSys.Infrastructure/VamSys.Infrastructure.csproj" AdditionalProperties="VamSysTestSupport=true" />
+  </ItemGroup>
+</Project>
