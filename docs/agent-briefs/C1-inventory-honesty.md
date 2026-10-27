@@ -28,4 +28,18 @@
 
 ## 结果（由子代理填写）
 
-按共用做法中的格式，不超过 25 行。
+删除前／后旧运行器场景数：未改动（本简报不涉及旧运行器）
+已删除场景：无
+新增测试：无
+改动：
+- SourceScan.Relative 不再把 Domain/Application/Infrastructure 的路径改写成 src/VamSys.Core/...，直接返回当前相对路径。
+- EnumInventoryTests 删除 MovedFromApp 来源映射，程序集名取真实名称（VamSys.Domain/Application/Infrastructure）；ItemState 的断言改为不依赖程序集前缀。
+- Golden.cs 与 EnumInventoryTests 加注释：位置变化时允许重新生成，但成员、数值、键必须不变。
+重新生成的预期文件（仅 3 个，其余只改换行符的已确认未入 diff）：
+- Enums.txt：只有程序集前缀变化（Core -> Domain/Application/Infrastructure），ReviewDisposition 由 "VamSys.App(source) ... declared in" 变为真实程序集 VamSys.Application:VamSys.Core.ReviewDisposition（成员 Ready0/Deferred1/Blocked2/AwaitingConnection3 不变）；去掉前缀后的成员与数值逐行比对，除上述来源差异外无差别。
+- CapabilityKeys.txt：4 行仅路径 VamSys.Core/ApiEvidence.cs -> VamSys.Domain/ApiEvidence.cs，键文本不变。
+- Constants.txt：2 行仅路径 VamSys.Core/AppPaths.cs -> VamSys.Infrastructure/AppPaths.cs，字面量不变。
+其余清单文件（JSON、资源键、自动化 ID、合同哈希）未变化。
+保留的场景及原因：无
+检查：pwsh scripts/check-all.ps1 ALL PASSED（unit 1387 通过 1 跳过，integration 187 通过 1 跳过）
+提交：见下方

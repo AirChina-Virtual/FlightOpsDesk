@@ -5,6 +5,9 @@ namespace VamSys.UnitTests.Inventory;
 /// <summary>
 /// Compares a generated, sorted text listing with a file in Inventory/Expected.
 /// Set VAMSYS_UPDATE_GOLDEN=1 to rewrite the expected file instead of comparing.
+/// The expected files record the real current file paths and assembly names. When code moves,
+/// regenerating them is allowed, but enum members and values, JSON properties, resource keys
+/// and capability keys must stay unchanged: review the git diff before committing.
 /// Lines of the form "key => value" are reported as "changed" when only the value differs.
 /// </summary>
 internal static class Golden
