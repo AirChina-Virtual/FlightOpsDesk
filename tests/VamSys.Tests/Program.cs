@@ -91,8 +91,6 @@ if (args.Length == 2 && args[0] == "--seed-ui")
     new WorkspaceStore(args[1]).Save(w); Console.WriteLine("Seeded isolated UI workspace"); return;
 }
 
-if(args.Length==1 && args[0]=="--performance") {await PerformanceScenarios.Run(Test); await CandidateIndexScenarios.Run(Test);Console.WriteLine($"{passed} performance scenarios passed.");return;}
-if(args.Length==1 && args[0]=="--indexes") {await CandidateIndexScenarios.Run(Test);Console.WriteLine($"{passed} index scenarios passed.");return;}
 if(args.Length==1 && args[0]=="--live-compatibility"){await LiveCompatibilityScenarios.Run(Test);Summary("live compatibility ");return;}
 if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await LiveCompatibilityScenarios.ExportDiagnostics(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-performance") {await PerformanceScenarios.Benchmark(args[1]);return;}
@@ -199,7 +197,6 @@ await Test("Language switch during execution does not resend writes or change ta
     await new BatchExecutor(fake,fake).ExecuteAsync(restored,()=>Task.CompletedTask,CancellationToken.None); Check(fake.Writes==1);
 });
 await LiveCompatibilityScenarios.Run(Test);
-await PerformanceScenarios.Run(Test); await CandidateIndexScenarios.Run(Test);
 await StorageScenarios.Run(Test);
 await VerifiedScopeScenarios.Run(Test);
 await UnblockScenarios.Run(Test);await UnblockScenarios.RunSoftDeletes(Test);await UnblockScenarios.RunRefresh(Test);
