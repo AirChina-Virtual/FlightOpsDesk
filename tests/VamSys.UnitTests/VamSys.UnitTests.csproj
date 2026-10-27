@@ -7,6 +7,14 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3" Version="4.0.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+  <!-- Page models are compiled from the WinUI project without referencing it; DataUiFixture stays in the legacy runner. -->
+  <ItemGroup>
+    <Compile Include="../../src/VamSys.App/TaskViewModels.cs" Link="Presentation/Linked/TaskViewModels.cs" />
+    <Compile Include="../../src/VamSys.App/DataTableViewModel.cs" Link="Presentation/Linked/DataTableViewModel.cs" />
+    <Compile Include="../../src/VamSys.App/ViewModels.cs" Link="Presentation/Linked/ViewModels.cs" />
+    <Compile Include="../VamSys.Tests/DataUiFixture.cs" Link="Presentation/Linked/DataUiFixture.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../VamSys.TestSupport/VamSys.TestSupport.csproj" />
