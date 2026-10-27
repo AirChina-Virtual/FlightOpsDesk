@@ -89,4 +89,29 @@ public class ApiBasicsTests
         Assert.Equal("AUTO", (string?)body["cost_index"]);
         Assert.ThrowsAny<InvalidOperationException>(() => kit.Api.Plan(ApiKit.Create(ResourceKind.Routes, Route(("Cost Index", "1000")))));
     }
+
+    // ---- C11: assertions of the C3 scenarios that were only matched by test name ----------------------------------
+
+    [Fact]
+    public void The_aircraft_move_message_tells_the_user_to_change_only_the_fleet_id()
+    {
+        var localization = new LocalizationService();
+        localization.SetLanguage("en-US");
+        Assert.Contains("Change only the aircraft Fleet ID", localization.Get("ApiMoveFleet"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_csv_export_is_repeatable_and_does_not_depend_on_the_identity_or_raw_record_of_the_row()
+    {
+        var kit = new ApiKit();
+        var fleet = kit.Map(ResourceKind.Fleets, """{"id":4,"airline_id":7,"name":"机型","code":"B738","type":"pax"}""");
+        var change = ApiKit.Update(ResourceKind.Fleets, fleet, ("Name", "测试"));
+        var csv = new CsvAdapter();
+
+        var before = csv.Export(ResourceKind.Fleets, [change]).Single();
+        Assert.Equal(before, csv.Export(ResourceKind.Fleets, [change]).Single());
+
+        change.After = change.After.WithIdentity(null).WithRawApiJson(null);
+        Assert.Equal(before, csv.Export(ResourceKind.Fleets, [change]).Single());
+    }
 }

@@ -364,4 +364,67 @@ public class WriteReadbackAndRecoveryStageTests
         Assert.Equal(1, Count(w, "PUT"));
         Assert.DoesNotContain(w.Remote.Server.Requests.Skip(seen), IsWrite);
     }
+
+    // ---- C11: assertions of the C3 scenarios that were only matched by test name ----------------------------------
+
+    [Fact]
+    public async Task A_prepared_two_step_create_saves_the_new_id_before_the_second_step_and_a_lost_answer_is_settled_by_reading()
+    {
+        var w = new GoldenWorld();
+        var draft = w.New(ResourceKind.Fleets, ("Name", "Legacy fleet"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "pax"), ("Max Passengers", "180"));
+        var item = new ChangeItem
+        {
+            Resource = ResourceKind.Fleets,
+            Kind = ChangeKind.Create,
+            After = draft,
+            Fields = draft.Fields.ToDictionary(p => p.Key, p => new FieldChange(FieldIntent.Set, p.Value))
+        };
+        OperationsAdapter.PrepareSteps(item,
+        [
+            new(HttpMethod.Post, "fleet", new() { ["name"] = "Legacy fleet", ["code"] = "B738", ["type"] = "pax" }),
+            new(HttpMethod.Put, "{created}", new() { ["max_pax"] = 180L })
+        ]);
+        var job = new BatchJob { Mode = RunMode.Online, Items = [item] };
+        w.Workspace.Jobs.Add(job);
+
+        // What the last save said about the new record when the second step was sent.
+        (bool Completed, string? Id)? savedWhenPutWasSent = null;
+        (bool Completed, string? Id) saved = (false, null);
+        w.Remote.Intercept = r =>
+        {
+            if (r.Method != "PUT")
+                return null;
+            savedWhenPutWasSent = saved;
+            w.Remote.Respond(r); // the server applies the second step, the answer is lost
+            throw new TimeoutException("simulated");
+        };
+        await Execute(w, job, () => { saved = (item.CreateCompleted, item.RemoteId); return Task.CompletedTask; });
+
+        Assert.Equal((true, "90"), savedWhenPutWasSent);
+        Assert.Equal(ItemState.Unknown, item.State);
+        Assert.Equal(1, Count(w, "POST"));
+        Assert.Equal(1, Count(w, "PUT"));
+
+        w.Remote.Intercept = null;
+        await Execute(w, job);
+
+        Assert.Equal(ItemState.Succeeded, item.State);
+        Assert.Equal(1, Count(w, "POST"));
+        Assert.Equal(1, Count(w, "PUT"));
+        Assert.Equal("90", Draft(w, ResourceKind.Fleets, "90").Get("ID"));
+    }
+
+    [Fact]
+    public async Task A_confirmed_soft_delete_records_that_the_server_accepted_the_write()
+    {
+        var w = new GoldenWorld();
+        w.MarkDelete(ResourceKind.Airports, "103");
+        await w.RunAsync();
+        var item = w.Job!.Items.Single();
+        Assert.Equal(ItemState.Succeeded, item.State);
+        Assert.True(item.WriteAccepted);
+        Assert.Equal(1, Count(w, "DELETE"));
+        Assert.Equal("DELETE", item.ApiSteps.Single().Method);
+        Assert.Equal(204, item.DiagnosticDetails!.Status);
+    }
 }

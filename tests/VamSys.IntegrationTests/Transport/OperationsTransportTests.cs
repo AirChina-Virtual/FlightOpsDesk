@@ -497,4 +497,18 @@ public class OperationsTransportTests
         await Assert.ThrowsAsync<ApiAccessException>(() => Ids(f.Transport, "fleet"));
         Assert.Single(f.Server.Requests);
     }
+
+    // ---- C11: assertions of the C3 scenarios that were only matched by test name ----------------------------------
+
+    [Fact]
+    public async Task The_diagnostic_of_a_failed_write_does_not_carry_secrets_from_the_answer()
+    {
+        var f = new TransportFixture();
+        f.Server.On(HttpMethod.Post, "fleet", FakeResponse.WithStatus(500, """{"access_token":"secret-value","error":"failed"}"""));
+        var error = await Assert.ThrowsAsync<ApiResponseException>(() => f.Transport.SendAsync(HttpMethod.Post, Url("fleet"), new { name = "x" }, TestContext.Current.CancellationToken));
+        Assert.Single(f.Server.Requests);
+        Assert.DoesNotContain("secret-value", error.Diagnostic, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-value", error.Details?.ResponseBody ?? "", StringComparison.Ordinal);
+        Assert.DoesNotContain("secret-value", f.Transport.LastResponse?.ResponseBody ?? "", StringComparison.Ordinal);
+    }
 }

@@ -525,4 +525,56 @@ public class RequestPlannerTests
         Is(Only(kit.Api.PreviewPlan(item)), HttpMethod.Post, "airports", """{"icao_iata":"EGSS","name":"Stansted"}""");
         Assert.Equal("ApiNoChanges", ApiKit.BlockedWith(() => kit.Api.PreviewPlan(ApiKit.Update(ResourceKind.Airports, kit.Map(ResourceKind.Airports, ApiKit.Egll)))));
     }
+
+    // ---- C11: assertions of the C3 scenarios that were only matched by test name ----------------------------------
+
+    [Fact]
+    public void An_aircraft_create_for_a_fleet_that_exists_only_locally_previews_but_is_not_planned()
+    {
+        var kit = Kit();
+        var local = new DataRow { Fields = new Dictionary<string, string> { ["Name"] = "New", ["Type Code"] = "B738", ["Type (pax/cargo/...)"] = "pax" } };
+        kit.Workspace.Resources[ResourceKind.Fleets].Draft.Add(local);
+        var item = ApiKit.Create(ResourceKind.Aircraft, ("Name", "Plane"), ("Registration", "G-TEST"), ("Fleet ID", LocalReference.Format(local.LocalId)));
+        Assert.Single(kit.Api.PreviewPlan(item));
+        Assert.Equal("ApiInvalid", ApiKit.BlockedWith(() => kit.Api.Plan(item)));
+    }
+
+    [Fact]
+    public void A_create_leaves_out_a_column_no_resource_knows()
+    {
+        var kit = Kit();
+        var item = NewFleet(("unknown", "keep"));
+        var step = Only(kit.Api.Plan(item));
+        Assert.Equal(HttpMethod.Post, step.Method);
+        Assert.Equal("fleet", step.Path);
+        Assert.Equal(["name", "code", "type", "max_pax"], step.Body.Keys);
+        Assert.Equal(189L, step.Body["max_pax"]);
+    }
+
+    [Fact]
+    public void A_fleet_type_code_outside_the_contract_never_leaves_the_machine()
+    {
+        var kit = Kit();
+        var fleet = kit.Map(ResourceKind.Fleets, ApiKit.Fleet4);
+        Assert.Equal("ApiInvalid", ApiKit.BlockedWith(() => kit.Api.Plan(ApiKit.Update(ResourceKind.Fleets, fleet, ("Type Code", "BAD")))));
+        // the contract check names the API property, not the column
+        Assert.Equal("code", ApiKit.BlockedField(() => kit.Api.Plan(ApiKit.Update(ResourceKind.Fleets, fleet, ("Type Code", "BAD")))));
+    }
+
+    [Fact]
+    public void An_airport_renamed_to_the_code_of_another_airport_is_still_addressed_by_its_id()
+    {
+        var kit = Kit();
+        var airport = kit.Map(ResourceKind.Airports, ApiKit.Egll);
+        Is(Only(kit.Api.Plan(ApiKit.Update(ResourceKind.Airports, airport, ("Name", "LGW")))), HttpMethod.Put, "airports/101", """{"name":"LGW"}""");
+    }
+
+    [Fact]
+    public void The_departure_airport_of_a_route_cannot_change_after_creation()
+    {
+        var kit = Kit();
+        var scheduled = kit.Map(ResourceKind.Routes, ApiKit.Scheduled10);
+        Assert.Equal("ApiImmutable", ApiKit.BlockedWith(() => kit.Api.Plan(ApiKit.Update(ResourceKind.Routes, scheduled, (Dep, "EGKK")))));
+        Assert.Equal(Dep, ApiKit.BlockedField(() => kit.Api.Plan(ApiKit.Update(ResourceKind.Routes, scheduled, (Dep, "EGKK")))));
+    }
 }

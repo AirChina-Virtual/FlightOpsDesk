@@ -244,4 +244,67 @@ public class SnapshotMergerTests
         Assert.Equal("EGLL", matched.Get("ICAO/IATA"));
         Assert.Empty(data.Conflicts);
     }
+
+    // ---- C11: assertions of the C3 scenarios that were only matched by test name ----------------------------------
+
+    [Fact]
+    public void Twenty_thousand_rows_merge_without_losing_identity_or_either_side_s_edit()
+    {
+        var rows = Enumerable.Range(1, 20000).Select(i => Remote(i.ToString(), ("Callsign", "ACA" + i), ("Remarks", "old"))).ToList();
+        var data = new ResourceData { Snapshot = rows.Select(r => r.Dup()).ToList(), Draft = rows.Select(r => r.Dup()).ToList() };
+        data.Draft[100] = data.Draft[100].With("Remarks", "local");
+        var incoming = rows.Select(r => r.Dup()).ToList();
+        incoming[200] = incoming[200].With("Remarks", "remote");
+
+        SnapshotMerger.Merge(ResourceKind.Routes, data, incoming);
+
+        Assert.Equal(20000, data.Draft.Count);
+        Assert.Equal("local", data.Draft[100].Get("Remarks"));
+        Assert.Equal("remote", data.Draft[200].Get("Remarks"));
+        Assert.Empty(data.Conflicts);
+        Assert.Equal("20000", data.Draft[19999].Identity!.RemoteId);
+    }
+
+    [Fact]
+    public void A_row_without_identity_is_matched_by_its_id_column_and_each_side_keeps_its_own_field()
+    {
+        var baseline = Row(("ID", "1"), ("Name", "Original"), ("Type Code", "B738"));
+        var draft = baseline.With("Name", "Mine");
+        var data = new ResourceData { Snapshot = [baseline], Draft = [draft] };
+
+        SnapshotMerger.Merge(Fleets, data, [Remote("1", ("Name", "Original"), ("Type Code", "B739"))]);
+
+        var row = data.Draft.Single();
+        Assert.Equal(draft.LocalId, row.LocalId);
+        Assert.Equal("Mine", row.Get("Name"));
+        Assert.Equal("B739", row.Get("Type Code"));
+        Assert.Empty(data.Conflicts);
+    }
+
+    [Fact]
+    public void A_remote_value_that_changed_after_a_first_merge_conflicts_with_the_local_edit_once()
+    {
+        var baseline = Row(("ID", "1"), ("Name", "Original"), ("Type Code", "B738"));
+        var data = new ResourceData { Snapshot = [baseline], Draft = [baseline.With("Name", "Mine")] };
+        SnapshotMerger.Merge(Fleets, data, [Remote("1", ("Name", "Original"), ("Type Code", "B739"))]);
+
+        var theirs = Remote("1", ("Name", "Theirs"), ("Type Code", "B739"));
+        SnapshotMerger.Merge(Fleets, data, [theirs]);
+        Assert.Equal([new MergeConflict(data.Draft[0].LocalId, "Name", "Original", "Mine", "Theirs")], data.Conflicts);
+
+        SnapshotMerger.Merge(Fleets, data, [theirs.Dup()]);
+        Assert.Single(data.Conflicts);
+    }
+
+    [Fact]
+    public void A_local_airport_without_identity_binds_by_its_icao_code_even_when_the_snapshot_holds_it_too()
+    {
+        var local = Row(("ICAO/IATA", "EGLL"), ("Name", "London"));
+        var data = new ResourceData { Snapshot = [local], Draft = [local.Dup()] };
+
+        SnapshotMerger.Merge(Airports, data, [RemoteAirport("101", "EGLL", "LHR", "London")]);
+
+        Assert.Single(data.Draft);
+        Assert.Equal("101", data.Draft[0].Identity!.RemoteId);
+    }
 }
