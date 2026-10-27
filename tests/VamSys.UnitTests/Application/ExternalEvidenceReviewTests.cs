@@ -1,0 +1,104 @@
+using VamSys.Core;
+using VamSys.Infrastructure;
+using VamSys.UnitTests.Api;
+
+namespace VamSys.UnitTests.Application;
+
+/// <summary>
+/// Independent live evidence (the isolated vCCA tests) lifts the sampling limit of the review, but only for the fields, types and
+/// the contract it covers, and it never bypasses the real preview validation or a pending task.
+/// </summary>
+public class ExternalEvidenceReviewTests
+{
+    static ChangeItem Update(ResourceKind kind, string field, string value) => new()
+    {
+        Resource = kind,
+        Kind = ChangeKind.Update,
+        Before = new() { Fields = new Dictionary<string, string> { ["Type"] = "scheduled" } },
+        After = new() { Fields = new Dictionary<string, string> { ["Type"] = "scheduled", [field] = value } },
+        Fields = new() { [field] = new(FieldIntent.Set, value) }
+    };
+
+    static int Submitted(IReadOnlyList<ChangeItem> items, string? contractHash, HashSet<string>? markers = null)
+        => ReviewPlanBuilder.Build(items, RunMode.Online, true, markers ?? [], _ => { }, externalEvidenceContractHash: contractHash).SubmitItems.Count;
+
+    [Fact]
+    public void The_external_evidence_contract_is_the_fixed_contract_of_this_release()
+        => Assert.Equal(ApiContracts.Sha256, IndependentApiEvidence.ContractHash);
+
+    [Theory]
+    [MemberData(nameof(Kinds))]
+    public void Covered_updates_of_every_resource_open_in_full_without_adding_workspace_markers_and_only_for_the_fixed_contract(ResourceKind kind)
+    {
+        var field = kind is ResourceKind.Routings or ResourceKind.Routes ? "Remarks" : "Name";
+        var items = Enumerable.Range(0, 8).Select(_ => Update(kind, field, "Updated")).ToList();
+        var markers = new HashSet<string>();
+
+        Assert.Equal(8, Submitted(items, ApiContracts.Sha256, markers));
+        Assert.Empty(markers);
+        // another contract falls back to the sampling limit
+        Assert.Equal(3, Submitted(items, "other-contract"));
+    }
+
+    public static TheoryData<ResourceKind> Kinds() => new(Enum.GetValues<ResourceKind>());
+
+    [Fact]
+    public void An_unverified_field_variant_keeps_the_sampling_limit_even_with_independent_evidence()
+    {
+        var untested = Enumerable.Range(0, 5).Select(_ => Update(ResourceKind.Routings, "Tags", "not-tested")).ToList();
+        Assert.Equal(3, Submitted(untested, ApiContracts.Sha256));
+    }
+
+    [Fact]
+    public void Types_and_fields_the_evidence_never_exercised_are_not_covered()
+    {
+        var charter = Update(ResourceKind.Routes, "Remarks", "x");
+        charter.Before = charter.Before!.With("Type", "charter");
+        charter.After = charter.After.With("Type", "charter");
+        Assert.False(IndependentApiEvidence.Covers(charter, ApiContracts.Sha256));
+
+        var fleet = new ChangeItem
+        {
+            Resource = ResourceKind.Fleets,
+            Kind = ChangeKind.Create,
+            After = new() { Fields = new Dictionary<string, string> { ["Type (pax/cargo/...)"] = "pax" } },
+            Fields = new() { ["Type (pax/cargo/...)"] = new(FieldIntent.Set, "pax") }
+        };
+        Assert.False(IndependentApiEvidence.Covers(fleet, ApiContracts.Sha256));
+
+        var jumpseat = new ChangeItem
+        {
+            Resource = ResourceKind.Routes,
+            Kind = ChangeKind.Create,
+            After = new() { Fields = new Dictionary<string, string> { ["Type"] = "jumpseat", ["Fleet IDs"] = "4" } },
+            Fields = new() { ["Type"] = new(FieldIntent.Set, "jumpseat"), ["Fleet IDs"] = new(FieldIntent.Set, "4") }
+        };
+        Assert.False(IndependentApiEvidence.Covers(jumpseat, ApiContracts.Sha256));
+    }
+
+    [Fact]
+    public void External_evidence_never_bypasses_the_real_preview_validation()
+    {
+        var kit = new ApiKit();
+        kit.LoadStandardAirportsAndFleets();
+        var aircraft = kit.Map(ResourceKind.Aircraft, ApiKit.Aircraft8);
+        var move = ApiKit.Update(ResourceKind.Aircraft, aircraft, ("Fleet ID", "5"));
+        move.Fields["Name"] = new(FieldIntent.Set, "Mixed");
+
+        var plan = ReviewPlanBuilder.Build([move], RunMode.Online, true, new HashSet<string>(), c => kit.Api.PreviewPlan(c), externalEvidenceContractHash: ApiContracts.Sha256);
+
+        Assert.Empty(plan.SubmitItems);
+        Assert.Equal("ApiMoveSeparate", plan.Entries.Single().Reason!.Code);
+    }
+
+    [Fact]
+    public void External_evidence_never_bypasses_a_pending_task()
+    {
+        var kit = new ApiKit();
+        var plan = ReviewPlanBuilder.Build([Update(ResourceKind.Fleets, "Name", "New")], RunMode.Online, true, new HashSet<string>(), _ => { },
+            [Messages.Define("ApiPendingJob")], ApiContracts.Sha256);
+
+        Assert.Empty(plan.SubmitItems);
+        Assert.Empty(kit.Server.Requests);
+    }
+}
