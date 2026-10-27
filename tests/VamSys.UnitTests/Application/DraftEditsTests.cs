@@ -170,4 +170,31 @@ public class DraftEditsTests
         Assert.Same(w, edits.Owner);
         Assert.True(edits.RequiresFullSave);
     }
+
+    [Fact]
+    public void A_restored_hand_over_with_edits_in_two_resources_is_retried_in_full_and_the_flag_is_handed_on_once()
+    {
+        var w = new Workspace();
+        var fleet = Guid.NewGuid();
+        var edits = new DraftEdits();
+        edits.Cell(w, ResourceKind.Fleets, fleet);
+        var taken = edits.Take();
+
+        Assert.True(taken.CanSaveRows(w));
+        Assert.Equal(fleet, Assert.Single(Assert.Single(taken.Changes).Rows));
+        Assert.Empty(Assert.Single(taken.Changes).History!.Upserts);
+
+        edits.Cell(w, ResourceKind.Routes, Guid.NewGuid());
+        edits.Restore(taken);
+
+        Assert.True(edits.RequiresFullSave);
+        Assert.False(edits.CanSaveRows(w));
+        Assert.Equal(2, edits.Changes.Count);
+
+        var retried = edits.Take();
+
+        Assert.True(retried.RequiresFullSave);
+        Assert.False(edits.RequiresFullSave);
+        Assert.Empty(edits.Changes);
+    }
 }
