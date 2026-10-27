@@ -72,7 +72,7 @@ public sealed partial class MainWindow
         var before = selection.Eligible.ToDictionary(r => r.LocalId);
         return new ListView
         {
-            MaxHeight = 360,
+            MaxHeight = UiTokens.BatchPreviewMaxHeight,
             SelectionMode = ListViewSelectionMode.None,
             Header = skipReasons is { Count: > 0 }
                 ? Stack([Text(() => BatchScope(selection, changes.Count, ruleSkipped)), .. skipReasons.Select(reason => Text(() => L(reason)))])
@@ -90,14 +90,14 @@ public sealed partial class MainWindow
         { Status(() => L("BatchNothing")); return; }
         if (proposal.Issues.Count > 0)
         {
-            await Confirm(L("Text_FD6D0919A9"), new ListView { MaxHeight = 350, ItemsSource = proposal.Issues.Select(i => L(i.Description)).ToArray() }, L("Text_3FD47EDCE4"));
+            await Confirm(L("Text_FD6D0919A9"), new ListView { MaxHeight = UiTokens.DialogListMaxHeight, ItemsSource = proposal.Issues.Select(i => L(i.Description)).ToArray() }, L("Text_3FD47EDCE4"));
             return;
         }
         var plan = proposal.Plan!;
         var ids = proposal.Ids;
         var preview = new ListView
         {
-            MaxHeight = 360,
+            MaxHeight = UiTokens.BatchPreviewMaxHeight,
             SelectionMode = ListViewSelectionMode.None,
             Header = Stack(Text(() => BatchScope(selection, ids.Count)), Text(() => L("Text_0360D81E1F", ("arg0", plan.RemoveDrafts.Count), ("arg1", plan.MarkExisting.Count))), Text(() => L("Text_0E38068B45"))),
             ItemsSource = selection.Eligible.Where(r => ids.Contains(r.LocalId)).Select(r => $"{Schemas.Key(resource, r)} · {r.Get("Name")}{r.Get("Flight Number")}").ToArray()
@@ -125,7 +125,7 @@ public sealed partial class MainWindow
         var selection = batch.Capture(SelectedRows());
         if (selection.Eligible.Count == 0)
         { Status(() => L("BatchNothing")); return; }
-        var field = new ComboBox { ItemsSource = batch.RuleFields(DisplayColumns()), SelectedIndex = 0, MinWidth = 300 }
+        var field = new ComboBox { ItemsSource = batch.RuleFields(DisplayColumns()), SelectedIndex = 0, MinWidth = UiTokens.RuleFieldPickerMinWidth }
             .Localize(localization, "Header", () => L("Text_86F623E5CC"));
         string[] keys = ["Text_A30D395090", "Text_5B7341C2D6", "Text_795CBFF909", "Text_6FE8FC1819", "Text_FAC7E021A1", "Text_E79453E164", "Text_6797F1B017"];
         var kinds = batch.RuleKinds(resource);

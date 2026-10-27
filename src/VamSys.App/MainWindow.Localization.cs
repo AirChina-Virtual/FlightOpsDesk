@@ -71,7 +71,7 @@ public sealed partial class MainWindow
     }
     ComboBox LanguagePicker()
     {
-        var picker = new ComboBox { ItemsSource = new[] { "简体中文", "English" }, SelectedIndex = localization.Language == "en-US" ? 1 : 0, MinWidth = 220 };
+        var picker = new ComboBox { ItemsSource = new[] { "简体中文", "English" }, SelectedIndex = localization.Language == "en-US" ? 1 : 0, MinWidth = UiTokens.LanguagePickerMinWidth };
         AutomationProperties.SetAutomationId(picker, "LanguagePicker");
         picker.Localize(localization, "Header", () => L("Language"));
         picker.Localize(localization, "SelectedIndex", () => localization.Language == "en-US" ? 1 : 0);

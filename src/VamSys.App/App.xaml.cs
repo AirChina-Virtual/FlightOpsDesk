@@ -43,7 +43,7 @@ public partial class App : Application
                 {
                     Text = new VamSys.Core.LocalizationService().Format(message) + "\n\n" + en.Format(message),
                     TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(24)
+                    Margin = UiTokens.StartupErrorMargin
                 }
             };
             window.AppWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "FlightOpsDesk.ico"));

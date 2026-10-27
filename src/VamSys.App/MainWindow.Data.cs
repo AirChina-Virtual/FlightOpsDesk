@@ -340,7 +340,7 @@ public sealed partial class MainWindow
                     ShowServerNull = () => view?.Row.Identity != null && view.Row.Get("Type") == "jumpseat" && (field is "Callsign" or "Flight Number"),
                     ServerNullLabel = () => L("JumpseatNotPreserved"),
                     Compact = tableDensity == "compact",
-                    Height = tableDensity == "compact" ? 28 : 32,
+                    Height = UiTokens.CellHeight(tableDensity == "compact"),
                     DisplayText = () => field == "_delete" ? RowStatus(view!.Row, tableBaseline, tableConflicts)
                         : field == "Parameter IDs" ? view!.Row.Get(field) : field is "Fleet ID" or "Fleet IDs" ? FleetLabel(view!.Row.Get(field), tableFleetLabels) : "",
                     ChooseFleet = field == "Parameter IDs" ? new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Guard(() => ChooseParameter(view!.Row)))
@@ -400,14 +400,14 @@ public sealed partial class MainWindow
         previousPage = DataButton("TablePrevious", () => ChangeDataPage(Model().Page - 1), "DataPreviousPage", Symbol.Back);
         nextPage = DataButton("TableNext", () => ChangeDataPage(Model().Page + 1), "DataNextPage", Symbol.Forward);
         lastPage = DataButton("TableLast", () => ChangeDataPage(Model().PageCount), "DataLastPage", Symbol.Next);
-        pageJump = new TextBox { Width = 48, Text = Model().Page.ToString() };
+        pageJump = new TextBox { Width = UiTokens.PageJumpWidth, Text = Model().Page.ToString() };
         AutomationProperties.SetAutomationId(pageJump, "DataPageJump");
         AutomationProperties.SetName(pageJump, L("TableGo"));
         void Go()
         { if (int.TryParse(pageJump.Text, out var n) && n >= 1 && n <= Model().PageCount) ChangeDataPage(n); else Status(() => L("TableInvalidPage")); }
         pageGo = DataButton("TableGo", Go, "DataGoPage", Symbol.Go);
         pageJump.KeyDown += async (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter && CanEditData()) { e.Handled = true; await UserAction(() => { Go(); return Task.CompletedTask; }); } };
-        pageSize = new ComboBox { Width = 78, ItemsSource = new[] { 100, 200, 500 }, SelectedItem = Model().PageSize };
+        pageSize = new ComboBox { Width = UiTokens.PageSizePickerWidth, ItemsSource = new[] { 100, 200, 500 }, SelectedItem = Model().PageSize };
         AutomationProperties.SetAutomationId(pageSize, "DataPageSize");
         AutomationProperties.SetName(pageSize, L("TablePageSize"));
         // Showing another state's size is not a change of size.
@@ -426,13 +426,13 @@ public sealed partial class MainWindow
         AutomationProperties.SetAutomationId(queryCancel, "DataQueryCancel");
         queryCancel.Click += (_, _) => { CancelDataQuery(); Status(() => L("TableQueryCanceled")); };
         var selected = Row(selectionButton, selectionSummary, queryCancel);
-        selected.Spacing = 8;
+        selected.Spacing = UiTokens.SpacingMedium;
         ToolTipService.SetToolTip(selectionSummary, new ToolTip().Localize(localization, "Content", () => L("BatchOnlySelected")));
         var navigation = Row(firstPage, previousPage, nextPage, lastPage, pageJump, pageGo, pageSize, pageSummary);
-        navigation.Spacing = 6;
+        navigation.Spacing = UiTokens.SpacingSmall;
         var selectionHost = Actions(selected);
         var navigationHost = Actions(navigation);
-        var footer = new Grid { RowSpacing = 4, ColumnSpacing = 8 };
+        var footer = new Grid { RowSpacing = UiTokens.SpacingTight, ColumnSpacing = UiTokens.SpacingMedium };
         footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
         footer.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
         footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
@@ -461,7 +461,7 @@ public sealed partial class MainWindow
     }
     Button DataButton(string key, Action action, string id, Symbol icon)
     {
-        var button = new Button { Content = new SymbolIcon(icon), Padding = new Thickness(7), Tag = key };
+        var button = new Button { Content = new SymbolIcon(icon), Padding = UiTokens.IconButtonPadding, Tag = key };
         AutomationProperties.SetAutomationId(button, id);
         AutomationProperties.SetName(button, L(key));
         ToolTipService.SetToolTip(button, new ToolTip().Localize(localization, "Content", () => L(key)));
@@ -532,7 +532,7 @@ public sealed partial class MainWindow
         if (table is null || table.IsHitTestVisible != locked)
             return;
         table.IsHitTestVisible = !locked;
-        table.Opacity = locked ? 0.6 : 1;
+        table.Opacity = locked ? UiTokens.LockedTableOpacity : 1;
         if (!locked || table.XamlRoot is null)
             return;
         for (var focused = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(table.XamlRoot) as DependencyObject; focused != null; focused = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(focused))

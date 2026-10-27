@@ -14,7 +14,7 @@ public sealed partial class MainWindow
     Task ChooseParameter(DataRow row) => LocalOperation(async () =>
     {
         var parameters = await maintenance.ChoosableParametersAsync(row);
-        var picker = new ComboBox { MinWidth = 320 };
+        var picker = new ComboBox { MinWidth = UiTokens.WorkspaceChoiceMinWidth };
         foreach (var parameter in parameters)
             picker.Items.Add(new ComboBoxItem { Content = parameter.Label, Tag = parameter.Id });
         picker.SelectedIndex = 0;

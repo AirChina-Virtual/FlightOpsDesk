@@ -53,7 +53,7 @@ public sealed partial class MainWindow
     UIElement ReviewPage()
     {
         var host = new Grid();
-        var waiting = Row(new ProgressRing { IsActive = true, Width = 20, Height = 20 }, Text(() => L("ReviewPreparing")));
+        var waiting = Row(new ProgressRing { IsActive = true, Width = UiTokens.InlineProgressSize, Height = UiTokens.InlineProgressSize }, Text(() => L("ReviewPreparing")));
         host.Children.Add(waiting);
         var generation = reviews.BeginLoad();
         var owner = workspace;
@@ -73,7 +73,7 @@ public sealed partial class MainWindow
     UIElement ReviewContent(WorkspaceReviewPlan plan)
     {
         var conflicts = workspace.Resources.Sum(p => p.Value.Conflicts.Count);
-        var header = Stack(Text(() => L("ReviewWorkspace"), 18), Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"))),
+        var header = Stack(Text(() => L("ReviewWorkspace"), UiTokens.SubsectionFontSize), Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"))),
             Text(() => L("ReviewCounts", ("total", plan.Entries.Count), ("ready", plan.SubmitCount),
                 ("deferred", plan.Entries.Count(e => e.Disposition == ReviewDisposition.Deferred)),
                 ("blocked", plan.Entries.Count(e => e.Disposition == ReviewDisposition.Blocked)))),
@@ -84,7 +84,7 @@ public sealed partial class MainWindow
             header.Children.Add(Text(() => L(blocker)));
         if (plan.Blockers.Count > 3)
             header.Children.Add(Button(() => L("ReviewIssues", ("count", plan.Blockers.Count)), async () =>
-                { await Confirm(L("ReviewIssues", ("count", plan.Blockers.Count)), new ListView { MaxHeight = 350, ItemsSource = plan.Blockers.Select(L).ToArray() }, L("Text_3FD47EDCE4")); }));
+                { await Confirm(L("ReviewIssues", ("count", plan.Blockers.Count)), new ListView { MaxHeight = UiTokens.DialogListMaxHeight, ItemsSource = plan.Blockers.Select(L).ToArray() }, L("Text_3FD47EDCE4")); }));
         header.Children.Add(Actions(
             Button(() => L(workspace.Mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit"), workspace.Mode == RunMode.Demo ? StartDemo : StartApi,
                 CanEditData() && plan.SubmitCount > 0 && workspace.Mode != RunMode.Offline),
@@ -109,7 +109,7 @@ public sealed partial class MainWindow
             HorizontalContentAlignment = HorizontalAlignment.Stretch
         };
         AutomationProperties.SetAutomationId(list, "WorkspaceReview");
-        var grid = new Grid { RowSpacing = 10 };
+        var grid = new Grid { RowSpacing = UiTokens.SpacingRelaxed };
         grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
         grid.Children.Add(header);
@@ -135,14 +135,14 @@ public sealed partial class MainWindow
     sealed class ReviewTemplateSelector : DataTemplateSelector
     {
         readonly DataTemplate header = Parse("""
-            <StackPanel Spacing="6" Margin="0,12,0,6">
-              <TextBlock Text="{Binding Heading}" FontSize="20"/>
+            <StackPanel Spacing="{StaticResource SpacingSmall}" Margin="{StaticResource ReviewGroupMargin}">
+              <TextBlock Text="{Binding Heading}" FontSize="{StaticResource SectionFontSize}"/>
               <Button Content="{Binding ExportLabel}" Command="{Binding ExportCommand}" HorizontalAlignment="Left"/>
             </StackPanel>
             """);
         readonly DataTemplate change = Parse("""
-            <StackPanel Spacing="4" Margin="0,4,0,8">
-              <TextBlock Text="{Binding State}" FontSize="14" FontWeight="SemiBold"/>
+            <StackPanel Spacing="{StaticResource SpacingTight}" Margin="{StaticResource ReviewItemMargin}">
+              <TextBlock Text="{Binding State}" FontSize="{StaticResource BodyFontSize}" FontWeight="SemiBold"/>
               <TextBlock Text="{Binding Body}" TextWrapping="Wrap"/>
               <TextBlock Text="{Binding Reason}" TextWrapping="Wrap"/>
             </StackPanel>
@@ -174,7 +174,7 @@ public sealed partial class MainWindow
         var items = shown.SubmitItems;
         var content = new ListView
         {
-            MaxHeight = 400,
+            MaxHeight = UiTokens.ReviewDetailMaxHeight,
             SelectionMode = ListViewSelectionMode.None,
             Header = Text(() => L("ApiSubmitScope", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"), ("count", items.Count))),
             ItemsSource = items.Select(i => $"{L(Schemas.All[i.Resource].Name)} · {ReviewChangeText(i)}").ToArray()
@@ -184,7 +184,7 @@ public sealed partial class MainWindow
         var deletes = items.Where(i => i.Kind == ChangeKind.Delete).ToArray();
         if (deletes.Length > 0 && !await Confirm(L("Text_5D6042B30E"), new ListView
         {
-            MaxHeight = 350,
+            MaxHeight = UiTokens.DialogListMaxHeight,
             Header = Text(() => L("ApiDeleteConfirm", ("count", deletes.Length))),
             ItemsSource = deletes.Select(i => $"{L(Schemas.All[i.Resource].Name)}: {Schemas.Key(i.Resource, i.After)}").ToArray()
         }, L("Confirm")))

@@ -6,8 +6,8 @@
       <TitleBar.IconSource><BitmapIconSource UriSource="ms-appx:///Assets/FlightOpsDesk.png" ShowAsMonochrome="False"/></TitleBar.IconSource>
       <TitleBar.Content>
         <StackPanel Orientation="Horizontal" Spacing="8">
-        <ComboBox x:Name="WorkspacePicker" Width="230" Margin="12,0" VerticalAlignment="Center" DisplayMemberPath="Name" SelectionChanged="WorkspaceChanged"/>
-        <Border CornerRadius="6" Padding="10,5" Background="{ThemeResource SubtleFillColorSecondaryBrush}" VerticalAlignment="Center"><TextBlock x:Name="ModeBadge" FontSize="12"/></Border>
+        <ComboBox x:Name="WorkspacePicker" Width="{StaticResource WorkspacePickerWidth}" Margin="{StaticResource WorkspacePickerMargin}" VerticalAlignment="Center" DisplayMemberPath="Name" SelectionChanged="WorkspaceChanged"/>
+        <Border CornerRadius="{StaticResource BadgeCornerRadius}" Padding="{StaticResource BadgePadding}" Background="{ThemeResource BadgeBackgroundBrush}" VerticalAlignment="Center"><TextBlock x:Name="ModeBadge" FontSize="{StaticResource BadgeFontSize}"/></Border>
         </StackPanel>
       </TitleBar.Content>
     </TitleBar>
@@ -20,20 +20,20 @@
         <NavigationViewItem Tag="tasks" Icon="List"/>
         <NavigationViewItem Tag="settings" Icon="Setting"/>
       </NavigationView.MenuItems>
-      <Grid x:Name="BodyGrid" Margin="28,20,28,12" RowSpacing="14" ColumnSpacing="16">
+      <Grid x:Name="BodyGrid" Margin="{StaticResource PageMargin}" RowSpacing="{StaticResource SpacingPage}" ColumnSpacing="16">
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <TextBlock x:Name="PageTitle" FontSize="28" FontWeight="SemiBold"/>
-        <StackPanel x:Name="ResourceBar" Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-          <ComboBox x:Name="ResourcePicker" Width="160" SelectionChanged="ResourceChanged"/>
-          <TextBlock x:Name="SnapshotLabel" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+        <TextBlock x:Name="PageTitle" FontSize="{StaticResource PageTitleFontSize}" FontWeight="SemiBold"/>
+        <StackPanel x:Name="ResourceBar" Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="{StaticResource SpacingLarge}" VerticalAlignment="Center">
+          <ComboBox x:Name="ResourcePicker" Width="{StaticResource ResourcePickerWidth}" SelectionChanged="ResourceChanged"/>
+          <TextBlock x:Name="SnapshotLabel" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource SecondaryTextBrush}"/>
         </StackPanel>
         <ContentControl x:Name="PageHost" Grid.Row="2" Grid.ColumnSpan="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
       </Grid>
     </NavigationView>
-    <Grid Grid.Row="2" Padding="24,8" ColumnSpacing="12">
+    <Grid Grid.Row="2" Padding="{StaticResource StatusBarPadding}" ColumnSpacing="{StaticResource SpacingLarge}">
       <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-      <ProgressRing x:Name="BusyRing" Width="18" Height="18" IsActive="False"/>
+      <ProgressRing x:Name="BusyRing" Width="{StaticResource BusyIndicatorSize}" Height="{StaticResource BusyIndicatorSize}" IsActive="False"/>
       <TextBlock x:Name="StatusLabel" Grid.Column="1" TextWrapping="Wrap"/>
     </Grid>
   </Grid>

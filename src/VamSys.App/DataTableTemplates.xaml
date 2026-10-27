@@ -8,19 +8,19 @@
     <local:DataRowPresenter Row="{x:Bind}"/>
   </DataTemplate>
   <DataTemplate x:Key="EditorTemplate" x:DataType="vm:CellViewModel">
-    <local:EditableCell Cell="{x:Bind}" Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind local:CellLayout.MarginFor(Compact)}" AutomationProperties.Name="{x:Bind Field}">
-      <Border BorderThickness="1" CornerRadius="4" Padding="9,0" BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}" Background="{ThemeResource ControlFillColorDefaultBrush}">
-        <TextBlock Text="{x:Bind VisibleText, Mode=OneWay}" Opacity="{x:Bind TextOpacity, Mode=OneWay}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+    <local:EditableCell Cell="{x:Bind}" Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind local:UiTokens.CellMargin(Compact)}" AutomationProperties.Name="{x:Bind Field}">
+      <Border BorderThickness="{StaticResource CellBorderThickness}" CornerRadius="{StaticResource CellCornerRadius}" Padding="{StaticResource CellBoxPadding}" BorderBrush="{ThemeResource CellBorderBrush}" Background="{ThemeResource CellBackgroundBrush}">
+        <TextBlock Text="{x:Bind VisibleText, Mode=OneWay}" Opacity="{x:Bind TextOpacity, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
       </Border>
     </local:EditableCell>
   </DataTemplate>
   <DataTemplate x:Key="FleetTemplate" x:DataType="vm:CellViewModel">
-    <Button Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind local:CellLayout.MarginFor(Compact)}" FontSize="14" Padding="8,2" HorizontalContentAlignment="Left"
+    <Button Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind local:UiTokens.CellMargin(Compact)}" FontSize="{StaticResource BodyFontSize}" Padding="{StaticResource CellButtonPadding}" HorizontalContentAlignment="Left"
         IsEnabled="{x:Bind IsEnabled, Mode=OneWay}" Command="{x:Bind ChooseFleet}" AutomationProperties.Name="{x:Bind FleetAutomationName, Mode=OneWay}">
       <TextBlock Text="{x:Bind DisplayValue, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
     </Button>
   </DataTemplate>
   <DataTemplate x:Key="StatusTemplate" x:DataType="vm:CellViewModel">
-    <TextBlock Width="{x:Bind Width}" Margin="{x:Bind local:CellLayout.MarginFor(Compact)}" Padding="8,0" FontSize="14" VerticalAlignment="Center" Text="{x:Bind DisplayValue, Mode=OneWay}"/>
+    <TextBlock Width="{x:Bind Width}" Margin="{x:Bind local:UiTokens.CellMargin(Compact)}" Padding="{StaticResource CellTextPadding}" FontSize="{StaticResource BodyFontSize}" VerticalAlignment="Center" Text="{x:Bind DisplayValue, Mode=OneWay}"/>
   </DataTemplate>
 </ResourceDictionary>

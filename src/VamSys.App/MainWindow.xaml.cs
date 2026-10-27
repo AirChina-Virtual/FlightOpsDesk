@@ -147,9 +147,9 @@ public sealed partial class MainWindow : Window
         button.Click += async (_, _) => { if (gate.CanInvokeCommand) await UserAction(action); };
         return button;
     }
-    static StackPanel Stack(params UIElement[] children) { var s = new StackPanel { Spacing = 12 }; foreach (var c in children) s.Children.Add(c); return s; }
+    static StackPanel Stack(params UIElement[] children) { var s = new StackPanel { Spacing = UiTokens.SpacingLarge }; foreach (var c in children) s.Children.Add(c); return s; }
     static StackPanel Row(params UIElement[] children) { var s = Stack(children); s.Orientation = Orientation.Horizontal; return s; }
-    TextBlock Text(Func<string> text, double size = 14) => new TextBlock { FontSize = size, TextWrapping = TextWrapping.Wrap }.Localize(localization, "Text", () => text());
+    TextBlock Text(Func<string> text, double? size = null) => new TextBlock { FontSize = size ?? UiTokens.BodyFontSize, TextWrapping = TextWrapping.Wrap }.Localize(localization, "Text", () => text());
     static ScrollViewer Scroll(UIElement content) => new() { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalContentAlignment = HorizontalAlignment.Stretch };
     static ScrollViewer Actions(params UIElement[] controls) => new() { Content = Row(controls), HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
     async Task<bool> Confirm(string title, UIElement content, string? primary = null)
@@ -210,11 +210,11 @@ public sealed partial class MainWindow : Window
     }
     UIElement WorkspacePage()
     {
-        var cards = new StackPanel { Spacing = 12 };
+        var cards = new StackPanel { Spacing = UiTokens.SpacingLarge };
         foreach (var (kind, data) in workspace.Resources)
         {
             var captured = kind;
-            cards.Children.Add(new Border { Padding = new Thickness(18), CornerRadius = new CornerRadius(8), Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"], Child = Row(Text(() => L(Schemas.All[kind].Name), 20), Text(() => L("Text_B9B43D4DAA", ("arg0", data.Draft.Count), ("arg1", CountChanges(data)))), Button(() => L("Text_C771248E51"), () => { resource = captured; ResourcePicker.SelectedIndex = (int)resource; Navigation.SelectedItem = Navigation.MenuItems[1]; return Task.CompletedTask; })) });
+            cards.Children.Add(new Border { Padding = UiTokens.WorkspaceCardPadding, CornerRadius = UiTokens.CardCornerRadius, Background = UiTokens.CardBackgroundBrush, Child = Row(Text(() => L(Schemas.All[kind].Name), UiTokens.SectionFontSize), Text(() => L("Text_B9B43D4DAA", ("arg0", data.Draft.Count), ("arg1", CountChanges(data)))), Button(() => L("Text_C771248E51"), () => { resource = captured; ResourcePicker.SelectedIndex = (int)resource; Navigation.SelectedItem = Navigation.MenuItems[1]; return Task.CompletedTask; })) });
         }
         return Scroll(Stack(Text(() => L("Text_2C33D5F7DE")),
             Row(Button(() => L("Text_946897D107"), async () =>
@@ -239,14 +239,14 @@ public sealed partial class MainWindow : Window
     {
         var state = CurrentDataState;
         shownState = state;
-        var grid = new Grid { RowSpacing = 6 };
+        var grid = new Grid { RowSpacing = UiTokens.SpacingSmall };
         grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
         grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var search = new TextBox { Width = 220 }.Localize(localization, "PlaceholderText", () => L("Text_762B9F2664"));
-        var filter = new ComboBox { Width = 140, SelectedIndex = 0 }.Localize(localization, "ItemsSource", () => new[] { L("Text_5C55A67935"), L("Text_682D211B71"), L("Text_549986E82C") });
-        var sort = new ComboBox { Width = 150, ItemsSource = Data.Columns.Count > 0 ? Data.Columns : Schemas.All[resource].Columns.ToList(), SelectedIndex = -1 }
+        var search = new TextBox { Width = UiTokens.SearchBoxWidth }.Localize(localization, "PlaceholderText", () => L("Text_762B9F2664"));
+        var filter = new ComboBox { Width = UiTokens.FilterPickerWidth, SelectedIndex = 0 }.Localize(localization, "ItemsSource", () => new[] { L("Text_5C55A67935"), L("Text_682D211B71"), L("Text_549986E82C") });
+        var sort = new ComboBox { Width = UiTokens.SortPickerWidth, ItemsSource = Data.Columns.Count > 0 ? Data.Columns : Schemas.All[resource].Columns.ToList(), SelectedIndex = -1 }
             .Localize(localization, "PlaceholderText", () => L("TableSort"));
         searchBox = search;
         filterBox = filter;
@@ -261,7 +261,7 @@ public sealed partial class MainWindow : Window
         var apply = Button(() => L("Text_0DE280B4DF"), () => LoadRowsAsync(search.Text, filter.SelectedIndex, sort.SelectedItem?.ToString()));
         queryNotice = Text(() => "");
         var toolbar = Row(search, filter, sort, queryNotice, apply, DensityPicker());
-        toolbar.Spacing = 8;
+        toolbar.Spacing = UiTokens.SpacingMedium;
         search.TextChanged += (_, _) => RefreshQueryNotice();
         filter.SelectionChanged += (_, _) => RefreshQueryNotice();
         sort.SelectionChanged += (_, _) => RefreshQueryNotice();
@@ -343,7 +343,7 @@ public sealed partial class MainWindow : Window
             leading.Add(FleetAssignmentService.Field(resource));
         return leading.Concat(Data.Columns.Count == 0 ? Schemas.All[resource].Columns : Data.Columns).Distinct().ToList();
     }
-    UIElement ImportPage() => Stack(Text(() => L("Text_D030C51D78"), 16),
+    UIElement ImportPage() => Stack(Text(() => L("Text_D030C51D78"), UiTokens.SubtitleFontSize),
         Text(() => L("Text_3618171B0A")), Text(() => L("WeightCsvHint")),
         Button(() => L("Text_5A2BBDEA04"), ImportCsv), Button(() => L("ApiRefresh"), RefreshApi));
     Task StartDemo() => SubmitWorkspace(RunMode.Demo);
@@ -365,11 +365,11 @@ public sealed partial class MainWindow : Window
         });
     }    UIElement SettingsPage()
     {
-        var url = new TextBox { Text = online.EndpointUrl, IsReadOnly = true, MaxWidth = 650, HorizontalAlignment = HorizontalAlignment.Stretch }.Localize(localization, "Header", () => L("Text_0251B89662"));
-        var clientId = new TextBox { Header = "Client ID", Text = workspace.ClientId ?? "", MaxWidth = 650, HorizontalAlignment = HorizontalAlignment.Stretch };
-        var secret = new PasswordBox { MaxWidth = 650, HorizontalAlignment = HorizontalAlignment.Stretch }.Localize(localization, "Header", () => L("Text_86032C09C5"));
+        var url = new TextBox { Text = online.EndpointUrl, IsReadOnly = true, MaxWidth = UiTokens.SettingsFieldMaxWidth, HorizontalAlignment = HorizontalAlignment.Stretch }.Localize(localization, "Header", () => L("Text_0251B89662"));
+        var clientId = new TextBox { Header = "Client ID", Text = workspace.ClientId ?? "", MaxWidth = UiTokens.SettingsFieldMaxWidth, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var secret = new PasswordBox { MaxWidth = UiTokens.SettingsFieldMaxWidth, HorizontalAlignment = HorizontalAlignment.Stretch }.Localize(localization, "Header", () => L("Text_86032C09C5"));
         var local = new CheckBox { IsChecked = workspace.LocalRouteTimes }.Localize(localization, "Content", () => L("Text_92BD49D337"));
-        return Scroll(Stack(LanguagePicker(), Text(() => L("ApiSettings"), 20), Text(() => L("ApiSettingsHelp")), url, clientId, secret, local,
+        return Scroll(Stack(LanguagePicker(), Text(() => L("ApiSettings"), UiTokens.SectionFontSize), Text(() => L("ApiSettingsHelp")), url, clientId, secret, local,
             Button(() => L("Text_760143E568"), async () =>
             {
                 if (!gate.CanAct)
@@ -391,7 +391,7 @@ public sealed partial class MainWindow : Window
             }, gate.CanRequestOnline), Text(() => L("ApiCredentialsHelp")), Button(() => L("ApiConnect"), ConnectApi), Button(() => L("ApiRefresh"), RefreshApi),
             Text(() => L("ApiCapability")), Text(() => L("ApiIndependentScope")), Text(() => L("ApiVerified", ("operations", string.Join(", ", workspace.VerifiedOperations)))),
             Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"))),
-            Button(() => L("ApiParametersLoad"), LoadParameters), Text(() => L("MaintenanceTitle"), 18), Button(() => L("BackupClear"), BackupAndClearWorkspace)));
+            Button(() => L("ApiParametersLoad"), LoadParameters), Text(() => L("MaintenanceTitle"), UiTokens.SubsectionFontSize), Button(() => L("BackupClear"), BackupAndClearWorkspace)));
     }
     Workspace DemoWorkspace() => DemoWorkspaceFactory.Create(L("DemoWorkspace", ("time", DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture))));
 }

@@ -11,7 +11,7 @@ static class PackageChecks
         void Require(bool condition, string message)
         { if (!condition) throw new InvalidOperationException(message); }
         foreach (var name in new[] { "FlightOpsDesk.exe", "FlightOpsDesk.dll", "VamSys.Domain.dll", "VamSys.Application.dll", "VamSys.Presentation.dll", "VamSys.Storage.dll", "VamSys.Infrastructure.dll",
-            "FlightOpsDesk.deps.json", "FlightOpsDesk.runtimeconfig.json", "FlightOpsDesk.pri", "MainWindow.xbf",
+            "FlightOpsDesk.deps.json", "FlightOpsDesk.runtimeconfig.json", "FlightOpsDesk.pri", "MainWindow.xbf", "Theme.xbf",
             "Assets/FlightOpsDesk.ico", "Assets/FlightOpsDesk.png", "README.md", "docs/USER-GUIDE.md", "docs/STORAGE-MIGRATION.md" })
             Require(File.Exists(Path.Combine(directory, name)), $"Missing package file: {name}");
 

@@ -99,7 +99,7 @@ public sealed partial class MainWindow
         FlushTasks();
         var list = new ListView
         {
-            MaxHeight = 450,
+            MaxHeight = UiTokens.TaskDetailMaxHeight,
             ItemsSource = vm.Items,
             SelectionMode = ListViewSelectionMode.Single,
             ItemTemplate = (DataTemplate)XamlReader.Load("""<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><TextBlock Text="{Binding Text}" TextWrapping="Wrap" Padding="8"/></DataTemplate>""")
@@ -115,7 +115,7 @@ public sealed partial class MainWindow
         if (tasksPage != null)
             return tasksPage;
         taskPageBuilds++;
-        var grid = new Grid { RowSpacing = 12 };
+        var grid = new Grid { RowSpacing = UiTokens.SpacingLarge };
         grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
         taskCancel = Button(() => L("Text_14F7E13979"), () => { running?.Cancel(); return Task.CompletedTask; }, running != null);
@@ -123,12 +123,12 @@ public sealed partial class MainWindow
         taskList = new ListView { ItemsSource = taskModels, SelectionMode = ListViewSelectionMode.Single, HorizontalContentAlignment = HorizontalAlignment.Stretch };
         taskList.ItemTemplate = (DataTemplate)XamlReader.Load("""
             <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-              <Border Padding="16" Margin="0,6" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                <StackPanel Spacing="10">
-                  <TextBlock Text="{Binding Title}" FontSize="17" TextWrapping="Wrap"/>
+              <Border Padding="{StaticResource TaskCardPadding}" Margin="{StaticResource TaskCardMargin}" CornerRadius="{StaticResource CardCornerRadius}" Background="{ThemeResource CardBackgroundBrush}">
+                <StackPanel Spacing="{StaticResource SpacingRelaxed}">
+                  <TextBlock Text="{Binding Title}" FontSize="{StaticResource CardTitleFontSize}" TextWrapping="Wrap"/>
                   <TextBlock Text="{Binding Summary}" TextWrapping="Wrap"/>
                   <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                    <StackPanel Orientation="Horizontal" Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingRelaxed}">
                       <Button Content="{Binding DetailsLabel}" Command="{Binding Details}"/>
                       <Button Content="{Binding ReviewLabel}" Command="{Binding Review}"/>
                       <Button Content="{Binding VerifyDeletesLabel}" Command="{Binding VerifyDeletes}"/>

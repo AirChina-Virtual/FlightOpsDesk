@@ -30,7 +30,7 @@ public sealed partial class MainWindow
         summary.Text = L("Text_D18ED1A023") + string.Join("；", choices.Where(c => c.Selected).Select(c => c.Label));
         var search = new TextBox { }.Localize(localization, "PlaceholderText", () => L("Text_368B16B1B0"));
         var mode = new ComboBox { ItemsSource = new[] { L("Text_DD9F9DBA0C"), L("Text_7A387A9608"), L("Text_58A816EF01") }, SelectedIndex = 0, IsEnabled = resource == ResourceKind.Routes }.Localize(localization, "Header", () => L("Text_ED31FBB483")).Localize(localization, "ItemsSource", () => new[] { L("Text_DD9F9DBA0C"), L("Text_7A387A9608"), L("Text_58A816EF01") });
-        var list = new ListView { Height = 180, SelectionMode = ListViewSelectionMode.None, ItemsSource = choices };
+        var list = new ListView { Height = UiTokens.FleetChoiceListHeight, SelectionMode = ListViewSelectionMode.None, ItemsSource = choices };
         list.ItemTemplate = (DataTemplate)XamlReader.Load("""
             <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
               <CheckBox Content="{Binding Label}" IsChecked="{Binding Selected, Mode=TwoWay}" IsEnabled="{Binding CanSelect}"/>
@@ -43,13 +43,13 @@ public sealed partial class MainWindow
             return;
         var preview = batch.PreviewFleets(resource, rows, choices.Where(c => c.Selected).Select(c => c.Option.Token), (FleetAssignmentMode)mode.SelectedIndex);
         if (preview.Issues.Count > 0)
-        { await Confirm(L("Text_7B23705C3B"), new ScrollViewer { MaxHeight = 350, Content = Text(() => string.Join("\n", preview.Issues.Take(60).Select(i => L(i.Description)))) }, L("Text_3FD47EDCE4")); return; }
+        { await Confirm(L("Text_7B23705C3B"), new ScrollViewer { MaxHeight = UiTokens.DialogListMaxHeight, Content = Text(() => string.Join("\n", preview.Issues.Take(60).Select(i => L(i.Description)))) }, L("Text_3FD47EDCE4")); return; }
         if (preview.Rows.Count == 0)
         { Status(() => BatchScope(selection, 0)); return; }
         var labels = options.ToDictionary(o => o.Token, o => o.Describe(localization), StringComparer.OrdinalIgnoreCase);
         string Label(string value) => string.Join("；", FleetAssignmentService.Tokens(value).Select(t => labels.GetValueOrDefault(t, t)));
         var before = rows.ToDictionary(r => r.LocalId);
-        if (!await Confirm(L("Text_D1482F496E"), new ListView { MaxHeight = 380, Header = Text(() => BatchScope(selection, preview.Rows.Count)), ItemsSource = preview.Rows.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n{Label(before[r.LocalId].Get(field))} → {Label(r.Get(field))}").ToList() }, L("Text_2354C137CE")))
+        if (!await Confirm(L("Text_D1482F496E"), new ListView { MaxHeight = UiTokens.FleetPreviewMaxHeight, Header = Text(() => BatchScope(selection, preview.Rows.Count)), ItemsSource = preview.Rows.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n{Label(before[r.LocalId].Get(field))} → {Label(r.Get(field))}").ToList() }, L("Text_2354C137CE")))
             return;
         await batch.ApplyFleetsAsync(resource, preview);
         Status(() => BatchScope(selection, preview.Rows.Count));

@@ -79,7 +79,7 @@ public sealed partial class EditableCell : ContentControl
         if (Editor != null || Cell is not { IsReadOnly: false } cell)
             return;
         display = Content as UIElement;
-        var editor = new TextBox { Text = cell.Value, FontSize = 14, Padding = new Thickness(8, 2, 8, 2), MinHeight = 0, VerticalAlignment = VerticalAlignment.Stretch };
+        var editor = new TextBox { Text = cell.Value, FontSize = UiTokens.BodyFontSize, Padding = UiTokens.CellEditorPadding, MinHeight = 0, VerticalAlignment = VerticalAlignment.Stretch };
         AutomationProperties.SetName(editor, cell.Field);
         // Commit on every text change, synchronously, as the former TwoWay binding did.
         editor.RegisterPropertyChangedCallback(TextBox.TextProperty, (_, _) => Commit(editor.Text));

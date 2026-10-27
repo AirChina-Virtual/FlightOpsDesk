@@ -10,15 +10,15 @@ public sealed partial class MainWindow
     string tableDensity = "comfortable";
     ComboBox? densityPicker;
     TextBlock? queryNotice;
-    double DataRowHeight => tableDensity == "compact" ? 32 : 40;
+    double DataRowHeight => UiTokens.DataRowHeight(tableDensity == "compact");
 
     void UpdateDataHeaderLayout()
     {
         var data = page == "data";
         var merged = data && BodyGrid.ActualWidth >= 800;
-        PageTitle.FontSize = data ? 24 : 28;
-        BodyGrid.Margin = data ? new Thickness(20, 12, 20, 8) : new Thickness(28, 20, 28, 12);
-        BodyGrid.RowSpacing = data ? 8 : 14;
+        PageTitle.FontSize = data ? UiTokens.DataPageTitleFontSize : UiTokens.PageTitleFontSize;
+        BodyGrid.Margin = data ? UiTokens.DataPageMargin : UiTokens.PageMargin;
+        BodyGrid.RowSpacing = data ? UiTokens.SpacingMedium : UiTokens.SpacingPage;
         Grid.SetRow(ResourceBar, merged ? 0 : 1);
         Grid.SetColumn(ResourceBar, merged ? 1 : 0);
         Grid.SetColumnSpan(ResourceBar, merged ? 1 : 2);
@@ -29,15 +29,15 @@ public sealed partial class MainWindow
     {
         var headers = Row();
         headers.Spacing = 0;
-        headers.Margin = new Thickness(44, 0, 0, 0);
+        headers.Margin = UiTokens.DataHeaderInset;
         foreach (var field in columns)
         {
             var label = new TextBlock
             {
                 Width = new CellViewModel(field, "", _ => { }).Width,
-                Margin = new Thickness(0, 0, 6, 0),
+                Margin = UiTokens.ColumnHeaderMargin,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                FontSize = 14
+                FontSize = UiTokens.BodyFontSize
             }
                 .Localize(localization, "Text", () => field == "_delete" ? L("ColumnStatus") : ApiOperationPolicy.FieldLabel(field, localization));
             ToolTipService.SetToolTip(label, new ToolTip().Localize(localization, "Content", () => field == "_delete" ? L("ColumnStatus") : ApiOperationPolicy.FieldLabel(field, localization)));
@@ -53,7 +53,7 @@ public sealed partial class MainWindow
         style.Setters.Add(new Setter(FrameworkElement.HeightProperty, DataRowHeight));
         style.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, DataRowHeight));
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
-        style.Setters.Add(new Setter(Control.FontSizeProperty, 14d));
+        style.Setters.Add(new Setter(Control.FontSizeProperty, UiTokens.BodyFontSize));
         style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
         target.ItemContainerStyle = style;
         target.Resources["ListViewItemMinHeight"] = DataRowHeight;
@@ -61,7 +61,7 @@ public sealed partial class MainWindow
 
     ComboBox DensityPicker()
     {
-        var picker = new ComboBox { Width = 144 };
+        var picker = new ComboBox { Width = UiTokens.DensityPickerWidth };
         picker.Items.Add(new ComboBoxItem().Localize(localization, "Content", () => L("DensityComfortable")));
         picker.Items.Add(new ComboBoxItem().Localize(localization, "Content", () => L("DensityCompact")));
         picker.SelectedIndex = tableDensity == "compact" ? 1 : 0;

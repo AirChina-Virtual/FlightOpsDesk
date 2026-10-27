@@ -36,13 +36,13 @@ public sealed partial class MainWindow
         await Work(async () =>
         {
             var parsed = await importExport.ParseFileAsync(file.Path);
-            var mapping = new StackPanel { Spacing = 8 };
+            var mapping = new StackPanel { Spacing = UiTokens.SpacingMedium };
             var boxes = new Dictionary<string, TextBox>();
             foreach (var h in parsed.Headers)
             { var box = new TextBox { Header = h, Text = h }; boxes[h] = box; mapping.Children.Add(box); }
             var baseline = new CheckBox { IsChecked = importExport.BaselineByDefault(resource), IsEnabled = importExport.BaselineAvailable }.Localize(localization, "Content", () => L("Text_B91DE02936"));
             var panel = Stack(Text(() => L("Text_42F0F930C9", ("arg0", parsed.Rows.Count))), Text(() => L("WeightCsvHint")), baseline,
-                new ScrollViewer { Content = mapping, MaxHeight = 280 }, Text(() => L("Text_793A76BFEA") + string.Join("\n", parsed.Rows.Take(3).Select(r => string.Join(" | ", r).Truncate(240)))));
+                new ScrollViewer { Content = mapping, MaxHeight = UiTokens.ImportMappingMaxHeight }, Text(() => L("Text_793A76BFEA") + string.Join("\n", parsed.Rows.Take(3).Select(r => string.Join(" | ", r).Truncate(240)))));
             if (!await Confirm(L("Text_E0FDE3C5CB"), panel, L("Text_C9B2630A18")))
                 return;
             if (importExport.BaselineNeedsWarning(resource, baseline.IsChecked == true) && !await Confirm(L("Text_885B15B2F5"), Text(() => L("Text_5B5C523423")), L("Text_131B13AA26")))
