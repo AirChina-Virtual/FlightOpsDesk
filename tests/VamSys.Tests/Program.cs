@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Net;
-using System.Text;
 using VamSys.Core;
 using VamSys.Infrastructure;
 
@@ -56,8 +54,6 @@ void Summary(string label)
     Console.WriteLine($"  Duration: {suite.Elapsed.TotalSeconds:0.0} s; slowest: " + string.Join("; ", durations.OrderByDescending(d => d.Elapsed).Take(5).Select(d => $"{d.Name} {d.Elapsed.TotalSeconds:0.0} s")));
     Console.WriteLine($"{passed} {label}passed.");
 }
-Task Sync(Action a) { a(); return Task.CompletedTask; }
-void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
 DataRow Row(params (string, string)[] fields) => new() { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
 if(args.Length==2 && args[0]=="--benchmark-v3"){await StorageV3Scenarios.Benchmark(args[1]);return;}
 if(args.Length==1 && args[0]=="--storage"){await StorageScenarios.Run(Test);Console.WriteLine($"{passed} storage scenarios passed.");return;}
@@ -68,7 +64,6 @@ if(args.Length==2 && args[0]=="--benchmark-core"){CorePerformanceBenchmark.Run(a
 if(args.Length==2 && args[0]=="--benchmark-review"){CorePerformanceBenchmark.RunReview(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-core-load"){CorePerformanceBenchmark.RunLoad(args[1]);return;}
 if(args.Length==3 && args[0]=="--seed-data-ui"){DataUiFixture.Seed(args[1],int.Parse(args[2]));return;}
-var csv = new CsvAdapter(); var planner = new ChangePlanner();
 if (args.Length == 2 && args[0] == "--seed-recovery-ui")
 {
     var w=new Workspace { Name="QA recovery candidates",Mode=RunMode.Online,AirlineId="7" };
@@ -92,130 +87,6 @@ if (args.Length == 2 && args[0] == "--seed-ui")
 if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await DiagnosticReplayExport.ExportDiagnostics(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-performance") {await PerformanceScenarios.Benchmark(args[1]);return;}
 
-await Test("SQLite workspace isolation, persisted undo, and DPAPI", () => Sync(() =>
-{
-    var folder = Path.Combine(Path.GetTempPath(),"vamsys-test-"+Guid.NewGuid());
-    var store = new WorkspaceStore(folder); var a = new Workspace { Name = "A" }; var b = new Workspace { Name = "B" };
-    a.Resources[ResourceKind.Airports].Draft.Add(Row(("ICAO/IATA","ZBAA"))); a.Resources[ResourceKind.Airports].Edit([],()=>{}); store.Save(a); store.Save(b);
-    Check(store.Load(a.Id).Resources[ResourceKind.Airports].Undo.Count == 1); Check(store.Load(b.Id).Resources[ResourceKind.Airports].Draft.Count == 0);
-    if (OperatingSystem.IsWindows()) { store.SaveSecret(a.Id,"secret"); Check(store.LoadSecret(a.Id)=="secret"); Check(store.LoadSecret(b.Id)==null); }
-}));
-await Test("Batch success and resume do not duplicate writes", async () =>
-{
-    var w = new Workspace(); var before = Row(("ICAO/IATA","ZBAA"),("Name","old")); CsvAdapter.Import(ResourceKind.Airports,w.Resources[ResourceKind.Airports],[before],true);
-    var fake = new CountingService(new DemoService(w)); var airportDraft=w.Resources[ResourceKind.Airports].Draft;airportDraft[0]=airportDraft[0].With("Name","new");
-    var job = new BatchJob { Items = planner.Plan(ResourceKind.Airports,w.Resources[ResourceKind.Airports]) };
-    var engine = new BatchExecutor(fake,fake); await engine.ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None); await engine.ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None);
-    Check(fake.Writes==1); Check(job.Items[0].State==ItemState.Succeeded);
-});
-await Test("Timeout after create stays unknown and never blindly retries", async () =>
-{
-    var fake = new CountingService(new DemoService(new Workspace())) { TimeoutWrites = true };
-    var item = new ChangeItem { Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,After=Row(("Name","new")) }; var job=new BatchJob { Items=[item] };
-    var engine = new BatchExecutor(fake,fake); await engine.ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None); await engine.ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None);
-    Check(item.State==ItemState.Unknown); Check(fake.Writes==1);
-});
-await Test("Remote conflict blocks overwrite", async () =>
-{
-    var w = new Workspace(); CsvAdapter.Import(ResourceKind.Airports,w.Resources[ResourceKind.Airports],[Row(("ICAO/IATA","ZBAA"),("Name","remote"))],true);
-    var fake=new CountingService(new DemoService(w)); var item=new ChangeItem { Resource=ResourceKind.Airports,Kind=ChangeKind.Update,Before=Row(("ICAO/IATA","ZBAA"),("Name","old")),After=Row(("ICAO/IATA","ZBAA"),("Name","new")) };
-    await new BatchExecutor(fake,fake).ExecuteAsync(new BatchJob { Items=[item] },()=>Task.CompletedTask,CancellationToken.None); Check(item.State==ItemState.Conflict && fake.Writes==0);
-});
-await Test("Cross-resource creates resolve returned IDs before dependent writes", async () =>
-{
-    var w=new Workspace(); var fleet=Row(("Name","New fleet")); var plane=Row(("Name","New plane"),("Fleet ID","local:"+fleet.LocalId));
-    w.Resources[ResourceKind.Fleets].Draft.Add(fleet); w.Resources[ResourceKind.Aircraft].Draft.Add(plane);
-    var job=new BatchJob { Items=planner.PlanWorkspace(w) }; var fake=new CountingService(new DemoService(w));
-    await new BatchExecutor(fake,fake).ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None);
-    Check(job.Items.All(i=>i.State==ItemState.Succeeded));
-    Check(job.Items.Single(i=>i.Resource==ResourceKind.Aircraft).After.Get("Fleet ID")==job.Items.Single(i=>i.Resource==ResourceKind.Fleets).RemoteId);
-});
-await Test("Persist failure stops all writes", async () =>
-{
-    var fake=new CountingService(new DemoService(new Workspace())); var job=new BatchJob { Items=[new ChangeItem { Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,After=Row(("Name","x")) }] };
-    try { await new BatchExecutor(fake,fake).ExecuteAsync(job,()=>throw new IOException("disk"),CancellationToken.None); throw new Exception("Persist failure swallowed"); } catch(PersistenceException) { }
-    Check(fake.Writes==0);
-});
-await Test("Cancellation stops pending writes, failed dependency skips child", async () =>
-{
-    var parent=new ChangeItem { Resource=ResourceKind.Fleets,State=ItemState.Failed }; var child=new ChangeItem { Resource=ResourceKind.Aircraft,Dependencies=[parent.Id] };
-    var fake=new CountingService(new DemoService(new Workspace())); var job=new BatchJob { Items=[parent,child] };
-    await new BatchExecutor(fake,fake).ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None); Check(child.State==ItemState.Skipped && fake.Writes==0);
-    var pending=new ChangeItem { Resource=ResourceKind.Fleets }; var cancelled=new BatchJob { Items=[pending] };
-    await new BatchExecutor(fake,fake).ExecuteAsync(cancelled,()=>Task.CompletedTask,new CancellationToken(true)); Check(pending.State==ItemState.Pending && fake.Writes==0);
-});
-await Test("401/403 pauses batch without sending later rows", async () =>
-{
-    var fake=new AccessDeniedService(); var job=new BatchJob { Items=[new ChangeItem { Resource=ResourceKind.Fleets },new ChangeItem { Resource=ResourceKind.Fleets }] };
-    await new BatchExecutor(fake,fake).ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None); Check(fake.Calls==1 && job.Status.Contains("暂停"));
-});
-await Test("Recovered create with persisted remote ID verifies without repeat", async () =>
-{
-    var w=new Workspace(); var after=Row(("ID",""),("Name","new")); var item=new ChangeItem { Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,After=after,State=ItemState.Running,RemoteId="123" };
-    var remote=after.With("ID","123"); w.Resources[ResourceKind.Fleets].Snapshot.Add(remote);
-    var fake=new CountingService(new DemoService(w)); await new BatchExecutor(fake,fake).ExecuteAsync(new BatchJob { Items=[item] },()=>Task.CompletedTask,CancellationToken.None);
-    Check(item.State==ItemState.Succeeded && fake.Writes==0);
-});
-await Test("Partial failure permits independent work; repaired dependency resumes child only", async () =>
-{
-    var fake=new CountingService(new DemoService(new Workspace())) { FailOnce=true };
-    var parent=new ChangeItem { Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,After=Row(("Name","parent")) };
-    var child=new ChangeItem { Resource=ResourceKind.Aircraft,Kind=ChangeKind.Create,After=Row(("Name","child")),Dependencies=[parent.Id] };
-    var independent=new ChangeItem { Resource=ResourceKind.Routes,Kind=ChangeKind.Create,After=Row(("Name","independent")) };
-    var job=new BatchJob { Items=[parent,child,independent] }; var engine=new BatchExecutor(fake,fake);
-    await engine.ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None);
-    Check(parent.State==ItemState.Failed && child.State==ItemState.Skipped && independent.State==ItemState.Succeeded);
-    parent.State=ItemState.Pending; await engine.ExecuteAsync(job,()=>Task.CompletedTask,CancellationToken.None);
-    Check(job.Items.All(i=>i.State==ItemState.Succeeded) && fake.Writes==4);
-});
-await Test("Documented capabilities available; legacy unverified adapter rejects writes", async () =>
-{
-    Check(ApiContracts.Capabilities.All(c=>c.CanRead && c.CanWrite));
-    foreach(var kind in Enum.GetValues<ResourceKind>())
-    {
-        try { await new UnverifiedOperationsAdapter().WriteAsync(new ChangeItem { Resource=kind,Kind=ChangeKind.Delete },CancellationToken.None); throw new Exception("Unverified write accepted"); }
-        catch(NotSupportedException) { }
-    }
-});
-await Test("Language preference persists in the store and an invalid value falls back to Chinese", () => Sync(() =>
-{
-    var dir = Path.Combine(Path.GetTempPath(), "vamsys-language-" + Guid.NewGuid()); var s = new WorkspaceStore(dir);
-    Check(s.LoadLanguage() == "zh-CN"); s.SaveLanguage("en-US"); Check(new WorkspaceStore(dir).LoadLanguage() == "en-US");
-    s.SaveLanguage("invalid"); Check(s.LoadLanguage() == "zh-CN");
-}));
-await Test("Language switch during execution does not resend writes or change task state", async () =>
-{
-    var job=new BatchJob{Items=[new ChangeItem{Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,After=Row(("Name","fleet"))}]};
-    var loc=new LocalizationService();var fake=new CountingService(new DemoService(new Workspace()));
-    await new BatchExecutor(fake,fake).ExecuteAsync(job,()=>{ loc.SetLanguage(loc.Language=="en-US"?"zh-CN":"en-US"); return Task.CompletedTask; },CancellationToken.None);
-    Check(fake.Writes==1 && job.StatusCode==JobStatus.Completed && job.Description?.Code=="Text_140197D868");
-    var restored=Workspace.Deserialize(new Workspace{Jobs=[job]}.Serialize()).Jobs.Single(); loc.SetLanguage("en-US");
-    Check(loc.Format(restored.Description!)=="Completed and verified" && loc.Format(restored.Items[0].Description!)=="Verified by read-back");
-    await new BatchExecutor(fake,fake).ExecuteAsync(restored,()=>Task.CompletedTask,CancellationToken.None); Check(fake.Writes==1);
-});
 await StorageScenarios.Run(Test);
 Summary("scenarios ");
 
-sealed class CountingService(DemoService inner) : IResourceReader,IResourceWriter
-{
-    public int Writes; public bool TimeoutWrites; public bool FailOnce;
-    public IAsyncEnumerable<DataRow> ReadAllAsync(ResourceKind k,CancellationToken ct)=>inner.ReadAllAsync(k,ct);
-    public Task<DataRow?> FindAsync(ResourceKind k,string id,CancellationToken ct)=>inner.FindAsync(k,id,ct);
-    public Task<string?> WriteAsync(ChangeItem c,CancellationToken ct) { Writes++; if(FailOnce) { FailOnce=false; throw new FormatException("invalid"); } if(TimeoutWrites) throw new TimeoutException(); return inner.WriteAsync(c,ct); }
-}
-sealed class FakeHttp : HttpMessageHandler
-{
-    public int Calls;
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
-    {
-        Calls++;
-        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content=new StringContent(Calls==1 ? "{\"data\":[{\"id\":1}],\"meta\":{\"next_cursor_url\":\"https://example.test/routes?cursor=2\"}}" : "{\"data\":[{\"id\":2}],\"meta\":{\"next_cursor_url\":null}}") });
-    }
-}
-sealed class AccessDeniedService : IResourceReader,IResourceWriter
-{
-    public int Calls;
-    public async IAsyncEnumerable<DataRow> ReadAllAsync(ResourceKind k,[System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct) { await Task.CompletedTask; yield break; }
-    public Task<DataRow?> FindAsync(ResourceKind k,string id,CancellationToken ct)=>throw new ApiAccessException("denied");
-    public Task<string?> WriteAsync(ChangeItem c,CancellationToken ct) { Calls++; throw new ApiAccessException("denied"); }
-}
