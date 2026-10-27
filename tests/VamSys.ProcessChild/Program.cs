@@ -39,7 +39,8 @@ static async Task RunTask(string[] args, StreamReader reader, StreamWriter write
     var store = new WorkspaceStore(args[1], Barrier);
     w = store.Load(Guid.Parse(args[3]));
     var clock = new TestTime();
-    using var client = new HttpClient(new PipeHttp(reader, writer));
+    using var handler = new PipeHttp(reader, writer);
+    using var client = new HttpClient(handler, disposeHandler: false);
     var api = new OperationsAdapter(new OperationsTransport(client, OperationsAdapter.BaseUri, "process-test", new TokenProvider(_ => Task.FromResult(new AccessToken("test", clock.GetUtcNow().AddHours(1))), clock), new(clock)), w);
     await clock.Drive(new OperationsBatchExecutor(api, w).ExecuteAsync(w.Jobs[0], store.CheckpointWriter(w), default));
     await writer.WriteLineAsync(JsonSerializer.Serialize(new Wire("done")));

@@ -58,16 +58,16 @@ public class ProcessTerminationTests
         Assert.Equal(durableRebase, item.State == ItemState.Succeeded);
         Assert.Equal(durableRebase ? 1 : 0, interrupted.Resources[ResourceKind.Fleets].Snapshot.Count);
         Assert.Equal(durableRebase ? 0 : 1, interrupted.Resources[ResourceKind.Fleets].Undo.Count);
-        if (boundary.Contains("POST|ResponseReceived"))
+        if (boundary.Contains("POST|ResponseReceived", StringComparison.Ordinal))
         {
             Assert.True(remote.Posts == 1 && remote.Puts == 0);
-            Assert.Equal(boundary.StartsWith("Step:AfterCommit"), item.CreateCompleted);
+            Assert.Equal(boundary.StartsWith("Step:AfterCommit", StringComparison.Ordinal), item.CreateCompleted);
             Assert.Equal(item.CreateCompleted, item.RemoteId == "10");
         }
-        if (boundary.Contains("PUT|InFlight"))
+        if (boundary.Contains("PUT|InFlight", StringComparison.Ordinal))
         {
             Assert.True(item.RemoteId == "10" && item.CreateCompleted && remote.Puts == 0);
-            Assert.Equal(boundary.StartsWith("Step:AfterCommit") ? BatchStepState.InFlight : BatchStepState.Prepared, item.ApiSteps[1].State);
+            Assert.Equal(boundary.StartsWith("Step:AfterCommit", StringComparison.Ordinal) ? BatchStepState.InFlight : BatchStepState.Prepared, item.ApiSteps[1].State);
         }
 
         var posts = remote.Posts;
@@ -98,7 +98,7 @@ public class ProcessTerminationTests
                 if (item.CanProposeRecoveryId)
                 {
                     item.ProposeRecoveryId("10");
-                    await store.CheckpointWriter(recovered).WriteAsync(new(CheckpointKind.Task, recovered.Jobs[0], item), default);
+                    await store.CheckpointWriter(recovered).WriteAsync(new(CheckpointKind.Task, recovered.Jobs[0], item), TestContext.Current.CancellationToken);
                 }
                 await Launch(dir.Path, w.Id, remote);
                 Assert.Equal(ItemState.Succeeded, store.Load(w.Id).Jobs[0].Items[0].State);

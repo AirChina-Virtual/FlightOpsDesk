@@ -46,19 +46,19 @@ public class V3BinaryRefusalTests
         foreach (var arg in new[] { baseline!, "--assert-close-ui", dir.Path })
             info.ArgumentList.Add(arg);
         using var process = Process.Start(info)!;
-        var error = process.StandardError.ReadToEndAsync();
-        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
+        var output = process.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         try
         { await process.WaitForExitAsync(timeout.Token); }
         finally
         {
             if (!process.HasExited)
-            { process.Kill(true); await process.WaitForExitAsync(); }
+            { process.Kill(true); await process.WaitForExitAsync(TestContext.Current.CancellationToken); }
         }
 
         var log = await error + await output;
-        Assert.True(process.ExitCode != 0 && log.Contains("WorkspaceStore.Initialize(String directory)") && log.Contains("WorkspaceStore.Schema.cs:line 15"), log);
+        Assert.True(process.ExitCode != 0 && log.Contains("WorkspaceStore.Initialize(String directory)", StringComparison.Ordinal) && log.Contains("WorkspaceStore.Schema.cs:line 15", StringComparison.Ordinal), log);
         Assert.True(before.SequenceEqual(File.ReadAllBytes(path)), "old reader changed v4 database");
     }
 }

@@ -25,7 +25,7 @@ internal static class ChildProcess
             if (request.Method == "POST") { Posts++; Created = true; return new("response", Body: Record, Code: 201); }
             if (request.Method == "PUT") { Puts++; Completed = true; return new("response", Body: "{\"data\":" + Record + "}"); }
             Assert.True(request.Method == "GET", "Unexpected write method");
-            if (request.Path!.Split('?')[0].EndsWith("/10"))
+            if (request.Path!.Split('?')[0].EndsWith("/10", StringComparison.Ordinal))
                 return Created ? new("response", Body: "{\"data\":" + Record + "}") : new("response", Body: "{}", Code: 404);
             return new("response", Body: "{\"data\":[" + Existing + (Created ? "," + Record : "") + "],\"meta\":{\"next_cursor_url\":null}}");
         }
@@ -97,11 +97,11 @@ internal static class ChildProcess
             return wire.Type == "accepted" && wire.Method == "PUT";
         if (wire.Type != "barrier")
             return false;
-        if (boundary.StartsWith("Migration") || boundary.StartsWith("Rebase") || boundary.StartsWith("Draft"))
+        if (boundary.StartsWith("Migration", StringComparison.Ordinal) || boundary.StartsWith("Rebase", StringComparison.Ordinal) || boundary.StartsWith("Draft", StringComparison.Ordinal))
             return wire.Point == boundary;
         using var body = JsonDocument.Parse(wire.Body!);
         var root = body.RootElement;
-        if (boundary.StartsWith("Task"))
+        if (boundary.StartsWith("Task", StringComparison.Ordinal))
             return wire.Point == boundary && root.GetProperty("state").GetString() == "Running";
         if (wire.Point != boundary.Split('|')[0])
             return false;
