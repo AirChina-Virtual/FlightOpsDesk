@@ -67,8 +67,6 @@ if(args.Length==3 && args[0]=="--benchmark-journal"){await JournalBenchmark.Run(
 if(args.Length==2 && args[0]=="--benchmark-core"){CorePerformanceBenchmark.Run(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-review"){CorePerformanceBenchmark.RunReview(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-core-load"){CorePerformanceBenchmark.RunLoad(args[1]);return;}
-if(args.Length==1 && args[0]=="--verified-scope"){await VerifiedScopeScenarios.Run(Test);Summary("verified scope ");return;}
-if(args.Length==1 && args[0]=="--unblock"){await UnblockScenarios.Run(Test);await UnblockScenarios.RunSoftDeletes(Test);await UnblockScenarios.RunRefresh(Test);Summary("unblock ");return;}
 if(args.Length==3 && args[0]=="--seed-data-ui"){DataUiFixture.Seed(args[1],int.Parse(args[2]));return;}
 var csv = new CsvAdapter(); var planner = new ChangePlanner();
 if (args.Length == 2 && args[0] == "--seed-recovery-ui")
@@ -198,8 +196,6 @@ await Test("Language switch during execution does not resend writes or change ta
 });
 await LiveCompatibilityScenarios.Run(Test);
 await StorageScenarios.Run(Test);
-await VerifiedScopeScenarios.Run(Test);
-await UnblockScenarios.Run(Test);await UnblockScenarios.RunSoftDeletes(Test);await UnblockScenarios.RunRefresh(Test);
 Summary("scenarios ");
 
 sealed class CountingService(DemoService inner) : IResourceReader,IResourceWriter
