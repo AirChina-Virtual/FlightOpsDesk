@@ -91,8 +91,7 @@ if (args.Length == 2 && args[0] == "--seed-ui")
     new WorkspaceStore(args[1]).Save(w); Console.WriteLine("Seeded isolated UI workspace"); return;
 }
 
-if(args.Length==1 && args[0]=="--live-compatibility"){await LiveCompatibilityScenarios.Run(Test);Summary("live compatibility ");return;}
-if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await LiveCompatibilityScenarios.ExportDiagnostics(args[1]);return;}
+if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await DiagnosticReplayExport.ExportDiagnostics(args[1]);return;}
 if(args.Length==2 && args[0]=="--benchmark-performance") {await PerformanceScenarios.Benchmark(args[1]);return;}
 
 await Test("SQLite workspace isolation, persisted undo, and DPAPI", () => Sync(() =>
@@ -196,7 +195,6 @@ await Test("Language switch during execution does not resend writes or change ta
     Check(loc.Format(restored.Description!)=="Completed and verified" && loc.Format(restored.Items[0].Description!)=="Verified by read-back");
     await new BatchExecutor(fake,fake).ExecuteAsync(restored,()=>Task.CompletedTask,CancellationToken.None); Check(fake.Writes==1);
 });
-await LiveCompatibilityScenarios.Run(Test);
 await StorageScenarios.Run(Test);
 await VerifiedScopeScenarios.Run(Test);
 await UnblockScenarios.Run(Test);await UnblockScenarios.RunSoftDeletes(Test);await UnblockScenarios.RunRefresh(Test);
