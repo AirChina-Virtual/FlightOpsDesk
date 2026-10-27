@@ -45,8 +45,7 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 | Program.cs | 选择要运行的检查，处理命令参数，为窗口测试准备数据 |
 | tests/VamSys.IntegrationTests/Fixtures/vcca-weight-20261020.json | 8 份保留的真实 API 响应回放：身份与追踪值脱敏，保留数值、null 和包装结构；仅在测试进程回放 |
 | CandidateIndexScenarios.cs | 仅保留基准入口 `CandidateIndexScenarios.Benchmark`（`--benchmark-*` 依赖）；其余检查已迁移到 xUnit 测试 |
-| StorageScenarios.cs、StorageV3Scenarios.cs | 只保留测试夹具、基准入口和实际 v3 二进制拒读 v4 的检查；其余已迁移到 `tests/VamSys.IntegrationTests/Storage` |
-| StorageProcessScenarios.cs | 强制结束正在执行的测试进程再重启，检查是否重复提交；也检查行级保存中途被结束 |
+| StorageScenarios.cs、StorageV3Scenarios.cs | 只保留窗口脚本和基准入口用的夹具与基准；场景已全部迁移到 `tests/VamSys.IntegrationTests/Storage` |
 | PerformanceScenarios.cs | 仅保留基准入口 `PerformanceScenarios.Benchmark`、`RouteBenchmark`（`--benchmark-performance` 依赖）；请求次数与查重速度检查已迁移到 xUnit 测试 |
 | CorePerformanceBenchmark.cs | 1 千／2 万／5 万行基准（规划对照、位置索引、局部回放的失败原子性已改由 `VamSys.UnitTests` 的领域测试覆盖） |
 | DataUiFixture.cs | `--seed-data-ui` 使用的窗口测试合成数据 |
@@ -68,7 +67,7 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 
 ## 程序突然退出后的恢复
 
-一个测试进程扮演服务器并记住已完成的操作，另一个进程执行任务。测试会在发送请求、收到 ID、补充修改或保存结果等指定时刻，强制结束执行任务的进程；重新启动后，检查进度有没有丢失，已完成的操作有没有被重复提交。服务器是模拟的，不会修改真实 vaMSYS 数据。`--storage-child` 等参数由测试内部使用。
+一个测试进程扮演服务器并记住已完成的操作，另一个进程执行任务。测试会在发送请求、收到 ID、补充修改或保存结果等指定时刻，强制结束执行任务的进程；重新启动后，检查进度有没有丢失，已完成的操作有没有被重复提交。服务器是模拟的，不会修改真实 vaMSYS 数据。这些场景现在是 `tests/VamSys.IntegrationTests/Storage/ProcessTermination` 中的 xUnit 测试（标记 Slow），被结束的进程是 `tests/VamSys.ProcessChild`（参数 `storage`／`draft`），不再经过本运行器。
 
 ## 实际窗口检查
 

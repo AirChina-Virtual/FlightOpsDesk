@@ -2,3 +2,4 @@
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("VamSys.TestSupport")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("VamSys.UnitTests")]
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("VamSys.IntegrationTests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("VamSys.ProcessChild")]

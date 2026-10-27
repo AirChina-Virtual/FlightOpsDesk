@@ -8,8 +8,6 @@ if(args.Length >= 2 && args[0] is "--seed-storage-ui" or "--seed-task-ui" or "--
     DataUiFixture.RequireEmptyDirectory(args[1]);
 if(args.Length==2 && args[0] is "--verify-package" or "--verify-qa-package")
 {PackageChecks.Verify(args[1],args[0]=="--verify-qa-package");return;}
-if(args.Length==4 && args[0]=="--storage-child"){await StorageProcessScenarios.Child(args);return;}
-if(args.Length==4 && args[0]=="--draft-child"){await StorageProcessScenarios.DraftChild(args);return;}
 if(args.Length==3 && args[0]=="--seed-storage-ui")
 {
     Directory.CreateDirectory(args[1]);var w=StorageScenarios.Fixture();using var db=StorageScenarios.Legacy(args[1],w);
@@ -60,7 +58,6 @@ Task Sync(Action a) { a(); return Task.CompletedTask; }
 void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
 DataRow Row(params (string, string)[] fields) => new() { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
 if(args.Length==2 && args[0]=="--benchmark-v3"){await StorageV3Scenarios.Benchmark(args[1]);return;}
-if(args.Length==1 && args[0]=="--storage"){await StorageScenarios.Run(Test);Console.WriteLine($"{passed} storage scenarios passed.");return;}
 if(args.Length==2 && args[0]=="--benchmark-storage"){await StorageScenarios.Benchmark(args[1]);return;}
 if(args.Length==1 && args[0]=="--benchmark-journal-jobs"){await JournalBenchmark.JobsCost();return;}
 if(args.Length==3 && args[0]=="--benchmark-journal"){await JournalBenchmark.Run(args[1],args[2]);return;}
@@ -193,7 +190,6 @@ await Test("Language switch during execution does not resend writes or change ta
     Check(loc.Format(restored.Description!)=="Completed and verified" && loc.Format(restored.Items[0].Description!)=="Verified by read-back");
     await new BatchExecutor(fake,fake).ExecuteAsync(restored,()=>Task.CompletedTask,CancellationToken.None); Check(fake.Writes==1);
 });
-await StorageScenarios.Run(Test);
 Summary("scenarios ");
 
 sealed class CountingService(DemoService inner) : IResourceReader,IResourceWriter
