@@ -11,25 +11,14 @@ namespace VamSys.UnitTests.Inventory;
 /// </summary>
 public partial class EnumInventoryTests
 {
-    // Enums that were declared in the WinUI app and now live in the application project.
-    static readonly Dictionary<string, string> MovedFromApp = new() { ["VamSys.Core.ReviewDisposition"] = "src/VamSys.App/ReviewPlanBuilder.cs" };
-
+    // The expected files record the current assembly and file locations. When code moves,
+    // regenerating them with VAMSYS_UPDATE_GOLDEN=1 is fine, but enum member names, numeric
+    // values, JSON properties, resource keys and capability keys must stay unchanged.
     static IEnumerable<string> Describe(Assembly assembly)
     {
-        // This inventory locks persisted enum names/numbers, not physical assembly placement.
-        // ArchitectureBoundaryTests locks the real Domain/Application owners separately.
-        var source = assembly == typeof(Workspace).Assembly || assembly == typeof(BatchExecutor).Assembly
-            ? "VamSys.Core" : assembly.GetName().Name;
+        var source = assembly.GetName().Name;
         foreach (var type in assembly.GetTypes().Where(t => t.IsEnum))
         {
-            // Moved out of the app assembly by R4: keep the R0 provenance the expected file records.
-            if (MovedFromApp.TryGetValue(type.FullName!, out var declaredIn))
-            {
-                yield return $"VamSys.App(source):{type.Name} => declared in {declaredIn}";
-                foreach (var name in Enum.GetNames(type))
-                    yield return $"VamSys.App(source):{type.Name}.{name} => {Convert.ToDecimal(Enum.Parse(type, name), System.Globalization.CultureInfo.InvariantCulture)}";
-                continue;
-            }
             var underlying = Enum.GetUnderlyingType(type).Name;
             var flags = type.GetCustomAttribute<FlagsAttribute>() != null ? " [Flags]" : "";
             var visibility = type.IsVisible ? "public" : "non-public";
@@ -67,7 +56,7 @@ public partial class EnumInventoryTests
     {
         var assemblies = new[] { typeof(Workspace).Assembly, typeof(BatchExecutor).Assembly, typeof(OperationsAdapter).Assembly, typeof(WorkspaceStore).Assembly };
         var lines = assemblies.Distinct().SelectMany(Describe).Concat(DescribeApp()).ToList();
-        Assert.Contains(lines, l => l.StartsWith("VamSys.Core:VamSys.Core.ItemState.ManuallyConfirmed => 7"));
+        Assert.Contains(lines, l => l.Contains(":VamSys.Core.ItemState.ManuallyConfirmed => 7", StringComparison.Ordinal));
         Golden.Verify("Enums.txt", lines);
     }
 }
