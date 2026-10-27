@@ -1,7 +1,12 @@
+// Verbatim port of the legacy runner scenarios: analyzer rules the old runner never applied are silenced here.
+#pragma warning disable CA2000, CA1307, CA1310
 using System.Net;
 using System.Text.Json;
 using VamSys.Core;
 using VamSys.Infrastructure;
+using VamSys.TestSupport;
+
+namespace VamSys.IntegrationTests.Api.Legacy;
 
 static class AuditScenarios
 {
@@ -168,10 +173,4 @@ static class AuditScenarios
         }
     }
 }
-sealed class AuditHttp:HttpMessageHandler
-{
-    public List<HttpMethod> Methods=[];
-    public Func<HttpRequestMessage,CancellationToken,HttpResponseMessage> Next=(r,ct)=>throw new Exception("Unexpected request");
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct)
-    { Methods.Add(request.Method);return Task.FromResult(Next(request,ct)); }
-}
+

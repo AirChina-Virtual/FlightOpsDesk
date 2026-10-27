@@ -1,7 +1,12 @@
+// Verbatim port of the legacy runner scenarios: analyzer rules the old runner never applied are silenced here.
+#pragma warning disable CA2000, CA1307, CA1310
 using System.Net;
 using System.Text.Json;
 using VamSys.Core;
 using VamSys.Infrastructure;
+using VamSys.TestSupport;
+
+namespace VamSys.IntegrationTests.Api.Legacy;
 
 static class ReauditScenarios
 {
@@ -106,3 +111,4 @@ static class ReauditScenarios
         });
     }
 }
+

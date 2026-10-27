@@ -23,4 +23,12 @@
 
 ## 结果（由子代理填写）
 
-按共用做法中的格式，不超过 25 行。
+删除前／后旧运行器场景数：删除 55 个（Api 12、Contract 5、Audit 22、Reaudit 8、Lifecycle 8）；运行器总数未测（按要求只跑快速档）。
+已删除场景：ApiScenarios、ContractScenarios、AuditScenarios、ReauditScenarios、LifecycleScenarios 五个文件的全部 55 个场景 → 逐个迁为 `LegacyApiScenarioTests.Scenario(group, name)` 的参数化用例（用例名即原场景名，含按故障类型／资源展开的各项）。
+  说明：未逐条去重到 UnitTests/IntegrationTests 已有测试（例如 Pager/RequestBudget/StepWriter/DuplicateFinder/ReadbackVerifier/UnknownResolver 与之有大量重叠），而是原样迁移断言，保证不丢覆盖；之后可再按已有测试逐条合并。
+  审核回归（每个问题至少一条以问题命名的用例）均保留：Unknown recovery survives restart and never writes（10 种故障）、Interrupted and legacy partially written items remain read-only、Recovery cannot be downgraded by unresolved dependencies or conflicts、Airport recovery validates aliases before binding a supplied ID、Airport duplicate checks reject both aliases、Routings/Routes readback / duplicate / ambiguity / cross-VA 系列、Typed create readback（boolean/numeric/unsent-default）、Sparse typed update、Explicit zero and empty collection、Preflight 500 is retryable、Post-write verification errors stay unknown、Recovery candidate can be corrected、Full refresh swaps identity index atomically（4 种）、Paused task rotates credentials（2 种）、Rotated credentials cannot change the bound VA、Successful permanent delete evicts the resource cache。
+新增测试：tests/VamSys.IntegrationTests/Api/Legacy/（ApiScenarios、ContractScenarios、AuditScenarios、ReauditScenarios、LifecycleScenarios、LegacyFixtures、LegacyApiScenarioTests；55 个用例）。
+  为通过“新警告”闸门，这些文件顶部加了 `#pragma warning disable CA2000, CA1307, CA1310`（原样搬来的旧代码）；基线文件未改。
+保留的场景及原因：无；`ScriptedHttp`、`AuditHttp` 仍被其他旧场景使用，移到新文件 tests/VamSys.Tests/LegacyHttpFixtures.cs；`RouteApprovalFixture`、`TestTime`、`InstantTime` 原文件未动。Program.cs 只去掉五行 `Run(Test)` 调用，命令行入口未动。
+未发现产品缺陷；未改 src/、docs/TEST-COVERAGE.md、docs/analyzer-baseline.txt。快速档：ALL PASSED（单元 1420、集成 297）。
+提交：见下方（分支 cleanup/c3-api-basics-legacy）。

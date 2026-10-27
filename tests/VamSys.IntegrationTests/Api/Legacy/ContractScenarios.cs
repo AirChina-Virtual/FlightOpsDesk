@@ -1,7 +1,12 @@
+// Verbatim port of the legacy runner scenarios: analyzer rules the old runner never applied are silenced here.
+#pragma warning disable CA2000, CA1307, CA1310
 using System.Net;
 using System.Text.Json;
 using VamSys.Core;
 using VamSys.Infrastructure;
+using VamSys.TestSupport;
+
+namespace VamSys.IntegrationTests.Api.Legacy;
 
 // Regressions for the OpenAPI contract audit: documented response shapes, paging, throttling and field formats.
 static class ContractScenarios
@@ -91,3 +96,4 @@ static class ContractScenarios
         });
     }
 }
+

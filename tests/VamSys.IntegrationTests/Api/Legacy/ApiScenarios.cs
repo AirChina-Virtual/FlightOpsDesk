@@ -1,7 +1,12 @@
+// Verbatim port of the legacy runner scenarios: analyzer rules the old runner never applied are silenced here.
+#pragma warning disable CA2000, CA1307, CA1310
 using System.Net;
 using System.Text.Json;
 using VamSys.Core;
 using VamSys.Infrastructure;
+using VamSys.TestSupport;
+
+namespace VamSys.IntegrationTests.Api.Legacy;
 
 static class ApiScenarios
 {
@@ -114,7 +119,7 @@ static class ApiScenarios
                 r=>{Check(persisted&&r.Method==HttpMethod.Put&&r.RequestUri!.AbsolutePath.EndsWith("fleet/4"));throw new TimeoutException();},
                 r=>Task.FromResult(ScriptedHttp.Json("{\"data\":{\"id\":4,\"airline_id\":7,\"name\":\"Fleet\",\"code\":\"B738\",\"type\":\"pax\",\"max_pax\":189}}"))]);
             var api=Adapter(w,h);var item=Create(ResourceKind.Fleets,Row(("Name","Fleet"),("Type Code","B738"),("Type (pax/cargo/...)","pax"),("Max Passengers","189")));
-            StorageScenarios.LegacyFleetSteps(item);
+            LegacyFixtures.LegacyFleetSteps(item);
             w.Resources[ResourceKind.Fleets].Draft.Add(item.After.Dup());var job=new BatchJob{Mode=RunMode.Online,Items=[item]};var executor=new OperationsBatchExecutor(api,w);
             await executor.ExecuteAsync(job,()=>{persisted=item.CreateCompleted&&item.RemoteId=="4";return Task.CompletedTask;},default);
             Check(item.State==ItemState.Unknown&&persisted&&h.Calls==3);
@@ -157,10 +162,4 @@ static class ApiScenarios
         }));
     }
 }
-sealed class ScriptedHttp(IEnumerable<Func<HttpRequestMessage,Task<HttpResponseMessage>>> scripts):HttpMessageHandler
-{
-    readonly Queue<Func<HttpRequestMessage,Task<HttpResponseMessage>>> queue=new(scripts);
-    public int Calls;
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,CancellationToken ct){Calls++;return queue.Dequeue()(request);}
-    public static HttpResponseMessage Json(string value,HttpStatusCode status=HttpStatusCode.OK)=>new(status){Content=new StringContent(value,System.Text.Encoding.UTF8,"application/json")};
-}
+
