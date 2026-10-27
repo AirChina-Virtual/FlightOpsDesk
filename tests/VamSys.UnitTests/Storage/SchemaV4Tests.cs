@@ -34,7 +34,9 @@ public class SchemaV4Tests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            // Only this test's pool: other tests may be using SQLite in parallel.
+            using (var pooled = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = Path.Combine(dir, "workspaces.db") }.ToString()))
+                SqliteConnection.ClearPool(pooled);
             if (Directory.Exists(dir))
                 Directory.Delete(dir, true);
         }

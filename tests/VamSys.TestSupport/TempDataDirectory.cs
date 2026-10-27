@@ -16,8 +16,14 @@ public sealed class TempDataDirectory : IDisposable
     public string File(string name) => System.IO.Path.Combine(Path, name);
     public void Dispose()
     {
-        // Release pooled SQLite handles so the database files can be removed on Windows.
-        SqliteConnection.ClearAllPools();
+        // Release the pooled SQLite handles of this directory's databases only, so the files can be removed on
+        // Windows. ClearAllPools would also close connections that tests running in parallel are still using.
+        if (Directory.Exists(Path))
+            foreach (var file in Directory.EnumerateFiles(Path, "*.db", SearchOption.AllDirectories))
+            {
+                using var connection = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = file }.ToString());
+                SqliteConnection.ClearPool(connection);
+            }
         for (var attempt = 0; attempt < 5; attempt++)
         {
             try

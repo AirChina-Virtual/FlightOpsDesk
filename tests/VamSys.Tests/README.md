@@ -15,8 +15,6 @@
 dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
 
 # 只运行其中一部分
-dotnet run --project tests/VamSys.Tests -c Release -- --verified-scope    # 外部证据范围、飞机移动、软删除和历史只读核对
-dotnet run --project tests/VamSys.Tests -c Release -- --live-compatibility # kg、诊断、参数、scheduled、jumpseat、备份清理
 dotnet run --project tests/VamSys.Tests -c Release -- --storage            # 数据保存与行级保存
 
 # 基准，写入 JSON
@@ -45,17 +43,11 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 | 文件 | 验证重点 |
 |---|---|
 | Program.cs | 选择要运行的检查，处理命令参数，为窗口测试准备数据 |
-| ApiScenarios.cs | 发给 API 的请求，以及服务器返回数据的处理 |
-| LiveCompatibilityScenarios.cs | 10 月契约兼容、完整诊断脱敏、批准关联、集合与恢复、备份事务；调用实际产品代码 |
-| Fixtures/vcca-weight-20261020.json | 8 份保留的真实 API 响应回放：身份与追踪值脱敏，保留数值、null 和包装结构；仅在测试进程回放 |
-| AuditScenarios.cs、ReauditScenarios.cs | 重现以前发现的问题，防止再次出现 |
-| ContractScenarios.cs | 按官方规范检查航线数据、分页、写入限流、字段校验和日期格式 |
-| CandidateIndexScenarios.cs | 同名记录保留、查重结果更新、随机数据对照 |
-| LifecycleScenarios.cs | 连续新增、修改、删除或恢复时，各步骤是否互相影响 |
+| tests/VamSys.IntegrationTests/Fixtures/vcca-weight-20261020.json | 8 份保留的真实 API 响应回放：身份与追踪值脱敏，保留数值、null 和包装结构；仅在测试进程回放 |
+| CandidateIndexScenarios.cs | 仅保留基准入口 `CandidateIndexScenarios.Benchmark`（`--benchmark-*` 依赖）；其余检查已迁移到 xUnit 测试 |
 | StorageScenarios.cs、StorageV3Scenarios.cs | 只保留测试夹具、基准入口和实际 v3 二进制拒读 v4 的检查；其余已迁移到 `tests/VamSys.IntegrationTests/Storage` |
 | StorageProcessScenarios.cs | 强制结束正在执行的测试进程再重启，检查是否重复提交；也检查行级保存中途被结束 |
-| VerifiedScopeScenarios.cs | 15 项证据基线与字段／类型范围、真实适配器和执行器的飞机 PATCH、204／404、历史任务只读补核对、原子人工确认与旧 JSON 回归 |
-| PerformanceScenarios.cs | 请求次数，以及大量记录下的查重和处理速度 |
+| PerformanceScenarios.cs | 仅保留基准入口 `PerformanceScenarios.Benchmark`、`RouteBenchmark`（`--benchmark-performance` 依赖）；请求次数与查重速度检查已迁移到 xUnit 测试 |
 | CorePerformanceBenchmark.cs | 1 千／2 万／5 万行基准（规划对照、位置索引、局部回放的失败原子性已改由 `VamSys.UnitTests` 的领域测试覆盖） |
 | DataUiFixture.cs | `--seed-data-ui` 使用的窗口测试合成数据 |
 | TestTime.cs | 两种虚拟时钟（见下节） |
