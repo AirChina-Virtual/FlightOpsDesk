@@ -34,6 +34,10 @@ public interface ILocalizationService
     CultureInfo DisplayCulture { get; }
     event EventHandler? LanguageChanged;
     string Get(string key, params (string Name, object? Value)[] arguments);
+    // A MessageDescriptor converts to its legacy text implicitly, and that text is not a resource key: Get would show
+    // "[航线]". This overload wins over the conversion, so such a call does not compile; translate it with Format.
+    [Obsolete("Get takes a resource key. Translate a MessageDescriptor with Format.", error: true)]
+    string Get(MessageDescriptor message, params (string Name, object? Value)[] arguments) => Format(message);
     string Format(MessageDescriptor message);
     void SetLanguage(string language);
 }
@@ -54,6 +58,8 @@ public sealed class LocalizationService : ILocalizationService
         LanguageChanged?.Invoke(this, EventArgs.Empty);
     }
     public string Get(string key, params (string Name, object? Value)[] arguments) => Format(Messages.Define(key, arguments));
+    [Obsolete("Get takes a resource key. Translate a MessageDescriptor with Format.", error: true)]
+    public string Get(MessageDescriptor message, params (string Name, object? Value)[] arguments) => Format(message);
     public string Format(MessageDescriptor message)
     {
         if (message.Code is null)

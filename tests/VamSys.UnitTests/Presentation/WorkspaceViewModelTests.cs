@@ -30,7 +30,9 @@ public class WorkspaceViewModelTests
         var card = model.Cards.Single(c => c.Kind == ResourceKind.Fleets);
         Assert.Equal(language.Get("Text_B9B43D4DAA", ("arg0", 2), ("arg1", 1)), card.Summary);
         Assert.Equal([fleets], asked);
-        Assert.Equal(language.Get(Schemas.All[ResourceKind.Fleets].Name), card.Title);
+        // The resource name is a message: translated, never looked up as a key (which would show "[机队]").
+        Assert.Equal("Fleets", card.Title);
+        Assert.All(model.Cards, c => Assert.DoesNotContain("[", c.Title, StringComparison.Ordinal));
     }
 
     [Fact]

@@ -45,6 +45,10 @@ public class ReviewViewModelTests
         foreach (var heading in model.Rows.Where(r => r.IsHeading))
             await heading.ExportCommand!.ExecuteAsync(null);
         Assert.Equal(expected, exported);
+        // The heading is the translated resource name, so the export button reads "Export Routes CSV".
+        var routes = model.Rows.Single(r => r.IsHeading && r.Resource == ResourceKind.Routes);
+        Assert.Equal("Routes", routes.Heading);
+        Assert.Equal("Export Routes CSV", routes.ExportLabel);
     }
 
     [Theory]

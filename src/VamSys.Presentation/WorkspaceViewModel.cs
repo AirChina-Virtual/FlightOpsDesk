@@ -8,7 +8,7 @@ namespace VamSys.Presentation;
 public sealed class ResourceCardViewModel(ResourceKind kind, ResourceData data, ILocalizationService language, Func<ResourceData, int> countChanges) : ObservableObject
 {
     public ResourceKind Kind { get; } = kind;
-    public string Title => language.Get(Schemas.All[Kind].Name);
+    public string Title => language.Format(Schemas.All[Kind].Name);
     public string Summary => language.Get("Text_B9B43D4DAA", ("arg0", data.Draft.Count), ("arg1", countChanges(data)));
     public string OpenLabel => language.Get("Text_C771248E51");
 

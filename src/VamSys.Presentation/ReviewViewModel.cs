@@ -21,7 +21,7 @@ public sealed class ReviewRowViewModel(ResourceKind resource, ReviewEntry? entry
     public ResourceKind Resource { get; } = resource;
     public ReviewEntry? Entry { get; } = entry;
     public bool IsHeading => Entry is null;
-    public string Heading => language.Get(Schemas.All[Resource].Name);
+    public string Heading => language.Format(Schemas.All[Resource].Name);
     public string ExportLabel => language.Get("ReviewExport", ("resource", Heading));
     public string State => Entry is null ? "" : language.Get("ReviewState_" + Entry.Disposition);
     public string Body => Entry is null ? "" : ReviewTexts.ChangeText(Entry.Planned, language);
