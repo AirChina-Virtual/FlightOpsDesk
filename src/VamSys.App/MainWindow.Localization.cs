@@ -48,9 +48,7 @@ public sealed partial class MainWindow
             AutomationProperties.SetName(ResourcePicker, L("ResourceType"));
             AutomationProperties.SetName(WorkspacePicker, L("CurrentWorkspace"));
             RefreshShell();
-            FlushTasks();
-            foreach (var task in taskModels)
-                task.RefreshLanguage();
+            Tasks.RefreshLanguage();
             StatusLabel.Text = statusText();
             foreach (var row in visible)
             foreach (var cell in row.Cells)

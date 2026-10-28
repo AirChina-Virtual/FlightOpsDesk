@@ -1,0 +1,38 @@
+<UserControl x:Class="VamSys.App.TasksPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:VamSys.Presentation">
+  <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
+  <Grid RowSpacing="{StaticResource SpacingLarge}">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <StackPanel Spacing="{StaticResource SpacingLarge}">
+      <TextBlock Text="{x:Bind Model.Header, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <Button Content="{x:Bind Model.CancelLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanCancel, Mode=OneWay}" Click="Cancel"/>
+    </StackPanel>
+    <!-- A virtualizing list: only the visible cards are realized, and each card updates only its changed texts. -->
+    <ListView Grid.Row="1" AutomationProperties.AutomationId="TaskJobsList" ItemsSource="{x:Bind Model.Jobs}"
+        SelectionMode="Single" HorizontalContentAlignment="Stretch" Loaded="JobsLoaded">
+      <ListView.ItemTemplate>
+        <DataTemplate x:DataType="vm:TaskJobViewModel">
+          <Border Padding="{StaticResource TaskCardPadding}" Margin="{StaticResource TaskCardMargin}" CornerRadius="{StaticResource CardCornerRadius}" Background="{ThemeResource CardBackgroundBrush}">
+            <StackPanel Spacing="{StaticResource SpacingRelaxed}">
+              <TextBlock Text="{x:Bind Title, Mode=OneWay}" FontSize="{StaticResource CardTitleFontSize}" TextWrapping="Wrap"/>
+              <TextBlock Text="{x:Bind Summary, Mode=OneWay}" TextWrapping="Wrap"/>
+              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingRelaxed}">
+                  <Button Content="{x:Bind DetailsLabel, Mode=OneWay}" Command="{x:Bind Details}"/>
+                  <Button Content="{x:Bind ReviewLabel, Mode=OneWay}" Command="{x:Bind Review}"/>
+                  <Button Content="{x:Bind VerifyDeletesLabel, Mode=OneWay}" Command="{x:Bind VerifyDeletes}"/>
+                  <Button Content="{x:Bind ResumeLabel, Mode=OneWay}" Command="{x:Bind Resume}"/>
+                  <Button Content="{x:Bind DiscardLabel, Mode=OneWay}" Command="{x:Bind Discard}"/>
+                  <Button Content="{x:Bind RetryLabel, Mode=OneWay}" Command="{x:Bind Retry}"/>
+                  <Button Content="{x:Bind ExportLabel, Mode=OneWay}" Command="{x:Bind Export}"/>
+                </StackPanel>
+              </ScrollViewer>
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ListView.ItemTemplate>
+    </ListView>
+  </Grid>
+</UserControl>

@@ -195,7 +195,7 @@ public sealed partial class MainWindow
                     }
                     PageHost.Content=Scroll(cards);RootGrid.UpdateLayout();if(n>=2)samples.Add(timer.Elapsed.TotalMilliseconds);
                 }
-                PageHost.Content=TasksPage();samples.Sort();return new{p95=samples[^1],samples=samples.Count};
+                PageHost.Content=BuildTasksPage();samples.Sort();return new{p95=samples[^1],samples=samples.Count};
             }
         }
         if(command.StartsWith("data-density:")){await ChangeTableDensity(command[13..]);RootGrid.UpdateLayout();await Task.Delay(80);RootGrid.UpdateLayout();return DataVerificationState();}

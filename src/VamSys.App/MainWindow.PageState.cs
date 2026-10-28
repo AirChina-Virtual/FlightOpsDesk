@@ -28,7 +28,7 @@ public sealed partial class MainWindow
     TextBox? searchBox; ComboBox? filterBox, sortBox;
     ScrollViewer? horizontalTable;
     DataPageState CurrentDataState => dataStates.TryGetValue((workspace.Id, resource), out var state) ? state : dataStates[(workspace.Id, resource)] = new();
-    static T? FindVisual<T>(DependencyObject parent) where T : DependencyObject
+    internal static T? FindVisual<T>(DependencyObject parent) where T : DependencyObject
     {
         for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
         {
@@ -83,12 +83,8 @@ public sealed partial class MainWindow
         tableConflicts = [];
         tableFleetLabels = new(StringComparer.OrdinalIgnoreCase);
         shownWorkspacePage = null;
-        tasksOwner = null;
         tasksPage = null;
-        taskList = null;
-        taskModels.Clear();
-        taskIndex.Clear();
-        pendingTaskItems.Clear();
+        Tasks.Clear();
         // Each session's adapter holds the instance it was created for; a reload gets a new one anyway.
         online.Release(previous.Id);
     }

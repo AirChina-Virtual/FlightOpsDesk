@@ -212,7 +212,7 @@ public sealed partial class MainWindow : Window
             ShellPage.Data => DataPage(),
             ShellPage.Import => BuildImportPage(),
             ShellPage.Review => ReviewPage(),
-            ShellPage.Tasks => TasksPage(),
+            ShellPage.Tasks => BuildTasksPage(),
             ShellPage.Settings => GetSettingsPage(),
             _ => BuildWorkspacePage()
         };
