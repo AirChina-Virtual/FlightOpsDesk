@@ -210,7 +210,7 @@ public sealed partial class MainWindow : Window
         PageHost.Content = shell.Page switch
         {
             ShellPage.Data => DataPage(),
-            ShellPage.Import => ImportPage(),
+            ShellPage.Import => BuildImportPage(),
             ShellPage.Review => ReviewPage(),
             ShellPage.Tasks => TasksPage(),
             ShellPage.Settings => GetSettingsPage(),
@@ -352,9 +352,10 @@ public sealed partial class MainWindow : Window
             leading.Add(FleetAssignmentService.Field(resource));
         return leading.Concat(Data.Columns.Count == 0 ? Schemas.All[resource].Columns : Data.Columns).Distinct().ToList();
     }
-    UIElement ImportPage() => Stack(Text(() => L("Text_D030C51D78"), UiTokens.SubtitleFontSize),
-        Text(() => L("Text_3618171B0A")), Text(() => L("WeightCsvHint")),
-        Button(() => L("Text_5A2BBDEA04"), ImportCsv), Button(() => L("ApiRefresh"), RefreshApi));
+    // Rebuilt on every render; the shown one is refreshed when the language changes.
+    ImportPage? shownImportPage;
+    UIElement BuildImportPage() => shownImportPage = new ImportPage(new ImportViewModel(localization),
+        new ImportPageActions(Invoke: async action => { if (gate.CanInvokeCommand) await UserAction(action); }, ImportCsv: ImportCsv, Refresh: RefreshApi));
     Task StartDemo() => SubmitWorkspace(RunMode.Demo);
     async Task ExecuteDemo(BatchJob job)
     {

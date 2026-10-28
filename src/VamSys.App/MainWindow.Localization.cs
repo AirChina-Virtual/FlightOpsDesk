@@ -59,6 +59,8 @@ public sealed partial class MainWindow
                 settingsPage.Model.RefreshLanguage();
             if (ReferenceEquals(PageHost.Content, shownWorkspacePage))
                 shownWorkspacePage?.Model.RefreshLanguage();
+            if (ReferenceEquals(PageHost.Content, shownImportPage))
+                shownImportPage?.Model.RefreshLanguage();
             if (page == "review")
             foreach (var row in reviewRows)
                 row.RefreshLanguage();
