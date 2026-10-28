@@ -18,8 +18,8 @@ public sealed partial class MainWindow
         public HashSet<Guid> Conflicts = [];
         public Dictionary<string, FleetOption> FleetLabels = new(StringComparer.OrdinalIgnoreCase);
         public double Vertical, Horizontal;
-        public bool SelectionCountsDirty = true;
-        public int SelectedActive, SelectedDeleted, SelectedDeletable;
+        public readonly SelectionCounts Counts = new();
+
     }
     readonly Dictionary<(Guid, ResourceKind), DataPageState> dataStates = [];
     readonly Dictionary<Guid, SettingsPage> settingsPages = [];

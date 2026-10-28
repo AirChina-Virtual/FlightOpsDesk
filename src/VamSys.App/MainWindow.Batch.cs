@@ -17,22 +17,7 @@ public sealed partial class MainWindow
     {
         if (shownState is null)
             return (0, 0, 0);
-        if (shownState.SelectionCountsDirty)
-        {
-            shownState.SelectedActive = shownState.SelectedDeleted = shownState.SelectedDeletable = 0;
-            foreach (var id in shownState.Model.Selected)
-                if (Data.FindDraftRow(id) is { } row)
-                {
-                    if (Schemas.Deleted(row))
-                        shownState.SelectedDeleted++;
-                    else
-                        shownState.SelectedActive++;
-                    if (!Schemas.Deleted(row) || !tableBaseline.ContainsKey(id))
-                        shownState.SelectedDeletable++;
-                }
-            shownState.SelectionCountsDirty = false;
-        }
-        return (shownState.SelectedActive, shownState.SelectedDeleted, shownState.SelectedDeletable);
+        return shownState.Counts.Read(shownState.Model.Selected, Data.FindDraftRow, tableBaseline.ContainsKey);
     }
     async Task LocalOperation(Func<Task> action)
     {

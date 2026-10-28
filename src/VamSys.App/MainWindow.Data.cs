@@ -147,7 +147,7 @@ public sealed partial class MainWindow
         changeCounts.Clear();
         foreach (var state in dataStates.Values)
         {
-            state.SelectionCountsDirty = true;
+            state.Counts.Invalidate();
             state.Model.Invalidate();
             state.Baseline = null;
             state.Conflicts = [];
@@ -165,7 +165,7 @@ public sealed partial class MainWindow
     {
         if (changeCounts.TryGetValue(source, out var count))
             changeCounts[source] = count - changedBefore + CountChanged(source, ids);
-        shownState!.SelectionCountsDirty = true;
+        shownState!.Counts.Invalidate();
         var replaced = ids.ToHashSet();
         foreach (var view in visible)
             if (replaced.Contains(view.Row.LocalId) && source.FindDraftRow(view.Row.LocalId) is { } row)
@@ -240,7 +240,7 @@ public sealed partial class MainWindow
             state.Conflicts = tableConflicts;
             state.FleetLabels = tableFleetLabels;
             state.Model.Apply(result, search, filter, sort);
-            state.SelectionCountsDirty = true;
+            state.Counts.Invalidate();
             state.AppliedSearch = search;
             state.AppliedFilter = filter;
             state.AppliedSort = sort;
@@ -400,7 +400,7 @@ public sealed partial class MainWindow
         pageSize.SelectionChanged += (_, _) => { if (CanEditData() && pageSize.SelectedItem is int size && size != Model().PageSize) { Model().SetPageSize(size); ShowDataPageRows(true); } };
         pageSummary = Text(() => PageSummary());
         selectionSummary = Text(() => SelectionSummary());
-        selectPage = SelectionItem("TableSelectPage", () => { restoringDataSelection = true; try { foreach (var row in visible) { Model().Selected.Add(row.Row.LocalId); if (!table!.SelectedItems.Contains(row)) table.SelectedItems.Add(row); } } finally { restoringDataSelection = false; } shownState!.SelectionCountsDirty = true; RefreshDataAvailability(); }, "DataSelectPage");
+        selectPage = SelectionItem("TableSelectPage", () => { restoringDataSelection = true; try { foreach (var row in visible) { Model().Selected.Add(row.Row.LocalId); if (!table!.SelectedItems.Contains(row)) table.SelectedItems.Add(row); } } finally { restoringDataSelection = false; } shownState!.Counts.Invalidate(); RefreshDataAvailability(); }, "DataSelectPage");
         selectAll = SelectionItem("TableSelectAll", () => { Model().SelectAll(); RestoreDataSelection(); }, "DataSelectAll");
         clearSelection = SelectionItem("TableClearSelection", () => { Model().Selected.Clear(); RestoreDataSelection(); }, "DataClearSelection");
         var menu = new MenuFlyout();
@@ -463,38 +463,40 @@ public sealed partial class MainWindow
         var enabled = CanEditData();
         var model = shownState.Model;
         var counts = SelectionCounts();
+        var can = DataGridAvailability.For(model, enabled, visible.Count);
         LockDataTable(!enabled);
         if (dataActions != null)
             foreach (var command in dataActions.PrimaryCommands.Concat(dataActions.SecondaryCommands).OfType<AppBarButton>())
             {
-                command.IsEnabled = enabled && ((command.Tag as string) switch { "active" => counts.Active > 0, "deleted" => counts.Deleted > 0, "delete" => counts.Deletable > 0, _ => true }) && (command.Icon is not SymbolIcon { Symbol: Symbol.Important } || Data.Conflicts.Count > 0);
-                if (command.Icon is SymbolIcon { Symbol: Symbol.Important })
+                var conflictCommand = command.Icon is SymbolIcon { Symbol: Symbol.Important };
+                command.IsEnabled = DataGridAvailability.Command(enabled, command.Tag as string, conflictCommand, counts, Data.Conflicts.Count);
+                if (conflictCommand)
                     command.Label = L("ApiConflicts", ("count", Data.Conflicts.Count));
             }
         if (firstPage != null)
-            firstPage.IsEnabled = enabled && model.Page > 1;
+            firstPage.IsEnabled = can.First;
         if (previousPage != null)
-            previousPage.IsEnabled = enabled && model.Page > 1;
+            previousPage.IsEnabled = can.Previous;
         if (nextPage != null)
-            nextPage.IsEnabled = enabled && model.Page < model.PageCount;
+            nextPage.IsEnabled = can.Next;
         if (lastPage != null)
-            lastPage.IsEnabled = enabled && model.Page < model.PageCount;
+            lastPage.IsEnabled = can.Last;
         if (pageGo != null)
-            pageGo.IsEnabled = enabled && model.Total > 0;
+            pageGo.IsEnabled = can.Go;
         if (pageJump != null)
-        { pageJump.IsEnabled = enabled; if (pageJump.Tag is not int oldPage || oldPage != model.Page) { pageJump.Text = model.Page.ToString(); pageJump.Tag = model.Page; } }
+        { pageJump.IsEnabled = can.Edit; if (pageJump.Tag is not int oldPage || oldPage != model.Page) { pageJump.Text = model.Page.ToString(); pageJump.Tag = model.Page; } }
         if (pageSize != null)
-            pageSize.IsEnabled = enabled;
+            pageSize.IsEnabled = can.Edit;
         if (selectionButton != null)
-            selectionButton.IsEnabled = enabled;
+            selectionButton.IsEnabled = can.Edit;
         if (densityPicker != null)
-        { densityPicker.IsEnabled = enabled; AutomationProperties.SetName(densityPicker, L("TableDensity")); }
+        { densityPicker.IsEnabled = can.Edit; AutomationProperties.SetName(densityPicker, L("TableDensity")); }
         if (selectPage != null)
-            selectPage.IsEnabled = enabled && visible.Count > 0;
+            selectPage.IsEnabled = can.SelectPage;
         if (selectAll != null)
-            selectAll.IsEnabled = enabled && model.Total > 0;
+            selectAll.IsEnabled = can.SelectAll;
         if (clearSelection != null)
-            clearSelection.IsEnabled = enabled && model.Selected.Count > 0;
+            clearSelection.IsEnabled = can.ClearSelection;
         if (queryCancel != null)
             queryCancel.Visibility = gate.QueryInProgress ? Visibility.Visible : Visibility.Collapsed;
         if (pageSummary != null)
@@ -529,7 +531,7 @@ public sealed partial class MainWindow
     {
         if (table is null || shownState is null)
             return;
-        shownState.SelectionCountsDirty = true;
+        shownState.Counts.Invalidate();
         restoringDataSelection = true;
         try
         { table.SelectedItems.Clear(); foreach (var row in visible) if (shownState.Model.Selected.Contains(row.Row.LocalId)) table.SelectedItems.Add(row); }
@@ -541,11 +543,11 @@ public sealed partial class MainWindow
         if (restoringDataSelection || shownState is null)
             return;
         foreach (var row in args.RemovedItems.Cast<RowViewModel>())
-            if (shownState.Model.Selected.Remove(row.Row.LocalId) && !shownState.SelectionCountsDirty)
-            { if (Schemas.Deleted(row.Row)) shownState.SelectedDeleted--; else shownState.SelectedActive--; if (!Schemas.Deleted(row.Row) || !tableBaseline.ContainsKey(row.Row.LocalId)) shownState.SelectedDeletable--; }
+            if (shownState.Model.Selected.Remove(row.Row.LocalId))
+                shownState.Counts.Removed(row.Row, tableBaseline.ContainsKey(row.Row.LocalId));
         foreach (var row in args.AddedItems.Cast<RowViewModel>())
-            if (shownState.Model.Selected.Add(row.Row.LocalId) && !shownState.SelectionCountsDirty)
-            { if (Schemas.Deleted(row.Row)) shownState.SelectedDeleted++; else shownState.SelectedActive++; if (!Schemas.Deleted(row.Row) || !tableBaseline.ContainsKey(row.Row.LocalId)) shownState.SelectedDeletable++; }
+            if (shownState.Model.Selected.Add(row.Row.LocalId))
+                shownState.Counts.Added(row.Row, tableBaseline.ContainsKey(row.Row.LocalId));
         RefreshDataAvailability();
     }
     void RestoreDataOffsets(DataPageState state)
