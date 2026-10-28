@@ -368,23 +368,9 @@ public sealed partial class MainWindow
         { shownState.Vertical = 0; FindVisual<ScrollViewer>(table)?.ChangeView(null, 0, null, true); }
         RefreshDataAvailability();
     }
-    bool CellReadOnly(DataRow row, string field) => Schemas.Deleted(row) || workspace.Mode == RunMode.Online && row.Identity != null
-        && (field == "Parameter IDs" || row.Get("Type") == "jumpseat" && (field is "Callsign" or "Flight Number"));
-    string RowStatus(DataRow row, Dictionary<Guid, DataRow> baseline, HashSet<Guid> conflicts)
-    {
-        if (Schemas.Deleted(row))
-            return L("Text_EE96DC1EBE");
-        if (conflicts.Contains(row.LocalId))
-            return L("ApiRowConflict");
-        if (!baseline.TryGetValue(row.LocalId, out var before))
-            return L("Text_4EF7F62706");
-        return L(ChangePlanner.GetChangeKind(row, before) != null ? "ApiRowDraft" : "Text_20D2382F10");
-    }
-    string FleetLabel(string value, Dictionary<string, FleetOption> labels)
-    {
-        var label = string.Join("; ", FleetAssignmentService.Tokens(value).Select(t => labels.TryGetValue(t, out var option) ? option.Describe(localization) : L("Text_C221144914") + t));
-        return label.Length > 0 ? label : L("Text_F274578907");
-    }
+    bool CellReadOnly(DataRow row, string field) => DataGridRules.CellReadOnly(row, field, workspace.Mode);
+    string RowStatus(DataRow row, Dictionary<Guid, DataRow> baseline, HashSet<Guid> conflicts) => DataGridRules.RowStatus(row, baseline, conflicts, localization);
+    string FleetLabel(string value, Dictionary<string, FleetOption> labels) => DataGridRules.FleetLabel(value, labels, localization);
     void ChangeDataPage(int target)
     {
         if (!CanEditData() || shownState is null)
