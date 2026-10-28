@@ -296,7 +296,7 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-10-27，refactor/r0 46650d9）：** 第 4 步第三个页面（导入）完成：`ImportPage.xaml` 加 `ImportViewModel`，语言切换刷新当前页；新增 1 项无窗口测试，经回植验证。现有窗口脚本均不打开导入页，这一页没有窗口验收，需在 R7 的 C# 窗口测试或人工检查中补上。
 
-**进度（2026-10-28，refactor/r0 6c67f27）：** 第 4 步第四个页面（任务）完成，同时覆盖第 6 步的任务列表部分。新增 `TaskListViewModel`：任务按新的在前排列；进度变化立即计入模型，界面每 50 ms 合并呈现一次（定时器经 `IAutosaveTimer` 注入），立即变化当场刷新。`TasksPage.xaml` 用编译绑定替换 `XamlReader` 反射模板，列表仍虚拟化。新增 7 项无窗口测试，经回植验证。`TaskJobsList` 改由 XAML 定义。另修复构建偶发文件锁（22f359d）：Infrastructure 向 Storage 传了空的 `VamSysTestSupport`，Storage 因此以两个实例并行写入同一 obj 目录。窗口验收：`test-v3-verification-ui -Tasks` 通过（1,001 个任务，本地更新 P95 1.3 ms，最大 3.8 ms，页面构建 1 次）；`test-recovery-ui` 通过。创建的卡片由 7 张变为 11 张，仍在虚拟化门槛内，原因未查。
+**进度（2026-10-28，refactor/r0 6c67f27）：** 第 4 步第四个页面（任务）完成，同时覆盖第 6 步的任务列表部分。新增 `TaskListViewModel`：任务按新的在前排列；进度变化立即计入模型，界面每 50 ms 合并呈现一次（定时器经 `IAutosaveTimer` 注入），立即变化当场刷新。`TasksPage.xaml` 用编译绑定替换 `XamlReader` 反射模板，列表仍虚拟化。新增 7 项无窗口测试，经回植验证。`TaskJobsList` 改由 XAML 定义。另修复构建偶发文件锁（22f359d）：Infrastructure 向 Storage 传了空的 `VamSysTestSupport`，Storage 因此以两个实例并行写入同一 obj 目录。窗口验收：`test-v3-verification-ui -Tasks` 通过（1,001 个任务，本地更新 P95 1.3 ms，最大 3.8 ms，页面构建 1 次）；`test-recovery-ui` 通过。创建的卡片数（脚本在第一次看到卡片时计数）本来就随时机波动：新版连跑 4 次为 11、8、6、5 张，旧版记录为 7、8 张，均远低于 100 张门槛，不是本步引起的变化。
 
 ### R7 测试体系重建
 
