@@ -170,7 +170,7 @@ public sealed partial class MainWindow
         foreach (var view in visible)
             if (replaced.Contains(view.Row.LocalId) && source.FindDraftRow(view.Row.LocalId) is { } row)
                 view.Rebind(row);
-        lastEditedCell = null;
+        cellEdits.ResetContinuation();
     }
     int CountChanges(ResourceData data)
     {
@@ -314,20 +314,12 @@ public sealed partial class MainWindow
                         return;
                     var owner = link.Owner!;
                     var data = link.Data!;
-                    var current = view!.Row;
-                    var currentId = current.LocalId;
-                    var before = ChangePlanner.GetChangeKind(current, tableBaseline.GetValueOrDefault(currentId));
-                    var key = currentId + ":" + field;
-                    var newStep = lastEditedCell != key;
+                    var currentId = view!.Row.LocalId;
+                    var (replacement, changedDelta) = cellEdits.Commit(data, view.Row, field, value, tableBaseline);
                     // Rows are replaced, never edited in place: the view follows the replacement.
-                    var replacement = current.With(field, value);
-                    data.Edit([currentId], () => data.ReplaceDraftRows([replacement]), newStep: newStep);
-                    view!.ReplaceRow(replacement);
-                    current = replacement;
-                    lastEditedCell = key;
-                    var after = ChangePlanner.GetChangeKind(current, tableBaseline.GetValueOrDefault(currentId));
+                    view.ReplaceRow(replacement);
                     if (changeCounts.TryGetValue(data, out var count))
-                        changeCounts[data] = count + (after != null ? 1 : 0) - (before != null ? 1 : 0);
+                        changeCounts[data] = count + changedDelta;
                     view?.Cells.FirstOrDefault(c => c.Field == "_delete")?.RefreshLanguage();
                     session.RecordCellEdit(owner, link.Kind, currentId);
                     Status(() => L("Text_75141EDE81"));
@@ -354,7 +346,7 @@ public sealed partial class MainWindow
             var keep = Math.Max(rows.Count, shownState.Model.PageSize);
             if (pageRowPool.Count > keep)
                 pageRowPool.RemoveRange(keep, pageRowPool.Count - keep);
-            lastEditedCell = null;
+            cellEdits.ResetContinuation();
             visible = rows;
             dataRowBuilds++;
             SyncShownRows(rows);

@@ -31,7 +31,8 @@ public sealed partial class MainWindow : Window
     Workspace workspace => session.Workspace;
     IUserSettings settings => storage;
     string page => shell.Page.Tag();
-    bool ready; string? lastEditedCell;
+    bool ready;
+    readonly CellEditCommitter cellEdits = new();
     ListView? table; List<RowViewModel> visible = []; AppBarButton? fleetCommand, retireCommand;
     CancellationTokenSource? running;
     ResourceData Data => workspace.Resources[resource];
@@ -204,7 +205,7 @@ public sealed partial class MainWindow : Window
         CapturePageState();
         CaptureTaskState();
         ReleaseWorkspaceViews();
-        lastEditedCell = null;
+        cellEdits.ResetContinuation();
         ResourceBar.Visibility = shell.ShowsResourceBar ? Visibility.Visible : Visibility.Collapsed;
         RefreshShell();
         PageHost.Content = shell.Page switch
