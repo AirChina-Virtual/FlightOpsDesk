@@ -292,6 +292,8 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-10-27，refactor/r0 59d4bfc）：** 第 4 步第一个页面（设置）完成：`SettingsPage.xaml`（编译绑定，无 `x:Name`）加 `SettingsViewModel`。该模型管理输入、页面文字、语言选择和两种保存，客户端密钥只经过、不保存；按工作区缓存，语言切换由窗口刷新。新增 9 项无窗口测试。清单变化：两个状态键改为间接引用，`LanguagePicker` 改由 XAML 定义，并同步了 D3 修复后脚本查找的控件名。窗口验收：`test-localization-ui`、`test-credentials-ui`、`test-settings-save-ui` 全部通过。
 
+**进度（2026-10-27，refactor/r0 9348bb6）：** 第 4 步第二个页面（工作区）完成：`WorkspacePage.xaml` 加 `WorkspaceViewModel`／`ResourceCardViewModel`。每类资源一张卡片，改动数在显示时取窗口缓存；页面仍随每次渲染重建，语言切换时刷新当前页，切换工作区时释放引用。新建工作区与创建演示工作区的操作抽成窗口方法，对话框待接入 `IDialogService`。新增 3 项无窗口测试，经回植验证。清单无变化。窗口验收：`test-localization-ui`（含点击创建演示工作区）与 `test-ui-interactions -Rows 20000` 通过。
+
 ### R7 测试体系重建
 
 现有测试是一个按顺序执行、失败即停的控制台程序（`Program.cs` 约 460 行负责调度、种子和断言入口），场景文件按“审核轮次”而不是按功能组织，很多断言绑在现有内部结构上（具体方法、分部类、内部字段），重构后大多会失效；界面逻辑靠链接源文件编译；窗口测试是 PowerShell 脚本，部分因编码无法在 5.1 运行，`test-localization-ui` 还有已知失败。因此不迁移旧测试，而是以第 3 节的需求为依据、针对新结构重新建立。目标结构：
