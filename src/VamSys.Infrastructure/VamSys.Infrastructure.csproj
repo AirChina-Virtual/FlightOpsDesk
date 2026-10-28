@@ -4,7 +4,15 @@
     <EmbeddedResource Include="../../docs/contracts/operations.json" LogicalName="Operations.OpenApi.json" />
     <ProjectReference Include="../VamSys.Domain/VamSys.Domain.csproj" />
     <ProjectReference Include="../VamSys.Application/VamSys.Application.csproj" />
-    <ProjectReference Include="../VamSys.Storage/VamSys.Storage.csproj" AdditionalProperties="VamSysTestSupport=$(VamSysTestSupport)" />
+  </ItemGroup>
+  <!-- Pass VamSysTestSupport only when it is set. An empty "VamSysTestSupport=" is a different global property from
+       none at all, so MSBuild built a second Storage instance into the same obj folder in parallel and the two
+       compilers fought over VamSys.Storage.dll (CS2012 / MSB3883). -->
+  <ItemGroup Condition="'$(VamSysTestSupport)' == 'true'">
+    <ProjectReference Include="../VamSys.Storage/VamSys.Storage.csproj" AdditionalProperties="VamSysTestSupport=true" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(VamSysTestSupport)' != 'true'">
+    <ProjectReference Include="../VamSys.Storage/VamSys.Storage.csproj" />
   </ItemGroup>
   <ItemGroup Condition="'$(VamSysTestSupport)' == 'true'">
     <Compile Include="../../tests/TestSupport/AssemblyInfo.cs" Link="TestSupport/AssemblyInfo.cs" />
