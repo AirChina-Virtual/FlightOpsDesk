@@ -74,7 +74,7 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 | `test-v3-verification-ui.ps1 [-History|-Autosave|-Tasks]` | 真实撤销／重做按钮、自动保存后强制结束、关闭失败恢复、大任务页 |
 | `test-storage-ui.ps1`、`test-recovery-ui.ps1`、`test-credentials-ui.ps1`、`test-settings-save-ui.ps1` | 旧数据库升级、待核对 ID、凭据与设置保存 |
 
-性能、基线、交互、单元格编辑和 v3 验证脚本可以用 `-Executable` 指定要测试的程序；其余脚本使用 artifacts 下的正式包或 QA 包。只有 Windows PowerShell 5.1 时，含中文字面量的脚本（如 `test-localization-ui.ps1`）需要另存为带 BOM 的 UTF-8 才能运行；该脚本目前还会在点击“Apply to drafts”时失败，见 [测试报告](../../docs/TEST-REPORT.md#尚未验证或已知问题)。
+性能、基线、交互、单元格编辑和 v3 验证脚本可以用 `-Executable` 指定要测试的程序；其余脚本使用 artifacts 下的正式包或 QA 包。只有 Windows PowerShell 5.1 时，含中文字面量、且未带 BOM 的脚本需要另存为带 BOM 的 UTF-8 才能运行；`test-localization-ui.ps1` 已带 BOM（5.1 下尚未实测）。
 
 单独检查发布包：
 

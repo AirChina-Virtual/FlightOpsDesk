@@ -1,4 +1,4 @@
-param([string]$DataDirectory, [string]$AppDirectory = "$PSScriptRoot/../artifacts/flightops-app")
+﻿param([string]$DataDirectory, [string]$AppDirectory = "$PSScriptRoot/../artifacts/flightops-app")
 $ErrorActionPreference = 'Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 if(!$DataDirectory){$DataDirectory=Join-Path $repo ('artifacts/ui-regression/test-localization-ui-'+[Guid]::NewGuid().ToString('N'))}
@@ -15,7 +15,18 @@ function Elements {
 }
 function Named($name,$type) { Elements | Where-Object { $_.Current.Name -eq $name -and (!$type -or $_.Current.ControlType.ProgrammaticName -eq "ControlType.$type") } | Select-Object -First 1 }
 function WaitFor([scriptblock]$condition) { $limit=[DateTime]::UtcNow.AddSeconds(15); do { $result=& $condition; if($result){return $result}; Start-Sleep -Milliseconds 100 } while([DateTime]::UtcNow -lt $limit); throw "UI timeout: $condition" }
-function Click($name) { $c=Named $name 'Button'; if(!$c){$more=Elements | Where-Object {$_.Current.AutomationId -eq 'MoreButton'} | Select-Object -First 1; if($more){([System.Windows.Automation.InvokePattern]$more.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke()}}; $c=WaitFor {Named $name 'Button'}; ([System.Windows.Automation.InvokePattern]$c.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke() }
+function Click($name) {
+    # A page selected a moment ago may not be laid out yet: wait for the button before deciding it sits in a
+    # command bar's overflow. Opening the overflow of a page that is still being replaced fails in UI Automation.
+    $limit=[DateTime]::UtcNow.AddSeconds(2)
+    do { $c=Named $name 'Button'; if($c){break}; Start-Sleep -Milliseconds 100 } while([DateTime]::UtcNow -lt $limit)
+    if(!$c){
+        $more=WaitFor {Elements | Where-Object {$_.Current.AutomationId -eq 'MoreButton'} | Select-Object -First 1}
+        ([System.Windows.Automation.InvokePattern]$more.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke()
+        $c=WaitFor {Named $name 'Button'}
+    }
+    ([System.Windows.Automation.InvokePattern]$c.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)).Invoke()
+}
 function SelectItem($name) { $c=WaitFor {Named $name 'ListItem'}; ([System.Windows.Automation.SelectionItemPattern]$c.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)).Select() }
 function Edit($name,$value) { $c=WaitFor {Named $name 'Edit'}; ([System.Windows.Automation.ValuePattern]$c.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)).SetValue($value) }
 function Value($control) { ([System.Windows.Automation.ValuePattern]$control.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)).Current.Value }
@@ -76,10 +87,14 @@ Click 'Delete selected'; Click 'Confirm deletion'
 WaitFor {Named 'Pending deletion' 'Text'} | Out-Null
 $id=Named 'ID' 'Edit'
 Assert (([System.Windows.Automation.ValuePattern]$id.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)).Current.IsReadOnly) 'Deleted row is editable'
-Click 'Restore deleted'; WaitFor {Named 'Unsubmitted draft' 'Text'} | Out-Null
+# Restoring shows a preview of the rows it brings back; the change applies only after Confirm.
+Click 'Restore deleted'; Click 'Confirm'; WaitFor {Named 'Unsubmitted draft' 'Text'} | Out-Null
 Write-Output 'PASS draft, filter, selection, fleet dialog, delete and restore'
-SelectItem 'Change review'; WaitFor {Named 'Export changes as CSV' 'Button'} | Out-Null
-Assert (!(Named 'Submit to API' 'Button').Current.IsEnabled) 'Live API unexpectedly enabled'
+# The review covers the whole workspace: each changed resource has its own CSV export, and a demo workspace
+# offers only the simulated submission, never the live API one.
+SelectItem 'Change review'; WaitFor {Named 'Export Routes CSV' 'Button'} | Out-Null
+Assert (Named 'Simulate workspace submission' 'Button') 'Demo submission missing from the review'
+Assert (!(Named 'Submit workspace changes' 'Button')) 'Live API submission offered for a demo workspace'
 Write-Output 'PASS English change review and disabled live API'
 } finally {
     if(!$testProcess.HasExited){$null=$testProcess.CloseMainWindow();if(!$testProcess.WaitForExit(15000)){$testProcess.Kill();$testProcess.WaitForExit()}}
