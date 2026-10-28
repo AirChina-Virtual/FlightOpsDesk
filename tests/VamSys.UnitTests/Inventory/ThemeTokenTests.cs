@@ -48,10 +48,14 @@ public partial class ThemeTokenTests
     public void Every_static_resource_in_the_app_is_a_theme_token()
     {
         var defined = TopLevelKeys(Theme());
+        // A page may also reference resources it defines itself (a template selector in its UserControl.Resources).
+        static HashSet<string> OwnKeys(string file) => file.EndsWith(".xaml", StringComparison.Ordinal)
+            ? XDocument.Parse(SourceScan.Read(file)).Descendants().Select(e => (string?)e.Attribute(X + "Key")).OfType<string>().ToHashSet(StringComparer.Ordinal)
+            : [];
         var used = SourceScan.XamlFiles(App).Concat(SourceScan.CsFiles(App))
-            .SelectMany(file => StaticReference().Matches(SourceScan.Read(file)).Select(m => (File: SourceScan.Relative(file), Key: m.Groups[1].Value)))
+            .SelectMany(file => StaticReference().Matches(SourceScan.Read(file)).Select(m => (File: SourceScan.Relative(file), Key: m.Groups[1].Value, Own: OwnKeys(file))))
             .ToList();
         Assert.NotEmpty(used);
-        Assert.All(used, use => Assert.True(defined.Contains(use.Key), $"{use.File} uses {use.Key}, which Theme.xaml does not define"));
+        Assert.All(used, use => Assert.True(defined.Contains(use.Key) || use.Own.Contains(use.Key), $"{use.File} uses {use.Key}, which neither Theme.xaml nor the file defines"));
     }
 }

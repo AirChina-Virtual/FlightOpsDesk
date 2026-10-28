@@ -1,16 +1,14 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Automation;
-using Microsoft.UI.Xaml.Markup;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using VamSys.Core;
 
 namespace VamSys.App;
 
 public sealed partial class MainWindow
 {
-    IReadOnlyList<ReviewDisplayRow> reviewRows = [];
+    // The review page being shown, if any; it is rebuilt each time the page is opened.
+    ReviewPage? shownReviewPage;
+    IReadOnlyList<ReviewRowViewModel> reviewRows => shownReviewPage?.Model.Rows ?? [];
     WorkspaceReviewPlan? reviewPlan => reviews.Shown?.Plan;
 
     WorkspaceReviewPlan BuildReviewPlan() => reviews.Build();
@@ -43,113 +41,31 @@ public sealed partial class MainWindow
         }
     }
 
-    string ReviewChangeText(ChangeItem item) => ReviewChangeText(PlannedChange.Wrap(item));
-    // Reads the reviewed rows directly: showing the page does not build the full items.
-    string ReviewChangeText(PlannedChange item) => $"{EnumText(item.Kind)} · {Schemas.Key(item.Resource, item.After)}\n" +
-        (item.Kind == ChangeKind.Delete ? L("Text_5ABD08A949") : string.Join("；", item.Fields().Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key, localization)}: {item.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}")));
+    string ReviewChangeText(ChangeItem item) => ReviewTexts.ChangeText(PlannedChange.Wrap(item), localization);
 
     Task reviewLoad = Task.CompletedTask;
     // The page appears at once; the plan is built on a worker and the page filled when it is ready.
-    UIElement ReviewPage()
+    UIElement BuildReviewPage()
     {
-        var host = new Grid();
-        var waiting = Row(new ProgressRing { IsActive = true, Width = UiTokens.InlineProgressSize, Height = UiTokens.InlineProgressSize }, Text(() => L("ReviewPreparing")));
-        host.Children.Add(waiting);
-        var generation = reviews.BeginLoad();
         var owner = workspace;
-        var airline = workspace.AirlineId;
-        var mode = workspace.Mode;
+        var model = new ReviewViewModel(owner, localization);
+        var page = shownReviewPage = new ReviewPage(model, new ReviewPageActions(
+            Invoke: async action => { if (gate.CanInvokeCommand) await UserAction(action); },
+            ShowIssues: async () => { await Confirm(L("ReviewIssues", ("count", model.AllBlockers.Count)), new ListView { MaxHeight = UiTokens.DialogListMaxHeight, ItemsSource = model.AllBlockers }, L("Text_3FD47EDCE4")); },
+            Submit: owner.Mode == RunMode.Demo ? StartDemo : StartApi,
+            ResolveConflicts: ResolveWorkspaceConflicts));
+        var generation = reviews.BeginLoad();
+        var airline = owner.AirlineId;
+        var mode = owner.Mode;
         reviewLoad = UserAction(async () =>
         {
             var plan = await WhileLocked(reviews.Capture());
-            if (!reviews.IsCurrent(generation) || !ReferenceEquals(owner, workspace) || !ReferenceEquals(PageHost.Content, host))
+            if (!reviews.IsCurrent(generation) || !ReferenceEquals(owner, workspace) || !ReferenceEquals(PageHost.Content, page))
                 return;
             reviews.Show(plan, owner.Id, airline, mode);
-            host.Children.Clear();
-            host.Children.Add(ReviewContent(plan));
+            model.Show(plan, CanEditData(), gate.CanResolveConflicts, kind => UserAction(() => ExportCsv(kind)));
         });
-        return host;
-    }
-    UIElement ReviewContent(WorkspaceReviewPlan plan)
-    {
-        var conflicts = workspace.Resources.Sum(p => p.Value.Conflicts.Count);
-        var header = Stack(Text(() => L("ReviewWorkspace"), UiTokens.SubsectionFontSize), Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"))),
-            Text(() => L("ReviewCounts", ("total", plan.Entries.Count), ("ready", plan.SubmitCount),
-                ("deferred", plan.Entries.Count(e => e.Disposition == ReviewDisposition.Deferred)),
-                ("blocked", plan.Entries.Count(e => e.Disposition == ReviewDisposition.Blocked)))),
-            Text(() => L("ReviewMode", ("mode", EnumText(workspace.Mode)))));
-        if (workspace.Mode == RunMode.Offline)
-            header.Children.Add(Text(() => L("ReviewConnect")));
-        foreach (var blocker in plan.Blockers.Take(3))
-            header.Children.Add(Text(() => L(blocker)));
-        if (plan.Blockers.Count > 3)
-            header.Children.Add(Button(() => L("ReviewIssues", ("count", plan.Blockers.Count)), async () =>
-                { await Confirm(L("ReviewIssues", ("count", plan.Blockers.Count)), new ListView { MaxHeight = UiTokens.DialogListMaxHeight, ItemsSource = plan.Blockers.Select(L).ToArray() }, L("Text_3FD47EDCE4")); }));
-        header.Children.Add(Actions(
-            Button(() => L(workspace.Mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit"), workspace.Mode == RunMode.Demo ? StartDemo : StartApi,
-                CanEditData() && plan.SubmitCount > 0 && workspace.Mode != RunMode.Offline),
-            Button(() => L("ApiConflicts", ("count", conflicts)), ResolveWorkspaceConflicts, gate.CanResolveConflicts && conflicts > 0)));
-        var rows = new List<ReviewDisplayRow>();
-        foreach (var kind in Enum.GetValues<ResourceKind>())
-        {
-            var entries = plan.Entries.Where(e => e.Planned.Resource == kind).ToArray();
-            if (entries.Length == 0)
-                continue;
-            rows.Add(new(this, kind, null));
-            rows.AddRange(entries.Select(e => new ReviewDisplayRow(this, kind, e)));
-        }
-        if (rows.Count == 0)
-            header.Children.Add(Text(() => L("Text_90484F47B3")));
-        reviewRows = rows;
-        var list = new ListView
-        {
-            SelectionMode = ListViewSelectionMode.None,
-            ItemsSource = rows,
-            ItemTemplateSelector = new ReviewTemplateSelector(),
-            HorizontalContentAlignment = HorizontalAlignment.Stretch
-        };
-        AutomationProperties.SetAutomationId(list, "WorkspaceReview");
-        var grid = new Grid { RowSpacing = UiTokens.SpacingRelaxed };
-        grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new() { Height = new(1, GridUnitType.Star) });
-        grid.Children.Add(header);
-        Grid.SetRow(list, 1);
-        grid.Children.Add(list);
-        return grid;
-    }
-    sealed class ReviewDisplayRow(MainWindow owner, ResourceKind resource, ReviewEntry? entry) : ObservableObject
-    {
-        public ReviewEntry? Entry { get; } = entry;
-        public string Heading => owner.L(Schemas.All[resource].Name);
-        public string ExportLabel => owner.L("ReviewExport", ("resource", Heading));
-        public string State => Entry is null ? "" : owner.L("ReviewState_" + Entry.Disposition);
-        public string Body => Entry is null ? "" : owner.ReviewChangeText(Entry.Planned);
-        public string Reason => Entry?.Reason is null ? "" : owner.L(Entry.Reason);
-        public IAsyncRelayCommand? ExportCommand { get; } = entry is null ? new AsyncRelayCommand(() => owner.UserAction(() => owner.ExportCsv(resource))) : null;
-        public void RefreshLanguage()
-        {
-            foreach (var name in new[] { nameof(Heading), nameof(ExportLabel), nameof(State), nameof(Body), nameof(Reason) })
-                OnPropertyChanged(name);
-        }
-    }
-    sealed class ReviewTemplateSelector : DataTemplateSelector
-    {
-        readonly DataTemplate header = Parse("""
-            <StackPanel Spacing="{StaticResource SpacingSmall}" Margin="{StaticResource ReviewGroupMargin}">
-              <TextBlock Text="{Binding Heading}" FontSize="{StaticResource SectionFontSize}"/>
-              <Button Content="{Binding ExportLabel}" Command="{Binding ExportCommand}" HorizontalAlignment="Left"/>
-            </StackPanel>
-            """);
-        readonly DataTemplate change = Parse("""
-            <StackPanel Spacing="{StaticResource SpacingTight}" Margin="{StaticResource ReviewItemMargin}">
-              <TextBlock Text="{Binding State}" FontSize="{StaticResource BodyFontSize}" FontWeight="SemiBold"/>
-              <TextBlock Text="{Binding Body}" TextWrapping="Wrap"/>
-              <TextBlock Text="{Binding Reason}" TextWrapping="Wrap"/>
-            </StackPanel>
-            """);
-        static DataTemplate Parse(string content) => (DataTemplate)XamlReader.Load("<DataTemplate xmlns=\"http://schemas.microsoft.com/winfx/2006/xaml/presentation\">" + content + "</DataTemplate>");
-        protected override DataTemplate SelectTemplateCore(object item) => item is ReviewDisplayRow { Entry: null } ? header : change;
-        protected override DataTemplate SelectTemplateCore(object item, DependencyObject container) => SelectTemplateCore(item);
+        return page;
     }
 
     // The shown plan when the live workspace still yields the same review; otherwise the page is refreshed.

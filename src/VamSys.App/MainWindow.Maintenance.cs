@@ -44,6 +44,6 @@ public sealed partial class MainWindow
             dataStates.Remove(key);
         taskScroll.Remove(owner);
         reviews.Invalidate();
-        reviewRows = [];
+        shownReviewPage = null;
     }
 }
