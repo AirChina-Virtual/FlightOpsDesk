@@ -10,10 +10,10 @@ public sealed partial class MainWindow
 
     void SelectTasksForSubmission()
     {
-        // Navigate ignores SelectionChanged while LocalOperation owns the lock.
-        // Set the page explicitly so its final Render cannot rebuild ReviewPage.
-        page = "tasks";
+        // The shell switches before the unlock: Navigate ignores the pane selection while LocalOperation owns the lock,
+        // and the final Render must not rebuild ReviewPage.
+        shell.ShowTasksBeforeUnlock();
         reviews.Invalidate(forget: false);
-        Navigation.SelectedItem = Navigation.MenuItems[4];
+        SelectPane(ShellPage.Tasks);
     }
 }

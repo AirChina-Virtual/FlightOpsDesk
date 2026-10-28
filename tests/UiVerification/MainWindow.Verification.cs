@@ -52,14 +52,14 @@ public sealed partial class MainWindow
         switch(command)
         {
             case "prepare":
-                resource=ResourceKind.Fleets;ResourcePicker.SelectedIndex=(int)resource;Navigation.SelectedItem=Navigation.MenuItems[1];Render();
+                resource=ResourceKind.Fleets;ResourcePicker.SelectedIndex=(int)resource;SelectPane(ShellPage.Data);Render();
                 await dataQueryTask;RootGrid.UpdateLayout();
                 return new{prepared=true};
             case "data-open":
             {
                 var timer=Stopwatch.StartNew();
                 ResourcePicker.SelectedIndex=(int)ResourceKind.Routes;
-                if(page=="data")Render();else Navigation.SelectedItem=Navigation.MenuItems[1];
+                if(page=="data")Render();else SelectPane(ShellPage.Data);
                 await dataQueryTask;RootGrid.UpdateLayout();
                 await WaitForDataPageReady();
                 return new{milliseconds=timer.Elapsed.TotalMilliseconds,state=DataVerificationState()};
@@ -68,7 +68,7 @@ public sealed partial class MainWindow
             case "review-fixture":
                 { var fleets = workspace.Resources[ResourceKind.Fleets].Draft; fleets[0] = fleets[0].With("Name", "QA reviewed fleet"); }
                 { var airports = workspace.Resources[ResourceKind.Airports].Draft; airports[0] = airports[0].With("Name", "QA reviewed airport"); }
-                await Save(); Navigation.SelectedItem = Navigation.MenuItems[3]; Render(); await reviewLoad; RootGrid.UpdateLayout();
+                await Save(); SelectPane(ShellPage.Review); Render(); await reviewLoad; RootGrid.UpdateLayout();
                 return ReviewVerificationState();
             case "review-state":await reviewLoad;return ReviewVerificationState();
             case "review-stale":
@@ -166,7 +166,7 @@ public sealed partial class MainWindow
                 var other=new Workspace{Name="QA other"};storage.Save(other);ReloadWorkspaces();WorkspacePicker.SelectedItem=((List<WorkspaceChoice>)WorkspacePicker.ItemsSource).Single(w=>w.Id==other.Id);return new{requested=true};
             case "workspace-back":
                 WorkspacePicker.SelectedItem=((List<WorkspaceChoice>)WorkspacePicker.ItemsSource).First(w=>w.Id!=workspace.Id);return new{requested=true};
-            case "tasks":Navigation.SelectedItem=Navigation.MenuItems[4];Render();return new{jobs=taskModels.Count,builds=taskPageBuilds};
+            case "tasks":SelectPane(ShellPage.Tasks);Render();return new{jobs=taskModels.Count,builds=taskPageBuilds};
             case "cancellable":running=new();RefreshTaskAvailability();return new{ready=true};
             case "task-state":return new{selected=(taskList?.SelectedItem as TaskJobViewModel)?.Id,builds=taskPageBuilds,canceled=running?.IsCancellationRequested??false};
             case "progress":
@@ -230,7 +230,7 @@ public sealed partial class MainWindow
                 using(var stall=new FrameStall())
                 {
                     timer.Restart();
-                    if(page=="review")Render();else Navigation.SelectedItem=Navigation.MenuItems[3];
+                    if(page=="review")Render();else SelectPane(ShellPage.Review);
                     await reviewLoad;RootGrid.UpdateLayout();renders.Add(timer.Elapsed.TotalMilliseconds);renderStalls.Add(stall.Longest);rows=reviewRows.Count;
                 }
                 // The check a submit runs before its confirmation dialog.

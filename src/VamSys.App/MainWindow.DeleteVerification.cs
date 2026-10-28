@@ -12,7 +12,7 @@ public sealed partial class MainWindow
             running = new();
             try
             {
-                Navigation.SelectedItem = Navigation.MenuItems[4];
+                SelectPane(ShellPage.Tasks);
                 Render();
                 await recovery.VerifyDeletionsAsync(job, NotifyTask, running.Token);
                 Status(() => L("ApiDeleteCheckDone"));

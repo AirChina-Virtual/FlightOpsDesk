@@ -41,9 +41,8 @@ public sealed partial class MainWindow
             RootGrid.Language = localization.Language;
             Title = AppTitleBar.Title = L("Text_E531BA46BD");
             AppTitleBar.Subtitle = RootGrid.ActualWidth is > 0 and < 1100 ? "" : L("Text_9750099F9F");
-            string[] keys = ["Text_3797982942", "Text_9BB882C622", "Text_D52C17622D", "Text_10CCC8AAA2", "Text_00B514C36A", "Text_C2B958136D"];
-            for (int i = 0; i < keys.Length; i++)
-                ((NavigationViewItem)Navigation.MenuItems[i]).Content = L(keys[i]);
+            foreach (var item in ShellPages.All)
+                ((NavigationViewItem)Navigation.MenuItems[item.PaneIndex()]).Content = L(item.TitleKey());
             ResourcePicker.ItemsSource = Enum.GetValues<ResourceKind>().Select(k => L(Schemas.All[k].Name)).ToList();
             ResourcePicker.SelectedIndex = (int)resource;
             AutomationProperties.SetName(ResourcePicker, L("ResourceType"));
@@ -65,9 +64,9 @@ public sealed partial class MainWindow
     }
     void RefreshShell()
     {
-        ModeBadge.Text = workspace.Mode switch { RunMode.Demo => L("Text_692F811146"), RunMode.Online => L("Text_C4C1F8C6F4"), _ => L("Text_6C352EE0B0") };
+        ModeBadge.Text = L(ShellViewModel.ModeBadgeKey(workspace.Mode));
         SnapshotLabel.Text = L("Text_B5B62EA34A", ("arg0", Data.Draft.Count), ("arg1", Data.SnapshotAt?.ToLocalTime().ToString("g", localization.DisplayCulture) ?? L("Text_C4CF69F358")));
-        PageTitle.Text = L(page switch { "data" => "Text_9BB882C622", "import" => "Text_D52C17622D", "review" => "Text_10CCC8AAA2", "tasks" => "Text_00B514C36A", "settings" => "Text_C2B958136D", _ => "Text_3797982942" });
+        PageTitle.Text = L(shell.PageTitleKey);
     }
     ComboBox LanguagePicker()
     {

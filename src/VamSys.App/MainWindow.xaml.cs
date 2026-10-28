@@ -14,6 +14,7 @@ public sealed partial class MainWindow : Window
     readonly WorkspaceStoreAdapter storage = WorkspaceStoreAdapter.OpenDefault();
     ResourceKind resource = ResourceKind.Routes;
     readonly InteractionGate gate = new();
+    readonly ShellViewModel shell;
     readonly DispatcherAutosaveTimer autosave = new(WorkspaceSession.AutosaveInterval);
     readonly WorkspaceSession session;
     readonly OnlineGateway online;
@@ -29,7 +30,8 @@ public sealed partial class MainWindow : Window
     readonly DiagnosticsService diagnostics;
     Workspace workspace => session.Workspace;
     IUserSettings settings => storage;
-    string page = "workspace"; bool ready; string? lastEditedCell;
+    string page => shell.Page.Tag();
+    bool ready; string? lastEditedCell;
     ListView? table; List<RowViewModel> visible = []; AppBarButton? fleetCommand, retireCommand;
     CancellationTokenSource? running;
     ResourceData Data => workspace.Resources[resource];
@@ -37,6 +39,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        shell = new(gate);
         session = new(storage, gate, autosave);
         session.DataInvalidated += InvalidateDataViews;
         online = new(storage);
@@ -87,7 +90,7 @@ public sealed partial class MainWindow : Window
             catch { Status(() => L("Text_7AF24B0E8E")); }
         };
         ready = true;
-        Navigation.SelectedItem = Navigation.MenuItems[0];
+        SelectPane(ShellPage.Workspace);
         Render();
         InitializeVerification();
     }
@@ -96,6 +99,8 @@ public sealed partial class MainWindow : Window
     partial void ObserveDialog(ContentDialog dialog, bool showing);
     void Status(Func<string> message) { statusText = message; StatusLabel.Text = message(); }
     void ToggleNavigation(TitleBar sender, object args) => Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
+    // Selects the pane item; its SelectionChanged asks the shell, which applies the gate.
+    void SelectPane(ShellPage target) => Navigation.SelectedItem = Navigation.MenuItems[target.PaneIndex()];
     void UpdateCaptionTheme()
     {
         var caption = AppWindow.TitleBar;
@@ -176,7 +181,7 @@ public sealed partial class MainWindow : Window
         if (!ready || !gate.CanNavigate)
             return;
         CancelDataQuery();
-        page = (args.SelectedItem as NavigationViewItem)?.Tag?.ToString() ?? "workspace";
+        shell.TryNavigate(ShellPages.FromTag((args.SelectedItem as NavigationViewItem)?.Tag?.ToString()));
         Render();
     }
     async void WorkspaceChanged(object sender, SelectionChangedEventArgs e)
@@ -200,12 +205,17 @@ public sealed partial class MainWindow : Window
         CaptureTaskState();
         ReleaseWorkspaceViews();
         lastEditedCell = null;
-        ModeBadge.Text = workspace.Mode switch { RunMode.Demo => L("Text_692F811146"), RunMode.Online => L("Text_C4C1F8C6F4"), _ => L("Text_6C352EE0B0") };
-        ResourceBar.Visibility = page is "data" or "import" ? Visibility.Visible : Visibility.Collapsed;
-        SnapshotLabel.Text = L("Text_B5B62EA34A", ("arg0", Data.Draft.Count), ("arg1", (Data.SnapshotAt?.ToLocalTime().ToString("g") ?? L("Text_C4CF69F358"))));
-        PageTitle.Text = page switch { "data" => L("Text_9BB882C622"), "import" => L("Text_D52C17622D"), "review" => L("Text_10CCC8AAA2"), "tasks" => L("Text_00B514C36A"), "settings" => L("Text_C2B958136D"), _ => L("Text_3797982942") };
+        ResourceBar.Visibility = shell.ShowsResourceBar ? Visibility.Visible : Visibility.Collapsed;
         RefreshShell();
-        PageHost.Content = page switch { "data" => DataPage(), "import" => ImportPage(), "review" => ReviewPage(), "tasks" => TasksPage(), "settings" => GetSettingsPage(), _ => WorkspacePage() };
+        PageHost.Content = shell.Page switch
+        {
+            ShellPage.Data => DataPage(),
+            ShellPage.Import => ImportPage(),
+            ShellPage.Review => ReviewPage(),
+            ShellPage.Tasks => TasksPage(),
+            ShellPage.Settings => GetSettingsPage(),
+            _ => WorkspacePage()
+        };
         UpdateDataHeaderLayout();
     }
     UIElement WorkspacePage()
@@ -214,7 +224,7 @@ public sealed partial class MainWindow : Window
         foreach (var (kind, data) in workspace.Resources)
         {
             var captured = kind;
-            cards.Children.Add(new Border { Padding = UiTokens.WorkspaceCardPadding, CornerRadius = UiTokens.CardCornerRadius, Background = UiTokens.CardBackgroundBrush, Child = Row(Text(() => L(Schemas.All[kind].Name), UiTokens.SectionFontSize), Text(() => L("Text_B9B43D4DAA", ("arg0", data.Draft.Count), ("arg1", CountChanges(data)))), Button(() => L("Text_C771248E51"), () => { resource = captured; ResourcePicker.SelectedIndex = (int)resource; Navigation.SelectedItem = Navigation.MenuItems[1]; return Task.CompletedTask; })) });
+            cards.Children.Add(new Border { Padding = UiTokens.WorkspaceCardPadding, CornerRadius = UiTokens.CardCornerRadius, Background = UiTokens.CardBackgroundBrush, Child = Row(Text(() => L(Schemas.All[kind].Name), UiTokens.SectionFontSize), Text(() => L("Text_B9B43D4DAA", ("arg0", data.Draft.Count), ("arg1", CountChanges(data)))), Button(() => L("Text_C771248E51"), () => { resource = captured; ResourcePicker.SelectedIndex = (int)resource; SelectPane(ShellPage.Data); return Task.CompletedTask; })) });
         }
         return Scroll(Stack(Text(() => L("Text_2C33D5F7DE")),
             Row(Button(() => L("Text_946897D107"), async () =>
@@ -271,7 +281,7 @@ public sealed partial class MainWindow : Window
         dataActions = actions;
         actions.PrimaryCommands.Add(Command(() => L("ApiRefresh"), Symbol.Refresh, RefreshApi, gate.CanRequestOnline));
         actions.PrimaryCommands.Add(BatchCommand(() => L("Text_E306752B35"), Symbol.Edit, EditRules, "active"));
-        actions.PrimaryCommands.Add(Command(() => L("Text_48A195CA7E"), Symbol.View, () => { Navigation.SelectedItem = Navigation.MenuItems[3]; return Task.CompletedTask; }));
+        actions.PrimaryCommands.Add(Command(() => L("Text_48A195CA7E"), Symbol.View, () => { SelectPane(ShellPage.Review); return Task.CompletedTask; }));
         actions.PrimaryCommands.Add(Command(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts, gate.CanRequestOnline && Data.Conflicts.Count > 0));
         actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!gate.CanAct) return; await batch.AddRowAsync(resource); Render(); }));
         // Kept for every resource and shown only where it applies, since the page outlives a resource switch.
@@ -353,7 +363,7 @@ public sealed partial class MainWindow : Window
         await Work(async () =>
         {
             running = new CancellationTokenSource();
-            await demo.RunAsync(job, running.Token, () => { Navigation.SelectedItem = Navigation.MenuItems[4]; Render(); },
+            await demo.RunAsync(job, running.Token, () => { SelectPane(ShellPage.Tasks); Render(); },
                 item => NotifyTask(new(workspace.Id, job.Id, item?.Id, job.StatusCode != JobStatus.Running)));
             foreach (var item in job.Items)
                 NotifyTask(new(workspace.Id, job.Id, item.Id));

@@ -26,7 +26,7 @@ public sealed partial class MainWindow
         if (!gate.CanRequestOnline)
             return;
         if (!connection.CanRefresh())
-        { Navigation.SelectedItem = Navigation.MenuItems[5]; Status(() => L("ApiConnectFirst")); return; }
+        { SelectPane(ShellPage.Settings); Status(() => L("ApiConnectFirst")); return; }
         await Work(async () =>
         {
             running = new();
@@ -81,7 +81,7 @@ public sealed partial class MainWindow
             running = new();
             try
             {
-                Navigation.SelectedItem = Navigation.MenuItems[4];
+                SelectPane(ShellPage.Tasks);
                 Render();
                 await recovery.ExecuteAsync(job, NotifyTask, running.Token);
                 Status(() => JobText(job));
