@@ -373,35 +373,6 @@ public sealed partial class MainWindow : Window
             Render();
             Status(() => L("Text_B64A075682") + JobText(job));
         });
-    }    UIElement SettingsPage()
-    {
-        var url = new TextBox { Text = online.EndpointUrl, IsReadOnly = true, MaxWidth = UiTokens.SettingsFieldMaxWidth, HorizontalAlignment = HorizontalAlignment.Stretch }.Localize(localization, "Header", () => L("Text_0251B89662"));
-        var clientId = new TextBox { Header = "Client ID", Text = workspace.ClientId ?? "", MaxWidth = UiTokens.SettingsFieldMaxWidth, HorizontalAlignment = HorizontalAlignment.Stretch };
-        var secret = new PasswordBox { MaxWidth = UiTokens.SettingsFieldMaxWidth, HorizontalAlignment = HorizontalAlignment.Stretch }.Localize(localization, "Header", () => L("Text_86032C09C5"));
-        var local = new CheckBox { IsChecked = workspace.LocalRouteTimes }.Localize(localization, "Content", () => L("Text_92BD49D337"));
-        return Scroll(Stack(LanguagePicker(), Text(() => L("ApiSettings"), UiTokens.SectionFontSize), Text(() => L("ApiSettingsHelp")), url, clientId, secret, local,
-            Button(() => L("Text_760143E568"), async () =>
-            {
-                if (!gate.CanAct)
-                    return;
-                await session.SaveConnectionSettingsAsync(clientId.Text, secret.Password, url.Text, local.IsChecked == true);
-                clientId.Text = workspace.ClientId ?? "";
-                secret.Password = "";
-                online.Release(workspace.Id);
-                Status(() => L("Text_DEADA9F3CC"));
-            }), Button(() => L("ApiUpdateCredentials"), async () =>
-            {
-                if (!gate.CanAct)
-                    return;
-                await session.UpdateCredentialsAsync(clientId.Text, secret.Password);
-                clientId.Text = workspace.ClientId ?? "";
-                secret.Password = "";
-                online.Release(workspace.Id);
-                Status(() => L("ApiCredentialsUpdated"));
-            }, gate.CanRequestOnline), Text(() => L("ApiCredentialsHelp")), Button(() => L("ApiConnect"), ConnectApi), Button(() => L("ApiRefresh"), RefreshApi),
-            Text(() => L("ApiCapability")), Text(() => L("ApiIndependentScope")), Text(() => L("ApiVerified", ("operations", string.Join(", ", workspace.VerifiedOperations)))),
-            Text(() => L("ApiTarget", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"))),
-            Button(() => L("ApiParametersLoad"), LoadParameters), Text(() => L("MaintenanceTitle"), UiTokens.SubsectionFontSize), Button(() => L("BackupClear"), BackupAndClearWorkspace)));
     }
     Workspace DemoWorkspace() => DemoWorkspaceFactory.Create(L("DemoWorkspace", ("time", DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture))));
 }

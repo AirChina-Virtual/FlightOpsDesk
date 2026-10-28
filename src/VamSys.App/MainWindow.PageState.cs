@@ -22,7 +22,7 @@ public sealed partial class MainWindow
         public int SelectedActive, SelectedDeleted, SelectedDeletable;
     }
     readonly Dictionary<(Guid, ResourceKind), DataPageState> dataStates = [];
-    readonly Dictionary<Guid, UIElement> settingsPages = [];
+    readonly Dictionary<Guid, SettingsPage> settingsPages = [];
     DataPageState? shownState;
     UIElement? shownDataPage;
     TextBox? searchBox; ComboBox? filterBox, sortBox;
@@ -91,10 +91,20 @@ public sealed partial class MainWindow
         // Each session's adapter holds the instance it was created for; a reload gets a new one anyway.
         online.Release(previous.Id);
     }
+    // One settings page per workspace, kept so unsaved input survives navigation and language switches.
     UIElement GetSettingsPage()
     {
         if (!settingsPages.TryGetValue(workspace.Id, out var content))
-            settingsPages[workspace.Id] = content = SettingsPage();
+            settingsPages[workspace.Id] = content = new SettingsPage(
+                new SettingsViewModel(session, gate, settings, localization, online.EndpointUrl, online.Release),
+                new SettingsPageActions(
+                    Invoke: async action => { if (gate.CanInvokeCommand) await UserAction(action); },
+                    Guard: Guard,
+                    Status: key => Status(() => L(key)),
+                    Connect: ConnectApi,
+                    Refresh: RefreshApi,
+                    LoadParameters: LoadParameters,
+                    BackupClear: BackupAndClearWorkspace));
         return content;
     }
 }

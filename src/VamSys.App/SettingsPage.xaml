@@ -1,0 +1,34 @@
+<UserControl x:Class="VamSys.App.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:VamSys.Presentation">
+  <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch">
+    <StackPanel Spacing="{StaticResource SpacingLarge}">
+      <ComboBox AutomationProperties.AutomationId="LanguagePicker" MinWidth="{StaticResource LanguagePickerMinWidth}"
+          Header="{x:Bind Model.LanguageHeader, Mode=OneWay}" ItemsSource="{x:Bind vm:SettingsViewModel.Languages}"
+          SelectedIndex="{x:Bind Model.LanguageIndex, Mode=OneWay}" SelectionChanged="LanguageChanged"/>
+      <TextBlock Text="{x:Bind Model.ApiSettingsTitle, Mode=OneWay}" FontSize="{StaticResource SectionFontSize}" TextWrapping="Wrap"/>
+      <TextBlock Text="{x:Bind Model.ApiSettingsHelp, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <TextBox Header="{x:Bind Model.EndpointHeader, Mode=OneWay}" Text="{x:Bind Model.EndpointUrl}" IsReadOnly="True"
+          MaxWidth="{StaticResource SettingsFieldMaxWidth}" HorizontalAlignment="Stretch"/>
+      <TextBox Header="Client ID" Text="{x:Bind Model.ClientId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+          MaxWidth="{StaticResource SettingsFieldMaxWidth}" HorizontalAlignment="Stretch"/>
+      <PasswordBox Header="{x:Bind Model.SecretHeader, Mode=OneWay}" Loaded="SecretLoaded"
+          MaxWidth="{StaticResource SettingsFieldMaxWidth}" HorizontalAlignment="Stretch"/>
+      <CheckBox Content="{x:Bind Model.LocalRouteTimesLabel, Mode=OneWay}" IsChecked="{x:Bind Model.LocalRouteTimes, Mode=TwoWay}"/>
+      <Button Content="{x:Bind Model.SaveLabel, Mode=OneWay}" Click="SaveConnection"/>
+      <Button Content="{x:Bind Model.UpdateCredentialsLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanUpdateCredentials}" Click="UpdateCredentials"/>
+      <TextBlock Text="{x:Bind Model.CredentialsHelp, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <Button Content="{x:Bind Model.ConnectLabel, Mode=OneWay}" Click="Connect"/>
+      <Button Content="{x:Bind Model.RefreshLabel, Mode=OneWay}" Click="Refresh"/>
+      <TextBlock Text="{x:Bind Model.Capability, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <TextBlock Text="{x:Bind Model.IndependentScope, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <TextBlock Text="{x:Bind Model.Verified, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <TextBlock Text="{x:Bind Model.Target, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <Button Content="{x:Bind Model.LoadParametersLabel, Mode=OneWay}" Click="LoadParameters"/>
+      <TextBlock Text="{x:Bind Model.MaintenanceTitle, Mode=OneWay}" FontSize="{StaticResource SubsectionFontSize}" TextWrapping="Wrap"/>
+      <Button Content="{x:Bind Model.BackupClearLabel, Mode=OneWay}" Click="BackupClear"/>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

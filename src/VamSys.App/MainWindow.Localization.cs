@@ -55,6 +55,8 @@ public sealed partial class MainWindow
             foreach (var row in visible)
             foreach (var cell in row.Cells)
                 cell.RefreshLanguage();
+            foreach (var settingsPage in settingsPages.Values)
+                settingsPage.Model.RefreshLanguage();
             if (page == "review")
             foreach (var row in reviewRows)
                 row.RefreshLanguage();
@@ -67,24 +69,5 @@ public sealed partial class MainWindow
         ModeBadge.Text = L(ShellViewModel.ModeBadgeKey(workspace.Mode));
         SnapshotLabel.Text = L("Text_B5B62EA34A", ("arg0", Data.Draft.Count), ("arg1", Data.SnapshotAt?.ToLocalTime().ToString("g", localization.DisplayCulture) ?? L("Text_C4CF69F358")));
         PageTitle.Text = L(shell.PageTitleKey);
-    }
-    ComboBox LanguagePicker()
-    {
-        var picker = new ComboBox { ItemsSource = new[] { "简体中文", "English" }, SelectedIndex = localization.Language == "en-US" ? 1 : 0, MinWidth = UiTokens.LanguagePickerMinWidth };
-        AutomationProperties.SetAutomationId(picker, "LanguagePicker");
-        picker.Localize(localization, "Header", () => L("Language"));
-        picker.Localize(localization, "SelectedIndex", () => localization.Language == "en-US" ? 1 : 0);
-        picker.SelectionChanged += async (_, _) => await Guard(() =>
-        {
-            var language = picker.SelectedIndex == 1 ? "en-US" : "zh-CN";
-            if (language == localization.Language)
-                return Task.CompletedTask;
-            try
-            { settings.SaveLanguage(language); }
-            catch { picker.SelectedIndex = localization.Language == "en-US" ? 1 : 0; throw; }
-            localization.SetLanguage(language);
-            return Task.CompletedTask;
-        });
-        return picker;
     }
 }

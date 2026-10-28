@@ -73,17 +73,19 @@ public sealed class FakeStorage : IWorkspaceStorage, IUserSettings
     {
         public Task WriteAsync(BatchCheckpoint checkpoint, CancellationToken ct) { owner.Checkpoints.Add(checkpoint); return Task.CompletedTask; }
     }
+    // What the store keeps of a typed client ID (the real store normalizes it).
+    public Func<string, string> StoredClientId = id => id;
     public void SaveConnectionSettings(Workspace workspace, string clientId, string secret, string url, bool localRouteTimes)
     {
         Calls.Add("settings");
-        workspace.ClientId = clientId;
+        workspace.ClientId = StoredClientId(clientId);
         workspace.LocalRouteTimes = localRouteTimes;
         Credentials.Add((workspace.Id, clientId, secret));
     }
     public void UpdateOperationsCredentials(Workspace workspace, string clientId, string secret)
     {
         Calls.Add("credentials");
-        workspace.ClientId = clientId;
+        workspace.ClientId = StoredClientId(clientId);
         Credentials.Add((workspace.Id, clientId, secret));
     }
     public MaintenancePreview PreviewMaintenance(Guid workspaceId) => Preview ?? throw new InvalidOperationException("no preview");
