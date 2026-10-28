@@ -214,35 +214,34 @@ public sealed partial class MainWindow : Window
             ShellPage.Review => ReviewPage(),
             ShellPage.Tasks => TasksPage(),
             ShellPage.Settings => GetSettingsPage(),
-            _ => WorkspacePage()
+            _ => BuildWorkspacePage()
         };
         UpdateDataHeaderLayout();
     }
-    UIElement WorkspacePage()
+    // Rebuilt on every render; the shown one is refreshed when the language changes.
+    WorkspacePage? shownWorkspacePage;
+    UIElement BuildWorkspacePage() => shownWorkspacePage = new WorkspacePage(
+        new WorkspaceViewModel(workspace, localization, CountChanges),
+        new WorkspacePageActions(
+            Invoke: async action => { if (gate.CanInvokeCommand) await UserAction(action); },
+            NewWorkspace: NewWorkspace,
+            CreateDemo: CreateDemoWorkspace,
+            OpenResource: kind => { resource = kind; ResourcePicker.SelectedIndex = (int)resource; SelectPane(ShellPage.Data); }));
+    async Task NewWorkspace()
     {
-        var cards = new StackPanel { Spacing = UiTokens.SpacingLarge };
-        foreach (var (kind, data) in workspace.Resources)
-        {
-            var captured = kind;
-            cards.Children.Add(new Border { Padding = UiTokens.WorkspaceCardPadding, CornerRadius = UiTokens.CardCornerRadius, Background = UiTokens.CardBackgroundBrush, Child = Row(Text(() => L(Schemas.All[kind].Name), UiTokens.SectionFontSize), Text(() => L("Text_B9B43D4DAA", ("arg0", data.Draft.Count), ("arg1", CountChanges(data)))), Button(() => L("Text_C771248E51"), () => { resource = captured; ResourcePicker.SelectedIndex = (int)resource; SelectPane(ShellPage.Data); return Task.CompletedTask; })) });
-        }
-        return Scroll(Stack(Text(() => L("Text_2C33D5F7DE")),
-            Row(Button(() => L("Text_946897D107"), async () =>
-            {
-                if (!gate.CanAct)
-                    return;
-                var name = new TextBox { Text = L("Text_A818AFCD80"), MaxLength = 80 }.Localize(localization, "Header", () => L("Text_8DCC576817"));
-                if (await Confirm(L("Text_CDD0362664"), name) && !string.IsNullOrWhiteSpace(name.Text))
-                { await session.ReplaceWithNewAsync(new Workspace { Name = name.Text.Trim() }); ReloadWorkspaces(); Render(); }
-            }), Button(() => L("Text_57D4E0340D"), async () =>
-            {
-                if (!gate.CanAct)
-                    return;
-                await session.ReplaceWithNewAsync(DemoWorkspace());
-                ReloadWorkspaces();
-                Render();
-            })), cards,
-            Text(() => L("Text_8B0B7AD880"))));
+        if (!gate.CanAct)
+            return;
+        var name = new TextBox { Text = L("Text_A818AFCD80"), MaxLength = 80 }.Localize(localization, "Header", () => L("Text_8DCC576817"));
+        if (await Confirm(L("Text_CDD0362664"), name) && !string.IsNullOrWhiteSpace(name.Text))
+        { await session.ReplaceWithNewAsync(new Workspace { Name = name.Text.Trim() }); ReloadWorkspaces(); Render(); }
+    }
+    async Task CreateDemoWorkspace()
+    {
+        if (!gate.CanAct)
+            return;
+        await session.ReplaceWithNewAsync(DemoWorkspace());
+        ReloadWorkspaces();
+        Render();
     }
     UIElement DataPage() => GetDataPage();
     UIElement BuildDataPage()

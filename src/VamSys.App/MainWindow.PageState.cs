@@ -82,6 +82,7 @@ public sealed partial class MainWindow
         tableBaseline = [];
         tableConflicts = [];
         tableFleetLabels = new(StringComparer.OrdinalIgnoreCase);
+        shownWorkspacePage = null;
         tasksOwner = null;
         tasksPage = null;
         taskList = null;

@@ -1,0 +1,32 @@
+<UserControl x:Class="VamSys.App.WorkspacePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:VamSys.Presentation">
+  <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch">
+    <StackPanel Spacing="{StaticResource SpacingLarge}">
+      <TextBlock Text="{x:Bind Model.Intro, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLarge}">
+        <Button Content="{x:Bind Model.NewWorkspaceLabel, Mode=OneWay}" Click="NewWorkspace"/>
+        <Button Content="{x:Bind Model.DemoWorkspaceLabel, Mode=OneWay}" Click="CreateDemo"/>
+      </StackPanel>
+      <ItemsControl ItemsSource="{x:Bind Model.Cards}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Spacing="{StaticResource SpacingLarge}"/></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ResourceCardViewModel">
+            <Border Padding="{StaticResource WorkspaceCardPadding}" CornerRadius="{StaticResource CardCornerRadius}" Background="{ThemeResource CardBackgroundBrush}">
+              <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLarge}">
+                <TextBlock Text="{x:Bind Title, Mode=OneWay}" FontSize="{StaticResource SectionFontSize}" TextWrapping="Wrap"/>
+                <TextBlock Text="{x:Bind Summary, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+                <Button Content="{x:Bind OpenLabel, Mode=OneWay}" Click="OpenResource"/>
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Text="{x:Bind Model.StorageNote, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

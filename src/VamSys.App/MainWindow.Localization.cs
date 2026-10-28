@@ -57,6 +57,8 @@ public sealed partial class MainWindow
                 cell.RefreshLanguage();
             foreach (var settingsPage in settingsPages.Values)
                 settingsPage.Model.RefreshLanguage();
+            if (ReferenceEquals(PageHost.Content, shownWorkspacePage))
+                shownWorkspacePage?.Model.RefreshLanguage();
             if (page == "review")
             foreach (var row in reviewRows)
                 row.RefreshLanguage();
