@@ -26,21 +26,32 @@ public sealed partial class MainWindow
     TextBlock? pageSummary, selectionSummary;
     CommandBar? dataActions;
     int dataPageBuilds, dataRowBuilds;
-    readonly List<RowViewModel> pageRowPool = [];
-    ResourceData? pooledData;
-    // What the pooled rows' edit closures act on. The pool is rebound to another workspace or
-    // resource with the same columns, and released rows are finalized late (their x:Bind event
-    // sources sit in the finalizer queue), so the closures reach the data only through this.
-    sealed class RowLink
-    {
-        public Workspace? Owner; public ResourceData? Data; public ResourceKind Kind;
-        public void Detach() { Owner = null; Data = null; }
-    }
-    RowLink? pooledLink;
-    List<string> pooledColumns = [];
+    DataGridViewModel? dataGrid;
+    DataGridViewModel DataGrid => dataGrid ??= new(new DataGridHost(this), cellEdits, localization);
     DataTableTemplates? tableTemplates;
     CellTemplateSelector? cellTemplates;
-    string pooledDensity = "";
+    // The pooled cells read the shown workspace, resource and baseline through this when they are used.
+    sealed class DataGridHost(MainWindow window) : IDataGridHost
+    {
+        public bool CanEdit => window.CanEditData() && !window.restoringDataSelection;
+        public Workspace Workspace => window.workspace;
+        public ResourceKind Resource => window.resource;
+        public ResourceData Data => window.Data;
+        public IReadOnlyDictionary<Guid, DataRow> Baseline => window.tableBaseline;
+        public IReadOnlySet<Guid> Conflicts => window.tableConflicts;
+        public IReadOnlyDictionary<string, FleetOption> FleetLabels => window.tableFleetLabels;
+        public object? CellTemplates => window.cellTemplates;
+        public double CellHeight(bool compact) => UiTokens.CellHeight(compact);
+        public void CellEdited(Workspace owner, ResourceKind kind, ResourceData data, Guid rowId, int changedDelta)
+        {
+            if (window.changeCounts.TryGetValue(data, out var count))
+                window.changeCounts[data] = count + changedDelta;
+            window.session.RecordCellEdit(owner, kind, rowId);
+            window.Status(() => window.L("Text_75141EDE81"));
+        }
+        public Task ChooseFleets(DataRow row) => window.Guard(() => window.ChooseFleets(row));
+        public Task ChooseParameter(DataRow row) => window.Guard(() => window.ChooseParameter(row));
+    }
 
     UIElement GetDataPage()
     {
@@ -269,84 +280,17 @@ public sealed partial class MainWindow
             return;
         var source = Data;
         var columns = DisplayColumns();
-        if (!pooledColumns.SequenceEqual(columns) || pooledDensity != tableDensity || pooledLink is null)
-        {
-            pooledLink?.Detach();
-            pageRowPool.Clear();
-            pooledColumns = columns;
-            pooledDensity = tableDensity;
-            pooledLink = new();
-        }
         // Rows with the same columns are rebound in place, also for another workspace or resource.
-        if (!ReferenceEquals(pooledData, source))
+        if (DataGrid.Bind(columns, tableDensity, workspace, source, resource))
         {
-            pooledData = source;
-            pooledLink.Owner = workspace;
-            pooledLink.Data = source;
-            pooledLink.Kind = resource;
             EnsureDataHeaders(columns);
             SyncSortColumns(sortBox?.SelectedItem as string);
         }
-        var rows = new List<RowViewModel>(shownState.Model.PageSize);
         restoringDataSelection = true;
         try
         {
             table.SelectedItems.Clear();
-            foreach (var id in shownState.Model.PageIds())
-            {
-                var row = source.FindDraftRow(id);
-                if (row is null)
-                    continue;
-                if (rows.Count < pageRowPool.Count)
-                {
-                    var reused = pageRowPool[rows.Count];
-                    reused.Rebind(row);
-                    rows.Add(reused);
-                    continue;
-                }
-                RowViewModel? view = null;
-                var link = pooledLink!;
-                bool Editable() => CanEditData() && !restoringDataSelection && ReferenceEquals(link.Owner, workspace) && link.Kind == resource
-                    && view != null && ReferenceEquals(link.Data, Data) && ReferenceEquals(Data.FindDraftRow(view.Row.LocalId), view.Row) && !Schemas.Deleted(view.Row);
-                var cells = columns.Select(field => new CellViewModel(field, row.Get(field), value =>
-                {
-                    if (!Editable() || field == "_delete")
-                        return;
-                    var owner = link.Owner!;
-                    var data = link.Data!;
-                    var currentId = view!.Row.LocalId;
-                    var (replacement, changedDelta) = cellEdits.Commit(data, view.Row, field, value, tableBaseline);
-                    // Rows are replaced, never edited in place: the view follows the replacement.
-                    view.ReplaceRow(replacement);
-                    if (changeCounts.TryGetValue(data, out var count))
-                        changeCounts[data] = count + changedDelta;
-                    view?.Cells.FirstOrDefault(c => c.Field == "_delete")?.RefreshLanguage();
-                    session.RecordCellEdit(owner, link.Kind, currentId);
-                    Status(() => L("Text_75141EDE81"));
-                })
-                {
-                    CanEdit = Editable,
-                    IsReadOnly = CellReadOnly(row, field),
-                    ReadOnlyForRow = r => CellReadOnly(r, field),
-                    FleetName = () => field == "Parameter IDs" ? L("AirlineParameter") : L("ChooseFleet"),
-                    ShowServerNull = () => view?.Row.Identity != null && view.Row.Get("Type") == "jumpseat" && (field is "Callsign" or "Flight Number"),
-                    ServerNullLabel = () => L("JumpseatNotPreserved"),
-                    Compact = tableDensity == "compact",
-                    Height = UiTokens.CellHeight(tableDensity == "compact"),
-                    DisplayText = () => field == "_delete" ? RowStatus(view!.Row, tableBaseline, tableConflicts)
-                        : field == "Parameter IDs" ? view!.Row.Get(field) : field is "Fleet ID" or "Fleet IDs" ? FleetLabel(view!.Row.Get(field), tableFleetLabels) : "",
-                    ChooseFleet = field == "Parameter IDs" ? new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Guard(() => ChooseParameter(view!.Row)))
-                        : field is "Fleet ID" or "Fleet IDs" ? new CommunityToolkit.Mvvm.Input.AsyncRelayCommand(() => Guard(() => ChooseFleets(view!.Row))) : null
-                }).ToList();
-                view = new(row, cells) { CellTemplates = cellTemplates };
-                rows.Add(view);
-                pageRowPool.Add(view);
-            }
-            // Kept beyond a short page (or an empty workspace), up to one full page.
-            var keep = Math.Max(rows.Count, shownState.Model.PageSize);
-            if (pageRowPool.Count > keep)
-                pageRowPool.RemoveRange(keep, pageRowPool.Count - keep);
-            cellEdits.ResetContinuation();
+            var rows = DataGrid.Fill(shownState.Model.PageIds(), source, shownState.Model.PageSize);
             visible = rows;
             dataRowBuilds++;
             SyncShownRows(rows);
@@ -360,9 +304,6 @@ public sealed partial class MainWindow
         { shownState.Vertical = 0; FindVisual<ScrollViewer>(table)?.ChangeView(null, 0, null, true); }
         RefreshDataAvailability();
     }
-    bool CellReadOnly(DataRow row, string field) => DataGridRules.CellReadOnly(row, field, workspace.Mode);
-    string RowStatus(DataRow row, Dictionary<Guid, DataRow> baseline, HashSet<Guid> conflicts) => DataGridRules.RowStatus(row, baseline, conflicts, localization);
-    string FleetLabel(string value, Dictionary<string, FleetOption> labels) => DataGridRules.FleetLabel(value, labels, localization);
     void ChangeDataPage(int target)
     {
         if (!CanEditData() || shownState is null)

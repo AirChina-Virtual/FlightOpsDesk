@@ -100,8 +100,7 @@ public sealed partial class MainWindow
         // Row heights live in the item container style: build the page again.
         shownDataPage = null;
         dataPageOwner = null;
-        pooledData = null;
-        pageRowPool.Clear();
+        DataGrid.Reset();
         Render();
         // Render captures the old table once more; install the new offset afterwards.
         state.Vertical = targetOffset;

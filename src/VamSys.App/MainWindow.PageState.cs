@@ -76,8 +76,7 @@ public sealed partial class MainWindow
         shownState = null;
         dataPageOwner = null;
         ClearDataRows();
-        pooledLink?.Detach();
-        pooledData = null;
+        DataGrid.Release();
         changeCounts.Clear();
         tableBaseline = [];
         tableConflicts = [];

@@ -34,6 +34,8 @@
 
 窗口改为调用它，旧控件不变。每部分都配无窗口测试。这一步不改界面，窗口脚本应全部照旧通过。
 
+实际落点（2026-10-28）：单元格规则在 `DataGridRules`，选择计数与可用状态在 `SelectionCounts`／`DataGridAvailability`，编辑提交在 `CellEditCommitter`，行池、`RowLink` 与行、单元格模型的创建在 `DataGridViewModel`。窗口经 `IDataGridHost` 提供当前工作区、资源、基线、对话框和编辑后的通知（改动计数、`RecordCellEdit`、状态栏）。改动计数字典和选择恢复仍在窗口，D2 时随控件一起处理。
+
 **D2 新 `DataGrid` 控件（仅 QA 构建可切换）。** 新建 `DataGrid.xaml` 用户控件：
 
 - 列标题、虚拟化行列表、行呈现器（沿用 `EditableCell` 与 `DataRowPresenter` 的做法）；
