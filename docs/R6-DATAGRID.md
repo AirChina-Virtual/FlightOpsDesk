@@ -51,6 +51,7 @@
 
 - `test-data-performance-ui -Rows 20000|50000`：打开、搜索、翻页、编辑、撤销、滚动；
 - `test-cell-editing-ui`：点击、输入、Tab、Esc、读屏值与只读；
+- `test-data-footer-ui -DataGrid old|new`：页脚翻页、跳页、每页条数、选择菜单与读屏名称；
 - `test-ui-interactions -Rows 20000`：密度、布局、批量范围。
 
 **D4 替换。** 新控件达到下面的门槛后，正式包改用新控件，删除旧控件、`MainWindow.Data*.cs` 中的表格代码和隐藏开关。

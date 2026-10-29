@@ -477,6 +477,11 @@ public sealed partial class MainWindow
         foreach (var button in new[] { firstPage, previousPage, nextPage, lastPage, pageGo })
             if (button?.Tag is string key)
                 AutomationProperties.SetName(button, L(key));
+        // Named once when built, these kept the previous language for screen readers.
+        if (pageJump != null)
+            AutomationProperties.SetName(pageJump, L("TableGo"));
+        if (pageSize != null)
+            AutomationProperties.SetName(pageSize, L("TablePageSize"));
         dataFooter?.Apply(can, model, gate.QueryInProgress, PageSummary(), SelectionSummary());
         RefreshQueryNotice();
     }

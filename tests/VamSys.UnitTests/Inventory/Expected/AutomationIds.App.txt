@@ -47,6 +47,8 @@ name-key:ResourceType => code src/VamSys.App/MainWindow.Localization.cs
 name-key:TableDensity => code src/VamSys.App/MainWindow.Data.cs
 name-key:TableDensity => code src/VamSys.App/MainWindow.DataLayout.cs
 name-key:TableGo => code src/VamSys.App/MainWindow.Data.cs
+name-key:TableGo => code src/VamSys.App/MainWindow.Data.cs
+name-key:TablePageSize => code src/VamSys.App/MainWindow.Data.cs
 name-key:TablePageSize => code src/VamSys.App/MainWindow.Data.cs
 name:{x:Bind Field} => xaml src/VamSys.App/DataTableTemplates.xaml
 name:{x:Bind FleetAutomationName, Mode=OneWay} => xaml src/VamSys.App/DataTableTemplates.xaml
