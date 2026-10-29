@@ -302,6 +302,8 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-10-28，数据表 D1，refactor/r0 cbffe8a）：** 方案见 [R6-DATAGRID.md](R6-DATAGRID.md)。D1 已移入 Presentation 的三块，窗口改为调用，旧控件不变：单元格只读、行状态与机队标签（`DataGridRules`）；选择计数（`SelectionCounts`）与数据页控件可用状态（`DataGridAvailability`）；单元格编辑提交（`CellEditCommitter`，替换行、同格连续输入合并撤销步骤、改动计数增量）。共新增 31 项无窗口测试，每块均经回植验证。窗口验收：`test-cell-editing-ui`、`test-ui-interactions -Rows 20000` 通过；`test-data-performance-ui -Rows 20000` 通过（首次展示 478 ms，搜索 124 ms，翻页 P95 11.2 ms，语言 P95 25.7 ms，单格处理 P95 1.3 ms，当前页 200 行／4,000 个单元格模型），均在门槛内。D1 第四块：行池、`RowLink` 与行、单元格模型的创建移入 `DataGridViewModel`，窗口经 `IDataGridHost` 提供当前状态和编辑后的通知；另加 8 项无窗口测试，9 处回植均被抓到。顺带修正一处潜在问题：列或密度变化重建行池时，若数据未变，新 `RowLink` 不会绑定，单元格会拒绝编辑。第四块窗口验收（f6f9d1f 的 QA 包）：`test-cell-editing-ui`、`test-ui-interactions -Rows 20000` 通过；`test-data-performance-ui -Rows 50000` 通过（首次展示 367 ms，搜索 233 ms，翻页 P95 8.4 ms，语言 P95 21.7 ms，单格处理 P95 0.6 ms，当前页 200 行／4,000 个单元格模型，脚本结束时工作集 692 MiB），单次测量，不作提速或回退结论。切换工作区后的内存由 `test-baseline-ui` 测量（5 轮往返后强制回收再读）：5 万行切换后工作集 671 MiB、托管堆 255 MiB，同日 D1 前（08:23）为 730／255 MiB；2 万行 580 MiB、托管堆 112 MiB。托管堆与 D1 前相同，说明切换后旧工作区没有被单元格留住；同样是单次测量。D1 完成。
 
+**进度（2026-10-28，数据表 D2 第一块）：** 新建 `DataGrid.xaml` 控件与 `DataGridFooterViewModel`，仅 QA 构建可用 `VAMSYS_QA_DATAGRID=new` 切换；正式包仍用旧表格，打包检查已证明正式包不含开关。页脚模型 4 项无窗口测试，6 处回植均被抓到；AutomationId 清单只多出同名 id 的新来源，没有新 id。新控件尚未在窗口中跑过脚本。
+
 ### R7 测试体系重建
 
 现有测试是一个按顺序执行、失败即停的控制台程序（`Program.cs` 约 460 行负责调度、种子和断言入口），场景文件按“审核轮次”而不是按功能组织，很多断言绑在现有内部结构上（具体方法、分部类、内部字段），重构后大多会失效；界面逻辑靠链接源文件编译；窗口测试是 PowerShell 脚本，部分因编码无法在 5.1 运行，`test-localization-ui` 还有已知失败。因此不迁移旧测试，而是以第 3 节的需求为依据、针对新结构重新建立。目标结构：

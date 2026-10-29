@@ -76,7 +76,7 @@ public sealed partial class MainWindow
         shownState = null;
         dataPageOwner = null;
         ClearDataRows();
-        DataGrid.Release();
+        PageRows.Release();
         changeCounts.Clear();
         tableBaseline = [];
         tableConflicts = [];

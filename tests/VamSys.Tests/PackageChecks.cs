@@ -1,4 +1,5 @@
 using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -36,8 +37,15 @@ static class PackageChecks
             var references = metadata.AssemblyReferences.Select(handle => metadata.GetString(metadata.GetAssemblyReference(handle).Name));
             Require(!references.Any(reference => reference.Contains("Tests", StringComparison.OrdinalIgnoreCase)), $"Test assembly referenced by {name}");
             if (name == "FlightOpsDesk")
-                foreach (var method in new[] { "InitializeVerification", "ConfigureVerificationTheme", "VerificationCommand" })
+            {
+                foreach (var method in new[] { "InitializeVerification", "ConfigureVerificationTheme", "VerificationCommand", "ChooseDataGrid" })
                     Require(methods.Contains(method) == qa, $"Unexpected QA entry point {method} in {name} (QA={qa})");
+                // The QA switches (pipe, theme, data grid) are read only by the QA build.
+                var switches = false;
+                for (var handle = MetadataTokens.UserStringHandle(1); !handle.IsNil && !switches; handle = metadata.GetNextHandle(handle))
+                    switches = metadata.GetUserString(handle).StartsWith("VAMSYS_QA_", StringComparison.Ordinal);
+                Require(switches == qa, $"Unexpected QA switch in {name} (QA={qa})");
+            }
             if (name is "VamSys.Storage" or "VamSys.Infrastructure")
             {
                 foreach (var method in name == "VamSys.Storage" ? new[] { "get_Barrier", "set_Barrier", "get_Faults", "set_Faults" } : [])

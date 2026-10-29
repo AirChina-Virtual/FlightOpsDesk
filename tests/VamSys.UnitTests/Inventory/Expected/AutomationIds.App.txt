@@ -2,18 +2,29 @@ id:AppTitleBar => xaml x:Name src/VamSys.App/MainWindow.xaml
 id:BodyGrid => xaml x:Name src/VamSys.App/MainWindow.xaml
 id:BusyRing => xaml x:Name src/VamSys.App/MainWindow.xaml
 id:DataClearSelection => code src/VamSys.App/MainWindow.Data.cs
+id:DataClearSelection => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataFilter => code src/VamSys.App/MainWindow.xaml.cs
 id:DataFirstPage => code src/VamSys.App/MainWindow.Data.cs
+id:DataFirstPage => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataGoPage => code src/VamSys.App/MainWindow.Data.cs
+id:DataGoPage => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataLastPage => code src/VamSys.App/MainWindow.Data.cs
+id:DataLastPage => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataNextPage => code src/VamSys.App/MainWindow.Data.cs
+id:DataNextPage => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataPageJump => code src/VamSys.App/MainWindow.Data.cs
+id:DataPageJump => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataPageSize => code src/VamSys.App/MainWindow.Data.cs
+id:DataPageSize => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataPreviousPage => code src/VamSys.App/MainWindow.Data.cs
+id:DataPreviousPage => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataQueryCancel => code src/VamSys.App/MainWindow.Data.cs
+id:DataQueryCancel => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataSearch => code src/VamSys.App/MainWindow.xaml.cs
 id:DataSelectAll => code src/VamSys.App/MainWindow.Data.cs
+id:DataSelectAll => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataSelectPage => code src/VamSys.App/MainWindow.Data.cs
+id:DataSelectPage => xaml AutomationId src/VamSys.App/DataGrid.xaml
 id:DataSort => code src/VamSys.App/MainWindow.xaml.cs
 id:DataTable => code src/VamSys.App/MainWindow.xaml.cs
 id:LanguagePicker => xaml AutomationId src/VamSys.App/SettingsPage.xaml
@@ -39,3 +50,11 @@ name-key:TableGo => code src/VamSys.App/MainWindow.Data.cs
 name-key:TablePageSize => code src/VamSys.App/MainWindow.Data.cs
 name:{x:Bind Field} => xaml src/VamSys.App/DataTableTemplates.xaml
 name:{x:Bind FleetAutomationName, Mode=OneWay} => xaml src/VamSys.App/DataTableTemplates.xaml
+name:{x:Bind Footer.FirstLabel, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
+name:{x:Bind Footer.GoLabel, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
+name:{x:Bind Footer.GoLabel, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
+name:{x:Bind Footer.LastLabel, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
+name:{x:Bind Footer.NextLabel, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
+name:{x:Bind Footer.PageSizeLabel, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
+name:{x:Bind Footer.PageSummary, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
+name:{x:Bind Footer.PreviousLabel, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml

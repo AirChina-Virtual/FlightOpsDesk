@@ -20,6 +20,7 @@ public sealed partial class MainWindow
     partial void ObserveDialog(ContentDialog dialog, bool showing) { if (showing) verificationDialog=dialog; else if(verificationDialog==dialog) verificationDialog=null; }
     partial void ConfigureVerificationTheme()
         => RootGrid.RequestedTheme = Environment.GetEnvironmentVariable("VAMSYS_QA_THEME") == "light" ? ElementTheme.Light : ElementTheme.Dark;
+    partial void ChooseDataGrid(ref bool useNew) => useNew = Environment.GetEnvironmentVariable("VAMSYS_QA_DATAGRID") == "new";
     partial void InitializeVerification()
     {
         var pipe=Environment.GetEnvironmentVariable("VAMSYS_QA_PIPE");if(string.IsNullOrWhiteSpace(pipe))return;
@@ -266,11 +267,11 @@ public sealed partial class MainWindow
             var view=visible[int.Parse(command[18..])];var marked=view.Row.With("_delete","TRUE");Data.ReplaceDraftRows([marked]);view.Rebind(marked);RootGrid.UpdateLayout();
             return new{id=view.Row.LocalId,readOnly=view.Cells.Where(c=>c.Field!="_delete").All(c=>c.IsReadOnly)};
         }
-        if(command.StartsWith("data-page-input:")){pageJump!.Text=command[16..];RestoreDataSelection();return DataVerificationState();}
+        if(command.StartsWith("data-page-input:")){DataPageJumpBox!.Text=command[16..];RestoreDataSelection();return DataVerificationState();}
         if(command.StartsWith("data-unapplied:")){searchBox!.Text=command[15..];await Task.Delay(50);RootGrid.UpdateLayout();return DataVerificationState();}
         if(command.StartsWith("language:")){localization.SetLanguage(command[9..]);RootGrid.UpdateLayout();return new{language=localization.Language};}
         if(command.StartsWith("data-page:")){ChangeDataPage(int.Parse(command[10..]));RootGrid.UpdateLayout();return DataVerificationState();}
-        if(command.StartsWith("data-size:")){pageSize!.SelectedItem=int.Parse(command[10..]);RootGrid.UpdateLayout();return DataVerificationState();}
+        if(command.StartsWith("data-size:")){DataPageSizeBox!.SelectedItem=int.Parse(command[10..]);RootGrid.UpdateLayout();return DataVerificationState();}
         if(command.StartsWith("data-query:"))
         {
             using var doc=JsonDocument.Parse(command[11..]);var value=doc.RootElement;
@@ -333,7 +334,7 @@ public sealed partial class MainWindow
             density=tableDensity,actualRowHeight=realized.FirstOrDefault().Height,viewport=scroll?.ViewportHeight,fullVisibleRows=realized.Count(r=>r.Top>=0&&r.Top+r.Height<=scroll!.ViewportHeight),
             vertical=scroll?.VerticalOffset,horizontal=horizontalTable?.HorizontalOffset,anchor=FirstVisibleDataRow()?.Id,
             windowWidth=RootGrid.ActualWidth,windowHeight=RootGrid.ActualHeight,rasterizationScale=RootGrid.XamlRoot?.RasterizationScale,
-            theme=RootGrid.ActualTheme.ToString(),pageInput=pageJump?.Text,unapplied=queryNotice?.Visibility==Visibility.Visible,
+            theme=RootGrid.ActualTheme.ToString(),pageInput=DataPageJumpBox?.Text,dataGrid=useNewDataGrid?"new":"old",unapplied=queryNotice?.Visibility==Visibility.Visible,
             batchEnabled=dataActions?.PrimaryCommands.Concat(dataActions.SecondaryCommands).OfType<AppBarButton>().Where(b=>b.Tag is string).Select(b=>new{target=b.Tag,enabled=b.IsEnabled}).ToArray(),
             draftSaves=verificationDraftCommits,fullSaves=verificationFullCommits,undo=Data.Undo.Count };
     }

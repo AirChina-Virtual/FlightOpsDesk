@@ -1,0 +1,66 @@
+<UserControl x:Class="VamSys.App.DataGrid"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock.
+       The code-behind reaches the table and the footer panels by their position in this tree. -->
+  <Grid RowSpacing="{StaticResource SpacingSmall}">
+    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <!-- The rows scroll vertically inside the list; the columns scroll horizontally with the header. -->
+    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" VerticalScrollMode="Disabled">
+      <ListView SelectionMode="Multiple" HorizontalContentAlignment="Stretch"/>
+    </ScrollViewer>
+    <Grid Grid.Row="1" RowSpacing="{StaticResource SpacingTight}" ColumnSpacing="{StaticResource SpacingMedium}" SizeChanged="FooterSizeChanged">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLarge}">
+          <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMedium}">
+            <Button Content="{x:Bind Footer.SelectionLabel, Mode=OneWay}" IsEnabled="{x:Bind Footer.CanEdit, Mode=OneWay}">
+              <Button.Flyout>
+                <MenuFlyout>
+                  <MenuFlyoutItem Text="{x:Bind Footer.SelectPageLabel, Mode=OneWay}" IsEnabled="{x:Bind Footer.CanSelectPage, Mode=OneWay}" AutomationProperties.AutomationId="DataSelectPage" Click="SelectPage"/>
+                  <MenuFlyoutItem Text="{x:Bind Footer.SelectAllLabel, Mode=OneWay}" IsEnabled="{x:Bind Footer.CanSelectAll, Mode=OneWay}" AutomationProperties.AutomationId="DataSelectAll" Click="SelectAll"/>
+                  <MenuFlyoutItem Text="{x:Bind Footer.ClearSelectionLabel, Mode=OneWay}" IsEnabled="{x:Bind Footer.CanClearSelection, Mode=OneWay}" AutomationProperties.AutomationId="DataClearSelection" Click="ClearSelection"/>
+                </MenuFlyout>
+              </Button.Flyout>
+            </Button>
+            <TextBlock Text="{x:Bind Footer.SelectionSummary, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.SelectionHint, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+            <Button Content="{x:Bind Footer.CancelQueryLabel, Mode=OneWay}" Visibility="{x:Bind Footer.QueryInProgress, Mode=OneWay}" AutomationProperties.AutomationId="DataQueryCancel" Click="CancelQuery"/>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLarge}">
+          <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingSmall}">
+            <Button Padding="{StaticResource IconButtonPadding}" IsEnabled="{x:Bind Footer.CanFirst, Mode=OneWay}" AutomationProperties.AutomationId="DataFirstPage"
+                AutomationProperties.Name="{x:Bind Footer.FirstLabel, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.FirstLabel, Mode=OneWay}" Click="FirstPage">
+              <SymbolIcon Symbol="Previous"/>
+            </Button>
+            <Button Padding="{StaticResource IconButtonPadding}" IsEnabled="{x:Bind Footer.CanPrevious, Mode=OneWay}" AutomationProperties.AutomationId="DataPreviousPage"
+                AutomationProperties.Name="{x:Bind Footer.PreviousLabel, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.PreviousLabel, Mode=OneWay}" Click="PreviousPage">
+              <SymbolIcon Symbol="Back"/>
+            </Button>
+            <Button Padding="{StaticResource IconButtonPadding}" IsEnabled="{x:Bind Footer.CanNext, Mode=OneWay}" AutomationProperties.AutomationId="DataNextPage"
+                AutomationProperties.Name="{x:Bind Footer.NextLabel, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.NextLabel, Mode=OneWay}" Click="NextPage">
+              <SymbolIcon Symbol="Forward"/>
+            </Button>
+            <Button Padding="{StaticResource IconButtonPadding}" IsEnabled="{x:Bind Footer.CanLast, Mode=OneWay}" AutomationProperties.AutomationId="DataLastPage"
+                AutomationProperties.Name="{x:Bind Footer.LastLabel, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.LastLabel, Mode=OneWay}" Click="LastPage">
+              <SymbolIcon Symbol="Next"/>
+            </Button>
+            <TextBox Width="{StaticResource PageJumpWidth}" Text="{x:Bind Footer.PageJumpText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{x:Bind Footer.CanEdit, Mode=OneWay}"
+                AutomationProperties.AutomationId="DataPageJump" AutomationProperties.Name="{x:Bind Footer.GoLabel, Mode=OneWay}" KeyDown="PageJumpKeyDown"/>
+            <Button Padding="{StaticResource IconButtonPadding}" IsEnabled="{x:Bind Footer.CanGo, Mode=OneWay}" AutomationProperties.AutomationId="DataGoPage"
+                AutomationProperties.Name="{x:Bind Footer.GoLabel, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.GoLabel, Mode=OneWay}" Click="GoPage">
+              <SymbolIcon Symbol="Go"/>
+            </Button>
+            <ComboBox Width="{StaticResource PageSizePickerWidth}" ItemsSource="{x:Bind Footer.PageSizeChoices}" SelectedItem="{x:Bind Footer.PageSize, Mode=OneWay}" IsEnabled="{x:Bind Footer.CanEdit, Mode=OneWay}"
+                AutomationProperties.AutomationId="DataPageSize" AutomationProperties.Name="{x:Bind Footer.PageSizeLabel, Mode=OneWay}" SelectionChanged="PageSizeChanged"/>
+            <TextBlock Text="{x:Bind Footer.PageText, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.PageSummary, Mode=OneWay}" AutomationProperties.Name="{x:Bind Footer.PageSummary, Mode=OneWay}"
+                FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Grid>
+</UserControl>

@@ -23,11 +23,16 @@ public sealed partial class MainWindow
     MenuFlyoutItem? selectPage, selectAll, clearSelection;
     TextBox? pageJump;
     ComboBox? pageSize;
+    // The table control (QA builds only for now) and its footer model; null when the window builds the table in code.
+    bool useNewDataGrid;
+    DataGridFooterViewModel? dataFooter;
+    TextBox? DataPageJumpBox => pageJump ?? (shownDataPage as Grid)?.Children.OfType<DataGrid>().FirstOrDefault()?.PageJump;
+    ComboBox? DataPageSizeBox => pageSize ?? (shownDataPage as Grid)?.Children.OfType<DataGrid>().FirstOrDefault()?.PageSize;
     TextBlock? pageSummary, selectionSummary;
     CommandBar? dataActions;
     int dataPageBuilds, dataRowBuilds;
-    DataGridViewModel? dataGrid;
-    DataGridViewModel DataGrid => dataGrid ??= new(new DataGridHost(this), cellEdits, localization);
+    DataGridViewModel? pageRows;
+    DataGridViewModel PageRows => pageRows ??= new(new DataGridHost(this), cellEdits, localization);
     DataTableTemplates? tableTemplates;
     CellTemplateSelector? cellTemplates;
     // The pooled cells read the shown workspace, resource and baseline through this when they are used.
@@ -107,6 +112,7 @@ public sealed partial class MainWindow
             pageSize.SelectedItem = state.Model.PageSize;
         if (pageJump != null)
         { pageJump.Text = state.Model.Page.ToString(); pageJump.Tag = state.Model.Page; }
+        dataFooter?.ShowPage(state.Model.Page);
     }
     // Removing the rows must not read as the user deselecting them.
     void ClearDataRows()
@@ -281,7 +287,7 @@ public sealed partial class MainWindow
         var source = Data;
         var columns = DisplayColumns();
         // Rows with the same columns are rebound in place, also for another workspace or resource.
-        if (DataGrid.Bind(columns, tableDensity, workspace, source, resource))
+        if (PageRows.Bind(columns, tableDensity, workspace, source, resource))
         {
             EnsureDataHeaders(columns);
             SyncSortColumns(sortBox?.SelectedItem as string);
@@ -290,7 +296,7 @@ public sealed partial class MainWindow
         try
         {
             table.SelectedItems.Clear();
-            var rows = DataGrid.Fill(shownState.Model.PageIds(), source, shownState.Model.PageSize);
+            var rows = PageRows.Fill(shownState.Model.PageIds(), source, shownState.Model.PageSize);
             visible = rows;
             dataRowBuilds++;
             SyncShownRows(rows);
@@ -311,10 +317,40 @@ public sealed partial class MainWindow
         shownState.Model.SetPage(target);
         ShowDataPageRows(true);
     }
+    // The pager is kept across workspaces and resources: act on the state shown now.
+    DataTableViewModel PagerModel() => (shownState ?? CurrentDataState).Model;
+    void GoToTypedPage(string text)
+    { if (int.TryParse(text, out var n) && n >= 1 && n <= PagerModel().PageCount) ChangeDataPage(n); else Status(() => L("TableInvalidPage")); }
+    // Showing another state's size is not a change of size.
+    void ChangePageSize(int size)
+    { if (CanEditData() && size != PagerModel().PageSize) { PagerModel().SetPageSize(size); ShowDataPageRows(true); } }
+    void SelectShownPage()
+    {
+        restoringDataSelection = true;
+        try { foreach (var row in visible) { PagerModel().Selected.Add(row.Row.LocalId); if (!table!.SelectedItems.Contains(row)) table.SelectedItems.Add(row); } }
+        finally { restoringDataSelection = false; }
+        shownState!.Counts.Invalidate();
+        RefreshDataAvailability();
+    }
+    void SelectAllResults() { PagerModel().SelectAll(); RestoreDataSelection(); }
+    void ClearDataSelection() { PagerModel().Selected.Clear(); RestoreDataSelection(); }
+    void CancelQueryByUser() { CancelDataQuery(); Status(() => L("TableQueryCanceled")); }
+    DataGridActions DataGridControlActions() => new(
+        CanEdit: CanEditData,
+        Run: async action => { if (CanEditData()) await UserAction(() => { action(); return Task.CompletedTask; }); },
+        FirstPage: () => ChangeDataPage(1),
+        PreviousPage: () => ChangeDataPage(PagerModel().Page - 1),
+        NextPage: () => ChangeDataPage(PagerModel().Page + 1),
+        LastPage: () => ChangeDataPage(PagerModel().PageCount),
+        GoToPage: GoToTypedPage,
+        ChangePageSize: ChangePageSize,
+        SelectPage: SelectShownPage,
+        SelectAll: SelectAllResults,
+        ClearSelection: ClearDataSelection,
+        CancelQuery: CancelQueryByUser);
     FrameworkElement DataPager()
     {
-        // The pager is kept across workspaces and resources: act on the state shown now.
-        DataTableViewModel Model() => (shownState ?? CurrentDataState).Model;
+        DataTableViewModel Model() => PagerModel();
         firstPage = DataButton("TableFirst", () => ChangeDataPage(1), "DataFirstPage", Symbol.Previous);
         previousPage = DataButton("TablePrevious", () => ChangeDataPage(Model().Page - 1), "DataPreviousPage", Symbol.Back);
         nextPage = DataButton("TableNext", () => ChangeDataPage(Model().Page + 1), "DataNextPage", Symbol.Forward);
@@ -322,20 +358,18 @@ public sealed partial class MainWindow
         pageJump = new TextBox { Width = UiTokens.PageJumpWidth, Text = Model().Page.ToString() };
         AutomationProperties.SetAutomationId(pageJump, "DataPageJump");
         AutomationProperties.SetName(pageJump, L("TableGo"));
-        void Go()
-        { if (int.TryParse(pageJump.Text, out var n) && n >= 1 && n <= Model().PageCount) ChangeDataPage(n); else Status(() => L("TableInvalidPage")); }
+        void Go() => GoToTypedPage(pageJump.Text);
         pageGo = DataButton("TableGo", Go, "DataGoPage", Symbol.Go);
         pageJump.KeyDown += async (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter && CanEditData()) { e.Handled = true; await UserAction(() => { Go(); return Task.CompletedTask; }); } };
-        pageSize = new ComboBox { Width = UiTokens.PageSizePickerWidth, ItemsSource = new[] { 100, 200, 500 }, SelectedItem = Model().PageSize };
+        pageSize = new ComboBox { Width = UiTokens.PageSizePickerWidth, ItemsSource = DataGridFooterViewModel.PageSizes, SelectedItem = Model().PageSize };
         AutomationProperties.SetAutomationId(pageSize, "DataPageSize");
         AutomationProperties.SetName(pageSize, L("TablePageSize"));
-        // Showing another state's size is not a change of size.
-        pageSize.SelectionChanged += (_, _) => { if (CanEditData() && pageSize.SelectedItem is int size && size != Model().PageSize) { Model().SetPageSize(size); ShowDataPageRows(true); } };
+        pageSize.SelectionChanged += (_, _) => { if (pageSize.SelectedItem is int size) ChangePageSize(size); };
         pageSummary = Text(() => PageSummary());
         selectionSummary = Text(() => SelectionSummary());
-        selectPage = SelectionItem("TableSelectPage", () => { restoringDataSelection = true; try { foreach (var row in visible) { Model().Selected.Add(row.Row.LocalId); if (!table!.SelectedItems.Contains(row)) table.SelectedItems.Add(row); } } finally { restoringDataSelection = false; } shownState!.Counts.Invalidate(); RefreshDataAvailability(); }, "DataSelectPage");
-        selectAll = SelectionItem("TableSelectAll", () => { Model().SelectAll(); RestoreDataSelection(); }, "DataSelectAll");
-        clearSelection = SelectionItem("TableClearSelection", () => { Model().Selected.Clear(); RestoreDataSelection(); }, "DataClearSelection");
+        selectPage = SelectionItem("TableSelectPage", SelectShownPage, "DataSelectPage");
+        selectAll = SelectionItem("TableSelectAll", SelectAllResults, "DataSelectAll");
+        clearSelection = SelectionItem("TableClearSelection", ClearDataSelection, "DataClearSelection");
         var menu = new MenuFlyout();
         menu.Items.Add(selectPage);
         menu.Items.Add(selectAll);
@@ -343,7 +377,7 @@ public sealed partial class MainWindow
         selectionButton = new Button { Flyout = menu }.Localize(localization, "Content", () => L("TableSelection"));
         queryCancel = new Button().Localize(localization, "Content", () => L("TableCancelQuery"));
         AutomationProperties.SetAutomationId(queryCancel, "DataQueryCancel");
-        queryCancel.Click += (_, _) => { CancelDataQuery(); Status(() => L("TableQueryCanceled")); };
+        queryCancel.Click += (_, _) => CancelQueryByUser();
         var selected = Row(selectionButton, selectionSummary, queryCancel);
         selected.Spacing = UiTokens.SpacingMedium;
         ToolTipService.SetToolTip(selectionSummary, new ToolTip().Localize(localization, "Content", () => L("BatchOnlySelected")));
@@ -443,6 +477,7 @@ public sealed partial class MainWindow
         foreach (var button in new[] { firstPage, previousPage, nextPage, lastPage, pageGo })
             if (button?.Tag is string key)
                 AutomationProperties.SetName(button, L(key));
+        dataFooter?.Apply(can, model, gate.QueryInProgress, PageSummary(), SelectionSummary());
         RefreshQueryNotice();
     }
     // Not IsEnabled: it cascades to every realized cell, and WinUI queues one IsEnabledChanged

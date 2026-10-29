@@ -58,6 +58,7 @@ public sealed partial class MainWindow : Window
         tableDensity = settings.LoadTableDensity();
         tableTemplates = new();
         cellTemplates = new(tableTemplates);
+        ChooseDataGrid(ref useNewDataGrid);
         BodyGrid.SizeChanged += (_, _) => UpdateDataHeaderLayout();
         ConfigureVerificationTheme();
         ExtendsContentIntoTitleBar = true;
@@ -97,6 +98,8 @@ public sealed partial class MainWindow : Window
     }
     partial void ConfigureVerificationTheme();
     partial void InitializeVerification();
+    // Only the QA build implements this (VAMSYS_QA_DATAGRID=new); the product build keeps the table built in code.
+    partial void ChooseDataGrid(ref bool useNew);
     partial void ObserveDialog(ContentDialog dialog, bool showing);
     void Status(Func<string> message) { statusText = message; StatusLabel.Text = message(); }
     void ToggleNavigation(TitleBar sender, object args) => Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
@@ -298,7 +301,14 @@ public sealed partial class MainWindow : Window
         actions.SecondaryCommands.Add(Command(() => L("Text_41B0AF8C5C"), Symbol.Accept, Validate));
         Grid.SetRow(actions, 1);
         grid.Children.Add(actions);
-        table = new ListView { SelectionMode = ListViewSelectionMode.Multiple, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        DataGrid? control = null;
+        if (useNewDataGrid)
+        {
+            control = new DataGrid(dataFooter = new(localization), DataGridControlActions());
+            table = control.Table;
+        }
+        else
+            table = new ListView { SelectionMode = ListViewSelectionMode.Multiple, HorizontalContentAlignment = HorizontalAlignment.Stretch };
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(table, "DataTable");
         // A locked table takes no pointer input; keyboard focus cannot enter it either.
         var lockTarget = table;
@@ -308,14 +318,24 @@ public sealed partial class MainWindow : Window
         table.ItemContainerTransitions = new Microsoft.UI.Xaml.Media.Animation.TransitionCollection();
         StyleDataTable(table);
         EnsureDataHeaders(DisplayColumns());
-        var horizontal = new ScrollViewer { Content = table, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollMode = ScrollMode.Disabled };
-        horizontalTable = horizontal;
         shownDataPage = grid;
-        Grid.SetRow(horizontal, 2);
-        grid.Children.Add(horizontal);
-        var pager = DataPager();
-        Grid.SetRow(pager, 3);
-        grid.Children.Add(pager);
+        if (control != null)
+        {
+            horizontalTable = control.Horizontal;
+            Grid.SetRow(control, 2);
+            Grid.SetRowSpan(control, 2);
+            grid.Children.Add(control);
+        }
+        else
+        {
+            var horizontal = new ScrollViewer { Content = table, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollMode = ScrollMode.Disabled };
+            horizontalTable = horizontal;
+            Grid.SetRow(horizontal, 2);
+            grid.Children.Add(horizontal);
+            var pager = DataPager();
+            Grid.SetRow(pager, 3);
+            grid.Children.Add(pager);
+        }
         table.Loaded += (_, _) => { if (shownState != null) RestoreDataOffsets(shownState); };
         return grid;
     }
