@@ -306,7 +306,7 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-10-29，数据表 D2 第二块）：** 列标题、行高样式、锁表、行源同步与选择应用从窗口移入共用的 `DataTableView`（见 [R6-DATAGRID.md](R6-DATAGRID.md)），新旧两条路径都改走它，所以正式包的旧表格也变了。Quick 检查、两个包通过；AutomationId 清单只是 `DataTable` 的来源文件变了。窗口验收（b5dad3b 的 QA 包）：新旧控件各跑 `test-cell-editing-ui`、`test-ui-interactions -Rows 20000`、`test-data-performance-ui -Rows 50000`、`test-data-footer-ui`，8 次全部通过。5 万行旧／新：首次展示 338／341 ms，搜索 246／226 ms，翻页 P95 9.1／9.1 ms，语言 P95 21.5／23.6 ms，单格处理 P95 0.8／0.7 ms，结束时工作集 694／694 MiB；各一次，不作快慢结论，留给 D3。
 
-**进度（2026-10-29，数据表 D2 第三块）：** 选择写回、选择本页、换密度锚点偏移移入 Presentation（`UserSelection`、`DataGridScroll`），滚动偏移读取与首个可见行移入 `DataTableView`；5 项无窗口测试，7 处回植均被抓到；Quick 检查与两个包通过。新旧两条路径都受影响。窗口验收（0c45024 的 QA 包）：旧表格 4 个脚本全部通过（5 万行首次展示 480 ms，搜索 230 ms，翻页 P95 10.3 ms，语言 P95 24.3 ms，单格 P95 0.8 ms）；新控件 `test-ui-interactions -Rows 20000`、`test-data-performance-ui -Rows 50000` 通过（首次展示 340 ms，搜索 219 ms，翻页 P95 11.6 ms，语言 P95 25.5 ms，单格 P95 0.8 ms）。新控件的 `test-cell-editing-ui` 与 `test-data-footer-ui` 两次都停在"QA 窗口无法置前"的前置检查，没有执行任何输入，待桌面空闲时重跑。
+**进度（2026-10-29，数据表 D2 第三块）：** 选择写回、选择本页、换密度锚点偏移移入 Presentation（`UserSelection`、`DataGridScroll`），滚动偏移读取与首个可见行移入 `DataTableView`；5 项无窗口测试，7 处回植均被抓到；Quick 检查与两个包通过。新旧两条路径都受影响。窗口验收（0c45024 的 QA 包）：旧表格 4 个脚本全部通过（5 万行首次展示 480 ms，搜索 230 ms，翻页 P95 10.3 ms，语言 P95 24.3 ms，单格 P95 0.8 ms）；新控件 `test-ui-interactions -Rows 20000`、`test-data-performance-ui -Rows 50000` 通过（首次展示 340 ms，搜索 219 ms，翻页 P95 11.6 ms，语言 P95 25.5 ms，单格 P95 0.8 ms）。新控件的 `test-cell-editing-ui` 与 `test-data-footer-ui` 起初两次都停在"QA 窗口无法置前"的前置检查（桌面被占用，没有执行任何输入），桌面空闲后重跑均通过。至此新旧控件 4 个脚本全部通过。
 
 ### R7 测试体系重建
 
