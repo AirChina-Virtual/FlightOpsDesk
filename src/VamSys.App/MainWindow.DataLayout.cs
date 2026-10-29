@@ -62,7 +62,7 @@ public sealed partial class MainWindow
         var anchorIndex = anchor is null ? -1 : visible.FindIndex(r => r.Row.LocalId == anchor.Value.Id);
         var headerHeight = tableView?.HeaderHeight ?? 0;
         tableDensity = target;
-        var targetOffset = anchorIndex < 0 ? state.Vertical : Math.Max(0, headerHeight + anchorIndex * DataRowHeight - anchor!.Value.Top);
+        var targetOffset = DataGridScroll.AnchoredOffset(anchorIndex, anchor?.Top ?? 0, headerHeight, DataRowHeight, state.Vertical);
         // Row heights live in the item container style: build the page again.
         shownDataPage = null;
         dataPageOwner = null;
@@ -75,19 +75,7 @@ public sealed partial class MainWindow
         await Task.CompletedTask;
     }
 
-    (Guid Id, double Top)? FirstVisibleDataRow()
-    {
-        if (table is null || FindVisual<ScrollViewer>(table) is not { } scroll)
-            return null;
-        for (var n = 0; n < visible.Count; n++)
-            if (table.ContainerFromIndex(n) is FrameworkElement item)
-            {
-                var y = item.TransformToVisual(scroll).TransformPoint(new Windows.Foundation.Point()).Y;
-                if (y + item.ActualHeight > 0 && y < scroll.ViewportHeight)
-                    return (visible[n].Row.LocalId, y);
-            }
-        return null;
-    }
+    (Guid Id, double Top)? FirstVisibleDataRow() => tableView?.FirstVisibleRow(visible);
 
     void RefreshQueryNotice()
     {

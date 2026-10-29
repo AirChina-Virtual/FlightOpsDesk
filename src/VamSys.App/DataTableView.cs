@@ -131,6 +131,23 @@ sealed class DataTableView
         return false;
     }
 
+    public (double Vertical, double Horizontal) Offsets => (Vertical?.VerticalOffset ?? 0, Horizontal.HorizontalOffset);
+
+    // The first of the shown rows that is at least partly in view, and its top relative to the viewport.
+    public (Guid Id, double Top)? FirstVisibleRow(IReadOnlyList<RowViewModel> shown)
+    {
+        if (Vertical is not { } scroll)
+            return null;
+        for (var n = 0; n < shown.Count; n++)
+            if (Table.ContainerFromIndex(n) is FrameworkElement item)
+            {
+                var y = item.TransformToVisual(scroll).TransformPoint(new Windows.Foundation.Point()).Y;
+                if (y + item.ActualHeight > 0 && y < scroll.ViewportHeight)
+                    return (shown[n].Row.LocalId, y);
+            }
+        return null;
+    }
+
     public void ScrollTo(double? vertical, double? horizontal)
     {
         if (vertical != null)

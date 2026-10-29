@@ -42,24 +42,13 @@ public sealed partial class MainWindow
     }
     void CapturePageState()
     {
-        if (shownState is null || !ReferenceEquals(PageHost.Content, shownDataPage) || table is null)
+        if (shownState is null || !ReferenceEquals(PageHost.Content, shownDataPage) || tableView is null)
             return;
         shownState.Search = searchBox?.Text ?? "";
         shownState.Filter = filterBox?.SelectedIndex ?? 0;
         shownState.Sort = sortBox?.SelectedItem as string;
-        shownState.Model.SelectPage(table.SelectedItems.Cast<RowViewModel>().Select(r => r.Row.LocalId));
-        shownState.Vertical = FindVisual<ScrollViewer>(table)?.VerticalOffset ?? 0;
-        shownState.Horizontal = horizontalTable?.HorizontalOffset ?? 0;
-    }
-    void RestoreTableState(ListView target, ScrollViewer horizontal, DataPageState state)
-    {
-        foreach (var row in visible.Where(r => state.Selected.Contains(r.Row.LocalId)))
-            target.SelectedItems.Add(row);
-        target.Loaded += (_, _) => DispatcherQueue.TryEnqueue(() =>
-        {
-            FindVisual<ScrollViewer>(target)?.ChangeView(null, state.Vertical, null, true);
-            horizontal.ChangeView(state.Horizontal, null, null, true);
-        });
+        shownState.Model.SelectPage(tableView.SelectedRows.Select(r => r.Row.LocalId));
+        (shownState.Vertical, shownState.Horizontal) = tableView.Offsets;
     }
     // Views built for a replaced Workspace instance. A discarded page is released by WinUI only some
     // time after it leaves the tree, and until then its rows' edit closures keep the old workspace

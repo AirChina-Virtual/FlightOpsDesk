@@ -300,10 +300,8 @@ public sealed partial class MainWindow
     { if (CanEditData() && size != PagerModel().PageSize) { PagerModel().SetPageSize(size); ShowDataPageRows(true); } }
     void SelectShownPage()
     {
-        foreach (var row in visible)
-            PagerModel().Selected.Add(row.Row.LocalId);
+        UserSelection.SelectShown(PagerModel(), shownState!.Counts, visible.Select(r => r.Row.LocalId));
         tableView!.Select(visible);
-        shownState!.Counts.Invalidate();
         RefreshDataAvailability();
     }
     void SelectAllResults() { PagerModel().SelectAll(); RestoreDataSelection(); }
@@ -478,12 +476,7 @@ public sealed partial class MainWindow
     {
         if (restoringDataSelection || shownState is null)
             return;
-        foreach (var row in removed)
-            if (shownState.Model.Selected.Remove(row.Row.LocalId))
-                shownState.Counts.Removed(row.Row, tableBaseline.ContainsKey(row.Row.LocalId));
-        foreach (var row in added)
-            if (shownState.Model.Selected.Add(row.Row.LocalId))
-                shownState.Counts.Added(row.Row, tableBaseline.ContainsKey(row.Row.LocalId));
+        UserSelection.Apply(shownState.Model, shownState.Counts, added.Select(r => r.Row), removed.Select(r => r.Row), tableBaseline.ContainsKey);
         RefreshDataAvailability();
     }
     void RestoreDataOffsets(DataPageState state)
