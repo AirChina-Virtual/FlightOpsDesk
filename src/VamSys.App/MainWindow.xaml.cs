@@ -33,7 +33,9 @@ public sealed partial class MainWindow : Window
     string page => shell.Page.Tag();
     bool ready;
     readonly CellEditCommitter cellEdits = new();
-    ListView? table; List<RowViewModel> visible = []; AppBarButton? fleetCommand, retireCommand;
+    DataTableView? tableView;
+    ListView? table => tableView?.Table;
+    List<RowViewModel> visible = []; AppBarButton? fleetCommand, retireCommand;
     CancellationTokenSource? running;
     ResourceData Data => workspace.Resources[resource];
 
@@ -302,41 +304,38 @@ public sealed partial class MainWindow : Window
         Grid.SetRow(actions, 1);
         grid.Children.Add(actions);
         DataGrid? control = null;
+        ListView list;
+        ScrollViewer horizontal;
         if (useNewDataGrid)
         {
             control = new DataGrid(dataFooter = new(localization), DataGridControlActions());
-            table = control.Table;
+            list = control.Table;
+            horizontal = control.Horizontal;
         }
         else
-            table = new ListView { SelectionMode = ListViewSelectionMode.Multiple, HorizontalContentAlignment = HorizontalAlignment.Stretch };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(table, "DataTable");
-        // A locked table takes no pointer input; keyboard focus cannot enter it either.
-        var lockTarget = table;
-        table.GettingFocus += (_, e) => { if (!lockTarget.IsHitTestVisible) e.TryCancel(); };
-        table.SelectionChanged += DataSelectionChanged;
-        table.ItemTemplate = tableTemplates!.Template("RowTemplate");
-        table.ItemContainerTransitions = new Microsoft.UI.Xaml.Media.Animation.TransitionCollection();
-        StyleDataTable(table);
-        EnsureDataHeaders(DisplayColumns());
+        {
+            list = new ListView { SelectionMode = ListViewSelectionMode.Multiple, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+            horizontal = new ScrollViewer { Content = list, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollMode = ScrollMode.Disabled };
+        }
+        tableView = new DataTableView(list, horizontal, tableTemplates!.Template("RowTemplate"), DataRowHeight, localization);
+        tableView.UserSelectionChanged += DataSelectionChanged;
+        tableView.ShowHeaders(DisplayColumns());
         shownDataPage = grid;
         if (control != null)
         {
-            horizontalTable = control.Horizontal;
             Grid.SetRow(control, 2);
             Grid.SetRowSpan(control, 2);
             grid.Children.Add(control);
         }
         else
         {
-            var horizontal = new ScrollViewer { Content = table, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollMode = ScrollMode.Disabled };
-            horizontalTable = horizontal;
             Grid.SetRow(horizontal, 2);
             grid.Children.Add(horizontal);
             var pager = DataPager();
             Grid.SetRow(pager, 3);
             grid.Children.Add(pager);
         }
-        table.Loaded += (_, _) => { if (shownState != null) RestoreDataOffsets(shownState); };
+        list.Loaded += (_, _) => { if (shownState != null) RestoreDataOffsets(shownState); };
         return grid;
     }
     // A step that only replaced rows saves those rows and the moved history step; adding, removing

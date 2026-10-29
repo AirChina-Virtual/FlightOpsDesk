@@ -114,36 +114,12 @@ public sealed partial class MainWindow
         { pageJump.Text = state.Model.Page.ToString(); pageJump.Tag = state.Model.Page; }
         dataFooter?.ShowPage(state.Model.Page);
     }
-    // Removing the rows must not read as the user deselecting them.
     void ClearDataRows()
     {
         visible = [];
-        if (table is null)
-            return;
-        restoringDataSelection = true;
-        try
-        { table.SelectedItems.Clear(); SyncShownRows([]); }
-        finally { restoringDataSelection = false; }
+        tableView?.ClearRows();
     }
-    // A new ItemsSource makes WinUI create every row's controls again and keep native memory for the
-    // discarded ones, so pooled rows are rebound in place whenever the row count stays the same.
-    // An observable collection would also recycle them when the count changes, but any observable
-    // source doubled the layout time of paging and language changes (P95 10 → 20 ms, 25 → 56 ms).
-    void SyncShownRows(List<RowViewModel> rows)
-    {
-        if (table is null)
-            return;
-        if (table.ItemsSource is not List<RowViewModel> old || old.Count != rows.Count || rows.Count > 0 && !ReferenceEquals(old[0], rows[0]))
-            table.ItemsSource = rows;
-    }
-    List<string> headerColumns = [];
-    void EnsureDataHeaders(List<string> columns)
-    {
-        if (table is null || table.Header != null && headerColumns.SequenceEqual(columns))
-            return;
-        headerColumns = columns;
-        table.Header = BuildDataHeaders(columns);
-    }
+    void EnsureDataHeaders(List<string> columns) => tableView?.ShowHeaders(columns);
     void SyncSortColumns(string? selected)
     {
         if (sortBox is null)
@@ -282,7 +258,7 @@ public sealed partial class MainWindow
     bool CanEditData() => gate.CanEdit;
     void ShowDataPageRows(bool resetVertical)
     {
-        if (table is null || shownState is null)
+        if (tableView is null || shownState is null)
             return;
         var source = Data;
         var columns = DisplayColumns();
@@ -295,19 +271,17 @@ public sealed partial class MainWindow
         restoringDataSelection = true;
         try
         {
-            table.SelectedItems.Clear();
+            tableView.ClearSelection();
             var rows = PageRows.Fill(shownState.Model.PageIds(), source, shownState.Model.PageSize);
             visible = rows;
             dataRowBuilds++;
-            SyncShownRows(rows);
-            foreach (var row in rows)
-            if (shownState.Model.Selected.Contains(row.Row.LocalId))
-                table.SelectedItems.Add(row);
+            var selected = shownState.Model.Selected;
+            tableView.ShowRows(rows, row => selected.Contains(row.Row.LocalId));
             RootGrid.UpdateLayout();
         }
         finally { restoringDataSelection = false; }
         if (resetVertical)
-        { shownState.Vertical = 0; FindVisual<ScrollViewer>(table)?.ChangeView(null, 0, null, true); }
+        { shownState.Vertical = 0; tableView.ScrollTo(0, null); }
         RefreshDataAvailability();
     }
     void ChangeDataPage(int target)
@@ -326,9 +300,9 @@ public sealed partial class MainWindow
     { if (CanEditData() && size != PagerModel().PageSize) { PagerModel().SetPageSize(size); ShowDataPageRows(true); } }
     void SelectShownPage()
     {
-        restoringDataSelection = true;
-        try { foreach (var row in visible) { PagerModel().Selected.Add(row.Row.LocalId); if (!table!.SelectedItems.Contains(row)) table.SelectedItems.Add(row); } }
-        finally { restoringDataSelection = false; }
+        foreach (var row in visible)
+            PagerModel().Selected.Add(row.Row.LocalId);
+        tableView!.Select(visible);
         shownState!.Counts.Invalidate();
         RefreshDataAvailability();
     }
@@ -485,40 +459,29 @@ public sealed partial class MainWindow
         dataFooter?.Apply(can, model, gate.QueryInProgress, PageSummary(), SelectionSummary());
         RefreshQueryNotice();
     }
-    // Not IsEnabled: it cascades to every realized cell, and WinUI queues one IsEnabledChanged
-    // event per control and drains one per dispatcher tick. Every query toggled it, so the queue
-    // only grew, and closing the window then spent minutes draining it before the process exited.
+    // Focus that was in the table moves to the search box, or the commands.
     void LockDataTable(bool locked)
     {
-        if (table is null || table.IsHitTestVisible != locked)
-            return;
-        table.IsHitTestVisible = !locked;
-        table.Opacity = locked ? UiTokens.LockedTableOpacity : 1;
-        if (!locked || table.XamlRoot is null)
-            return;
-        for (var focused = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(table.XamlRoot) as DependencyObject; focused != null; focused = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(focused))
-            if (ReferenceEquals(focused, table))
-            { if (searchBox?.Focus(FocusState.Programmatic) != true) dataActions?.Focus(FocusState.Programmatic); return; }
+        if (tableView?.Lock(locked) == true && searchBox?.Focus(FocusState.Programmatic) != true)
+            dataActions?.Focus(FocusState.Programmatic);
     }
     void RestoreDataSelection()
     {
-        if (table is null || shownState is null)
+        if (tableView is null || shownState is null)
             return;
         shownState.Counts.Invalidate();
-        restoringDataSelection = true;
-        try
-        { table.SelectedItems.Clear(); foreach (var row in visible) if (shownState.Model.Selected.Contains(row.Row.LocalId)) table.SelectedItems.Add(row); }
-        finally { restoringDataSelection = false; }
+        var selected = shownState.Model.Selected;
+        tableView.ApplySelection(visible, row => selected.Contains(row.Row.LocalId));
         RefreshDataAvailability();
     }
-    void DataSelectionChanged(object sender, SelectionChangedEventArgs args)
+    void DataSelectionChanged(List<RowViewModel> added, List<RowViewModel> removed)
     {
         if (restoringDataSelection || shownState is null)
             return;
-        foreach (var row in args.RemovedItems.Cast<RowViewModel>())
+        foreach (var row in removed)
             if (shownState.Model.Selected.Remove(row.Row.LocalId))
                 shownState.Counts.Removed(row.Row, tableBaseline.ContainsKey(row.Row.LocalId));
-        foreach (var row in args.AddedItems.Cast<RowViewModel>())
+        foreach (var row in added)
             if (shownState.Model.Selected.Add(row.Row.LocalId))
                 shownState.Counts.Added(row.Row, tableBaseline.ContainsKey(row.Row.LocalId));
         RefreshDataAvailability();
@@ -527,10 +490,9 @@ public sealed partial class MainWindow
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            if (!ReferenceEquals(shownState, state) || table is null)
+            if (!ReferenceEquals(shownState, state) || tableView is null)
                 return;
-            FindVisual<ScrollViewer>(table)?.ChangeView(null, state.Vertical, null, true);
-            horizontalTable?.ChangeView(state.Horizontal, null, null, true);
+            tableView.ScrollTo(state.Vertical, state.Horizontal);
         });
     }
     List<DataRow> SelectedRows() => shownState?.Model.Selected.Select(Data.FindDraftRow).OfType<DataRow>().ToList() ?? [];

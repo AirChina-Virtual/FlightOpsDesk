@@ -47,6 +47,8 @@
 
 进度（2026-10-28，第一块）：`DataGrid.xaml` 含横向滚动区、行列表与页脚；页脚（翻页、跳页、每页条数、选择菜单、取消查询）用编译绑定绑到 Presentation 的 `DataGridFooterViewModel`，AutomationId 与旧页脚相同。窗口经 QA 构建才实现的分部方法 `ChooseDataGrid` 选择控件；两条路径共用同一组翻页与选择方法。打包检查新增两项：`ChooseDataGrid` 只在 QA 包中存在，正式包程序集不含任何 `VAMSYS_QA_` 字符串。列标题、锁表、选择恢复与行填充仍由窗口对新控件的 `ListView` 执行，后续几块再移入控件。
 
+进度（2026-10-29，第二块）：列标题、行高样式、锁表、行源同步与选择应用移入 `DataTableView`。它包装一个 `ListView` 与其横向滚动区，旧路径和新控件都用它，只把用户自己的选择变化报告给窗口；窗口的 `table`、`horizontalTable` 改为它的只读别名。D4 删除旧路径后再并入 `DataGrid`。仍在窗口：决定显示哪些行（`DataGridViewModel.Fill`）、选择计数、滚动位置的保存与恢复时机、锁表后焦点移到哪里。
+
 **D3 并排测量。** 同机交替运行，新旧控件各 3 轮：
 
 - `test-data-performance-ui -Rows 20000|50000`：打开、搜索、翻页、编辑、撤销、滚动；

@@ -25,40 +25,6 @@ public sealed partial class MainWindow
         SnapshotLabel.MaxWidth = Math.Max(120, BodyGrid.ActualWidth - (merged ? 340 : 200));
     }
 
-    FrameworkElement BuildDataHeaders(IEnumerable<string> columns)
-    {
-        var headers = Row();
-        headers.Spacing = 0;
-        headers.Margin = UiTokens.DataHeaderInset;
-        foreach (var field in columns)
-        {
-            var label = new TextBlock
-            {
-                Width = new CellViewModel(field, "", _ => { }).Width,
-                Margin = UiTokens.ColumnHeaderMargin,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                FontSize = UiTokens.BodyFontSize
-            }
-                .Localize(localization, "Text", () => field == "_delete" ? L("ColumnStatus") : ApiOperationPolicy.FieldLabel(field, localization));
-            ToolTipService.SetToolTip(label, new ToolTip().Localize(localization, "Content", () => field == "_delete" ? L("ColumnStatus") : ApiOperationPolicy.FieldLabel(field, localization)));
-            headers.Children.Add(label);
-        }
-        return headers;
-    }
-
-    void StyleDataTable(ListView target)
-    {
-        // Keep WinUI's themed selection presenter, including the paired checkbox fill and glyph.
-        var style = new Style(typeof(ListViewItem)) { BasedOn = (Style)Application.Current.Resources["DefaultListViewItemStyle"] };
-        style.Setters.Add(new Setter(FrameworkElement.HeightProperty, DataRowHeight));
-        style.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, DataRowHeight));
-        style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
-        style.Setters.Add(new Setter(Control.FontSizeProperty, UiTokens.BodyFontSize));
-        style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
-        target.ItemContainerStyle = style;
-        target.Resources["ListViewItemMinHeight"] = DataRowHeight;
-    }
-
     ComboBox DensityPicker()
     {
         var picker = new ComboBox { Width = UiTokens.DensityPickerWidth };
@@ -94,7 +60,7 @@ public sealed partial class MainWindow
         var state = CurrentDataState;
         var anchor = FirstVisibleDataRow();
         var anchorIndex = anchor is null ? -1 : visible.FindIndex(r => r.Row.LocalId == anchor.Value.Id);
-        var headerHeight = (table?.Header as FrameworkElement)?.ActualHeight ?? 0;
+        var headerHeight = tableView?.HeaderHeight ?? 0;
         tableDensity = target;
         var targetOffset = anchorIndex < 0 ? state.Vertical : Math.Max(0, headerHeight + anchorIndex * DataRowHeight - anchor!.Value.Top);
         // Row heights live in the item container style: build the page again.

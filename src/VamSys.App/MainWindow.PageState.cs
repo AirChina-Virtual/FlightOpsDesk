@@ -26,7 +26,7 @@ public sealed partial class MainWindow
     DataPageState? shownState;
     UIElement? shownDataPage;
     TextBox? searchBox; ComboBox? filterBox, sortBox;
-    ScrollViewer? horizontalTable;
+    ScrollViewer? horizontalTable => tableView?.Horizontal;
     DataPageState CurrentDataState => dataStates.TryGetValue((workspace.Id, resource), out var state) ? state : dataStates[(workspace.Id, resource)] = new();
     internal static T? FindVisual<T>(DependencyObject parent) where T : DependencyObject
     {
