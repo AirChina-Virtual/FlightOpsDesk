@@ -316,7 +316,7 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-10-29，R6 对话框第二块）：** 新增 `TextInputDialogViewModel`（段落＋单行输入）、`ChoiceDialogViewModel`（`DialogChoice` 的读屏名为其标签）、`TaskDetailsDialogViewModel`（直接用任务页的条目模型，运行中仍随状态更新），文字对话框加第二段 `Detail`；对应 XAML 视图编译绑定、无 x:Name。迁移冲突审阅（原先自建 `ContentDialog`、不经 QA 观察，现改走统一入口）、新建工作区名称、未知核对的远端 ID 输入、航司参数选择、任务详情（`TaskDetailsList` 改在 XAML 声明）；`Choose` 已无调用而删除。仍走旧路径的只剩机队选择、导入映射、批量规则表单。新增 3 项无窗口测试；Quick 检查与两个包通过；清单只有 `TaskDetailsList` 的来源变化。窗口验收待跑。
 
-**进度（2026-10-29，R6 对话框第三块）：** 最后三个表单对话框改为模型＋XAML：`BatchRuleDialogViewModel`（列、规则种类、查找、新值；退役时列选择不可用）、`ImportMappingDialogViewModel`（每列一个目标框、基线勾选、样例；同名列按最后一个框映射，与原先一致）、`FleetChoiceDialogViewModel`（替换／追加／移除、搜索、每个机队一个勾选框；飞机只能选一个，移除方式允许选择不可用的机队）。窗口的旧入口 `Confirm(标题, UIElement)` 已删除，`DialogHost` 只接受对话框模型，所有对话框都经 `IDialogService` 打开（R6 第 1 步的对话框部分完成）。新增 4 项无窗口测试，8 处回植均被抓到；Full 检查通过（单元 1616、集成 484、分析器 47／47），两个包通过，清单无变化。窗口验收待跑。
+**进度（2026-10-29，R6 对话框第三块）：** 最后三个表单对话框改为模型＋XAML：`BatchRuleDialogViewModel`（列、规则种类、查找、新值；退役时列选择不可用）、`ImportMappingDialogViewModel`（每列一个目标框、基线勾选、样例；同名列按最后一个框映射，与原先一致）、`FleetChoiceDialogViewModel`（替换／追加／移除、搜索、每个机队一个勾选框；飞机只能选一个，移除方式允许选择不可用的机队）。窗口的旧入口 `Confirm(标题, UIElement)` 已删除，`DialogHost` 只接受对话框模型，所有对话框都经 `IDialogService` 打开（R6 第 1 步的对话框部分完成）。新增 4 项无窗口测试，8 处回植均被抓到；Full 检查通过（单元 1616、集成 484、分析器 47／47），两个包通过，清单无变化。窗口验收（7cb5e56 的包，覆盖第二、三块）：`test-localization-ui`（机队选择：按标题与机队名找到勾选框、预览并应用）、`test-recovery-ui`（远端 ID 输入反复打开、重启后保留、中英文）、`test-ui-interactions -Rows 20000`（批量规则表单打开时锁定、取消后不改草稿）、`test-v3-verification-ui -Tasks`（任务详情列表只建可见行）全部通过。导入映射、冲突审阅、新建工作区与航司参数选择没有窗口脚本打开，留给 R7。
 
 ### R7 测试体系重建
 
