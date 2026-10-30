@@ -20,3 +20,9 @@ public sealed partial class WorkspaceStore
         set => context.Faults = value == null ? null : new ActionStorageFaults(value);
     }
 }
+
+// The QA window build is not a friend assembly; it sets the barrier through this, which exists only in test builds.
+public static class StorageTestHooks
+{
+    public static void SetBarrier(WorkspaceStore store, Action<string>? barrier) => store.Barrier = barrier;
+}

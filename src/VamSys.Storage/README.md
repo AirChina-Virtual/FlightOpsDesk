@@ -48,6 +48,6 @@
 
 ## 测试钩子如何隔离
 
-`VamSysTestSupport=true` 的构建会把 tests/TestSupport 里的 `ActionStorageFaults`、`WorkspaceStore.Barrier` 和测试友元授权编译进来，输出放在 artifacts/test-build。正式程序集不含这些类型、属性和友元授权，`--verify-package` 会检查。测试项目必须直接引用本项目并带上同一个 `VamSysTestSupport` 属性，传递引用不会带过去。
+`VamSysTestSupport=true` 的构建会把 tests/TestSupport 里的 `ActionStorageFaults`、`WorkspaceStore.Barrier`、供 QA 窗口（不是友元程序集）设置屏障的公开 `StorageTestHooks`，以及测试友元授权编译进来，输出放在 artifacts/test-build。正式程序集不含这些类型、属性和友元授权，`--verify-package` 会检查。测试项目必须直接引用本项目并带上同一个 `VamSysTestSupport` 属性，传递引用不会带过去。
 
 [迁移说明](../../docs/STORAGE-MIGRATION.md) · [Infrastructure](../VamSys.Infrastructure/README.md)

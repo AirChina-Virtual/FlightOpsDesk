@@ -17,10 +17,18 @@ public sealed partial class MainWindow
     double? verificationFirstFrameMs;
     Guid? verificationSwitchTarget;
     ContentDialog? verificationDialog;
-    partial void ObserveDialog(ContentDialog dialog, bool showing) { if (showing) verificationDialog=dialog; else if(verificationDialog==dialog) verificationDialog=null; }
-    partial void ConfigureVerificationTheme()
+    partial void CreateVerification(ref IWindowVerification? hooks) => hooks = new WindowVerification(this);
+    // The QA hooks the window calls; each forwards to the methods below.
+    sealed class WindowVerification(MainWindow window) : IWindowVerification
+    {
+        public void ConfigureTheme() => window.ConfigureVerificationTheme();
+        public void Start() => window.InitializeVerification();
+        public void ObserveDialog(ContentDialog dialog, bool showing) => window.ObserveVerificationDialog(dialog, showing);
+    }
+    void ObserveVerificationDialog(ContentDialog dialog, bool showing) { if (showing) verificationDialog=dialog; else if(verificationDialog==dialog) verificationDialog=null; }
+    void ConfigureVerificationTheme()
         => RootGrid.RequestedTheme = Environment.GetEnvironmentVariable("VAMSYS_QA_THEME") == "light" ? ElementTheme.Light : ElementTheme.Dark;
-    partial void InitializeVerification()
+    void InitializeVerification()
     {
         var pipe=Environment.GetEnvironmentVariable("VAMSYS_QA_PIPE");if(string.IsNullOrWhiteSpace(pipe))return;
         // Process creation to the end of the window constructor, and to the first composition frame.
@@ -28,14 +36,14 @@ public sealed partial class MainWindow
         EventHandler<object>? firstFrame=null;
         firstFrame=(_,_)=>{Microsoft.UI.Xaml.Media.CompositionTarget.Rendering-=firstFrame;verificationFirstFrameMs=(DateTime.Now-processStarted).TotalMilliseconds;};
         Microsoft.UI.Xaml.Media.CompositionTarget.Rendering+=firstFrame;
-        storage.Inner.GetType().GetProperty("Barrier",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.SetValue(storage.Inner,(Action<string>)(p=>{
+        VamSys.Infrastructure.StorageTestHooks.SetBarrier(storage.Inner,p=>{
             if(p=="Draft:AfterCommit")Interlocked.Increment(ref verificationDraftCommits);
             if(p=="Full:AfterCommit")Interlocked.Increment(ref verificationFullCommits);
             if(p!="Full:BeforeCommit"||!verificationArmed||gate.Closing.State!=WindowCloseState.Saving)return;
             verificationArmed=false;verificationSaves++;verificationEntered=true;
             if(!verificationRelease.Wait(TimeSpan.FromSeconds(45)))throw new TimeoutException("QA close barrier");
             if(verificationFail)throw new IOException("QA injected close save failure");
-        }));
+        });
         _=Task.Run(async()=>{
             using var server=new NamedPipeServerStream(pipe,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous);
             await server.WaitForConnectionAsync();using var reader=new StreamReader(server);using var writer=new StreamWriter(server){AutoFlush=true};

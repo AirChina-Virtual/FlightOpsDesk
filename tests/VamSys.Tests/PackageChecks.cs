@@ -34,12 +34,15 @@ static class PackageChecks
             using var pe = new PEReader(stream);
             var metadata = pe.GetMetadataReader();
             var methods = metadata.MethodDefinitions.Select(handle => metadata.GetString(metadata.GetMethodDefinition(handle).Name)).ToHashSet();
+            var types = metadata.TypeDefinitions.Select(handle => metadata.GetString(metadata.GetTypeDefinition(handle).Name)).ToHashSet();
             var references = metadata.AssemblyReferences.Select(handle => metadata.GetString(metadata.GetAssemblyReference(handle).Name));
             Require(!references.Any(reference => reference.Contains("Tests", StringComparison.OrdinalIgnoreCase)), $"Test assembly referenced by {name}");
             if (name == "FlightOpsDesk")
             {
-                foreach (var method in new[] { "InitializeVerification", "ConfigureVerificationTheme", "VerificationCommand" })
+                foreach (var method in new[] { "CreateVerification", "InitializeVerification", "ConfigureVerificationTheme", "VerificationCommand" })
                     Require(methods.Contains(method) == qa, $"Unexpected QA entry point {method} in {name} (QA={qa})");
+                // The window's QA hooks are implemented only by the QA build.
+                Require(types.Contains("WindowVerification") == qa, $"Unexpected QA hook implementation in {name} (QA={qa})");
                 // The QA switches (pipe, theme) are read only by the QA build.
                 var switches = false;
                 for (var handle = MetadataTokens.UserStringHandle(1); !handle.IsNil && !switches; handle = metadata.GetNextHandle(handle))
@@ -51,8 +54,8 @@ static class PackageChecks
                 foreach (var method in name == "VamSys.Storage" ? new[] { "get_Barrier", "set_Barrier", "get_Faults", "set_Faults" } : [])
                     Require(methods.Contains(method) == qa, $"Unexpected storage test hook {method} (QA={qa})");
                 if (name == "VamSys.Storage")
-                    Require(metadata.TypeDefinitions.Any(handle => metadata.GetString(metadata.GetTypeDefinition(handle).Name) == "ActionStorageFaults") == qa,
-                        $"Unexpected storage fault implementation (QA={qa})");
+                    foreach (var type in new[] { "ActionStorageFaults", "StorageTestHooks" })
+                        Require(types.Contains(type) == qa, $"Unexpected storage test type {type} (QA={qa})");
                 var friends = metadata.GetAssemblyDefinition().GetCustomAttributes().Any(handle =>
                 {
                     var constructor = metadata.GetCustomAttribute(handle).Constructor;

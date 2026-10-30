@@ -60,7 +60,8 @@ public sealed partial class MainWindow : Window
         tableTemplates = new();
         cellTemplates = new(tableTemplates);
         BodyGrid.SizeChanged += (_, _) => UpdateDataHeaderLayout();
-        ConfigureVerificationTheme();
+        CreateVerification(ref verification);
+        verification?.ConfigureTheme();
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "FlightOpsDesk.ico"));
@@ -94,11 +95,18 @@ public sealed partial class MainWindow : Window
         ready = true;
         SelectPane(ShellPage.Workspace);
         Render();
-        InitializeVerification();
+        verification?.Start();
     }
-    partial void ConfigureVerificationTheme();
-    partial void InitializeVerification();
-    partial void ObserveDialog(ContentDialog dialog, bool showing);
+    // What the QA build attaches to the window: a theme override, its command pipe and storage barrier, and the dialog
+    // it may close. Only the QA build implements CreateVerification; the product build attaches nothing.
+    interface IWindowVerification
+    {
+        void ConfigureTheme();
+        void Start();
+        void ObserveDialog(ContentDialog dialog, bool showing);
+    }
+    IWindowVerification? verification;
+    partial void CreateVerification(ref IWindowVerification? hooks);
     void Status(Func<string> message) { statusText = message; StatusLabel.Text = message(); }
     void ToggleNavigation(TitleBar sender, object args) => Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
     // Selects the pane item; its SelectionChanged asks the shell, which applies the gate.
@@ -188,7 +196,7 @@ public sealed partial class MainWindow : Window
                 IsPrimaryButtonEnabled = dialog.CanPrimary
             };
             using var open = window.gate.BeginDialog();
-            window.ObserveDialog(d, true);
+            window.verification?.ObserveDialog(d, true);
             try
             {
                 return await d.ShowAsync() switch
@@ -198,7 +206,7 @@ public sealed partial class MainWindow : Window
                     _ => DialogResult.Closed
                 };
             }
-            finally { window.ObserveDialog(d, false); }
+            finally { window.verification?.ObserveDialog(d, false); }
         }
     }
     Task<bool> Confirm(DialogViewModel dialog) => Dialogs.ConfirmAsync(dialog);

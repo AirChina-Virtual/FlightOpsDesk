@@ -320,6 +320,8 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-10-29，R6 外壳启用状态）：** 窗口原先在 5 处各自设置导航、工作区与资源选择、页面宿主、窗格按钮和进度环（独占工作、本地操作、审阅工作锁、关闭保存、数据查询），规则略有出入。现由 `InteractionGate` 新增的 `NavigationEnabled`、`ContextPickersEnabled`、`PageEnabled`、`PaneToggleVisible`、`ShowsActivity` 给出，窗口只在 `ApplyShellState()` 一处应用；删除不再使用的 `ShowsProgress`、`ShowsWorkProgress`。两处有意的变化：关闭保存期间资源选择也禁用（原先只禁用工作区选择，它此时本就不起作用）；取消查询时若本地操作仍在进行，进度环不再提前熄灭。组合测试改为核对新查询，另补"仅本地操作"的断言；7 处回植均被抓到。Quick 检查与两个包通过。窗口验收待跑。
 
+**进度（2026-10-29，R6 第 7 步 QA 扩展）：** 存储的故障注入原本已是接口（`IStorageFaults`，实现只在测试构建）；唯一的缺口是 QA 窗口经反射写存储的私有 `Barrier`，现改为调用只在测试构建中存在的公开 `StorageTestHooks.SetBarrier`。窗口原先的三个分部方法（主题覆盖、启动命令管道与屏障、观察对话框）收为一个 `IWindowVerification` 接口，QA 构建经唯一的 `CreateVerification` 提供实现 `WindowVerification`，正式构建里该字段为空。打包检查新增：`CreateVerification` 与 `WindowVerification` 只在 QA 包、`StorageTestHooks` 只在 QA 包的存储程序集中。两个包通过。窗口命令本身仍是窗口的分部类（需要读取窗口内部状态），改为独立的 C# 窗口测试属于 R7。窗口验收待跑。
+
 ### R7 测试体系重建
 
 现有测试是一个按顺序执行、失败即停的控制台程序（`Program.cs` 约 460 行负责调度、种子和断言入口），场景文件按“审核轮次”而不是按功能组织，很多断言绑在现有内部结构上（具体方法、分部类、内部字段），重构后大多会失效；界面逻辑靠链接源文件编译；窗口测试是 PowerShell 脚本，部分因编码无法在 5.1 运行，`test-localization-ui` 还有已知失败。因此不迁移旧测试，而是以第 3 节的需求为依据、针对新结构重新建立。目标结构：
