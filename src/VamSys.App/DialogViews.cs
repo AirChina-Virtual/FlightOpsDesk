@@ -34,6 +34,24 @@ public sealed partial class TaskDetailsDialogView : UserControl
     public TaskDetailsDialogViewModel Model { get; }
 }
 
+public sealed partial class BatchRuleDialogView : UserControl
+{
+    public BatchRuleDialogView(BatchRuleDialogViewModel model) { Model = model; InitializeComponent(); }
+    public BatchRuleDialogViewModel Model { get; }
+}
+
+public sealed partial class ImportMappingDialogView : UserControl
+{
+    public ImportMappingDialogView(ImportMappingDialogViewModel model) { Model = model; InitializeComponent(); }
+    public ImportMappingDialogViewModel Model { get; }
+}
+
+public sealed partial class FleetChoiceDialogView : UserControl
+{
+    public FleetChoiceDialogView(FleetChoiceDialogViewModel model) { Model = model; InitializeComponent(); }
+    public FleetChoiceDialogViewModel Model { get; }
+}
+
 // The dialog views' sizes and modes, for their compiled bindings.
 public static class DialogViews
 {
@@ -50,7 +68,7 @@ public static class DialogViews
     public static ScrollMode ScrollMode(bool scrolls) => scrolls ? Microsoft.UI.Xaml.Controls.ScrollMode.Auto : Microsoft.UI.Xaml.Controls.ScrollMode.Disabled;
     public static ScrollBarVisibility ScrollBar(bool scrolls) => scrolls ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
 
-    // The view for a dialog model; dialogs not yet given a model of their own pass their content directly.
+    // The view for a dialog model.
     public static UIElement For(DialogViewModel dialog) => dialog switch
     {
         MessageDialogViewModel message => new MessageDialogView(message),
@@ -58,6 +76,9 @@ public static class DialogViews
         TextInputDialogViewModel input => new TextInputDialogView(input),
         ChoiceDialogViewModel choice => new ChoiceDialogView(choice),
         TaskDetailsDialogViewModel details => new TaskDetailsDialogView(details),
+        BatchRuleDialogViewModel rule => new BatchRuleDialogView(rule),
+        ImportMappingDialogViewModel import => new ImportMappingDialogView(import),
+        FleetChoiceDialogViewModel fleets => new FleetChoiceDialogView(fleets),
         _ => throw new ArgumentException($"No view for {dialog.GetType().Name}", nameof(dialog))
     };
 }

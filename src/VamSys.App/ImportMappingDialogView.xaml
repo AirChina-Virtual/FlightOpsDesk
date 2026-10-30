@@ -1,0 +1,25 @@
+<UserControl x:Class="VamSys.App.ImportMappingDialogView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:VamSys.Presentation">
+  <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
+  <StackPanel Spacing="{StaticResource SpacingLarge}">
+    <TextBlock Text="{x:Bind Model.Summary}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+    <TextBlock Text="{x:Bind Model.Hint}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+    <CheckBox Content="{x:Bind Model.BaselineLabel}" IsChecked="{x:Bind Model.Baseline, Mode=TwoWay}" IsEnabled="{x:Bind Model.CanBaseline}"/>
+    <ScrollViewer MaxHeight="{StaticResource ImportMappingMaxHeight}">
+      <!-- One box per CSV column, named by the column. -->
+      <ItemsControl ItemsSource="{x:Bind Model.Columns}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Spacing="{StaticResource SpacingMedium}"/></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ImportColumnViewModel">
+            <TextBox Header="{x:Bind Header}" Text="{x:Bind Target, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+    <TextBlock Text="{x:Bind Model.Sample}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+  </StackPanel>
+</UserControl>

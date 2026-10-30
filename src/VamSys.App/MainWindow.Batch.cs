@@ -50,8 +50,8 @@ public sealed partial class MainWindow
     string BatchScope(BatchSelection selection, int changed, int ruleSkipped = 0) => L("BatchCounts", ("selected", selection.Selected.Count),
         ("skipped", selection.Skipped + ruleSkipped), ("unchanged", selection.Eligible.Count - changed - ruleSkipped), ("changed", changed));
     string BatchScope(BatchEditPreview preview) => BatchScope(preview.Selection, preview.Changes.Count, preview.RuleSkips.Count);
-    TextBlock BatchTargets(BatchSelection selection, bool single = false) => Text(() => L(single ? "BatchSingle" : "BatchTargets",
-        ("selected", selection.Selected.Count), ("skipped", selection.Skipped), ("eligible", selection.Eligible.Count)));
+    string BatchTargetsText(BatchSelection selection, bool single = false) => L(single ? "BatchSingle" : "BatchTargets",
+        ("selected", selection.Selected.Count), ("skipped", selection.Skipped), ("eligible", selection.Eligible.Count));
     // The rows a batch change affects, each with its value before and after, under the selection counts.
     ListDialogViewModel BatchPreview(string title, string primary, BatchSelection selection, string field, IReadOnlyList<DataRow> changes, IReadOnlyList<MessageDescriptor>? skipReasons = null, int ruleSkipped = 0)
     {
@@ -107,18 +107,10 @@ public sealed partial class MainWindow
         var selection = batch.Capture(SelectedRows());
         if (selection.Eligible.Count == 0)
         { Status(() => L("BatchNothing")); return; }
-        var field = new ComboBox { ItemsSource = batch.RuleFields(DisplayColumns()), SelectedIndex = 0, MinWidth = UiTokens.RuleFieldPickerMinWidth }
-            .Localize(localization, "Header", () => L("Text_86F623E5CC"));
-        string[] keys = ["Text_A30D395090", "Text_5B7341C2D6", "Text_795CBFF909", "Text_6FE8FC1819", "Text_FAC7E021A1", "Text_E79453E164", "Text_6797F1B017"];
-        var kinds = batch.RuleKinds(resource);
-        var kind = new ComboBox { SelectedIndex = 0 }.Localize(localization, "Header", () => L("Text_ED31FBB483"))
-            .Localize(localization, "ItemsSource", () => kinds.Select(k => L(keys[(int)k])).ToArray());
-        kind.SelectionChanged += (_, _) => field.IsEnabled = kind.SelectedIndex >= 0 && kinds[kind.SelectedIndex] != RuleKind.Retire;
-        var value = new TextBox().Localize(localization, "Header", () => L("Text_DD5ABC95B1"));
-        var find = new TextBox().Localize(localization, "Header", () => L("Text_8FAB339859"));
-        if (!await Confirm(L("Text_E306752B35"), Stack(BatchTargets(selection), field, kind, find, value), L("Text_13D61FEA9F")))
+        var form = new BatchRuleDialogViewModel(BatchTargetsText(selection), batch.RuleFields(DisplayColumns()), batch.RuleKinds(resource), localization)
+        { Title = L("Text_E306752B35"), PrimaryLabel = L("Text_13D61FEA9F") };
+        if (!await Confirm(form) || form.Rule is not { } rule)
             return;
-        var rule = new EditRule(kinds[kind.SelectedIndex], field.SelectedItem!.ToString()!, value.Text, find.Text);
         // UI mutation remains locked while the copies are processed off-thread.
         var preview = await batch.PreviewRuleAsync(selection, rule);
         if (preview.Validation is { } invalid)

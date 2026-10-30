@@ -17,31 +17,15 @@ public sealed partial class MainWindow
         var field = start.Field;
         var initial = start.Initial;
         var options = start.Options;
-        var summary = Text(() => "");
-        var choices = new List<FleetOptionViewModel>();
-        void Changed(FleetOptionViewModel choice)
+        var form = new FleetChoiceDialogViewModel(BatchTargetsText(selection, single != null), options, initial, singleFleet: resource == ResourceKind.Aircraft, canChooseMode: resource == ResourceKind.Routes, localization)
         {
-            if (resource == ResourceKind.Aircraft && choice.Selected)
-                foreach (var other in choices.Where(c => c != choice && c.Selected))
-                    other.Selected = false;
-            summary.Text = L("Text_D18ED1A023") + string.Join("；", choices.Where(c => c.Selected).Select(c => c.Label));
-        }
-        choices.AddRange(options.Select(o => new FleetOptionViewModel(o, initial.Contains(o.Token, StringComparer.OrdinalIgnoreCase), Changed, localization)));
-        summary.Text = L("Text_D18ED1A023") + string.Join("；", choices.Where(c => c.Selected).Select(c => c.Label));
-        var search = new TextBox { }.Localize(localization, "PlaceholderText", () => L("Text_368B16B1B0"));
-        var mode = new ComboBox { ItemsSource = new[] { L("Text_DD9F9DBA0C"), L("Text_7A387A9608"), L("Text_58A816EF01") }, SelectedIndex = 0, IsEnabled = resource == ResourceKind.Routes }.Localize(localization, "Header", () => L("Text_ED31FBB483")).Localize(localization, "ItemsSource", () => new[] { L("Text_DD9F9DBA0C"), L("Text_7A387A9608"), L("Text_58A816EF01") });
-        var list = new ListView { Height = UiTokens.FleetChoiceListHeight, SelectionMode = ListViewSelectionMode.None, ItemsSource = choices };
-        list.ItemTemplate = (DataTemplate)XamlReader.Load("""
-            <DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
-              <CheckBox Content="{Binding Label}" IsChecked="{Binding Selected, Mode=TwoWay}" IsEnabled="{Binding CanSelect}"/>
-            </DataTemplate>
-            """);
-        search.TextChanged += (_, _) => list.ItemsSource = choices.Where(c => c.Label.Contains(search.Text, StringComparison.OrdinalIgnoreCase)).ToList();
-        mode.SelectionChanged += (_, _) => { foreach (var c in choices) c.AllowRemoval = mode.SelectedIndex == 2; };
-        if (!await Confirm(resource == ResourceKind.Aircraft ? L("Text_F1439C5A73") : L("Text_F042305012"),
-            new ScrollViewer { MaxHeight = Math.Max(160, RootGrid.ActualHeight - 220), Content = Stack(BatchTargets(selection, single != null), mode, search, list, summary) }, L("Text_5C250CFB41")))
+            Title = resource == ResourceKind.Aircraft ? L("Text_F1439C5A73") : L("Text_F042305012"),
+            PrimaryLabel = L("Text_5C250CFB41"),
+            AvailableHeight = Math.Max(160, RootGrid.ActualHeight - 220)
+        };
+        if (!await Confirm(form))
             return;
-        var preview = batch.PreviewFleets(resource, rows, choices.Where(c => c.Selected).Select(c => c.Option.Token), (FleetAssignmentMode)mode.SelectedIndex);
+        var preview = batch.PreviewFleets(resource, rows, form.SelectedTokens, form.Mode);
         if (preview.Issues.Count > 0)
         { await ConfirmMessage(L("Text_7B23705C3B"), string.Join("\n", preview.Issues.Take(60).Select(i => L(i.Description))), L("Text_3FD47EDCE4"), scrolls: true, DialogHeight.List); return; }
         if (preview.Rows.Count == 0)

@@ -36,18 +36,23 @@ public sealed partial class MainWindow
         await Work(async () =>
         {
             var parsed = await importExport.ParseFileAsync(file.Path);
-            var mapping = new StackPanel { Spacing = UiTokens.SpacingMedium };
-            var boxes = new Dictionary<string, TextBox>();
-            foreach (var h in parsed.Headers)
-            { var box = new TextBox { Header = h, Text = h }; boxes[h] = box; mapping.Children.Add(box); }
-            var baseline = new CheckBox { IsChecked = importExport.BaselineByDefault(resource), IsEnabled = importExport.BaselineAvailable }.Localize(localization, "Content", () => L("Text_B91DE02936"));
-            var panel = Stack(Text(() => L("Text_42F0F930C9", ("arg0", parsed.Rows.Count))), Text(() => L("WeightCsvHint")), baseline,
-                new ScrollViewer { Content = mapping, MaxHeight = UiTokens.ImportMappingMaxHeight }, Text(() => L("Text_793A76BFEA") + string.Join("\n", parsed.Rows.Take(3).Select(r => string.Join(" | ", r).Truncate(240)))));
-            if (!await Confirm(L("Text_E0FDE3C5CB"), panel, L("Text_C9B2630A18")))
+            var form = new ImportMappingDialogViewModel
+            {
+                Title = L("Text_E0FDE3C5CB"),
+                PrimaryLabel = L("Text_C9B2630A18"),
+                Summary = L("Text_42F0F930C9", ("arg0", parsed.Rows.Count)),
+                Hint = L("WeightCsvHint"),
+                BaselineLabel = L("Text_B91DE02936"),
+                Baseline = importExport.BaselineByDefault(resource),
+                CanBaseline = importExport.BaselineAvailable,
+                Columns = parsed.Headers.Select(h => new ImportColumnViewModel(h)).ToList(),
+                Sample = L("Text_793A76BFEA") + string.Join("\n", parsed.Rows.Take(3).Select(r => string.Join(" | ", r).Truncate(240)))
+            };
+            if (!await Confirm(form))
                 return;
-            if (importExport.BaselineNeedsWarning(resource, baseline.IsChecked == true) && !await ConfirmMessage(L("Text_885B15B2F5"), L("Text_5B5C523423"), L("Text_131B13AA26")))
+            if (importExport.BaselineNeedsWarning(resource, form.Baseline) && !await ConfirmMessage(L("Text_885B15B2F5"), L("Text_5B5C523423"), L("Text_131B13AA26")))
                 return;
-            var summary = await importExport.ImportAsync(resource, parsed, boxes.ToDictionary(p => p.Key, p => p.Value.Text.Trim()), baseline.IsChecked == true);
+            var summary = await importExport.ImportAsync(resource, parsed, form.Mapping, form.Baseline);
             Render();
             Status(() => L("Text_D84A9B1171", ("arg0", summary.Rows), ("arg1", summary.Issues)));
         });

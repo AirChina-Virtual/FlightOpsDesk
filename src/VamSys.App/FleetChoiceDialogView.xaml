@@ -1,0 +1,22 @@
+<UserControl x:Class="VamSys.App.FleetChoiceDialogView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:VamSys.Presentation">
+  <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
+  <ScrollViewer MaxHeight="{x:Bind Model.AvailableHeight}">
+    <StackPanel Spacing="{StaticResource SpacingLarge}">
+      <TextBlock Text="{x:Bind Model.Targets}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <ComboBox Header="{x:Bind Model.ModeHeader}" ItemsSource="{x:Bind Model.Modes}" SelectedIndex="{x:Bind Model.ModeIndex, Mode=TwoWay}" IsEnabled="{x:Bind Model.CanChooseMode}"/>
+      <TextBox PlaceholderText="{x:Bind Model.SearchPlaceholder}" Text="{x:Bind Model.Search, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+      <ListView Height="{StaticResource FleetChoiceListHeight}" SelectionMode="None" ItemsSource="{x:Bind Model.Shown, Mode=OneWay}">
+        <ListView.ItemTemplate>
+          <!-- Each check box is named by its fleet. -->
+          <DataTemplate x:DataType="vm:FleetOptionViewModel">
+            <CheckBox Content="{x:Bind Label}" IsChecked="{x:Bind Selected, Mode=TwoWay}" IsEnabled="{x:Bind CanSelect, Mode=OneWay}"/>
+          </DataTemplate>
+        </ListView.ItemTemplate>
+      </ListView>
+      <TextBlock Text="{x:Bind Model.Summary, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
