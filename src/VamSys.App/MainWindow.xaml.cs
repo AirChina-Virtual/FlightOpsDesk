@@ -159,25 +159,37 @@ public sealed partial class MainWindow : Window
     TextBlock Text(Func<string> text, double? size = null) => new TextBlock { FontSize = size ?? UiTokens.BodyFontSize, TextWrapping = TextWrapping.Wrap }.Localize(localization, "Text", () => text());
     static ScrollViewer Scroll(UIElement content) => new() { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalContentAlignment = HorizontalAlignment.Stretch };
     static ScrollViewer Actions(params UIElement[] controls) => new() { Content = Row(controls), HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
-    async Task<bool> Confirm(string title, UIElement content, string? primary = null)
+    // Dialogs with a model of their own open through this; the rest still pass their content (R6 moves them over).
+    IDialogService? dialogs;
+    IDialogService Dialogs => dialogs ??= new DialogHost(this);
+    sealed class DialogHost(MainWindow window) : IDialogService
     {
-        var d = new ContentDialog { XamlRoot = Content.XamlRoot, Title = title, Content = content, PrimaryButtonText = primary ?? L("Confirm"), CloseButtonText = L("Text_2CD0F3BE87"), DefaultButton = ContentDialogButton.Close };
-        using var open = gate.BeginDialog();
-        ObserveDialog(d, true);
-        try
-        { return await d.ShowAsync() == ContentDialogResult.Primary; }
-        finally { ObserveDialog(d, false); }
+        public async Task<DialogResult> ShowAsync(DialogViewModel dialog)
+            => await window.ShowDialog(dialog.Title, DialogViews.For(dialog), dialog.PrimaryLabel, dialog.SecondaryLabel, dialog.CanPrimary) switch
+            {
+                ContentDialogResult.Primary => DialogResult.Primary,
+                ContentDialogResult.Secondary => DialogResult.Secondary,
+                _ => DialogResult.Closed
+            };
     }
-    // A secondary action is shown only when its label is given.
-    async Task<ContentDialogResult> Choose(string title, UIElement content, string primary, string? secondary)
+    // A secondary action is shown only when its label is given. Cancel is always offered and is the default button.
+    async Task<ContentDialogResult> ShowDialog(string title, UIElement content, string primary, string? secondary, bool canPrimary = true)
     {
-        var d = new ContentDialog { XamlRoot = Content.XamlRoot, Title = title, Content = content, PrimaryButtonText = primary, SecondaryButtonText = secondary ?? "", CloseButtonText = L("Text_2CD0F3BE87"), DefaultButton = ContentDialogButton.Close };
+        var d = new ContentDialog { XamlRoot = Content.XamlRoot, Title = title, Content = content, PrimaryButtonText = primary, SecondaryButtonText = secondary ?? "", CloseButtonText = L("Text_2CD0F3BE87"), DefaultButton = ContentDialogButton.Close, IsPrimaryButtonEnabled = canPrimary };
         using var open = gate.BeginDialog();
         ObserveDialog(d, true);
         try
         { return await d.ShowAsync(); }
         finally { ObserveDialog(d, false); }
     }
+    async Task<bool> Confirm(string title, UIElement content, string? primary = null) => await ShowDialog(title, content, primary ?? L("Confirm"), null) == ContentDialogResult.Primary;
+    Task<ContentDialogResult> Choose(string title, UIElement content, string primary, string? secondary) => ShowDialog(title, content, primary, secondary);
+    Task<bool> Confirm(DialogViewModel dialog) => Dialogs.ConfirmAsync(dialog);
+    // Shorthands for the plain dialogs.
+    Task<bool> ConfirmMessage(string title, string message, string primary, bool scrolls = false, DialogHeight height = DialogHeight.Unbounded)
+        => Confirm(new MessageDialogViewModel { Title = title, Message = message, PrimaryLabel = primary, Scrolls = scrolls, Height = height });
+    Task<bool> ConfirmList(string title, IReadOnlyList<string> items, string primary, IReadOnlyList<string>? header = null, DialogHeight height = DialogHeight.List, bool selectable = true)
+        => Confirm(new ListDialogViewModel { Title = title, Items = items, PrimaryLabel = primary, Header = header ?? [], Height = height, Selectable = selectable });
     void Navigate(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
         if (!ready || !gate.CanNavigate)

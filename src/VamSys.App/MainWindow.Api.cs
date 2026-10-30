@@ -119,32 +119,32 @@ public sealed partial class MainWindow
             return choice == ContentDialogResult.Secondary ? new(null, true) : choice == ContentDialogResult.Primary ? new(id.Text, false) : RecoveryIdAnswer.Cancel;
         }
         public Task<bool> ConfirmManualDeleteAsync(ChangeItem item)
-            => owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L("ApiManualDelete", ("id", item.RemoteId ?? item.After.Identity?.RemoteId))), owner.L("ApiManualConfirm"));
+            => owner.ConfirmMessage(owner.L("ApiUnknownReview"), owner.L("ApiManualDelete", ("id", item.RemoteId ?? item.After.Identity?.RemoteId)), owner.L("ApiManualConfirm"));
         static string Differences(IReadOnlyList<ApiFieldDifference> differences) => string.Join("\n", differences.Select(d => $"{d.Field}: {d.Expected ?? "∅"} → {d.Actual ?? "∅"}"));
         public Task ShowStillReadableAsync(ChangeItem item, NoReceiptInspection review)
         {
             var id = item.RemoteId ?? item.After.Identity?.RemoteId;
             var differences = Differences(review.Differences);
-            return owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L("ApiNoReceiptStillReadable", ("id", id)) + "\n" + differences), owner.L("Text_3FD47EDCE4"));
+            return owner.ConfirmMessage(owner.L("ApiUnknownReview"), owner.L("ApiNoReceiptStillReadable", ("id", id)) + "\n" + differences, owner.L("Text_3FD47EDCE4"));
         }
         public Task<bool> ConfirmNoReceiptAsync(ChangeItem item, NoReceiptInspection review, bool deleted)
         {
             var id = item.RemoteId ?? item.After.Identity?.RemoteId;
-            return owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L(deleted ? "ApiConfirmNoReceipt" : "ApiSoftDeleteUnchangedHelp", ("id", id))), owner.L(deleted ? "ApiManualConfirm" : "ApiMarkNotApplied"));
+            return owner.ConfirmMessage(owner.L("ApiUnknownReview"), owner.L(deleted ? "ApiConfirmNoReceipt" : "ApiSoftDeleteUnchangedHelp", ("id", id)), owner.L(deleted ? "ApiManualConfirm" : "ApiMarkNotApplied"));
         }
         public Task ShowCannotAcceptAsync(ChangeItem item, ServerValueInspection review)
-            => owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L(review.HasCurrent ? "ApiAcceptNowMatches" : "ApiAcceptMissing") + "\n" + owner.ApiReview(item)), owner.L("Text_3FD47EDCE4"));
+            => owner.ConfirmMessage(owner.L("ApiUnknownReview"), owner.L(review.HasCurrent ? "ApiAcceptNowMatches" : "ApiAcceptMissing") + "\n" + owner.ApiReview(item), owner.L("Text_3FD47EDCE4"));
         public Task<bool> ConfirmAcceptAsync(ChangeItem item, ServerValueInspection review)
         {
             var differences = Differences(review.Differences);
             string Help() => item.Kind == ChangeKind.Delete ? owner.L("ApiAcceptDeleteHelp", ("id", review.CurrentRemoteId)) : owner.L("ApiAcceptServerHelp");
-            return owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.ApiReview(item) + "\n" + Help() + "\n" + differences), owner.L("ApiAcceptServerValue"));
+            return owner.ConfirmMessage(owner.L("ApiUnknownReview"), owner.ApiReview(item) + "\n" + Help() + "\n" + differences, owner.L("ApiAcceptServerValue"));
         }
         public async Task<bool> ShowUnknownAsync(ChangeItem item, bool canVerifyNotApplied)
         {
             if (canVerifyNotApplied)
-                return await owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L("ApiUnknown") + "\n" + owner.ApiReview(item) + "\n" + owner.L("ApiNotAppliedHelp")), owner.L("ApiVerifyNotApplied"));
-            await owner.Confirm(owner.L("ApiUnknownReview"), owner.Text(() => owner.L("ApiUnknown") + "\n" + owner.ApiReview(item)), owner.L("Text_3FD47EDCE4"));
+                return await owner.ConfirmMessage(owner.L("ApiUnknownReview"), owner.L("ApiUnknown") + "\n" + owner.ApiReview(item) + "\n" + owner.L("ApiNotAppliedHelp"), owner.L("ApiVerifyNotApplied"));
+            await owner.ConfirmMessage(owner.L("ApiUnknownReview"), owner.L("ApiUnknown") + "\n" + owner.ApiReview(item), owner.L("Text_3FD47EDCE4"));
             return false;
         }
         public void Report(RecoveryOutcome outcome)

@@ -52,17 +52,20 @@ public sealed partial class MainWindow
     string BatchScope(BatchEditPreview preview) => BatchScope(preview.Selection, preview.Changes.Count, preview.RuleSkips.Count);
     TextBlock BatchTargets(BatchSelection selection, bool single = false) => Text(() => L(single ? "BatchSingle" : "BatchTargets",
         ("selected", selection.Selected.Count), ("skipped", selection.Skipped), ("eligible", selection.Eligible.Count)));
-    ListView BatchPreview(BatchSelection selection, string field, IReadOnlyList<DataRow> changes, IReadOnlyList<MessageDescriptor>? skipReasons = null, int ruleSkipped = 0)
+    // The rows a batch change affects, each with its value before and after, under the selection counts.
+    ListDialogViewModel BatchPreview(string title, string primary, BatchSelection selection, string field, IReadOnlyList<DataRow> changes, IReadOnlyList<MessageDescriptor>? skipReasons = null, int ruleSkipped = 0)
     {
         var before = selection.Eligible.ToDictionary(r => r.LocalId);
-        return new ListView
+        return new ListDialogViewModel
         {
-            MaxHeight = UiTokens.BatchPreviewMaxHeight,
-            SelectionMode = ListViewSelectionMode.None,
+            Title = title,
+            PrimaryLabel = primary,
+            Height = DialogHeight.BatchPreview,
+            Selectable = false,
             Header = skipReasons is { Count: > 0 }
-                ? Stack([Text(() => BatchScope(selection, changes.Count, ruleSkipped)), .. skipReasons.Select(reason => Text(() => L(reason)))])
-                : Text(() => BatchScope(selection, changes.Count)),
-            ItemsSource = changes.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n" +
+                ? [BatchScope(selection, changes.Count, ruleSkipped), .. skipReasons.Select(reason => L(reason))]
+                : [BatchScope(selection, changes.Count)],
+            Items = changes.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n" +
                 (field == "_delete" ? $"{L("ColumnStatus")}: {L("Text_EE96DC1EBE")} → {L("BatchRestored")}" : $"{field}: {before[r.LocalId].Get(field)} → {r.Get(field)}")).ToArray()
         };
     }
@@ -75,19 +78,13 @@ public sealed partial class MainWindow
         { Status(() => L("BatchNothing")); return; }
         if (proposal.Issues.Count > 0)
         {
-            await Confirm(L("Text_FD6D0919A9"), new ListView { MaxHeight = UiTokens.DialogListMaxHeight, ItemsSource = proposal.Issues.Select(i => L(i.Description)).ToArray() }, L("Text_3FD47EDCE4"));
+            await ConfirmList(L("Text_FD6D0919A9"), proposal.Issues.Select(i => L(i.Description)).ToArray(), L("Text_3FD47EDCE4"));
             return;
         }
         var plan = proposal.Plan!;
         var ids = proposal.Ids;
-        var preview = new ListView
-        {
-            MaxHeight = UiTokens.BatchPreviewMaxHeight,
-            SelectionMode = ListViewSelectionMode.None,
-            Header = Stack(Text(() => BatchScope(selection, ids.Count)), Text(() => L("Text_0360D81E1F", ("arg0", plan.RemoveDrafts.Count), ("arg1", plan.MarkExisting.Count))), Text(() => L("Text_0E38068B45"))),
-            ItemsSource = selection.Eligible.Where(r => ids.Contains(r.LocalId)).Select(r => $"{Schemas.Key(resource, r)} · {r.Get("Name")}{r.Get("Flight Number")}").ToArray()
-        };
-        if (!await Confirm(L("Text_948725D00E"), preview, L("Text_A3EA3C17B4")))
+        if (!await ConfirmList(L("Text_948725D00E"), selection.Eligible.Where(r => ids.Contains(r.LocalId)).Select(r => $"{Schemas.Key(resource, r)} · {r.Get("Name")}{r.Get("Flight Number")}").ToArray(), L("Text_A3EA3C17B4"),
+            [BatchScope(selection, ids.Count), L("Text_0360D81E1F", ("arg0", plan.RemoveDrafts.Count), ("arg1", plan.MarkExisting.Count)), L("Text_0E38068B45")], DialogHeight.BatchPreview, selectable: false))
             return;
         await batch.ApplyDeleteAsync(proposal);
         Status(() => BatchScope(selection, ids.Count));
@@ -99,7 +96,7 @@ public sealed partial class MainWindow
         var selection = proposal.Selection;
         if (proposal.Changes.Count == 0)
         { Status(() => L("BatchNothing")); return; }
-        if (!await Confirm(L("Text_A6926595CE"), BatchPreview(selection, "_delete", proposal.Changes), L("Confirm")))
+        if (!await Confirm(BatchPreview(L("Text_A6926595CE"), L("Confirm"), selection, "_delete", proposal.Changes)))
             return;
         await batch.ApplyRestoreAsync(resource, proposal);
         Status(() => BatchScope(selection, proposal.Changes.Count));
@@ -128,7 +125,7 @@ public sealed partial class MainWindow
         { Status(() => L(invalid)); return; }
         if (preview.Changes.Count == 0)
         { Status(() => string.Join(" ", new[] { BatchScope(preview) }.Concat(preview.SkipReasons.Select(r => L(r))))); return; }
-        if (!await Confirm(L("Text_AD86791376"), BatchPreview(selection, preview.Field, preview.Changes, preview.SkipReasons, preview.RuleSkips.Count), L("Text_2354C137CE")))
+        if (!await Confirm(BatchPreview(L("Text_AD86791376"), L("Text_2354C137CE"), selection, preview.Field, preview.Changes, preview.SkipReasons, preview.RuleSkips.Count)))
             return;
         await batch.ApplyEditAsync(resource, preview);
         Status(() => BatchScope(preview));

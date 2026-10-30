@@ -43,13 +43,14 @@ public sealed partial class MainWindow
             return;
         var preview = batch.PreviewFleets(resource, rows, choices.Where(c => c.Selected).Select(c => c.Option.Token), (FleetAssignmentMode)mode.SelectedIndex);
         if (preview.Issues.Count > 0)
-        { await Confirm(L("Text_7B23705C3B"), new ScrollViewer { MaxHeight = UiTokens.DialogListMaxHeight, Content = Text(() => string.Join("\n", preview.Issues.Take(60).Select(i => L(i.Description)))) }, L("Text_3FD47EDCE4")); return; }
+        { await ConfirmMessage(L("Text_7B23705C3B"), string.Join("\n", preview.Issues.Take(60).Select(i => L(i.Description))), L("Text_3FD47EDCE4"), scrolls: true, DialogHeight.List); return; }
         if (preview.Rows.Count == 0)
         { Status(() => BatchScope(selection, 0)); return; }
         var labels = options.ToDictionary(o => o.Token, o => o.Describe(localization), StringComparer.OrdinalIgnoreCase);
         string Label(string value) => string.Join("；", FleetAssignmentService.Tokens(value).Select(t => labels.GetValueOrDefault(t, t)));
         var before = rows.ToDictionary(r => r.LocalId);
-        if (!await Confirm(L("Text_D1482F496E"), new ListView { MaxHeight = UiTokens.FleetPreviewMaxHeight, Header = Text(() => BatchScope(selection, preview.Rows.Count)), ItemsSource = preview.Rows.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n{Label(before[r.LocalId].Get(field))} → {Label(r.Get(field))}").ToList() }, L("Text_2354C137CE")))
+        if (!await ConfirmList(L("Text_D1482F496E"), preview.Rows.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n{Label(before[r.LocalId].Get(field))} → {Label(r.Get(field))}").ToList(),
+            L("Text_2354C137CE"), [BatchScope(selection, preview.Rows.Count)], DialogHeight.FleetPreview))
             return;
         await batch.ApplyFleetsAsync(resource, preview);
         Status(() => BatchScope(selection, preview.Rows.Count));
@@ -64,7 +65,7 @@ public sealed partial class MainWindow
         var preview = proposal.Preview!;
         if (preview.Changes.Count == 0)
         { Status(() => BatchScope(selection, 0)); return; }
-        if (!await Confirm(L("Text_B80DA74EC5"), BatchPreview(selection, preview.Field, preview.Changes), L("Text_52D4945C25")))
+        if (!await Confirm(BatchPreview(L("Text_B80DA74EC5"), L("Text_52D4945C25"), selection, preview.Field, preview.Changes)))
             return;
         await batch.ApplyEditAsync(resource, preview);
         Status(() => BatchScope(selection, preview.Changes.Count));

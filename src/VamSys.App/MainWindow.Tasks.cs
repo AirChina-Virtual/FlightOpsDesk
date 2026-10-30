@@ -99,7 +99,7 @@ public sealed partial class MainWindow
         if (!gate.CanAct || job.Mode != RunMode.Online)
             return;
         var ids = recovery.DiscardableItems(job);
-        if (ids.Count == 0 || !await Confirm(L("ApiDiscardPending"), Text(() => L("ApiDiscardConfirm", ("count", ids.Count))), L("ApiDiscardPending")))
+        if (ids.Count == 0 || !await ConfirmMessage(L("ApiDiscardPending"), L("ApiDiscardConfirm", ("count", ids.Count)), L("ApiDiscardPending")))
             return;
         var count = 0;
         await Work(async () =>

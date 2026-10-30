@@ -51,7 +51,7 @@ public sealed partial class MainWindow
         var model = new ReviewViewModel(owner, localization);
         var page = shownReviewPage = new ReviewPage(model, new ReviewPageActions(
             Invoke: async action => { if (gate.CanInvokeCommand) await UserAction(action); },
-            ShowIssues: async () => { await Confirm(L("ReviewIssues", ("count", model.AllBlockers.Count)), new ListView { MaxHeight = UiTokens.DialogListMaxHeight, ItemsSource = model.AllBlockers }, L("Text_3FD47EDCE4")); },
+            ShowIssues: async () => { await ConfirmList(L("ReviewIssues", ("count", model.AllBlockers.Count)), model.AllBlockers, L("Text_3FD47EDCE4")); },
             Submit: owner.Mode == RunMode.Demo ? StartDemo : StartApi,
             ResolveConflicts: ResolveWorkspaceConflicts));
         var generation = reviews.BeginLoad();
@@ -88,22 +88,13 @@ public sealed partial class MainWindow
             return null;
         // Use the exact objects shown on the page, including their dependency IDs.
         var items = shown.SubmitItems;
-        var content = new ListView
-        {
-            MaxHeight = UiTokens.ReviewDetailMaxHeight,
-            SelectionMode = ListViewSelectionMode.None,
-            Header = Text(() => L("ApiSubmitScope", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"), ("count", items.Count))),
-            ItemsSource = items.Select(i => $"{L(Schemas.All[i.Resource].Name)} · {ReviewChangeText(i)}").ToArray()
-        };
-        if (!await Confirm(L(mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit"), content, L(mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit")))
+        var submit = L(mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit");
+        if (!await ConfirmList(submit, items.Select(i => $"{L(Schemas.All[i.Resource].Name)} · {ReviewChangeText(i)}").ToArray(), submit,
+            [L("ApiSubmitScope", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"), ("count", items.Count))], DialogHeight.ReviewDetail, selectable: false))
             return null;
         var deletes = items.Where(i => i.Kind == ChangeKind.Delete).ToArray();
-        if (deletes.Length > 0 && !await Confirm(L("Text_5D6042B30E"), new ListView
-        {
-            MaxHeight = UiTokens.DialogListMaxHeight,
-            Header = Text(() => L("ApiDeleteConfirm", ("count", deletes.Length))),
-            ItemsSource = deletes.Select(i => $"{L(Schemas.All[i.Resource].Name)}: {Schemas.Key(i.Resource, i.After)}").ToArray()
-        }, L("Confirm")))
+        if (deletes.Length > 0 && !await ConfirmList(L("Text_5D6042B30E"), deletes.Select(i => $"{L(Schemas.All[i.Resource].Name)}: {Schemas.Key(i.Resource, i.After)}").ToArray(), L("Confirm"),
+            [L("ApiDeleteConfirm", ("count", deletes.Length))]))
             return null;
         return items;
     }

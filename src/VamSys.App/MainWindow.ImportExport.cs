@@ -12,7 +12,7 @@ public sealed partial class MainWindow
         if (workspace.Mode == RunMode.Online)
         {
             var messages = importExport.ValidateOnline(resource).Select(L).ToList();
-            await Confirm(L("Text_38833A8579"), Scroll(Text(() => messages.Count == 0 ? L("Text_AA9F647A82") : string.Join("\n", messages))), L("Text_3FD47EDCE4"));
+            await ConfirmMessage(L("Text_38833A8579"), messages.Count == 0 ? L("Text_AA9F647A82") : string.Join("\n", messages), L("Text_3FD47EDCE4"), scrolls: true);
             return;
         }
         await Work(async () =>
@@ -20,7 +20,7 @@ public sealed partial class MainWindow
             var issues = await importExport.ValidateAsync(resource);
             Status(() => issues.Count == 0 ? L("Text_AA9F647A82") : L("Text_8EEF5FE8E6", ("arg0", issues.Count)));
             if (issues.Count > 0)
-                await Confirm(L("Text_38833A8579"), Scroll(Text(() => string.Join("\n", issues.Take(100).Select(i => L("Text_7560F012B2", ("arg0", Data.Draft.FindIndex(r => r.LocalId == i.RowId) + 1), ("arg1", i.Field), ("arg2", L(i.Description))))))), L("Text_3FD47EDCE4"));
+                await ConfirmMessage(L("Text_38833A8579"), string.Join("\n", issues.Take(100).Select(i => L("Text_7560F012B2", ("arg0", Data.Draft.FindIndex(r => r.LocalId == i.RowId) + 1), ("arg1", i.Field), ("arg2", L(i.Description))))), L("Text_3FD47EDCE4"), scrolls: true);
         });
     }
     async Task ImportCsv()
@@ -45,7 +45,7 @@ public sealed partial class MainWindow
                 new ScrollViewer { Content = mapping, MaxHeight = UiTokens.ImportMappingMaxHeight }, Text(() => L("Text_793A76BFEA") + string.Join("\n", parsed.Rows.Take(3).Select(r => string.Join(" | ", r).Truncate(240)))));
             if (!await Confirm(L("Text_E0FDE3C5CB"), panel, L("Text_C9B2630A18")))
                 return;
-            if (importExport.BaselineNeedsWarning(resource, baseline.IsChecked == true) && !await Confirm(L("Text_885B15B2F5"), Text(() => L("Text_5B5C523423")), L("Text_131B13AA26")))
+            if (importExport.BaselineNeedsWarning(resource, baseline.IsChecked == true) && !await ConfirmMessage(L("Text_885B15B2F5"), L("Text_5B5C523423"), L("Text_131B13AA26")))
                 return;
             var summary = await importExport.ImportAsync(resource, parsed, boxes.ToDictionary(p => p.Key, p => p.Value.Text.Trim()), baseline.IsChecked == true);
             Render();
@@ -66,9 +66,9 @@ public sealed partial class MainWindow
     sealed class ExportDialogs(MainWindow owner) : IExportPrompts
     {
         public Task ShowIssuesAsync(ResourceKind kind, IReadOnlyList<Issue> issues)
-            => owner.Confirm(owner.L("Text_75843F167F"), Scroll(owner.Text(() => string.Join("\n", issues.Take(60).Select(i => owner.L("Text_7560F012B2", ("arg0", owner.workspace.Resources[kind].Draft.FindIndex(r => r.LocalId == i.RowId) + 1), ("arg1", i.Field), ("arg2", owner.L(i.Description))))))), owner.L("Text_3FD47EDCE4"));
+            => owner.ConfirmMessage(owner.L("Text_75843F167F"), string.Join("\n", issues.Take(60).Select(i => owner.L("Text_7560F012B2", ("arg0", owner.workspace.Resources[kind].Draft.FindIndex(r => r.LocalId == i.RowId) + 1), ("arg1", i.Field), ("arg2", owner.L(i.Description))))), owner.L("Text_3FD47EDCE4"), scrolls: true);
         public Task<bool> ConfirmDeletesAsync(int count)
-            => owner.Confirm(owner.L("Text_5D6042B30E"), owner.Text(() => owner.L("Text_B83678AC3A", ("arg0", count))), owner.L("Text_6B20B383BC"));
+            => owner.ConfirmMessage(owner.L("Text_5D6042B30E"), owner.L("Text_B83678AC3A", ("arg0", count)), owner.L("Text_6B20B383BC"));
         public async Task<string?> ChooseFolderAsync()
         {
             var picker = new FolderPicker();

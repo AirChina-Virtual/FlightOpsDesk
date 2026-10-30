@@ -27,8 +27,8 @@ public sealed partial class MainWindow
     });    Task BackupAndClearWorkspace() => LocalOperation(async () =>
     {
         var preview = await maintenance.PrepareBackupAsync();
-        if (!await Confirm(L("BackupClear"), Text(() => L("BackupClearPreview", ("name", preview.Name), ("path", preview.DataDirectory),
-            ("snapshots", preview.Snapshots), ("drafts", preview.Drafts), ("jobs", preview.Jobs), ("conflicts", preview.Conflicts), ("history", preview.HistorySteps))), L("Confirm")))
+        if (!await ConfirmMessage(L("BackupClear"), L("BackupClearPreview", ("name", preview.Name), ("path", preview.DataDirectory),
+            ("snapshots", preview.Snapshots), ("drafts", preview.Drafts), ("jobs", preview.Jobs), ("conflicts", preview.Conflicts), ("history", preview.HistorySteps)), L("Confirm")))
             return;
         var result = await maintenance.BackupAndClearAsync(preview, owner =>
         {
