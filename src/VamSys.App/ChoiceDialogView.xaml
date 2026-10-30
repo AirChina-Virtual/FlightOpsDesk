@@ -1,0 +1,16 @@
+<UserControl x:Class="VamSys.App.ChoiceDialogView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:VamSys.Presentation">
+  <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
+  <StackPanel Spacing="{StaticResource SpacingLarge}">
+    <TextBlock Text="{x:Bind Model.Prompt}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+    <ComboBox MinWidth="{StaticResource WorkspaceChoiceMinWidth}" ItemsSource="{x:Bind Model.Choices}" SelectedIndex="{x:Bind Model.SelectedIndex, Mode=TwoWay}">
+      <ComboBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:DialogChoice">
+          <TextBlock Text="{x:Bind Label}"/>
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+  </StackPanel>
+</UserControl>

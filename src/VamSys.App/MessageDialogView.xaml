@@ -5,6 +5,9 @@
   <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
   <ScrollViewer HorizontalContentAlignment="Stretch" MaxHeight="{x:Bind local:DialogViews.MaxHeight(Model.Height)}"
       VerticalScrollMode="{x:Bind local:DialogViews.ScrollMode(Model.Scrolls)}" VerticalScrollBarVisibility="{x:Bind local:DialogViews.ScrollBar(Model.Scrolls)}">
-    <TextBlock Text="{x:Bind Model.Message}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+    <StackPanel Spacing="{StaticResource SpacingLarge}">
+      <TextBlock Text="{x:Bind Model.Message}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <TextBlock Text="{x:Bind Model.Detail}" Visibility="{x:Bind Model.HasDetail}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+    </StackPanel>
   </ScrollViewer>
 </UserControl>

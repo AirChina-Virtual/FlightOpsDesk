@@ -37,4 +37,36 @@ public class DialogTests
         Assert.False(list.HasHeader);
         Assert.True(new ListDialogViewModel { Title = "t", PrimaryLabel = "OK", Items = [], Header = ["scope"] }.HasHeader);
     }
+
+    [Fact]
+    public void A_message_shows_a_second_paragraph_only_when_it_has_one()
+    {
+        Assert.False(new MessageDialogViewModel { Message = "m" }.HasDetail);
+        Assert.False(new MessageDialogViewModel { Message = "m", Detail = "" }.HasDetail);
+        Assert.True(new MessageDialogViewModel { Message = "m", Detail = "values" }.HasDetail);
+    }
+
+    [Fact]
+    public void A_choice_reads_as_its_label_and_the_selection_is_the_chosen_option_or_none()
+    {
+        var choices = new[] { new DialogChoice("Standard", "1"), new DialogChoice("Charter", "2") };
+        Assert.Equal("Charter", choices[1].ToString());
+        var dialog = new ChoiceDialogViewModel { Choices = choices, SelectedIndex = 1 };
+        Assert.Equal("2", dialog.Selected!.Value);
+        dialog.SelectedIndex = -1;
+        Assert.Null(dialog.Selected);
+        dialog.SelectedIndex = 2;
+        Assert.Null(dialog.Selected);
+        Assert.Null(new ChoiceDialogViewModel().Selected);
+    }
+
+    [Fact]
+    public void Text_input_keeps_what_was_typed_and_shows_paragraphs_only_when_given()
+    {
+        var input = new TextInputDialogViewModel { InputHeader = "Remote ID", Text = "102" };
+        Assert.False(input.HasParagraphs);
+        input.Text = "103";
+        Assert.Equal("103", input.Text);
+        Assert.True(new TextInputDialogViewModel { Paragraphs = ["review"] }.HasParagraphs);
+    }
 }

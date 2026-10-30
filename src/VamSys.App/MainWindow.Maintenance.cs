@@ -14,16 +14,19 @@ public sealed partial class MainWindow
     Task ChooseParameter(DataRow row) => LocalOperation(async () =>
     {
         var parameters = await maintenance.ChoosableParametersAsync(row);
-        var picker = new ComboBox { MinWidth = UiTokens.WorkspaceChoiceMinWidth };
-        foreach (var parameter in parameters)
-            picker.Items.Add(new ComboBoxItem { Content = parameter.Label, Tag = parameter.Id });
-        picker.SelectedIndex = 0;
-        for (var i = 0; i < picker.Items.Count; i++)
-        if ((string)((ComboBoxItem)picker.Items[i]).Tag == row.Get("Parameter IDs"))
-            picker.SelectedIndex = i;
-        if (!await Confirm(L("AirlineParameter"), Stack(Text(() => L("ParameterSelect")), picker), L("Confirm")))
+        var choices = parameters.Select(p => new DialogChoice(p.Label, p.Id)).ToList();
+        // The row's current parameter, or the first one.
+        var dialog = new ChoiceDialogViewModel
+        {
+            Title = L("AirlineParameter"),
+            Prompt = L("ParameterSelect"),
+            Choices = choices,
+            SelectedIndex = Math.Max(0, choices.FindLastIndex(c => c.Value == row.Get("Parameter IDs"))),
+            PrimaryLabel = L("Confirm")
+        };
+        if (!await Confirm(dialog) || dialog.Selected is not { } chosen)
             return;
-        await maintenance.AssignParameterAsync(resource, row, (string)((ComboBoxItem)picker.SelectedItem).Tag);
+        await maintenance.AssignParameterAsync(resource, row, chosen.Value);
     });    Task BackupAndClearWorkspace() => LocalOperation(async () =>
     {
         var preview = await maintenance.PrepareBackupAsync();

@@ -314,6 +314,8 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-10-29，R6 对话框第一块）：** Presentation 新增 `IDialogService`、`DialogViewModel` 与两个通用模型 `MessageDialogViewModel`（文字，可滚动、可限高）、`ListDialogViewModel`（可选多行表头、条目、限高、是否可选中）；App 新增 `MessageDialogView.xaml`、`ListDialogView.xaml`（编译绑定，无 x:Name）和窗口内的 `DialogHost`。限高以 `DialogHeight` 命名，在 App 映射到原来的主题令牌；取消始终提供且为默认按钮，`gate.BeginDialog` 与 QA 的对话框观察不变。迁移了 23 处文字与列表对话框：校验结果、导出问题与删除确认、导入基线警告、备份清理、放弃未发送项、未知核对的 7 个确认、批量删除问题与预览、恢复／规则编辑／退役三个批量预览（`BatchPreview` 改为返回模型）、机队问题与预览、审阅问题、提交清单与删除确认。仍走旧路径、下一块再做的：航司参数选择、机队选择、任务详情、导入映射、冲突审阅、未知核对的远端 ID 输入、批量规则表单、新建工作区名称。新增 4 项无窗口测试；Quick 检查与两个包通过，清单无变化。窗口验收（e31cfb0 的包）：`test-localization-ui`、`test-recovery-ui`、`test-ui-interactions -Rows 20000` 通过。其中真正打开已迁移对话框的只有批量删除预览与恢复预览（`test-localization-ui` 点击确认）；`test-recovery-ui` 的远端 ID 输入与 `test-ui-interactions` 的规则编辑表单仍是旧路径。其余 21 个已迁移对话框没有窗口脚本打开，R7 补窗口测试时覆盖。
 
+**进度（2026-10-29，R6 对话框第二块）：** 新增 `TextInputDialogViewModel`（段落＋单行输入）、`ChoiceDialogViewModel`（`DialogChoice` 的读屏名为其标签）、`TaskDetailsDialogViewModel`（直接用任务页的条目模型，运行中仍随状态更新），文字对话框加第二段 `Detail`；对应 XAML 视图编译绑定、无 x:Name。迁移冲突审阅（原先自建 `ContentDialog`、不经 QA 观察，现改走统一入口）、新建工作区名称、未知核对的远端 ID 输入、航司参数选择、任务详情（`TaskDetailsList` 改在 XAML 声明）；`Choose` 已无调用而删除。仍走旧路径的只剩机队选择、导入映射、批量规则表单。新增 3 项无窗口测试；Quick 检查与两个包通过；清单只有 `TaskDetailsList` 的来源变化。窗口验收待跑。
+
 ### R7 测试体系重建
 
 现有测试是一个按顺序执行、失败即停的控制台程序（`Program.cs` 约 460 行负责调度、种子和断言入口），场景文件按“审核轮次”而不是按功能组织，很多断言绑在现有内部结构上（具体方法、分部类、内部字段），重构后大多会失效；界面逻辑靠链接源文件编译；窗口测试是 PowerShell 脚本，部分因编码无法在 5.1 运行，`test-localization-ui` 还有已知失败。因此不迁移旧测试，而是以第 3 节的需求为依据、针对新结构重新建立。目标结构：

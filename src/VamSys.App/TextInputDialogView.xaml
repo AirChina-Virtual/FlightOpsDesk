@@ -1,0 +1,19 @@
+<UserControl x:Class="VamSys.App.TextInputDialogView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
+  <StackPanel Spacing="{StaticResource SpacingLarge}">
+    <ItemsControl ItemsSource="{x:Bind Model.Paragraphs}" Visibility="{x:Bind Model.HasParagraphs}">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><StackPanel Spacing="{StaticResource SpacingLarge}"/></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="x:String">
+          <TextBlock Text="{x:Bind}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <!-- The header is the input's automation name. -->
+    <TextBox Header="{x:Bind Model.InputHeader}" Text="{x:Bind Model.Text, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" MaxLength="{x:Bind Model.MaxLength}"/>
+  </StackPanel>
+</UserControl>

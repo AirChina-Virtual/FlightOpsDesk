@@ -183,7 +183,6 @@ public sealed partial class MainWindow : Window
         finally { ObserveDialog(d, false); }
     }
     async Task<bool> Confirm(string title, UIElement content, string? primary = null) => await ShowDialog(title, content, primary ?? L("Confirm"), null) == ContentDialogResult.Primary;
-    Task<ContentDialogResult> Choose(string title, UIElement content, string primary, string? secondary) => ShowDialog(title, content, primary, secondary);
     Task<bool> Confirm(DialogViewModel dialog) => Dialogs.ConfirmAsync(dialog);
     // Shorthands for the plain dialogs.
     Task<bool> ConfirmMessage(string title, string message, string primary, bool scrolls = false, DialogHeight height = DialogHeight.Unbounded)
@@ -245,8 +244,8 @@ public sealed partial class MainWindow : Window
     {
         if (!gate.CanAct)
             return;
-        var name = new TextBox { Text = L("Text_A818AFCD80"), MaxLength = 80 }.Localize(localization, "Header", () => L("Text_8DCC576817"));
-        if (await Confirm(L("Text_CDD0362664"), name) && !string.IsNullOrWhiteSpace(name.Text))
+        var name = new TextInputDialogViewModel { Title = L("Text_CDD0362664"), InputHeader = L("Text_8DCC576817"), Text = L("Text_A818AFCD80"), MaxLength = 80, PrimaryLabel = L("Confirm") };
+        if (await Confirm(name) && !string.IsNullOrWhiteSpace(name.Text))
         { await session.ReplaceWithNewAsync(new Workspace { Name = name.Text.Trim() }); ReloadWorkspaces(); Render(); }
     }
     async Task CreateDemoWorkspace()

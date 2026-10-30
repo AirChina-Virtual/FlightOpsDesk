@@ -16,6 +16,24 @@ public sealed partial class ListDialogView : UserControl
     public ListDialogViewModel Model { get; }
 }
 
+public sealed partial class TextInputDialogView : UserControl
+{
+    public TextInputDialogView(TextInputDialogViewModel model) { Model = model; InitializeComponent(); }
+    public TextInputDialogViewModel Model { get; }
+}
+
+public sealed partial class ChoiceDialogView : UserControl
+{
+    public ChoiceDialogView(ChoiceDialogViewModel model) { Model = model; InitializeComponent(); }
+    public ChoiceDialogViewModel Model { get; }
+}
+
+public sealed partial class TaskDetailsDialogView : UserControl
+{
+    public TaskDetailsDialogView(TaskDetailsDialogViewModel model) { Model = model; InitializeComponent(); }
+    public TaskDetailsDialogViewModel Model { get; }
+}
+
 // The dialog views' sizes and modes, for their compiled bindings.
 public static class DialogViews
 {
@@ -25,6 +43,7 @@ public static class DialogViews
         DialogHeight.ReviewDetail => UiTokens.ReviewDetailMaxHeight,
         DialogHeight.FleetPreview => UiTokens.FleetPreviewMaxHeight,
         DialogHeight.BatchPreview => UiTokens.BatchPreviewMaxHeight,
+        DialogHeight.TaskDetail => UiTokens.TaskDetailMaxHeight,
         _ => double.PositiveInfinity
     };
     public static ListViewSelectionMode Selection(bool selectable) => selectable ? ListViewSelectionMode.Single : ListViewSelectionMode.None;
@@ -36,6 +55,9 @@ public static class DialogViews
     {
         MessageDialogViewModel message => new MessageDialogView(message),
         ListDialogViewModel list => new ListDialogView(list),
+        TextInputDialogViewModel input => new TextInputDialogView(input),
+        ChoiceDialogViewModel choice => new ChoiceDialogView(choice),
+        TaskDetailsDialogViewModel details => new TaskDetailsDialogView(details),
         _ => throw new ArgumentException($"No view for {dialog.GetType().Name}", nameof(dialog))
     };
 }

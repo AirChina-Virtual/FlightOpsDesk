@@ -44,24 +44,18 @@ public sealed partial class MainWindow
     async Task<ConflictChoice> ChooseConflict(ConflictPrompt prompt)
     {
         var (kind, row, conflict) = (prompt.Kind, prompt.Row, prompt.Conflict);
-        var content = Stack(Text(() => L(Schemas.All[kind].Name) + " · " + Schemas.Key(kind, row) + " · " + conflict.Field),
-            Text(() => L("ApiConflictValues", ("old", conflict.Original ?? "∅"), ("local", conflict.Local ?? "∅"), ("remote", conflict.Remote ?? "∅"))));
-        var dialog = new ContentDialog
+        var choice = await Dialogs.ShowAsync(new MessageDialogViewModel
         {
-            XamlRoot = Content.XamlRoot,
             Title = L("ApiConflict"),
-            Content = content,
-            PrimaryButtonText = L("ApiKeepLocal"),
-            SecondaryButtonText = L("ApiUseRemote"),
-            CloseButtonText = L("Text_2CD0F3BE87"),
-            DefaultButton = ContentDialogButton.Close,
-            IsPrimaryButtonEnabled = prompt.CanKeepLocal
-        };
-        ContentDialogResult choice;
-        using (gate.BeginDialog())
-            choice = await dialog.ShowAsync();
-        return choice == ContentDialogResult.None ? ConflictChoice.Stop : choice == ContentDialogResult.Secondary ? ConflictChoice.UseRemote : ConflictChoice.KeepLocal;
-    }    string ApiReview(ChangeItem change)
+            Message = L(Schemas.All[kind].Name) + " · " + Schemas.Key(kind, row) + " · " + conflict.Field,
+            Detail = L("ApiConflictValues", ("old", conflict.Original ?? "∅"), ("local", conflict.Local ?? "∅"), ("remote", conflict.Remote ?? "∅")),
+            PrimaryLabel = L("ApiKeepLocal"),
+            SecondaryLabel = L("ApiUseRemote"),
+            CanPrimary = prompt.CanKeepLocal
+        });
+        return choice switch { DialogResult.Primary => ConflictChoice.KeepLocal, DialogResult.Secondary => ConflictChoice.UseRemote, _ => ConflictChoice.Stop };
+    }
+    string ApiReview(ChangeItem change)
     {
         var text = $"{L(Schemas.All[change.Resource].Name)} · {EnumText(change.Kind)} · {Schemas.Key(change.Resource, change.After)}\n" +
             string.Join("; ", change.Fields.Select(f => $"{ApiOperationPolicy.FieldLabel(f.Key, localization)}: {change.Before?.Get(f.Key) ?? "∅"} → {f.Value.Value}"));
@@ -114,9 +108,21 @@ public sealed partial class MainWindow
         {
             var notApplied = canVerifyNotApplied ? owner.L("ApiVerifyNotApplied") : null;
             string Help() => notApplied == null ? "" : "\n" + owner.L("ApiNotAppliedHelp");
-            var id = new TextBox { Header = "Remote ID", Text = item.EditableRecoveryId ?? "" };
-            var choice = await owner.Choose(owner.L("ApiUnknownReview"), Stack(owner.Text(() => owner.ApiReview(item)), owner.Text(() => owner.L("ApiRecoverId") + Help()), id), owner.L(online ? "ApiCheckRemote" : "ApiSaveCandidate"), notApplied);
-            return choice == ContentDialogResult.Secondary ? new(null, true) : choice == ContentDialogResult.Primary ? new(id.Text, false) : RecoveryIdAnswer.Cancel;
+            var dialog = new TextInputDialogViewModel
+            {
+                Title = owner.L("ApiUnknownReview"),
+                Paragraphs = [owner.ApiReview(item), owner.L("ApiRecoverId") + Help()],
+                InputHeader = "Remote ID",
+                Text = item.EditableRecoveryId ?? "",
+                PrimaryLabel = owner.L(online ? "ApiCheckRemote" : "ApiSaveCandidate"),
+                SecondaryLabel = notApplied
+            };
+            return await owner.Dialogs.ShowAsync(dialog) switch
+            {
+                DialogResult.Secondary => new(null, true),
+                DialogResult.Primary => new(dialog.Text, false),
+                _ => RecoveryIdAnswer.Cancel
+            };
         }
         public Task<bool> ConfirmManualDeleteAsync(ChangeItem item)
             => owner.ConfirmMessage(owner.L("ApiUnknownReview"), owner.L("ApiManualDelete", ("id", item.RemoteId ?? item.After.Identity?.RemoteId)), owner.L("ApiManualConfirm"));

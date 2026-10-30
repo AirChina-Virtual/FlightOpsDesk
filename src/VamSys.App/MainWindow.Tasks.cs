@@ -69,15 +69,7 @@ public sealed partial class MainWindow
     async Task TaskDetails(TaskJobViewModel vm)
     {
         FlushTasks();
-        var list = new ListView
-        {
-            MaxHeight = UiTokens.TaskDetailMaxHeight,
-            ItemsSource = vm.Items,
-            SelectionMode = ListViewSelectionMode.Single,
-            ItemTemplate = (DataTemplate)XamlReader.Load("""<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"><TextBlock Text="{Binding Text}" TextWrapping="Wrap" Padding="8"/></DataTemplate>""")
-        };
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(list, "TaskDetailsList");
-        await Confirm(L("Text_4DCE8EF2E4"), list, L("Text_3FD47EDCE4"));
+        await Confirm(new TaskDetailsDialogViewModel(vm) { Title = L("Text_4DCE8EF2E4"), PrimaryLabel = L("Text_3FD47EDCE4") });
     }
     UIElement BuildTasksPage()
     {
