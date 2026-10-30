@@ -55,7 +55,7 @@
 
 - `test-data-performance-ui -Rows 20000|50000`：打开、搜索、翻页、编辑、撤销、滚动；
 - `test-cell-editing-ui`：点击、输入、Tab、Esc、读屏值与只读；
-- `test-data-footer-ui -DataGrid old|new`：页脚翻页、跳页、每页条数、选择菜单与读屏名称；
+- `test-data-footer-ui -DataGrid old|new`（D4 后无此参数）：页脚翻页、跳页、每页条数、选择菜单与读屏名称；
 - `test-ui-interactions -Rows 20000`：密度、布局、批量范围。
 
 结果（2026-10-29，2e73707 的 QA 包，`scripts/measure-datagrid-ab.ps1`，3 轮交替：旧新、新旧、旧新；每次运行都核对了 `dataGrid` 是否为所测控件；18 次全部通过）。表中为 3 轮中位数：
@@ -77,6 +77,8 @@
 门槛中其余各项：窗口脚本全部通过、AutomationId 一致、键盘与读屏（`test-cell-editing-ui`、`test-data-footer-ui`）两边结果一致，均已满足；明暗主题、高对比度与 100％／150％／200％ 缩放的人工查看尚未进行。
 
 **D4 替换。** 新控件达到下面的门槛后，正式包改用新控件，删除旧控件、`MainWindow.Data*.cs` 中的表格代码和隐藏开关。
+
+完成（2026-10-29）：窗口只用 `DataGrid`；`DataGrid` 自建 `DataTableView`。已删除：窗口用代码搭建的行列表与横向滚动区、旧页脚（`DataPager`、`DataButton`、`SelectionItem` 及其 13 个字段）、`RefreshDataAvailability` 中的旧页脚分支、QA 开关 `ChooseDataGrid`／`VAMSYS_QA_DATAGRID`、对比用的 `measure-datagrid-ab.ps1`（结果已记在上方，脚本可从 git 历史找回）。打包检查不再列 `ChooseDataGrid`，仍要求正式包程序集不含任何 `VAMSYS_QA_` 字符串。`test-data-footer-ui.ps1` 与 `open-datagrid-qa.ps1` 去掉了 `-DataGrid` 参数。主题、高对比度与缩放的人工查看按用户决定推迟到 R8 验收。
 
 ## 验收门槛
 

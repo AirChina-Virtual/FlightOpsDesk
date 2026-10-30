@@ -7,9 +7,8 @@ using VamSys.Presentation;
 
 namespace VamSys.App;
 
-// The data table's row list and its horizontal scroller: column headers, row height, locking, the rows shown and
-// their selection. Used for the table the window builds in code and for the DataGrid control, so both behave alike;
-// the window decides what is shown and is told only about selection changes the user made.
+// The DataGrid control's row list and its horizontal scroller: column headers, row height, locking, the rows shown and
+// their selection. The window decides what is shown and is told only about selection changes the user made.
 sealed class DataTableView
 {
     readonly ILocalizationService language;

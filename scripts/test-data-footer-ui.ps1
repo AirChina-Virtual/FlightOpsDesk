@@ -1,7 +1,7 @@
 ﻿# The data table footer through UI Automation, as a user or screen reader reaches it: paging buttons and their
 # availability, the page jump (Go button, Enter key, invalid input), the page size picker, the selection menu and
-# the automation names after a language change. -DataGrid new runs the same steps on the R6 DataGrid control.
-param([ValidateSet('old','new')][string]$DataGrid='old',[string]$Executable,[string]$OutputDirectory)
+# the automation names after a language change.
+param([string]$Executable,[string]$OutputDirectory)
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes,System.Windows.Forms
 Add-Type -Namespace QaFooter -Name Native -MemberDefinition @'
@@ -10,15 +10,14 @@ Add-Type -Namespace QaFooter -Name Native -MemberDefinition @'
 '@
 $repo=Split-Path $PSScriptRoot -Parent
 if(!$Executable){$Executable=Join-Path $repo 'artifacts/v3-qa/FlightOpsDesk.exe'}
-if(!$OutputDirectory){$OutputDirectory=Join-Path $repo "artifacts/ui-footer/$DataGrid"}
+if(!$OutputDirectory){$OutputDirectory=Join-Path $repo 'artifacts/ui-footer'}
 New-Item -ItemType Directory -Force $OutputDirectory|Out-Null
 $dir=Join-Path $OutputDirectory ('data-'+[Guid]::NewGuid().ToString('N'))
 if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'An existing FlightOps Desk window is open; isolate QA before running'}
 & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --seed-data-ui $dir 20000
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $pipeName='flightops-footer-'+[Guid]::NewGuid().ToString('N')
-$previousGrid=$env:VAMSYS_QA_DATAGRID
-$env:VAMSYS_DATA_DIR=$dir;$env:VAMSYS_QA_PIPE=$pipeName;$env:VAMSYS_QA_DATAGRID=$(if($DataGrid -eq 'new'){'new'}else{''})
+$env:VAMSYS_DATA_DIR=$dir;$env:VAMSYS_QA_PIPE=$pipeName
 $process=Start-Process -FilePath $Executable -PassThru
 $pipe=[IO.Pipes.NamedPipeClientStream]::new('.',$pipeName,[IO.Pipes.PipeDirection]::InOut)
 $A=[System.Windows.Automation.AutomationElement]
@@ -58,7 +57,6 @@ try{
     $pipe.Connect(60000);$reader=[IO.StreamReader]::new($pipe);$writer=[IO.StreamWriter]::new($pipe);$writer.AutoFlush=$true
     Q 'language:en-US'|Out-Null
     $opened=Q 'data-open'
-    Assert ($opened.state.dataGrid -eq $DataGrid) "The window shows the $($opened.state.dataGrid) table, not $DataGrid"
     Assert ($opened.state.total -eq 20000 -and $opened.state.pages -eq 100 -and $opened.state.page -eq 1) 'Unexpected initial page'
     foreach($id in $footerIds){One $id|Out-Null}
     # Not querying: the cancel button is collapsed and not in the automation tree.
@@ -107,9 +105,9 @@ try{
     Invoke (SelectionButton '选择');$menu=Wait {$e=Find 'DataSelectAll';if($e.Count -ge 1){,$e}} 'Chinese selection menu';Assert ($menu.Count -eq 1 -and $menu[0].Current.Name -eq '选择全部筛选结果') "Chinese menu: $($menu.Count) items named '$($menu[0].Current.Name)'";[System.Windows.Forms.SendKeys]::SendWait('{ESC}')
 
     $ids=@($footerIds|ForEach-Object{(One $_).Current.AutomationId})
-    @{dataGrid=$DataGrid;ids=$ids;english=$english;dataDirectory=$dir}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $OutputDirectory 'footer.json') -Encoding utf8
+    @{ids=$ids;english=$english;dataDirectory=$dir}|ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $OutputDirectory 'footer.json') -Encoding utf8
     Q close|Out-Null;Assert ($process.WaitForExit(30000)) 'Close did not finish'
-    Write-Output "PASS $DataGrid footer: paging buttons and availability, Go/Enter/invalid page jump, page size anchor, selection menu, automation names in two languages"
+    Write-Output "PASS footer: paging buttons and availability, Go/Enter/invalid page jump, page size anchor, selection menu, automation names in two languages"
 }catch{
     $state=try{State|ConvertTo-Json -Compress -Depth 3}catch{'unavailable'}
     $message="$_ | state: $state";Set-Content -LiteralPath (Join-Path $OutputDirectory 'footer-error.txt') -Value $message -Encoding utf8;throw $message
@@ -117,5 +115,4 @@ try{
     if($writer){$writer.Dispose()};if($reader){$reader.Dispose()};$pipe.Dispose()
     if(!$process.HasExited){$process.Kill();$process.WaitForExit()}
     Remove-Item Env:VAMSYS_DATA_DIR -ErrorAction SilentlyContinue;Remove-Item Env:VAMSYS_QA_PIPE -ErrorAction SilentlyContinue
-    $env:VAMSYS_QA_DATAGRID=$previousGrid
 }

@@ -38,9 +38,9 @@ static class PackageChecks
             Require(!references.Any(reference => reference.Contains("Tests", StringComparison.OrdinalIgnoreCase)), $"Test assembly referenced by {name}");
             if (name == "FlightOpsDesk")
             {
-                foreach (var method in new[] { "InitializeVerification", "ConfigureVerificationTheme", "VerificationCommand", "ChooseDataGrid" })
+                foreach (var method in new[] { "InitializeVerification", "ConfigureVerificationTheme", "VerificationCommand" })
                     Require(methods.Contains(method) == qa, $"Unexpected QA entry point {method} in {name} (QA={qa})");
-                // The QA switches (pipe, theme, data grid) are read only by the QA build.
+                // The QA switches (pipe, theme) are read only by the QA build.
                 var switches = false;
                 for (var handle = MetadataTokens.UserStringHandle(1); !handle.IsNil && !switches; handle = metadata.GetNextHandle(handle))
                     switches = metadata.GetUserString(handle).StartsWith("VAMSYS_QA_", StringComparison.Ordinal);

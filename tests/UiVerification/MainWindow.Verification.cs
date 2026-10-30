@@ -20,7 +20,6 @@ public sealed partial class MainWindow
     partial void ObserveDialog(ContentDialog dialog, bool showing) { if (showing) verificationDialog=dialog; else if(verificationDialog==dialog) verificationDialog=null; }
     partial void ConfigureVerificationTheme()
         => RootGrid.RequestedTheme = Environment.GetEnvironmentVariable("VAMSYS_QA_THEME") == "light" ? ElementTheme.Light : ElementTheme.Dark;
-    partial void ChooseDataGrid(ref bool useNew) => useNew = Environment.GetEnvironmentVariable("VAMSYS_QA_DATAGRID") == "new";
     partial void InitializeVerification()
     {
         var pipe=Environment.GetEnvironmentVariable("VAMSYS_QA_PIPE");if(string.IsNullOrWhiteSpace(pipe))return;
@@ -334,7 +333,7 @@ public sealed partial class MainWindow
             density=tableDensity,actualRowHeight=realized.FirstOrDefault().Height,viewport=scroll?.ViewportHeight,fullVisibleRows=realized.Count(r=>r.Top>=0&&r.Top+r.Height<=scroll!.ViewportHeight),
             vertical=scroll?.VerticalOffset,horizontal=horizontalTable?.HorizontalOffset,anchor=FirstVisibleDataRow()?.Id,
             windowWidth=RootGrid.ActualWidth,windowHeight=RootGrid.ActualHeight,rasterizationScale=RootGrid.XamlRoot?.RasterizationScale,
-            theme=RootGrid.ActualTheme.ToString(),pageInput=DataPageJumpBox?.Text,dataGrid=useNewDataGrid?"new":"old",unapplied=queryNotice?.Visibility==Visibility.Visible,
+            theme=RootGrid.ActualTheme.ToString(),pageInput=DataPageJumpBox?.Text,unapplied=queryNotice?.Visibility==Visibility.Visible,
             batchEnabled=dataActions?.PrimaryCommands.Concat(dataActions.SecondaryCommands).OfType<AppBarButton>().Where(b=>b.Tag is string).Select(b=>new{target=b.Tag,enabled=b.IsEnabled}).ToArray(),
             draftSaves=verificationDraftCommits,fullSaves=verificationFullCommits,undo=Data.Undo.Count };
     }

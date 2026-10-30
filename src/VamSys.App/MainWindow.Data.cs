@@ -19,16 +19,12 @@ public sealed partial class MainWindow
     Dictionary<Guid, DataRow> tableBaseline = [];
     HashSet<Guid> tableConflicts = [];
     Dictionary<string, FleetOption> tableFleetLabels = new(StringComparer.OrdinalIgnoreCase);
-    Button? firstPage, previousPage, nextPage, lastPage, pageGo, queryCancel, selectionButton;
-    MenuFlyoutItem? selectPage, selectAll, clearSelection;
-    TextBox? pageJump;
-    ComboBox? pageSize;
-    // The table control (QA builds only for now) and its footer model; null when the window builds the table in code.
-    bool useNewDataGrid;
+    // The table control on the data page, kept across workspaces and resources, and its footer model.
+    DataGrid? dataGrid;
     DataGridFooterViewModel? dataFooter;
-    TextBox? DataPageJumpBox => pageJump ?? (shownDataPage as Grid)?.Children.OfType<DataGrid>().FirstOrDefault()?.PageJump;
-    ComboBox? DataPageSizeBox => pageSize ?? (shownDataPage as Grid)?.Children.OfType<DataGrid>().FirstOrDefault()?.PageSize;
-    TextBlock? pageSummary, selectionSummary;
+    DataTableView? tableView => dataGrid?.View;
+    TextBox? DataPageJumpBox => dataGrid?.PageJump;
+    ComboBox? DataPageSizeBox => dataGrid?.PageSize;
     CommandBar? dataActions;
     int dataPageBuilds, dataRowBuilds;
     DataGridViewModel? pageRows;
@@ -108,10 +104,6 @@ public sealed partial class MainWindow
             fleetCommand.Visibility = resource is ResourceKind.Aircraft or ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
         if (retireCommand != null)
             retireCommand.Visibility = resource == ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
-        if (pageSize != null)
-            pageSize.SelectedItem = state.Model.PageSize;
-        if (pageJump != null)
-        { pageJump.Text = state.Model.Page.ToString(); pageJump.Tag = state.Model.Page; }
         dataFooter?.ShowPage(state.Model.Page);
     }
     void ClearDataRows()
@@ -320,79 +312,6 @@ public sealed partial class MainWindow
         SelectAll: SelectAllResults,
         ClearSelection: ClearDataSelection,
         CancelQuery: CancelQueryByUser);
-    FrameworkElement DataPager()
-    {
-        DataTableViewModel Model() => PagerModel();
-        firstPage = DataButton("TableFirst", () => ChangeDataPage(1), "DataFirstPage", Symbol.Previous);
-        previousPage = DataButton("TablePrevious", () => ChangeDataPage(Model().Page - 1), "DataPreviousPage", Symbol.Back);
-        nextPage = DataButton("TableNext", () => ChangeDataPage(Model().Page + 1), "DataNextPage", Symbol.Forward);
-        lastPage = DataButton("TableLast", () => ChangeDataPage(Model().PageCount), "DataLastPage", Symbol.Next);
-        pageJump = new TextBox { Width = UiTokens.PageJumpWidth, Text = Model().Page.ToString() };
-        AutomationProperties.SetAutomationId(pageJump, "DataPageJump");
-        AutomationProperties.SetName(pageJump, L("TableGo"));
-        void Go() => GoToTypedPage(pageJump.Text);
-        pageGo = DataButton("TableGo", Go, "DataGoPage", Symbol.Go);
-        pageJump.KeyDown += async (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter && CanEditData()) { e.Handled = true; await UserAction(() => { Go(); return Task.CompletedTask; }); } };
-        pageSize = new ComboBox { Width = UiTokens.PageSizePickerWidth, ItemsSource = DataGridFooterViewModel.PageSizes, SelectedItem = Model().PageSize };
-        AutomationProperties.SetAutomationId(pageSize, "DataPageSize");
-        AutomationProperties.SetName(pageSize, L("TablePageSize"));
-        pageSize.SelectionChanged += (_, _) => { if (pageSize.SelectedItem is int size) ChangePageSize(size); };
-        pageSummary = Text(() => PageSummary());
-        selectionSummary = Text(() => SelectionSummary());
-        selectPage = SelectionItem("TableSelectPage", SelectShownPage, "DataSelectPage");
-        selectAll = SelectionItem("TableSelectAll", SelectAllResults, "DataSelectAll");
-        clearSelection = SelectionItem("TableClearSelection", ClearDataSelection, "DataClearSelection");
-        var menu = new MenuFlyout();
-        menu.Items.Add(selectPage);
-        menu.Items.Add(selectAll);
-        menu.Items.Add(clearSelection);
-        selectionButton = new Button { Flyout = menu }.Localize(localization, "Content", () => L("TableSelection"));
-        queryCancel = new Button().Localize(localization, "Content", () => L("TableCancelQuery"));
-        AutomationProperties.SetAutomationId(queryCancel, "DataQueryCancel");
-        queryCancel.Click += (_, _) => CancelQueryByUser();
-        var selected = Row(selectionButton, selectionSummary, queryCancel);
-        selected.Spacing = UiTokens.SpacingMedium;
-        ToolTipService.SetToolTip(selectionSummary, new ToolTip().Localize(localization, "Content", () => L("BatchOnlySelected")));
-        var navigation = Row(firstPage, previousPage, nextPage, lastPage, pageJump, pageGo, pageSize, pageSummary);
-        navigation.Spacing = UiTokens.SpacingSmall;
-        var selectionHost = Actions(selected);
-        var navigationHost = Actions(navigation);
-        var footer = new Grid { RowSpacing = UiTokens.SpacingTight, ColumnSpacing = UiTokens.SpacingMedium };
-        footer.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
-        footer.ColumnDefinitions.Add(new() { Width = new(1, GridUnitType.Star) });
-        footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        footer.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        footer.Children.Add(selectionHost);
-        footer.Children.Add(navigationHost);
-        void Arrange()
-        {
-            var wide = footer.ActualWidth >= Math.Max(800, selected.DesiredSize.Width + navigation.DesiredSize.Width + 8);
-            Grid.SetColumn(navigationHost, wide ? 1 : 0);
-            Grid.SetRow(navigationHost, wide ? 0 : 1);
-            Grid.SetColumnSpan(navigationHost, wide ? 1 : 2);
-            Grid.SetColumnSpan(selectionHost, wide ? 1 : 2);
-            navigationHost.HorizontalAlignment = wide ? HorizontalAlignment.Right : HorizontalAlignment.Stretch;
-        }
-        footer.SizeChanged += (_, _) => Arrange();
-        Arrange();
-        return footer;
-    }
-    MenuFlyoutItem SelectionItem(string key, Action action, string id)
-    {
-        var item = new MenuFlyoutItem().Localize(localization, "Text", () => L(key));
-        AutomationProperties.SetAutomationId(item, id);
-        item.Click += async (_, _) => { if (CanEditData()) await UserAction(() => { action(); return Task.CompletedTask; }); };
-        return item;
-    }
-    Button DataButton(string key, Action action, string id, Symbol icon)
-    {
-        var button = new Button { Content = new SymbolIcon(icon), Padding = UiTokens.IconButtonPadding, Tag = key };
-        AutomationProperties.SetAutomationId(button, id);
-        AutomationProperties.SetName(button, L(key));
-        ToolTipService.SetToolTip(button, new ToolTip().Localize(localization, "Content", () => L(key)));
-        button.Click += async (_, _) => { if (CanEditData()) await UserAction(() => { action(); return Task.CompletedTask; }); };
-        return button;
-    }
     string PageSummary() => shownState is null ? "" : L("TablePageSummary", ("page", shownState.Model.Page), ("pages", shownState.Model.PageCount), ("first", shownState.Model.First), ("last", shownState.Model.Last), ("total", shownState.Model.Total));
     string SelectionSummary() => shownState is null ? "" : L("TableSelectionSummary", ("total", shownState.Model.Selected.Count), ("page", visible.Count(r => shownState.Model.Selected.Contains(r.Row.LocalId)))) + " · " + L("BatchSelectionHint");
     void RefreshDataAvailability()
@@ -412,48 +331,8 @@ public sealed partial class MainWindow
                 if (conflictCommand)
                     command.Label = L("ApiConflicts", ("count", Data.Conflicts.Count));
             }
-        if (firstPage != null)
-            firstPage.IsEnabled = can.First;
-        if (previousPage != null)
-            previousPage.IsEnabled = can.Previous;
-        if (nextPage != null)
-            nextPage.IsEnabled = can.Next;
-        if (lastPage != null)
-            lastPage.IsEnabled = can.Last;
-        if (pageGo != null)
-            pageGo.IsEnabled = can.Go;
-        if (pageJump != null)
-        { pageJump.IsEnabled = can.Edit; if (pageJump.Tag is not int oldPage || oldPage != model.Page) { pageJump.Text = model.Page.ToString(); pageJump.Tag = model.Page; } }
-        if (pageSize != null)
-            pageSize.IsEnabled = can.Edit;
-        if (selectionButton != null)
-            selectionButton.IsEnabled = can.Edit;
         if (densityPicker != null)
         { densityPicker.IsEnabled = can.Edit; AutomationProperties.SetName(densityPicker, L("TableDensity")); }
-        if (selectPage != null)
-            selectPage.IsEnabled = can.SelectPage;
-        if (selectAll != null)
-            selectAll.IsEnabled = can.SelectAll;
-        if (clearSelection != null)
-            clearSelection.IsEnabled = can.ClearSelection;
-        if (queryCancel != null)
-            queryCancel.Visibility = gate.QueryInProgress ? Visibility.Visible : Visibility.Collapsed;
-        if (pageSummary != null)
-        {
-            pageSummary.Text = $"{model.Page} / {model.PageCount}";
-            ToolTipService.SetToolTip(pageSummary, PageSummary());
-            AutomationProperties.SetName(pageSummary, PageSummary());
-        }
-        if (selectionSummary != null)
-            selectionSummary.Text = SelectionSummary();
-        foreach (var button in new[] { firstPage, previousPage, nextPage, lastPage, pageGo })
-            if (button?.Tag is string key)
-                AutomationProperties.SetName(button, L(key));
-        // Named once when built, these kept the previous language for screen readers.
-        if (pageJump != null)
-            AutomationProperties.SetName(pageJump, L("TableGo"));
-        if (pageSize != null)
-            AutomationProperties.SetName(pageSize, L("TablePageSize"));
         dataFooter?.Apply(can, model, gate.QueryInProgress, PageSummary(), SelectionSummary());
         RefreshQueryNotice();
     }

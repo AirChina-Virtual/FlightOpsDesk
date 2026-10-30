@@ -17,7 +17,6 @@ public static class UiTokens
     public static double DataPageTitleFontSize => Get<double>("DataPageTitleFontSize");
     public static double PageTitleFontSize => Get<double>("PageTitleFontSize");
 
-    public static double SpacingTight => Get<double>("SpacingTight");
     public static double SpacingSmall => Get<double>("SpacingSmall");
     public static double SpacingMedium => Get<double>("SpacingMedium");
     public static double SpacingRelaxed => Get<double>("SpacingRelaxed");
@@ -28,7 +27,6 @@ public static class UiTokens
     public static Thickness DataPageMargin => Get<Thickness>("DataPageMargin");
     public static Thickness StartupErrorMargin => Get<Thickness>("StartupErrorMargin");
     public static Thickness WorkspaceCardPadding => Get<Thickness>("WorkspaceCardPadding");
-    public static Thickness IconButtonPadding => Get<Thickness>("IconButtonPadding");
     public static CornerRadius CardCornerRadius => Get<CornerRadius>("CardCornerRadius");
     public static Brush CardBackgroundBrush => Get<Brush>("CardBackgroundBrush");
 
@@ -44,8 +42,6 @@ public static class UiTokens
     public static double FilterPickerWidth => Get<double>("FilterPickerWidth");
     public static double SortPickerWidth => Get<double>("SortPickerWidth");
     public static double DensityPickerWidth => Get<double>("DensityPickerWidth");
-    public static double PageJumpWidth => Get<double>("PageJumpWidth");
-    public static double PageSizePickerWidth => Get<double>("PageSizePickerWidth");
     public static double SettingsFieldMaxWidth => Get<double>("SettingsFieldMaxWidth");
     public static double LanguagePickerMinWidth => Get<double>("LanguagePickerMinWidth");
     public static double RuleFieldPickerMinWidth => Get<double>("RuleFieldPickerMinWidth");

@@ -1,36 +1,35 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using VamSys.Core;
 using VamSys.Presentation;
 
 namespace VamSys.App;
 
 // What the table footer asks of the window. Run applies the guard every paging and selection button uses; page size
-// and query cancellation act directly, as the old footer did.
+// and query cancellation act directly (the window checks the page size against the shown state).
 public sealed record DataGridActions(Func<bool> CanEdit, Func<Action, Task> Run, Action FirstPage, Action PreviousPage, Action NextPage, Action LastPage,
     Action<string> GoToPage, Action<int> ChangePageSize, Action SelectPage, Action SelectAll, Action ClearSelection, Action CancelQuery);
 
-// The data table: the row list in its horizontal scroller, and the paging and selection footer. Only built by the
-// QA build behind VAMSYS_QA_DATAGRID=new until it replaces the table the window builds in code (R6 D4).
+// The data table: the row list in its horizontal scroller (headers, row height, rows, selection and locking through
+// View), and the paging and selection footer. The window decides which rows are shown and acts on the footer's requests.
 public sealed partial class DataGrid : UserControl
 {
     readonly DataGridActions actions;
 
-    public DataGrid(DataGridFooterViewModel footer, DataGridActions actions)
+    public DataGrid(DataGridFooterViewModel footer, DataGridActions actions, DataTemplate rowTemplate, double rowHeight, ILocalizationService language)
     {
         Footer = footer;
         this.actions = actions;
         InitializeComponent();
         var root = (Grid)Content;
-        Horizontal = (ScrollViewer)root.Children[0];
-        Table = (ListView)Horizontal.Content;
+        var horizontal = (ScrollViewer)root.Children[0];
+        View = new DataTableView((ListView)horizontal.Content, horizontal, rowTemplate, rowHeight, language);
         ArrangeFooter((Grid)root.Children[1]);
     }
 
     public DataGridFooterViewModel Footer { get; }
-    // The window fills, selects and locks the rows; they are here so the control owns the layout.
-    public ListView Table { get; }
-    public ScrollViewer Horizontal { get; }
+    internal DataTableView View { get; }
     internal TextBox PageJump => (TextBox)Navigation.Children[4];
     internal ComboBox PageSize => (ComboBox)Navigation.Children[6];
     StackPanel Navigation => (StackPanel)((StackPanel)((ScrollViewer)((Grid)((Grid)Content).Children[1]).Children[1]).Content).Children[0];

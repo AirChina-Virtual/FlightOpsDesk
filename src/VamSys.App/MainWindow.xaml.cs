@@ -33,7 +33,6 @@ public sealed partial class MainWindow : Window
     string page => shell.Page.Tag();
     bool ready;
     readonly CellEditCommitter cellEdits = new();
-    DataTableView? tableView;
     ListView? table => tableView?.Table;
     List<RowViewModel> visible = []; AppBarButton? fleetCommand, retireCommand;
     CancellationTokenSource? running;
@@ -60,7 +59,6 @@ public sealed partial class MainWindow : Window
         tableDensity = settings.LoadTableDensity();
         tableTemplates = new();
         cellTemplates = new(tableTemplates);
-        ChooseDataGrid(ref useNewDataGrid);
         BodyGrid.SizeChanged += (_, _) => UpdateDataHeaderLayout();
         ConfigureVerificationTheme();
         ExtendsContentIntoTitleBar = true;
@@ -100,8 +98,6 @@ public sealed partial class MainWindow : Window
     }
     partial void ConfigureVerificationTheme();
     partial void InitializeVerification();
-    // Only the QA build implements this (VAMSYS_QA_DATAGRID=new); the product build keeps the table built in code.
-    partial void ChooseDataGrid(ref bool useNew);
     partial void ObserveDialog(ContentDialog dialog, bool showing);
     void Status(Func<string> message) { statusText = message; StatusLabel.Text = message(); }
     void ToggleNavigation(TitleBar sender, object args) => Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
@@ -303,39 +299,15 @@ public sealed partial class MainWindow : Window
         actions.SecondaryCommands.Add(Command(() => L("Text_41B0AF8C5C"), Symbol.Accept, Validate));
         Grid.SetRow(actions, 1);
         grid.Children.Add(actions);
-        DataGrid? control = null;
-        ListView list;
-        ScrollViewer horizontal;
-        if (useNewDataGrid)
-        {
-            control = new DataGrid(dataFooter = new(localization), DataGridControlActions());
-            list = control.Table;
-            horizontal = control.Horizontal;
-        }
-        else
-        {
-            list = new ListView { SelectionMode = ListViewSelectionMode.Multiple, HorizontalContentAlignment = HorizontalAlignment.Stretch };
-            horizontal = new ScrollViewer { Content = list, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollMode = ScrollMode.Disabled };
-        }
-        tableView = new DataTableView(list, horizontal, tableTemplates!.Template("RowTemplate"), DataRowHeight, localization);
-        tableView.UserSelectionChanged += DataSelectionChanged;
-        tableView.ShowHeaders(DisplayColumns());
+        var control = dataGrid = new DataGrid(dataFooter = new(localization), DataGridControlActions(), tableTemplates!.Template("RowTemplate"), DataRowHeight, localization);
+        control.View.UserSelectionChanged += DataSelectionChanged;
+        control.View.ShowHeaders(DisplayColumns());
         shownDataPage = grid;
-        if (control != null)
-        {
-            Grid.SetRow(control, 2);
-            Grid.SetRowSpan(control, 2);
-            grid.Children.Add(control);
-        }
-        else
-        {
-            Grid.SetRow(horizontal, 2);
-            grid.Children.Add(horizontal);
-            var pager = DataPager();
-            Grid.SetRow(pager, 3);
-            grid.Children.Add(pager);
-        }
-        list.Loaded += (_, _) => { if (shownState != null) RestoreDataOffsets(shownState); };
+        // The table and its footer share the remaining rows.
+        Grid.SetRow(control, 2);
+        Grid.SetRowSpan(control, 2);
+        grid.Children.Add(control);
+        control.View.Table.Loaded += (_, _) => { if (shownState != null) RestoreDataOffsets(shownState); };
         return grid;
     }
     // A step that only replaced rows saves those rows and the moved history step; adding, removing

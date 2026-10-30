@@ -71,7 +71,7 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 | `test-baseline-ui.ps1 -Rows 20000|50000` | 启动、工作区读取与切换、审阅、逐帧滚动、内存；只测量，不设门槛 |
 | `test-ui-interactions.ps1 -Rows 20000` | 16 种布局组合、密度、批量范围、预览锁、审阅分组 |
 | `test-cell-editing-ui.ps1` | 用真实鼠标和键盘点击、输入、Tab、Esc；自动化读写与只读状态 |
-| `test-data-footer-ui.ps1` | 经 UI 自动化操作数据表页脚（翻页、跳页、每页条数、选择菜单、读屏名称）；`-DataGrid new` 改测 R6 新控件 |
+| `test-data-footer-ui.ps1` | 经 UI 自动化操作数据表页脚（翻页、跳页、每页条数、选择菜单、读屏名称） |
 | `test-v3-verification-ui.ps1 [-History|-Autosave|-Tasks]` | 真实撤销／重做按钮、自动保存后强制结束、关闭失败恢复、大任务页 |
 | `test-storage-ui.ps1`、`test-recovery-ui.ps1`、`test-credentials-ui.ps1`、`test-settings-save-ui.ps1` | 旧数据库升级、待核对 ID、凭据与设置保存 |
 
