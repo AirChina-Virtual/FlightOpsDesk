@@ -48,12 +48,17 @@ public sealed class InteractionGate
     public bool CanLoadOnBuild => !busy;
     // Resolving conflicts from the review page.
     public bool CanResolveConflicts => !busy && !local;
-    // The progress ring shows for exclusive work, a query, or a worker that still reads the workspace.
-    public bool ShowsProgress => busy || querying || reviewLocks > 0;
-    // The ring after exclusive work or a query ends in the data page.
-    public bool ShowsWorkProgress => busy;
     // The window cannot start closing while any of these runs; the user is told to wait.
     public bool CloseBlockedByActivity => busy || local || interactiveOperations > 0 || dialogs > 0;
+    // The shell's controls. Navigation stays usable during exclusive work (the pages guard their own commands); the
+    // workspace and resource pickers and the page are locked by a local operation, the pickers also by work and while
+    // closing saves.
+    public bool NavigationEnabled => IsOpen && !local;
+    public bool ContextPickersEnabled => CanSwitchContext;
+    public bool PageEnabled => !local;
+    public bool PaneToggleVisible => Closing.State != WindowCloseState.Saving;
+    // The progress ring: anything still running, including the save before closing.
+    public bool ShowsActivity => busy || local || querying || reviewLocks > 0 || Closing.State == WindowCloseState.Saving;
     // Nothing runs at all (QA state reports).
     public bool IsIdle => interactiveOperations == 0 && !busy && !local && !querying && dialogs == 0;
 

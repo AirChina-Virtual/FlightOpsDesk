@@ -174,7 +174,7 @@ public sealed partial class MainWindow
         dataQueryCancellation?.Cancel();
         dataQueryCancellation = null;
         gate.SetQuerying(false);
-        BusyRing.IsActive = gate.ShowsWorkProgress;
+        ApplyShellState();
         RefreshDataAvailability();
     }
     async Task LoadRowsAsync(string search, int filter, string? sort)
@@ -191,7 +191,7 @@ public sealed partial class MainWindow
         var source = Data;
         var state = CurrentDataState;
         gate.SetQuerying(true);
-        BusyRing.IsActive = true;
+        ApplyShellState();
         RefreshDataAvailability();
         try
         {
@@ -242,7 +242,7 @@ public sealed partial class MainWindow
             {
                 dataQueryCancellation = null;
                 gate.SetQuerying(false);
-                BusyRing.IsActive = gate.ShowsWorkProgress;
+                ApplyShellState();
                 RefreshDataAvailability();
             }
         }

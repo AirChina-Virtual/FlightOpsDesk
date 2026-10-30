@@ -21,23 +21,17 @@ public sealed partial class MainWindow
     async Task<T> WhileLocked<T>(Func<T> work)
     {
         var scope = gate.BeginReviewLock();
+        ApplyShellState();
         if (scope.TookLocal)
-        {
-            Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = PageHost.IsEnabled = false;
-            BusyRing.IsActive = true;
             RefreshDataAvailability();
-        }
         try
         { return await Task.Run(work); }
         finally
         {
             scope.Dispose();
+            ApplyShellState();
             if (scope.ReleasedLocal)
-            {
-                Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = PageHost.IsEnabled = gate.ControlsEnabled;
-                BusyRing.IsActive = gate.ShowsProgress;
                 RefreshDataAvailability();
-            }
         }
     }
 

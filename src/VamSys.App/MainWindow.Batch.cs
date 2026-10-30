@@ -24,9 +24,7 @@ public sealed partial class MainWindow
         var scope = gate.TryBeginLocal();
         if (scope is null)
             return;
-        Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = false;
-        PageHost.IsEnabled = false;
-        BusyRing.IsActive = true;
+        ApplyShellState();
         RefreshDataAvailability();
         try
         {
@@ -35,14 +33,9 @@ public sealed partial class MainWindow
         }
         finally
         {
-            // A review worker started inside this operation still reads the workspace: it unlocks when done.
+            // A review worker started inside this operation still reads the workspace: the shell stays locked until it is done.
             scope.Dispose();
-            if (scope.Released)
-            {
-                Navigation.IsEnabled = WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = gate.ControlsEnabled;
-                PageHost.IsEnabled = gate.ControlsEnabled;
-            }
-            BusyRing.IsActive = gate.ShowsProgress;
+            ApplyShellState();
             Render();
         }
     }

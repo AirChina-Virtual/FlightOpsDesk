@@ -135,12 +135,20 @@ public sealed partial class MainWindow : Window
         if (work is null)
             return;
         var pendingSave = session.TakeAutosavePending();
-        BusyRing.IsActive = true;
-        WorkspacePicker.IsEnabled = false;
-        ResourcePicker.IsEnabled = false;
+        ApplyShellState();
         try
         { if (pendingSave) await SaveEdits(); await operation(); }
-        finally { work.Dispose(); BusyRing.IsActive = false; WorkspacePicker.IsEnabled = true; ResourcePicker.IsEnabled = true; Render(); }
+        finally { work.Dispose(); ApplyShellState(); Render(); }
+    }
+    // The shell's controls follow the gate: navigation, the workspace and resource pickers, the page, the pane toggle
+    // and the progress ring. Called whenever work, a local operation, a worker lock, a query or closing starts or ends.
+    void ApplyShellState()
+    {
+        Navigation.IsEnabled = gate.NavigationEnabled;
+        WorkspacePicker.IsEnabled = ResourcePicker.IsEnabled = gate.ContextPickersEnabled;
+        PageHost.IsEnabled = gate.PageEnabled;
+        AppTitleBar.IsPaneToggleButtonVisible = gate.PaneToggleVisible;
+        BusyRing.IsActive = gate.ShowsActivity;
     }
     Button Button(Func<string> label, Func<Task> action, bool enabled = true)
     {

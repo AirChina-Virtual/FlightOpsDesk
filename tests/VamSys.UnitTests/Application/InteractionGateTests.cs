@@ -75,8 +75,12 @@ public class InteractionGateTests
         Assert.Equal(!c.Busy && !c.Querying, gate.CanLoadOnShow);
         Assert.Equal(!c.Busy, gate.CanLoadOnBuild);
         Assert.Equal(!c.Busy && !c.Local, gate.CanResolveConflicts);
-        Assert.Equal(c.Busy || c.Querying || c.Local, gate.ShowsProgress);
-        Assert.Equal(c.Busy, gate.ShowsWorkProgress);
+        // The shell: navigation stays usable during work; the pickers also lock for work; the ring shows anything running.
+        Assert.Equal(c.Open && !c.Local, gate.NavigationEnabled);
+        Assert.Equal(c.Open && !c.Busy && !c.Local, gate.ContextPickersEnabled);
+        Assert.Equal(!c.Local, gate.PageEnabled);
+        Assert.Equal(c.Window != WindowCloseState.Saving, gate.PaneToggleVisible);
+        Assert.Equal(c.Busy || c.Querying || c.Local || c.Window == WindowCloseState.Saving, gate.ShowsActivity);
         Assert.Equal(c.Busy || c.Local || c.Actions > 0 || c.Dialogs > 0, gate.CloseBlockedByActivity);
         Assert.Equal(!c.Busy && !c.Local && !c.Querying && c.Actions == 0 && c.Dialogs == 0, gate.IsIdle);
         Assert.Equal(c.Busy, gate.WorkInProgress);
@@ -139,17 +143,20 @@ public class InteractionGateTests
         var local = gate.TryBeginLocal()!;
         Assert.True(gate.LocalOperationActive);
         Assert.False(gate.CanEdit);
+        // A local operation alone shows the ring and locks the shell.
+        Assert.True(gate.ShowsActivity);
+        Assert.False(gate.NavigationEnabled || gate.ContextPickersEnabled || gate.PageEnabled);
         var worker = gate.BeginReviewLock();
         Assert.False(worker.TookLocal);
         local.Dispose();
         Assert.False(local.Released);
         Assert.True(gate.LocalOperationActive);
-        Assert.True(gate.ShowsProgress);
+        Assert.True(gate.ShowsActivity);
         worker.Dispose();
         Assert.True(worker.ReleasedLocal);
         Assert.False(gate.LocalOperationActive);
         Assert.True(gate.CanEdit);
-        Assert.False(gate.ShowsProgress);
+        Assert.False(gate.ShowsActivity);
     }
 
     [Fact]

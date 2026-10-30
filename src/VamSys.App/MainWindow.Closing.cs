@@ -8,10 +8,7 @@ public sealed partial class MainWindow
         session.CancelAutosave();
         CancelDataQuery();
         RefreshDataAvailability();
-        Navigation.IsEnabled = !frozen;
-        WorkspacePicker.IsEnabled = !frozen;
-        AppTitleBar.IsPaneToggleButtonVisible = !frozen;
-        BusyRing.IsActive = frozen;
+        ApplyShellState();
         if (frozen)
             Status(() => L("CloseSaving"));
         else
