@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace VamSys.UnitTests.Inventory;
 
 // The requirement coverage matrix (docs/TEST-COVERAGE.md, R7 step 1) names the tests that cover each requirement. Every
-// requirement row must name at least one test, and every test, class and window script it names must exist, so the
+// requirement row must name at least one test, and every test, class, window test and window script it names must exist, so the
 // matrix cannot drift from the tests it describes.
 public partial class CoverageMatrixTests
 {
@@ -12,8 +12,8 @@ public partial class CoverageMatrixTests
     // Short prefixes used in the matrix, longest first.
     static readonly (string Short, string Full)[] Prefixes =
     [
-        ("VamSys.UnitTests.", "VamSys.UnitTests."), ("VamSys.IntegrationTests.", "VamSys.IntegrationTests."),
-        ("UnitTests.", "VamSys.UnitTests."), ("IntegrationTests.", "VamSys.IntegrationTests."),
+        ("VamSys.UnitTests.", "VamSys.UnitTests."), ("VamSys.IntegrationTests.", "VamSys.IntegrationTests."), ("VamSys.UiTests.", "VamSys.UiTests."),
+        ("UnitTests.", "VamSys.UnitTests."), ("IntegrationTests.", "VamSys.IntegrationTests."), ("UiTests.", "VamSys.UiTests."),
         ("Domain.", "VamSys.UnitTests.Domain."), ("Application.", "VamSys.UnitTests.Application."), ("Transport.", "VamSys.UnitTests.Transport."),
         ("Inventory.", "VamSys.UnitTests.Inventory."), ("Api.", "VamSys.UnitTests.Api."), ("Review.", "VamSys.UnitTests.Review."),
         ("Presentation.", "VamSys.UnitTests.Presentation."), ("Storage.", "VamSys.UnitTests.Storage.")
@@ -23,7 +23,7 @@ public partial class CoverageMatrixTests
     // them tests; once one has a test it must leave this list.
     static readonly HashSet<string> KnownGaps = ["I14", "J07"];
 
-    [GeneratedRegex(@"(?<![\w.])((?:VamSys\.)?(?:UnitTests|IntegrationTests|Domain|Application|Transport|Inventory|Api|Review|Presentation|Storage)(?:\.[A-Za-z_]\w*)+\*?)(?:\.\{([^}]*)\})?")]
+    [GeneratedRegex(@"(?<![\w.])((?:VamSys\.)?(?:UnitTests|IntegrationTests|UiTests|Domain|Application|Transport|Inventory|Api|Review|Presentation|Storage)(?:\.[A-Za-z_]\w*)+\*?)(?:\.\{([^}]*)\})?")]
     private static partial Regex Reference();
     [GeneratedRegex(@"\btest-[a-z0-9-]+-ui\b")]
     private static partial Regex Script();
@@ -31,7 +31,7 @@ public partial class CoverageMatrixTests
     private static partial Regex Namespace();
     [GeneratedRegex(@"\b(?:class|record)\s+(\w+)")]
     private static partial Regex ClassName();
-    [GeneratedRegex(@"\[(?:Fact|Theory)\b[^\n]*\n(?:\s*\[[^\n]*\n)*\s*public\s+(?:async\s+)?(?:void|Task)\s+(\w+)\s*\(")]
+    [GeneratedRegex(@"\[(?:Fact|Theory|WindowFact)\b[^\n]*\n(?:\s*\[[^\n]*\n)*\s*public\s+(?:async\s+)?(?:void|Task)\s+(\w+)\s*\(")]
     private static partial Regex TestMethod();
 
     // Test classes by full name, with their test methods. A file's test methods belong to the classes it declares
@@ -39,7 +39,7 @@ public partial class CoverageMatrixTests
     static Dictionary<string, HashSet<string>> TestClasses()
     {
         var classes = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        foreach (var project in new[] { "VamSys.UnitTests", "VamSys.IntegrationTests" })
+        foreach (var project in new[] { "VamSys.UnitTests", "VamSys.IntegrationTests", "VamSys.UiTests" })
             foreach (var file in SourceScan.CsFiles(Path.Combine(Golden.RepoRoot, "tests", project)))
             {
                 var text = SourceScan.Read(file);

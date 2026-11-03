@@ -1,0 +1,37 @@
+using System.Text.Json.Nodes;
+using System.Windows.Automation;
+
+namespace VamSys.UiTests.Driver;
+
+/// <summary>The UI Automation patterns the tests use, as a user or screen reader operates the controls.</summary>
+public static class Patterns
+{
+    public static void Invoke(this AutomationElement element) =>
+        ((InvokePattern)element.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+
+    public static void SetText(this AutomationElement element, string text) =>
+        ((ValuePattern)element.GetCurrentPattern(ValuePattern.Pattern)).SetValue(text);
+
+    public static string Text(this AutomationElement element) =>
+        ((ValuePattern)element.GetCurrentPattern(ValuePattern.Pattern)).Current.Value;
+
+    public static void Expand(this AutomationElement element) =>
+        ((ExpandCollapsePattern)element.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
+
+    /// <summary>Collapses the element unless it already is.</summary>
+    public static void Collapse(this AutomationElement element)
+    {
+        var pattern = (ExpandCollapsePattern)element.GetCurrentPattern(ExpandCollapsePattern.Pattern);
+        if (pattern.Current.ExpandCollapseState != ExpandCollapseState.Collapsed)
+            pattern.Collapse();
+    }
+
+    public static void Select(this AutomationElement element) =>
+        ((SelectionItemPattern)element.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
+
+    // ---- QA pipe answers ----------------------------------------------------------------------------------------------
+
+    public static int Int(this JsonNode node, string key) => int.Parse(node[key]!.ToString(), System.Globalization.CultureInfo.InvariantCulture);
+
+    public static string? Str(this JsonNode node, string key) => node[key]?.ToString();
+}

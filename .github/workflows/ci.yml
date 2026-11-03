@@ -14,10 +14,12 @@ jobs:
         run: dotnet restore VamSys.slnx --locked-mode
       - name: Analyzer baseline
         run: pwsh -File scripts/check-analyzer-baseline.ps1
-      - name: QA tool and benchmarks build
+      # The window tests need a desktop and the QA package, so CI only builds them.
+      - name: QA tool, benchmarks and window tests build
         run: |
           dotnet build tools/VamSys.QaSeed/VamSys.QaSeed.csproj -c Release -p:RestoreLockedMode=true
           dotnet build tests/VamSys.Benchmarks/VamSys.Benchmarks.csproj -c Release -p:RestoreLockedMode=true
+          dotnet build tests/VamSys.UiTests/VamSys.UiTests.csproj -c Release -p:RestoreLockedMode=true
       - name: Unit tests
         run: dotnet test --project tests/VamSys.UnitTests/VamSys.UnitTests.csproj -c Release -p:RestoreLockedMode=true
       - name: Integration tests

@@ -82,12 +82,35 @@ public partial class AutomationIdInventoryTests
     [GeneratedRegex(@"case\s+""(?<command>[^""]+)""\s*:")]
     private static partial Regex VerificationCommand();
 
+    // C# window tests (tests/VamSys.UiTests): the driver's lookups by AutomationId and by name, the id lists they loop
+    // over, and comparisons of a control's name with a literal.
+    [GeneratedRegex(@"\b(?:One|Find|Enabled|Name)\(""(?<id>[^""]+)""\)|\bIds\s*=\s*\[(?<list>[^\]]*)\]")]
+    private static partial Regex WindowTestId();
+
+    [GeneratedRegex(@"\b(?:Named|First|SelectionMenu)\(""(?<name>[^""]+)""|\bName\(""[^""]+""\)\s*==\s*""(?<name2>[^""]+)""|Assert\.Equal\(""(?<name3>[^""]+)"",[^;]*\.Current\.Name\)")]
+    private static partial Regex WindowTestName();
+
     static (SortedSet<string> Ids, SortedSet<string> Names, SortedSet<string> Commands) ScriptLookups()
     {
         var ids = new SortedSet<string>(StringComparer.Ordinal);
         var names = new SortedSet<string>(StringComparer.Ordinal);
         var commands = new SortedSet<string>(StringComparer.Ordinal);
+        var windowTests = Path.Combine(Golden.RepoRoot, "tests", "VamSys.UiTests");
         var sources = Directory.EnumerateFiles(Path.Combine(Golden.RepoRoot, "scripts"), "*.ps1").Concat(Directory.EnumerateFiles(Path.Combine(Golden.RepoRoot, "tests", "UiVerification"), "*.cs"));
+        foreach (var file in SourceScan.CsFiles(windowTests).Order(StringComparer.Ordinal))
+        {
+            var text = SourceScan.Read(file);
+            foreach (Match m in WindowTestId().Matches(text))
+                if (m.Groups["id"].Success)
+                    ids.Add(m.Groups["id"].Value);
+                else
+                    foreach (var literal in SourceScan.Literals(m.Groups["list"].Value))
+                        ids.Add(literal);
+            foreach (Match m in WindowTestName().Matches(text))
+                foreach (var group in new[] { "name", "name2", "name3" })
+                    if (m.Groups[group].Success)
+                        names.Add(m.Groups[group].Value);
+        }
         foreach (var file in sources.Order(StringComparer.Ordinal))
         {
             var text = SourceScan.Read(file);

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Window tests (R7 step 4, R-D9): drive the QA package (scripts/build.ps1 -Publish -UiVerification) through the UI
+       Automation client that ships with Windows, replacing the PowerShell window scripts one by one. Every test is
+       explicit because it takes over the desktop; see README.md for how to run them. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- For UIAutomationClient and UIAutomationTypes only; no WPF window is created. -->
+    <UseWPF>true</UseWPF>
+    <!-- The generated user32 imports (focus and keyboard input). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Seeds the isolated data directory in process, as the QA tool's seed commands do. -->
+    <ProjectReference Include="../VamSys.TestSupport/VamSys.TestSupport.csproj" />
+    <ProjectReference Include="../../src/VamSys.Storage/VamSys.Storage.csproj" AdditionalProperties="VamSysTestSupport=true" />
+    <ProjectReference Include="../../src/VamSys.Infrastructure/VamSys.Infrastructure.csproj" AdditionalProperties="VamSysTestSupport=true" />
+  </ItemGroup>
+  <!-- UseWPF leaves System.IO out of the implicit usings. -->
+  <ItemGroup><Using Include="Xunit" /><Using Include="System.IO" /></ItemGroup>
+</Project>

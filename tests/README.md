@@ -8,6 +8,7 @@
 | `VamSys.IntegrationTests` | 真实 SQLite 存储、迁移、故障注入、模拟服务器上的 API 与执行流水线、进程终止恢复、金样 |
 | `VamSys.TestSupport` | 虚拟时钟、模拟 Operations 服务器、隔离数据目录、存储与窗口测试数据夹具、旧式 HTTP 桩 |
 | `VamSys.ProcessChild` | 进程终止测试中被强制结束的子进程 |
+| `VamSys.UiTests` | C# 窗口测试：用 Windows 自带的 UI 自动化客户端驱动 QA 包，逐个替换窗口脚本；显式运行，见 [说明](VamSys.UiTests/README.md) |
 | `VamSys.Benchmarks` | 性能基准（`--benchmark-*`），只测量、写 JSON，见 [说明](VamSys.Benchmarks/README.md) |
 | `../tools/VamSys.QaSeed` | 窗口测试的数据准备、重启后断言、打包检查与诊断回放，见 [说明](../tools/VamSys.QaSeed/README.md) |
 | `UiVerification`、`TestSupport` | 只编译进 QA 包的窗口控制命令，以及只编译进测试构建的存储故障注入与友元授权 |
@@ -44,7 +45,7 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 
 ## 实际窗口检查
 
-窗口脚本位于 ../scripts，会实际操作窗口，需要可用的 Windows 桌面，并通过 `UiVerification=true` 构建的 QA 版本运行（`./scripts/build.ps1 -Publish -UiVerification` 输出到 artifacts/v3-qa）。脚本用 `tools/VamSys.QaSeed` 准备数据，所有 `--seed-*` 入口在写入前都会拒绝已有文件的目录；脚本默认在 artifacts 下新建 GUID 目录，只结束自己启动的进程，不调用真实 API。R7 计划把这些脚本逐个改写为 C# 窗口测试。
+窗口脚本位于 ../scripts，会实际操作窗口，需要可用的 Windows 桌面，并通过 `UiVerification=true` 构建的 QA 版本运行（`./scripts/build.ps1 -Publish -UiVerification` 输出到 artifacts/v3-qa）。脚本用 `tools/VamSys.QaSeed` 准备数据，所有 `--seed-*` 入口在写入前都会拒绝已有文件的目录；脚本默认在 artifacts 下新建 GUID 目录，只结束自己启动的进程，不调用真实 API。R7 正把这些脚本逐个改写为 [C# 窗口测试](VamSys.UiTests/README.md)，已改写的脚本会删除（页脚：`DataFooterTests`）。
 
 | 脚本 | 用途 |
 |---|---|
@@ -52,7 +53,6 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 | `test-baseline-ui.ps1 -Rows 20000|50000` | 启动、工作区读取与切换、审阅、逐帧滚动、内存；只测量，不设门槛 |
 | `test-ui-interactions.ps1 -Rows 20000` | 16 种布局组合、密度、批量范围、预览锁、审阅分组 |
 | `test-cell-editing-ui.ps1` | 用真实鼠标和键盘点击、输入、Tab、Esc；自动化读写与只读状态 |
-| `test-data-footer-ui.ps1` | 经 UI 自动化操作数据表页脚（翻页、跳页、每页条数、选择菜单、读屏名称） |
 | `test-v3-verification-ui.ps1 [-History|-Autosave|-Tasks]` | 真实撤销／重做按钮、自动保存后强制结束、关闭失败恢复、大任务页 |
 | `test-localization-ui.ps1` | 中英文即时切换、草稿与筛选、机队对话框、删除与恢复、审阅 |
 | `test-storage-ui.ps1`、`test-recovery-ui.ps1`、`test-credentials-ui.ps1`、`test-settings-save-ui.ps1` | 旧数据库升级、待核对 ID、凭据与设置保存 |
