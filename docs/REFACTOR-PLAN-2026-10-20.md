@@ -320,7 +320,9 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-10-29，R6 外壳启用状态）：** 窗口原先在 5 处各自设置导航、工作区与资源选择、页面宿主、窗格按钮和进度环（独占工作、本地操作、审阅工作锁、关闭保存、数据查询），规则略有出入。现由 `InteractionGate` 新增的 `NavigationEnabled`、`ContextPickersEnabled`、`PageEnabled`、`PaneToggleVisible`、`ShowsActivity` 给出，窗口只在 `ApplyShellState()` 一处应用；删除不再使用的 `ShowsProgress`、`ShowsWorkProgress`。两处有意的变化：关闭保存期间资源选择也禁用（原先只禁用工作区选择，它此时本就不起作用）；取消查询时若本地操作仍在进行，进度环不再提前熄灭。组合测试改为核对新查询，另补"仅本地操作"的断言；7 处回植均被抓到。Quick 检查与两个包通过。窗口验收待跑。
 
-**进度（2026-10-29，R6 第 7 步 QA 扩展）：** 存储的故障注入原本已是接口（`IStorageFaults`，实现只在测试构建）；唯一的缺口是 QA 窗口经反射写存储的私有 `Barrier`，现改为调用只在测试构建中存在的公开 `StorageTestHooks.SetBarrier`。窗口原先的三个分部方法（主题覆盖、启动命令管道与屏障、观察对话框）收为一个 `IWindowVerification` 接口，QA 构建经唯一的 `CreateVerification` 提供实现 `WindowVerification`，正式构建里该字段为空。打包检查新增：`CreateVerification` 与 `WindowVerification` 只在 QA 包、`StorageTestHooks` 只在 QA 包的存储程序集中。两个包通过。窗口命令本身仍是窗口的分部类（需要读取窗口内部状态），改为独立的 C# 窗口测试属于 R7。窗口验收待跑。
+**进度（2026-10-29，R6 第 7 步 QA 扩展）：** 存储的故障注入原本已是接口（`IStorageFaults`，实现只在测试构建）；唯一的缺口是 QA 窗口经反射写存储的私有 `Barrier`，现改为调用只在测试构建中存在的公开 `StorageTestHooks.SetBarrier`。窗口原先的三个分部方法（主题覆盖、启动命令管道与屏障、观察对话框）收为一个 `IWindowVerification` 接口，QA 构建经唯一的 `CreateVerification` 提供实现 `WindowVerification`，正式构建里该字段为空。打包检查新增：`CreateVerification` 与 `WindowVerification` 只在 QA 包、`StorageTestHooks` 只在 QA 包的存储程序集中。两个包通过。窗口命令本身仍是窗口的分部类（需要读取窗口内部状态），改为独立的 C# 窗口测试属于 R7。
+
+**窗口验收（2026-11-02，外壳启用状态与 QA 扩展两块）：** `test-v3-verification-ui` 的 `-Autosave`、`-History`，`test-ui-interactions -Rows 20000`，`test-data-performance-ui -Rows 50000`（首次展示 338 ms，搜索 209 ms，翻页 P95 7.6 ms，语言 P95 21.5 ms，单格 P95 0.6 ms）通过；自动保存与历史两项依赖存储屏障的计数（行保存 2 次、完整保存 0 次），说明去掉反射后屏障照常工作。默认模式（关闭冻结、保存失败恢复、重试关闭）起初失败：QA 屏障只拦 `Full:BeforeCommit`，而 R3 起关闭保存走日志保存（`Journal:BeforeCommit`），屏障拦不住，窗口真的关闭，随后读取导航控件报 0x8000FFFF。在 a3b6611（本两块之前）构建的 QA 包上同样失败，所以这是 R3 起就存在的测试装置问题、与本两块无关；该模式上次通过的记录在 10-19。修正为同时拦截日志与完整保存的提交点后，三种模式全部通过；该检查同时证明关闭保存期间导航被禁用、失败后恢复。
 
 ### R7 测试体系重建
 

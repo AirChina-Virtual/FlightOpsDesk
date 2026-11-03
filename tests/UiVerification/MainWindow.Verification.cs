@@ -39,7 +39,8 @@ public sealed partial class MainWindow
         VamSys.Infrastructure.StorageTestHooks.SetBarrier(storage.Inner,p=>{
             if(p=="Draft:AfterCommit")Interlocked.Increment(ref verificationDraftCommits);
             if(p=="Full:AfterCommit")Interlocked.Increment(ref verificationFullCommits);
-            if(p!="Full:BeforeCommit"||!verificationArmed||gate.Closing.State!=WindowCloseState.Saving)return;
+            // The close save is a journal save, or a full save when the journal asks for one (after a failure).
+            if(p is not ("Full:BeforeCommit" or "Journal:BeforeCommit")||!verificationArmed||gate.Closing.State!=WindowCloseState.Saving)return;
             verificationArmed=false;verificationSaves++;verificationEntered=true;
             if(!verificationRelease.Wait(TimeSpan.FromSeconds(45)))throw new TimeoutException("QA close barrier");
             if(verificationFail)throw new IOException("QA injected close save failure");
