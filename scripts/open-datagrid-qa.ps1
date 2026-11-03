@@ -9,7 +9,7 @@ if(!(Test-Path $Executable)){throw "QA package missing: run scripts/build.ps1 -P
 if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'A FlightOps Desk window is already open; close it first'}
 $dir=Join-Path $repo "artifacts/manual-datagrid/data-$Rows"
 if(!(Test-Path (Join-Path $dir '*'))){
-    & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --seed-data-ui $dir $Rows
+    & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tools/VamSys.QaSeed" -c Release -- --seed-data-ui $dir $Rows
     if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 }
 $saved=@{data=$env:VAMSYS_DATA_DIR;theme=$env:VAMSYS_QA_THEME;pipe=$env:VAMSYS_QA_PIPE}

@@ -19,9 +19,9 @@ public partial class CoverageMatrixTests
         ("Presentation.", "VamSys.UnitTests.Presentation."), ("Storage.", "VamSys.UnitTests.Storage.")
     ];
 
-    // Requirements that so far have only command-line checks or measurements (package checks, benchmarks). R7 gives
+    // Requirements that so far have only command-line measurements (the benchmarks). R7 gives
     // them tests; once one has a test it must leave this list.
-    static readonly HashSet<string> KnownGaps = ["F26", "I14", "J07"];
+    static readonly HashSet<string> KnownGaps = ["I14", "J07"];
 
     [GeneratedRegex(@"(?<![\w.])((?:VamSys\.)?(?:UnitTests|IntegrationTests|Domain|Application|Transport|Inventory|Api|Review|Presentation|Storage)(?:\.[A-Za-z_]\w*)+\*?)(?:\.\{([^}]*)\})?")]
     private static partial Regex Reference();

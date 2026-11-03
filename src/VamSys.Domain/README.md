@@ -64,7 +64,7 @@ Domain 不引用其他产品项目。文件、网络、环境目录和日志写�
 从仓库根目录运行：
 
 ~~~powershell
-dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
+pwsh -File scripts/check-all.ps1
 ~~~
 
 自动测试会检查 CSV、机型分配、删除、冲突合并、旧提示读取以及关闭保存。这个项目不打开窗口；真正的窗口操作由 scripts 中的测试脚本检查。

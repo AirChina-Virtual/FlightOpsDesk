@@ -29,7 +29,7 @@ function WaitText($process,[string[]]$need) {
     throw "Missing startup text: $need"
 }
 try {
-    & "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build --project "$PSScriptRoot/../tests/VamSys.Tests" -c Release -- --seed-storage-ui $DataDirectory legacy
+    & "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build --project "$PSScriptRoot/../tools/VamSys.QaSeed" -c Release -- --seed-storage-ui $DataDirectory legacy
     if($LASTEXITCODE -ne 0){throw 'Legacy seed failed'}
     $primary=Launch $DataDirectory
     WaitText $primary @('Task center','Connection & settings')
@@ -43,7 +43,7 @@ try {
     $null=$primary.CloseMainWindow();if(!$primary.WaitForExit(10000)){throw 'Primary did not close'}
     $futureDir=$DataDirectory+'-future'
     if(Test-Path -LiteralPath $futureDir){throw 'Future-format test directory already exists'}
-    & "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build --project "$PSScriptRoot/../tests/VamSys.Tests" -c Release -- --seed-storage-ui $futureDir future
+    & "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build --project "$PSScriptRoot/../tools/VamSys.QaSeed" -c Release -- --seed-storage-ui $futureDir future
     if($LASTEXITCODE -ne 0){throw 'Future seed failed'}
     $future=Launch $futureDir
     WaitText $future @('数据库由更新版本创建','This database requires a newer application version.')

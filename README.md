@@ -54,7 +54,7 @@ GitHub 的“Download ZIP”下载的是源代码，不能直接运行；生成�
 只运行自动测试：
 
 ~~~powershell
-dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
+pwsh -File scripts/check-all.ps1
 ~~~
 
 `build.ps1` 和部分窗口脚本含有中文字面量，并且保存为无 BOM 的 UTF-8，Windows PowerShell 5.1 无法正确读取它们。只有 5.1 时，可以直接运行上面的 dotnet 命令，发布参数见 [性能报告](docs/PERFORMANCE.md#测量方法与复现)。图标源文件和重新生成方法见 [品牌说明](docs/BRANDING.md)。
@@ -68,7 +68,7 @@ dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:Restor
 | [src/VamSys.Application](src/VamSys.Application/README.md) | I/O 端口、批次编排、待保存编辑和关闭流程；仅依赖 Domain |
 | [src/VamSys.Infrastructure](src/VamSys.Infrastructure/README.md) | 连接 vaMSYS、查找重复记录 |
 | [src/VamSys.Storage](src/VamSys.Storage/README.md) | 本机数据库：保存、读取、升级和备份 |
-| [tests/VamSys.Tests](tests/VamSys.Tests/README.md) | 自动测试、窗口脚本和测量方法 |
+| [tests](tests/README.md) | 自动测试、窗口脚本、QA 工具与基准 |
 | tests/VamSys.UnitTests、tests/VamSys.IntegrationTests | xUnit 单元测试、架构与兼容性清单、请求／存储／CSV 金样和真实库副本回归 |
 | scripts | 生成程序和图标、自动操作窗口、测量性能 |
 | docs | 使用方法、API 支持情况、测试与性能报告、升级说明；history 保存历史报告 |

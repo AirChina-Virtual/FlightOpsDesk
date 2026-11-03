@@ -39,13 +39,6 @@ if(args.Length==4 && args[0]=="--assert-history-ui")
     Console.WriteLine("PASS restart restores complete last history step");return;
 }
 DataRow Row(params (string, string)[] fields) => new() { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
-if(args.Length==2 && args[0]=="--benchmark-v3"){await StorageV3Scenarios.Benchmark(args[1]);return;}
-if(args.Length==2 && args[0]=="--benchmark-storage"){await StorageScenarios.Benchmark(args[1]);return;}
-if(args.Length==1 && args[0]=="--benchmark-journal-jobs"){await JournalBenchmark.JobsCost();return;}
-if(args.Length==3 && args[0]=="--benchmark-journal"){await JournalBenchmark.Run(args[1],args[2]);return;}
-if(args.Length==2 && args[0]=="--benchmark-core"){CorePerformanceBenchmark.Run(args[1]);return;}
-if(args.Length==2 && args[0]=="--benchmark-review"){CorePerformanceBenchmark.RunReview(args[1]);return;}
-if(args.Length==2 && args[0]=="--benchmark-core-load"){CorePerformanceBenchmark.RunLoad(args[1]);return;}
 if(args.Length==3 && args[0]=="--seed-data-ui"){DataUiFixture.Seed(args[1],int.Parse(args[2]));return;}
 if (args.Length == 2 && args[0] == "--seed-recovery-ui")
 {
@@ -68,8 +61,7 @@ if (args.Length == 2 && args[0] == "--seed-ui")
 }
 
 if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await DiagnosticReplayExport.ExportDiagnostics(args[1]);return;}
-if(args.Length==2 && args[0]=="--benchmark-performance") {await PerformanceScenarios.Benchmark(args[1]);return;}
 
-// All scenarios now live in VamSys.UnitTests and VamSys.IntegrationTests; only the command-line entries above remain.
-Console.Error.WriteLine("Unknown or missing command. See tests/VamSys.Tests/README.md for the command-line entries.");
+// Seeds, restart assertions, package checks and diagnostic replays for the window tests; benchmarks are in tests/VamSys.Benchmarks.
+Console.Error.WriteLine("Unknown or missing command. See tools/VamSys.QaSeed/README.md for the command-line entries.");
 Environment.ExitCode = 2;

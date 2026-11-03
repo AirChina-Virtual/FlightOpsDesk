@@ -11,7 +11,7 @@ function WaitFor([scriptblock]$f){$until=[DateTime]::UtcNow.AddSeconds(20);do{$r
 function Position { foreach($list in (All|Where-Object{$_.Current.ControlType.ProgrammaticName -eq 'ControlType.List'})){$pattern=$null;if($list.TryGetCurrentPattern([System.Windows.Automation.ScrollPattern]::Pattern,[ref]$pattern) -and $pattern.Current.VerticallyScrollable){return $pattern.Current.VerticalScrollPercent}};return -1 }
 function SelectItem($n){$e=WaitFor {Named $n 'ListItem'};([System.Windows.Automation.SelectionItemPattern]$e.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)).Select()}
 if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close test app first'}
-& "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build -c Release --project "$PSScriptRoot/../tests/VamSys.Tests" -- --seed-ui $DataDirectory
+& "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build -c Release --project "$PSScriptRoot/../tools/VamSys.QaSeed" -- --seed-ui $DataDirectory
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $env:VAMSYS_DATA_DIR=$DataDirectory
 $testProcess=Start-Process "$PSScriptRoot/../artifacts/flightops-app/FlightOpsDesk.exe" -WindowStyle Hidden -PassThru

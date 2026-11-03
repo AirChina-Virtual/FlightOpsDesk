@@ -12,6 +12,8 @@
     <ProjectReference Include="../VamSys.TestSupport/VamSys.TestSupport.csproj" />
     <ProjectReference Include="../../src/VamSys.Storage/VamSys.Storage.csproj" AdditionalProperties="VamSysTestSupport=true" />
     <ProjectReference Include="../../src/VamSys.Infrastructure/VamSys.Infrastructure.csproj" AdditionalProperties="VamSysTestSupport=true" />
+    <!-- The package check lives in the QA tool; Packaging/PackageChecksTests calls it directly. -->
+    <ProjectReference Include="../../tools/VamSys.QaSeed/VamSys.QaSeed.csproj" />
   </ItemGroup>
   <ItemGroup><Using Include="Xunit" /></ItemGroup>
   <!-- The child process of the real-termination tests: built first, then copied to <output>/ProcessChild (run as `dotnet VamSys.ProcessChild.dll`). -->

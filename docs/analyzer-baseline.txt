@@ -4,12 +4,14 @@ src/VamSys.Domain/VamSys.Domain.csproj|CA1310|1
 src/VamSys.Infrastructure/VamSys.Infrastructure.csproj|CA1307|5
 src/VamSys.Infrastructure/VamSys.Infrastructure.csproj|CA1310|2
 src/VamSys.Infrastructure/VamSys.Infrastructure.csproj|CA2000|1
+tests/VamSys.Benchmarks/VamSys.Benchmarks.csproj|CA1307|2
+tests/VamSys.Benchmarks/VamSys.Benchmarks.csproj|CA1310|3
+tests/VamSys.Benchmarks/VamSys.Benchmarks.csproj|CA2000|4
 tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|CA1307|5
 tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|CA1310|2
 tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|CA2000|5
 tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj|xUnit1051|3
-tests/VamSys.Tests/VamSys.Tests.csproj|CA1307|5
-tests/VamSys.Tests/VamSys.Tests.csproj|CA1310|3
-tests/VamSys.Tests/VamSys.Tests.csproj|CA2000|5
 tests/VamSys.UnitTests/VamSys.UnitTests.csproj|CA1307|6
 tests/VamSys.UnitTests/VamSys.UnitTests.csproj|CA1310|1
+tools/VamSys.QaSeed/VamSys.QaSeed.csproj|CA1307|3
+tools/VamSys.QaSeed/VamSys.QaSeed.csproj|CA2000|1

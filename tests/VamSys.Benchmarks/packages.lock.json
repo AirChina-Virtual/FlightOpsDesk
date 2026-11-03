@@ -90,6 +90,13 @@
           "VamSys.Application": "[1.0.0, )",
           "VamSys.Domain": "[1.0.0, )"
         }
+      },
+      "vamsys.testsupport": {
+        "type": "Project",
+        "dependencies": {
+          "VamSys.Infrastructure": "[1.0.0, )",
+          "VamSys.Storage": "[1.0.0, )"
+        }
       }
     }
   }

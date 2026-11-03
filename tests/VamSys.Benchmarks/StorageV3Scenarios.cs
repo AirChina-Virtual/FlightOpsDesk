@@ -3,7 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using VamSys.Core;
 using VamSys.Infrastructure;
-using static StorageScenarios;
+using static VamSys.TestSupport.StorageScenarios;
 
 static class StorageV3Scenarios
 {

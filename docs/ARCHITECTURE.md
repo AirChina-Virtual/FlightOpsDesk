@@ -30,8 +30,9 @@ VamSys.Domain  ←  VamSys.Application  ←  VamSys.Storage
 | `tests/VamSys.UnitTests` | 各层单元测试（`Domain/`、`Application/`、`Storage/`、`Transport/`、`Api/`、`Review/`），以及 `Inventory/` 清单测试（枚举数值、持久化结构、资源键、能力键、AutomationId） | `pwsh scripts/check-all.ps1` |
 | `tests/VamSys.IntegrationTests` | `Golden/` 金样（请求、存储、CSV）、真实 SQLite、模拟服务器、执行流水线、`RealData/`（只在设置环境变量时运行） | 同上；标记 `Slow` 的只在 `-Mode Full` 运行 |
 | `tests/VamSys.TestSupport` | 虚拟时钟、模拟 Operations 服务器、隔离数据目录 | — |
-| `tests/VamSys.Tests` | 旧测试运行器，逐步删除中；含真实进程终止恢复场景 | `-Mode Full` |
-| `tests/UiVerification`、`scripts/test-*-ui.ps1` | 只编译进 QA 包的窗口控制命令和窗口脚本 | 见 `tests/VamSys.Tests/README.md` |
+| `tools/VamSys.QaSeed` | 窗口测试数据、重启断言、打包检查、诊断回放（命令行） | `scripts/build.ps1` 与窗口脚本 |
+| `tests/VamSys.Benchmarks` | 性能基准（命令行，只测量、写 JSON） | 手动，见 `tests/VamSys.Benchmarks/README.md` |
+| `tests/UiVerification`、`scripts/test-*-ui.ps1` | 只编译进 QA 包的窗口控制命令和窗口脚本 | 见 `tests/README.md` |
 
 需求与测试的对应关系见 [TEST-COVERAGE.md](TEST-COVERAGE.md)。
 

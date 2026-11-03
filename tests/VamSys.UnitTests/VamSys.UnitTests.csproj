@@ -9,10 +9,6 @@
     <PackageReference Include="xunit.v3" Version="4.0.1" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
-  <!-- DataUiFixture stays in the legacy runner, which seeds window scripts with it. -->
-  <ItemGroup>
-    <Compile Include="../VamSys.Tests/DataUiFixture.cs" Link="Presentation/Linked/DataUiFixture.cs" />
-  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../VamSys.TestSupport/VamSys.TestSupport.csproj" />
     <ProjectReference Include="../../src/VamSys.Presentation/VamSys.Presentation.csproj" AdditionalProperties="VamSysTestSupport=true" />

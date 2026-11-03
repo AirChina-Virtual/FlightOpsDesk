@@ -4,8 +4,13 @@ using System.Reflection.PortableExecutable;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-static class PackageChecks
+// What the product and QA packages must and must not contain (scripts/build.ps1 runs it on every publish).
+public static class PackageChecks
 {
+    // Test and tool assemblies, none of which may ship or be referenced by a shipped assembly.
+    static readonly string[] TestAssemblies = ["VamSys.Tests", "VamSys.UnitTests", "VamSys.IntegrationTests", "VamSys.TestSupport", "VamSys.ProcessChild", "VamSys.QaSeed", "VamSys.Benchmarks"];
+    static bool IsTestAssembly(string name) => TestAssemblies.Any(test => name.StartsWith(test, StringComparison.OrdinalIgnoreCase));
+
     public static void Verify(string directory, bool qa)
     {
         directory = Path.GetFullPath(directory);
@@ -23,7 +28,7 @@ static class PackageChecks
             Require(!relative.Split('/').Any(part => part is "tests" or "src" or "obj" or ".tools"), $"Developer directory in package: {relative}");
             Require(!Regex.IsMatch(relative, @"\.(cs|csproj|slnx|ps1)$", RegexOptions.IgnoreCase), $"Developer file in package: {relative}");
             Require(qa || !file.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase), $"Debug symbols in product package: {relative}");
-            Require(!Path.GetFileName(file).StartsWith("VamSys.Tests", StringComparison.OrdinalIgnoreCase), $"Test runner in package: {relative}");
+            Require(!IsTestAssembly(Path.GetFileName(file)), $"Test or tool assembly in package: {relative}");
             if (relative.StartsWith("docs/", StringComparison.OrdinalIgnoreCase))
                 Require(relative is "docs/USER-GUIDE.md" or "docs/STORAGE-MIGRATION.md", $"Developer document in package: {relative}");
         }
@@ -36,7 +41,7 @@ static class PackageChecks
             var methods = metadata.MethodDefinitions.Select(handle => metadata.GetString(metadata.GetMethodDefinition(handle).Name)).ToHashSet();
             var types = metadata.TypeDefinitions.Select(handle => metadata.GetString(metadata.GetTypeDefinition(handle).Name)).ToHashSet();
             var references = metadata.AssemblyReferences.Select(handle => metadata.GetString(metadata.GetAssemblyReference(handle).Name));
-            Require(!references.Any(reference => reference.Contains("Tests", StringComparison.OrdinalIgnoreCase)), $"Test assembly referenced by {name}");
+            Require(!references.Any(IsTestAssembly), $"Test assembly referenced by {name}");
             if (name == "FlightOpsDesk")
             {
                 foreach (var method in new[] { "CreateVerification", "InitializeVerification", "ConfigureVerificationTheme", "VerificationCommand" })
@@ -70,7 +75,7 @@ static class PackageChecks
             }
         }
         using var deps = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "FlightOpsDesk.deps.json")));
-        Require(!deps.RootElement.GetProperty("libraries").EnumerateObject().Any(library => library.Name.Contains("VamSys.Tests", StringComparison.OrdinalIgnoreCase)),
+        Require(!deps.RootElement.GetProperty("libraries").EnumerateObject().Any(library => IsTestAssembly(library.Name)),
             "Test dependency in product dependency manifest");
 
         // User-facing links must still work after leaving the developer documentation out.

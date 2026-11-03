@@ -18,7 +18,7 @@
 | 切换工作区，没有改动 | 1 → 0 | 1 799 ms | 24 325 480 | 200 000 | 0.2–0.4 ms | 0 | 0 |
 | 保存连接设置 | 1 | 2 968 ms | 24 325 483 | 200 000 | 8–45 ms | 232 | 0（头部 1 次） |
 
-“新增一行”之后的 3.9 MB 几乎全是撤销步骤：结构性编辑的步骤要记录整个草稿的行序（5 万个编号，前后各一份），这是撤销历史既有的机制（决定 R-D5：日志只覆盖行和元数据，撤销历史沿用原来的增量机制），不是日志写入的。目标“批量编辑 200 行或新增一行从约 2 s 降到 100 ms 以内”已达到。复现：`dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-journal <full｜journal> <输出目录>`（`full` 是改造前的保存方式，`journal` 是现在的）。
+“新增一行”之后的 3.9 MB 几乎全是撤销步骤：结构性编辑的步骤要记录整个草稿的行序（5 万个编号，前后各一份），这是撤销历史既有的机制（决定 R-D5：日志只覆盖行和元数据，撤销历史沿用原来的增量机制），不是日志写入的。目标“批量编辑 200 行或新增一行从约 2 s 降到 100 ms 以内”已达到。复现：`dotnet run --project tests/VamSys.Benchmarks -c Release -- --benchmark-journal <full｜journal> <输出目录>`（`full` 是改造前的保存方式，`journal` 是现在的）。
 
 ## R3 结束时的完整复测（2026-10-22）
 
@@ -201,7 +201,7 @@ JSON 加载中位数：1,000 行 24.9043 → 15.5515 ms，2 万行 437.2899 → 
 ./scripts/test-baseline-ui.ps1 -Rows 50000 -Executable "$PWD/artifacts/v3-qa/FlightOpsDesk.exe"
 
 # 核心计算基准（不含窗口和数据库）
-./.tools/dotnet/dotnet.exe run --project tests/VamSys.Tests -c Release -- --benchmark-core artifacts/core-performance/current.json
+./.tools/dotnet/dotnet.exe run --project tests/VamSys.Benchmarks -c Release -- --benchmark-core artifacts/core-performance/current.json
 ~~~
 
 本轮的原始结果（JSON、截图、日志）已压缩到本机 `archive/2026-10-19-performance/performance-round-results.zip`，原路径和 SHA-256 记录在同目录的 `performance-round-results-files.csv`。历史记录中提到的 artifacts 路径都可以在这里查到。

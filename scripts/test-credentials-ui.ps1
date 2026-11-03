@@ -18,7 +18,7 @@ function Language($name) {
 function DataRow { Elements | Where-Object {$_.Current.ControlType -eq [System.Windows.Automation.ControlType]::ListItem -and $_.Current.Name.StartsWith('RowViewModel')} | Select-Object -First 1 }
 function Assert($condition,$message) { if(!$condition){throw $message} }
 if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close the existing app before running isolated UI tests'}
-& "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build -c Release --project "$PSScriptRoot/../tests/VamSys.Tests" -- --seed-recovery-ui $DataDirectory
+& "$PSScriptRoot/../.tools/dotnet/dotnet.exe" run --no-build -c Release --project "$PSScriptRoot/../tools/VamSys.QaSeed" -- --seed-recovery-ui $DataDirectory
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $env:VAMSYS_DATA_DIR=$DataDirectory
 function Launch { Start-Process "$PSScriptRoot/../artifacts/flightops-app/FlightOpsDesk.exe" -WindowStyle Hidden }

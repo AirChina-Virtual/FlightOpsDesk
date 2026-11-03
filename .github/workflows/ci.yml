@@ -14,8 +14,10 @@ jobs:
         run: dotnet restore VamSys.slnx --locked-mode
       - name: Analyzer baseline
         run: pwsh -File scripts/check-analyzer-baseline.ps1
-      - name: Legacy suite
-        run: dotnet run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
+      - name: QA tool and benchmarks build
+        run: |
+          dotnet build tools/VamSys.QaSeed/VamSys.QaSeed.csproj -c Release -p:RestoreLockedMode=true
+          dotnet build tests/VamSys.Benchmarks/VamSys.Benchmarks.csproj -c Release -p:RestoreLockedMode=true
       - name: Unit tests
         run: dotnet test --project tests/VamSys.UnitTests/VamSys.UnitTests.csproj -c Release -p:RestoreLockedMode=true
       - name: Integration tests

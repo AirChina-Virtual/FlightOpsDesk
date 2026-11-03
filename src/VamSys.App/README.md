@@ -61,7 +61,7 @@ R4 起，保存、状态判断和业务流程在 Application 的服务中；本�
 
 两种发布都会先运行全部自动测试，再检查程序集中是否含有测试入口，以及包内的文件清单。QA 版本的编译目录独立于正式程序。入口为 `FlightOpsDesk.exe`；同目录中的 PRI、XBF、Assets 和运行库都需要保留。只有 Windows PowerShell 5.1 时，可以直接用 `.tools/dotnet/dotnet.exe publish` 生成，参数见 [性能报告](../../docs/PERFORMANCE.md#测量方法与复现)。
 
-窗口脚本需要可操作的 Windows 桌面和单独的测试数据目录，运行前要关闭正在使用的程序。各脚本说明见 [Tests 项目说明](../../tests/VamSys.Tests/README.md#实际窗口检查)。
+窗口脚本需要可操作的 Windows 桌面和单独的测试数据目录，运行前要关闭正在使用的程序。各脚本说明见 [测试说明](../../tests/README.md#实际窗口检查)。
 
 ## 品牌与兼容
 

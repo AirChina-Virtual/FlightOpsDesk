@@ -105,11 +105,11 @@
 
 ~~~powershell
 # 全部自动测试
-./.tools/dotnet/dotnet.exe run --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -p:RestoreLockedMode=true
+pwsh -File scripts/check-all.ps1
 
 # 正式包与 QA 包（会先运行全部测试，再检查包内容）
 ./scripts/build.ps1 -Publish
 ./scripts/build.ps1 -Publish -UiVerification
 ~~~
 
-窗口脚本需要可操作的 Windows 桌面，运行前要关闭正在使用的 FlightOps Desk。各脚本的参数见 [Tests 项目说明](../tests/VamSys.Tests/README.md)。
+窗口脚本需要可操作的 Windows 桌面，运行前要关闭正在使用的 FlightOps Desk。各脚本的参数见 [测试说明](../tests/README.md#实际窗口检查)。

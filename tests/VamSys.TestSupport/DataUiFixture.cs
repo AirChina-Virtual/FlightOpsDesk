@@ -1,7 +1,9 @@
 using VamSys.Core;
 using VamSys.Infrastructure;
 
-static class DataUiFixture
+namespace VamSys.TestSupport;
+
+public static class DataUiFixture
 {
     public static void RequireEmptyDirectory(string directory)
     {

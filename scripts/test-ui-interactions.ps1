@@ -8,7 +8,7 @@ if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'An existing F
 New-Item -ItemType Directory -Force -Path $OutputDirectory|Out-Null
 $dataDirectory=Join-Path $OutputDirectory ('data-'+[Guid]::NewGuid().ToString('N'))
 $pipeName='flightops-interactions-'+[Guid]::NewGuid().ToString('N')
-& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --seed-data-ui $dataDirectory $Rows
+& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tools/VamSys.QaSeed" -c Release -- --seed-data-ui $dataDirectory $Rows
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $previousData=$env:VAMSYS_DATA_DIR;$previousPipe=$env:VAMSYS_QA_PIPE
 $env:VAMSYS_DATA_DIR=$dataDirectory;$env:VAMSYS_QA_PIPE=$pipeName

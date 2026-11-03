@@ -21,7 +21,7 @@ if(!$OutputDirectory){$OutputDirectory=Join-Path $repo 'artifacts/ui-cells/editi
 New-Item -ItemType Directory -Force $OutputDirectory|Out-Null
 $dir=Join-Path $OutputDirectory ('data-'+[Guid]::NewGuid().ToString('N'))
 if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'An existing FlightOps Desk window is open; isolate QA before running'}
-& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --seed-data-ui $dir 20000
+& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tools/VamSys.QaSeed" -c Release -- --seed-data-ui $dir 20000
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $pipeName='flightops-cells-'+[Guid]::NewGuid().ToString('N')
 $env:VAMSYS_DATA_DIR=$dir;$env:VAMSYS_QA_PIPE=$pipeName

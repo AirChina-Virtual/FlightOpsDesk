@@ -5,8 +5,8 @@ $repo=Split-Path $PSScriptRoot -Parent
 $dir=Join-Path $repo ('artifacts/storage-v3-20260922/qa-'+[Guid]::NewGuid().ToString('N'))
 $pipeName='vamsys-ui-'+[Guid]::NewGuid().ToString('N')
 if(Get-Process FlightOpsDesk -ErrorAction SilentlyContinue){throw 'Close existing app before isolated QA'}
-if($Tasks){& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --seed-task-ui $dir}
-else {& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --seed-storage-ui $dir legacy}
+if($Tasks){& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tools/VamSys.QaSeed" -c Release -- --seed-task-ui $dir}
+else {& "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tools/VamSys.QaSeed" -c Release -- --seed-storage-ui $dir legacy}
 if($LASTEXITCODE -ne 0){throw 'Seed failed'}
 $env:VAMSYS_DATA_DIR=$dir;$env:VAMSYS_QA_PIPE=$pipeName
 if(!$Executable){$Executable="$repo/artifacts/v3-qa/FlightOpsDesk.exe"}
@@ -56,7 +56,7 @@ try {
         Click 'More';Click 'Redo'
         Wait {(Q state).name -eq 'history second'}|Out-Null
         Wait {(Q state).idle}|Out-Null;Q close|Out-Null;Assert ($p.WaitForExit(10000)) 'Close did not persist history'
-        & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --assert-history-ui $dir 'history second' $start.name
+        & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tools/VamSys.QaSeed" -c Release -- --assert-history-ui $dir 'history second' $start.name
         if($LASTEXITCODE -ne 0){throw 'History restart verification failed'}
         Write-Output 'PASS actual Undo/Redo buttons, same-cell continuation across autosaves, workspace switch and history after restart'
     } elseif($Autosave){
@@ -68,7 +68,7 @@ try {
         $second=Wait {$s=Q state;if($s.draftSaves -ge $start.draftSaves+2){$s}}
         Assert ($second.fullSaves -eq $start.fullSaves) 'Autosave used a full save'
         $p.Kill();$p.WaitForExit()
-        & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --assert-autosave-ui $dir 'autosaved second'
+        & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tools/VamSys.QaSeed" -c Release -- --assert-autosave-ui $dir 'autosaved second'
         if($LASTEXITCODE -ne 0){throw 'Restart verification failed'}
         Write-Output "PASS actual window: two cell autosaves wrote rows only (draft saves $($second.draftSaves-$start.draftSaves), full saves 0); value survived a forced kill"
     } elseif(!$Tasks){
@@ -84,7 +84,7 @@ try {
         Assert ((Q state).actions -eq 1) 'Command did not recover'
         Q arm|Out-Null;Q close|Out-Null;Wait {$s=Q state;if($s.entered){$s}}|Out-Null
         Q release|Out-Null;Assert ($p.WaitForExit(10000)) 'Successful close did not exit'
-        & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tests/VamSys.Tests" -c Release -- --assert-close-ui $dir
+        & "$repo/.tools/dotnet/dotnet.exe" run --no-build --project "$repo/tools/VamSys.QaSeed" -c Release -- --assert-close-ui $dir
         if($LASTEXITCODE -ne 0){throw 'Restart verification failed'}
         Write-Output 'PASS actual window: freeze before delayed save, edit/action/repeated close blocked, failure restores draft and commands, retry closes'
     } else {

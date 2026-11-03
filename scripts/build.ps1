@@ -44,7 +44,7 @@ try {
     [IO.File]::WriteAllText((Join-Path $staging 'docs/USER-GUIDE.md'), $guide, [Text.UTF8Encoding]::new($false))
     Copy-Item examples/*.csv (Join-Path $staging 'examples')
     $check = if ($UiVerification) { '--verify-qa-package' } else { '--verify-package' }
-    & $sdk run --no-build --project tests/VamSys.Tests/VamSys.Tests.csproj -c Release -- $check $staging
+    & $sdk run --no-build --project tools/VamSys.QaSeed/VamSys.QaSeed.csproj -c Release -- $check $staging
     if ($LASTEXITCODE -ne 0) { throw 'Published package isolation check failed' }
 
     $name = if ($UiVerification) { 'v3-qa' } else { 'flightops-app' }

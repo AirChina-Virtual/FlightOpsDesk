@@ -6,7 +6,7 @@
 
 测试名称：行内写成 `命名空间简写.类名.{方法, 方法}`，也可以只写类名（类中全部测试）或 `类名.方法`；`Write_*` 这类带 `*` 的名称代表所有以它开头的方法。完整名称由前缀加上简写得到：`Domain.`、`Application.`、`Transport.`、`Inventory.`、`Api.`、`Review.`、`Presentation.`、`Storage.` ＝ `VamSys.UnitTests.` 下的同名命名空间；`UnitTests.` ＝ `VamSys.UnitTests.`；以 `IntegrationTests.` 开头的为 `VamSys.IntegrationTests.…`；以 `VamSys.UnitTests.` 开头的已写全（BatchShiftMinutesTests、LocalReferenceTests、RowReplacementTests 在根命名空间）。含 `Theory` 的方法名代表它的全部数据行。
 
-自动检查：`Inventory.CoverageMatrixTests` 读本文件 3.1–3.3 节，要求每一行至少有一条存在的测试，并且行里写到的每个测试类、方法、通配名称和窗口脚本都存在；只有列为“待办”的 F26、I14、J07 例外，它们一旦有了测试，检查会要求从例外名单中去掉。
+自动检查：`Inventory.CoverageMatrixTests` 读本文件 3.1–3.3 节，要求每一行至少有一条存在的测试，并且行里写到的每个测试类、方法、通配名称和窗口脚本都存在；只有列为“待办”的 I14、J07（只有基准测量）例外，它们一旦有了测试，检查会要求从例外名单中去掉。
 
 ## 3.1 功能
 
@@ -37,7 +37,7 @@
 | F23 存储版本：迁移、拒绝更高版本、版本号防陈旧覆盖、单实例 | Storage、Domain（历史格式） | Domain.EditHistoryTests.{Legacy_full_snapshot_histories_convert_to_the_same_undo_and_redo_states, An_unknown_history_version_or_an_ambiguous_mix_of_formats_is_refused, A_workspace_round_trip_keeps_both_stacks_and_the_cells_they_restore}；IntegrationTests.Golden.Storage.LegacyMigrationGoldenTests、IntegrationTests.Golden.Storage.StorageSequenceGoldenTests、Inventory.PersistedJsonShapeTests（R0）；IntegrationTests.Storage.JournalWriteScopeTests.{A_stale_copy_is_rejected_by_a_journal_save_and_nothing_is_written, A_failure_after_the_commit_is_reported_and_the_stale_copy_cannot_overwrite_the_database, A_loaded_workspace_is_trusted_and_a_workspace_changed_by_another_writer_is_saved_in_full}（版本号防陈旧覆盖在日志保存上同样成立）；IntegrationTests.Storage.StorageMigrationTests.{A_database_from_a_newer_release_is_refused_and_left_alone, One_instance_may_use_a_data_directory_and_leaving_releases_it, A_v2_database_keeps_its_task_revision_and_recovery_candidate_and_old_writers_are_locked_out, A_v2_database_with_a_duplicated_local_row_ID_is_refused_and_stays_v2, Fixed_legacy_databases_keep_every_undo_and_redo_node_and_the_cursor_position, A_damaged_v3_history_is_refused_before_anything_is_changed, A_v0_upgrade_backs_up_the_committed_WAL_and_keeps_business_content_identifiers_and_order, A_failed_upgrade_changes_nothing_in_any_workspace_and_keeps_the_backup}；IntegrationTests.Storage.ProcessTermination.V3BinaryRefusalTests | test-storage-ui | 完成 |
 | F24 安全关闭 | Application、UI | Application.WindowCloseControllerTests（全部）；Application.InteractionGateTests；Application.WorkspaceSessionTests | test-v3-verification-ui（默认模式：关闭冻结、保存失败恢复、重试关闭） | 完成 |
 | F25 性能统计文件 | Infrastructure | Api.PerformanceMetricsTests（全部）；IntegrationTests.Api.SaveMetricsTests | — | 完成 |
-| F26 正式包与 QA 包 | 打包 | 待办 | `scripts/build.ps1 -Publish [-UiVerification]` 的打包检查（`--verify-package`／`--verify-qa-package`，命令行入口，不是测试） | 待办：打包检查随命令行工具拆出后补测试（R7） |
+| F26 正式包与 QA 包 | 打包 | IntegrationTests.Packaging.PackageChecksTests（全部：由生成的程序集组成的正式包与 QA 包各通过；QA 入口、开关字符串、钩子实现、存储测试类型与屏障、友元授权、调试符号、测试与工具程序集、开发目录与文件、依赖清单、运行文件、API 契约、文档链接各一种拒绝） | `scripts/build.ps1 -Publish [-UiVerification]` 每次发布都对真实包运行该检查（`tools/VamSys.QaSeed --verify-package`／`--verify-qa-package`） | 完成 |
 
 ## 3.2 不变规则
 
@@ -69,7 +69,7 @@
 | J04 日志不可信时回退完整保存：从未保存的工作区、版本号被其他写入者推进、增量写入与数据库不符、加载到的位置有空洞（检查点或旧程序留下） | Storage | IntegrationTests.Storage.JournalWriteScopeTests.{A_new_workspace_is_written_in_full_and_then_incrementally, A_loaded_workspace_is_trusted_and_a_workspace_changed_by_another_writer_is_saved_in_full, A_database_that_does_not_hold_what_the_journal_assumes_is_repaired_by_a_full_save, Gaps_in_the_stored_positions_are_repaired_instead_of_colliding_with_an_appended_row} | — | 完成 |
 | J05 任务检查点与日志共存：任务检查点后日志仍可信且只重写该任务；变基检查点后重写所属资源的全部行 | Storage | IntegrationTests.Storage.JournalWriteScopeTests.{A_task_checkpoint_keeps_the_journal_valid_and_only_its_job_is_written_again, A_rebase_checkpoint_marks_the_rows_of_its_resource_for_rewriting}；JournalEquivalenceTests（随机序列中的任务检查点） | IntegrationTests.Storage.StorageCheckpointTests、IntegrationTests.Storage.ProcessTermination.ProcessTerminationTests | 完成 |
 | J06 定向读写：`JobExists`、`LoadJob`、`CountRows` 与完整加载的结果一致；维护预览用它们 | Storage | IntegrationTests.Storage.JournalWriteScopeTests.Targeted_reads_agree_with_a_full_load | — | 完成 |
-| J07 5 万行工作区的保存开销（批量编辑、新增、解决冲突、只写头部、提交任务、无改动切换、保存连接设置） | 基准 | `dotnet run --project tests/VamSys.Tests -c Release -- --benchmark-journal <full｜journal> <输出目录>`，改造前后对照见 [性能报告](PERFORMANCE.md) | `--benchmark-journal`（命令行，不是测试） | 待办：基准项目（R7） |
+| J07 5 万行工作区的保存开销（批量编辑、新增、解决冲突、只写头部、提交任务、无改动切换、保存连接设置） | 基准 | `dotnet run --project tests/VamSys.Benchmarks -c Release -- --benchmark-journal <full｜journal> <输出目录>`，改造前后对照见 [性能报告](PERFORMANCE.md) | `--benchmark-journal`（命令行，不是测试） | 待办：基准项目（R7） |
 
 ## 只在旧测试里出现（或旧测试表达得更多）的行为
 
