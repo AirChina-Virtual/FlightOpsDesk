@@ -357,6 +357,10 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-10-26，C8／C9）：** 旧运行器的场景全部迁完（32→0），`tests/VamSys.Tests` 只剩命令行入口，不带参数运行时提示用法并以退出码 2 结束；完整档去掉旧运行器一步。C8：13 个演示执行器与存储场景迁为 `UnitTests.Application.BatchExecutorTests`、`UnverifiedAdapterTests` 和 `IntegrationTests.Storage.WorkspaceIsolationTests`，每条“不重发”都断言写入次数，并新增 F01 的直接隔离测试（同库两个工作区重开后逐字节比对、密钥互不可见）。C9：新建子进程宿主 `tests/VamSys.ProcessChild`，真实进程终止的 18 个边界迁为 `IntegrationTests.Storage.ProcessTermination.ProcessTerminationTests`（Slow，约 17 秒），v3 旧程序拒读 v4 迁为 `V3BinaryRefusalTests`（主检出有基线时实际运行并通过，缺失时跳过）；回植验证四组均能拦下。新测试单元 1,484 项、集成 459 项；分析器告警 62→47。合并时修正：v3 测试改为只清本库连接池；C9 新文件的 8 条告警（快速档未报出）已修。
 
+**R7 剩余工作的顺序（2026-11-02 定）：** ① 覆盖矩阵更新到现有测试并加自动检查；② 命令行工具拆出（`tools/VamSys.QaSeed`：种子、断言、打包检查、诊断回放；`tests/VamSys.Benchmarks`：基准），并为打包检查补测试；③ 写入安全状态表的参数化测试；④ `tests/VamSys.UiTests`（C#＋UIAutomationClient，见 R-D9）逐个替换 PowerShell 窗口脚本，补齐目前没有窗口测试的对话框与流程；⑤ 每个已修复问题一条回归用例，整理回植清单；⑥ 集成测试运行时间。
+
+**进度（2026-11-02，R7 第①块）：** `docs/TEST-COVERAGE.md` 更新到 R3–R6 之后的测试：第 4 列由“仍覆盖的旧场景”（旧运行器已无场景）改为“窗口与其他检查”，各行补上 R4–R6 新增的 Presentation／Application 测试与覆盖它的窗口脚本，状态改为完成／部分／待办并写明缺口。新增 `Inventory.CoverageMatrixTests`：读 3.1–3.3 节，要求每行至少一条存在的测试、写到的每个类／方法／通配名称／窗口脚本都存在；F26（打包检查）、I14（性能基准）、J07（日志保存基准）目前只有命令行检查，列为已知例外，有了测试就必须移出。检查当场发现 J01 引用的方法已改名。回植 6 种（改名方法、缺失类、无效通配、缺失脚本、整行无测试、例外名单漏项）均被抓到。现为“部分”的行：F04 冲突审阅、F10 参数选择、F11 导入、F14 提交移交缺窗口测试，F15／I01 缺写入状态表。
+
 ### R8 验收与收尾
 
 1. 全部单元、集成和窗口测试，正式包与 QA 包检查；需求覆盖矩阵每一行都有通过的测试，回植错误全部被发现；旧运行器和旧脚本已删除。
@@ -416,7 +420,7 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 | R-D6 | 演示是否改为共用在线执行流水线（C3） | 改，但作为 R5 之后的独立行为变更；在此之前文档写明差异 |
 | R-D7 | 重构期间是否冻结 E／F／G 功能项 | 冻结，P1 修复除外 |
 | R-D8 | git 的安装方式 | 安装 Git for Windows；不方便时用便携版放入 `.tools` |
-| R-D9 | 窗口测试的实现方式 | 改为 C#＋FlaUI（基于 Windows UI 自动化）驱动 QA 包；新增一个仅测试使用的 NuGet 依赖，不进入正式包 |
+| R-D9 | 窗口测试的实现方式 | 改为 C# 驱动 QA 包。原定 FlaUI；2026-11-02 改为直接用 Windows 自带的 UIAutomationClient（现有脚本已在用），不新增 NuGet 依赖、不需下载，代价是自写一层小封装 |
 | R-D10 | 界面视觉是否允许调整 | 只允许统一间距、字号和样式等整理；不增删功能入口，不改文案和 AutomationId |
 
 [审查与优化计划](REVIEW-AND-PLAN-2026-10-20.md) · [代码优化计划](OPTIMIZATION-PLAN.md) · [能力验证矩阵](CAPABILITY-MATRIX.md) · [项目首页](../README.md)
