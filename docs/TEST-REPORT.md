@@ -12,7 +12,7 @@
 
 请求、存储、CSV 金样及枚举、持久化形状、资源键、AutomationId、能力常量清单全部通过，预期文件和 `docs/contracts` 没有修改。真实数据检查使用 R0 保存副本的再复制目录，与原有计数、摘要和 Pending 项基线一致；未连接 API，未打开用户原库或执行其任务。
 
-`test-history-mutations.ps1` 已适配 Domain 路径及格式化后的锚点。两个隔离副本分别省略同一步 After 更新、保留应删除的 redo 历史，均成功编译并被历史行为断言拒绝。Release 中四个行属性 setter 的空守卫调用已在 IL 中移除，Debug 行守卫测试仍通过。
+`test-history-mutations.ps1`（2026-11-03 由 `test-mutations.ps1` 取代）已适配 Domain 路径及格式化后的锚点。两个隔离副本分别省略同一步 After 更新、保留应删除的 redo 历史，均成功编译并被历史行为断言拒绝。Release 中四个行属性 setter 的空守卫调用已在 IL 中移除，Debug 行守卫测试仍通过。
 
 正式包与最终 QA 包分别发布到本机 `artifacts/r2-closeout-20261022/after-product`、`after-qa-recheck`，包检查均通过。正式包 541 个文件、245,534,638 字节；QA 包 545 个文件、245,905,632 字节。两者包含 Domain、Application 和中英文资源；正式包检查覆盖测试入口、故障注入、PDB、运行文件、依赖及文档链接。现有 `artifacts/flightops-app` 没有替换。
 

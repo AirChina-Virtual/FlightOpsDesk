@@ -37,6 +37,15 @@ public class ReadbackVerifierTests
     }
 
     [Fact]
+    public void A_record_that_does_not_carry_the_written_values_fails()
+    {
+        var kit = Kit();
+        var item = ApiKit.Update(ResourceKind.Airports, kit.Map(ResourceKind.Airports, ApiKit.Egll), ("Name", "Heathrow"));
+        var current = kit.Map(ResourceKind.Airports, """{"id":101,"airline_id":7,"icao":"EGLL","iata":"LHR","name":"Someone else's name"}""");
+        Assert.False(kit.Api.Matches(item, current, item.After, false));
+    }
+
+    [Fact]
     public void A_value_that_differs_is_listed_with_what_was_expected_and_what_is_there()
     {
         var kit = Kit();

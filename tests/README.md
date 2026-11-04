@@ -28,6 +28,10 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 
 单元测试应分别用 Release、Debug 运行，以覆盖两种编译配置。部分检查会调用 Windows 的密钥保护或启动额外进程，因此完整测试要在 Windows 上运行。测试数据都放在单独目录，不使用用户的真实数据。真实数据库回归只读取隔离副本，需设置 `VAMSYS_REAL_DB_DIR` 和 `VAMSYS_REAL_DB_EXPECTED`，否则该项跳过。
 
+## 回归清单与回植
+
+[回归清单](../docs/REGRESSION-LEDGER.md)列出每个已修复问题对应的测试，`Inventory.RegressionLedgerTests` 核对它们都存在。`scripts/test-mutations.ps1` 在隔离的代码副本里逐个植入已知错误，确认测试会失败；R8 验收要求全部被发现。
+
 ## 测试中的时间
 
 程序每秒最多发送 1 次请求，遇到 429 或服务器错误时还会等待重试。`VamSys.TestSupport/TestTime.cs` 提供两种虚拟时钟，程序照常计算间隔和等待，但不需要真实等待：

@@ -377,6 +377,8 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-11-03，R7 第④块完成）：** 最后 3 个脚本改写并删除：`test-data-performance-ui` → `DataPerformanceTests`，`test-api-ui-20k` → `LargeTableLanguageTests`，`test-baseline-ui` → `BaselineMeasurements`（只测量，标 `Category=Measurement`，普通运行排除）。QA 工具删去 `--seed-ui`，只保留 `--seed-data-ui`（`open-datagrid-qa.ps1` 用）。同一轮 34 个普通用例全部通过（3 分 31 秒），基线测量 2 个启动 1 次走通（1 分 06 秒）。5 万行：打开 457 ms，搜索 230 ms，翻页 P95 7.6 ms，语言 P95 21.7 ms，单格 P95 0.7 ms，工作集 689 MiB；只作单轮记录，不作比较。未做：窗口测试的回植验证（第⑤块）；7 个需要连接才出现的对话框没有窗口覆盖（见测试报告）。
 
+**进度（2026-11-03，R7 第⑤块）：** 新增 `docs/REGRESSION-LEDGER.md`：审查文档和更新日志里到 2026-09-29 的已修复问题共 41 条，每条对应测试，`Inventory.RegressionLedgerTests` 核对都存在；更早各轮只在 docs/history，没有逐条列入。对照时发现 4 条没有回归：数字 Client ID 脱敏、诊断路径脱敏、复选框样式、查询时切换 IsEnabled，已补（后两条是源码检查，外观留给 R8）。`test-history-mutations.ps1` 由 `test-mutations.ps1` 取代：19 个不开窗口的回植覆盖不重发、未知判定、检查点顺序、回读、判重、版本号、陈旧覆盖、撤销历史和清单中的修复，首次 17 个被抓到，没被抓到的两个是真实缺口（回读不一致时 `ReadbackVerifierTests` 没有断言失败；冲突停下后没有断言不再询问），补测试后 19 个全部被抓到。另备 7 个窗口回植（`-Set Window`），待运行。
+
 ### R8 验收与收尾
 
 1. 全部单元、集成和窗口测试，正式包与 QA 包检查；需求覆盖矩阵每一行都有通过的测试，回植错误全部被发现；旧运行器和旧脚本已删除。

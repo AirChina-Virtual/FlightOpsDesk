@@ -56,6 +56,38 @@ public class ApiDiagnosticsTests
         Assert.Equal(["POST /oauth/token", "PUT /api/v3/operations/fleet/4"], server.Requests.Select(r => r.Method + " " + r.Path));
     }
 
+    static async Task<ApiDiagnostic> RefusedPut(string clientId, string url, string body)
+    {
+        using var server = new FakeOperationsServer();
+        server.On(HttpMethod.Post, "/oauth/token", FakeResponse.Ok("""{"access_token":"fixture-token","token_type":"Bearer","expires_in":3600}"""));
+        server.On(Put, "fleet/3", FakeResponse.WithStatus(422, body));
+        using var client = server.CreateClient();
+        var time = InstantTime.Requests();
+        var transport = new OperationsTransport(client, OperationsAdapter.BaseUri, "diagnostic",
+            TokenProvider.ClientCredentials(client, new(clientId, "fixture-secret"), time.Clock), time);
+        var error = await Assert.ThrowsAsync<ApiResponseException>(() => transport.SendAsync(Put, TransportFixture.Url(url), new { }, TestContext.Current.CancellationToken));
+        return error.Details!;
+    }
+
+    // A short Client ID such as 3 once turned every 3 in the answer into [REDACTED], error ids included.
+    [Fact]
+    public async Task A_numeric_client_id_is_left_in_the_answer_while_the_secret_is_still_masked()
+    {
+        var details = await RefusedPut("3", "fleet/3", """{"message":"route 3 refused fixture-secret","error_id":"3"}""");
+
+        Assert.Equal("route 3 refused [REDACTED]", details.ServerMessage);
+        Assert.Equal("3", details.ErrorId);
+    }
+
+    // The path once went through the same masking, and a Client ID equal to "/v3/" or a record ID broke the delete proofs.
+    [Fact]
+    public async Task A_client_id_found_in_the_path_stays_there_and_is_masked_in_the_query()
+    {
+        var details = await RefusedPut("fleet", "fleet/3?note=fleet", """{"message":"refused"}""");
+
+        Assert.Equal("/api/v3/operations/fleet/3?note=[REDACTED]", details.Path);
+    }
+
     [Fact]
     public void A_huge_body_is_cut_on_a_character_boundary_with_a_hash_of_the_whole_and_without_secrets()
     {

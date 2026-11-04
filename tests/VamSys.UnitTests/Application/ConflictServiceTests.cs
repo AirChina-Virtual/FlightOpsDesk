@@ -60,7 +60,9 @@ public class ConflictServiceTests
     public async Task Stopping_at_once_changes_and_saves_nothing()
     {
         var f = new Fixture();
-        await f.Service.ResolveAsync([ResourceKind.Airports], _ => Task.FromResult(ConflictChoice.Stop));
+        var asked = 0;
+        await f.Service.ResolveAsync([ResourceKind.Airports], _ => { asked++; return Task.FromResult(ConflictChoice.Stop); });
+        Assert.Equal(1, asked);
         Assert.Equal(2, f.Data.Conflicts.Count);
         Assert.Equal(0, f.Saves);
     }

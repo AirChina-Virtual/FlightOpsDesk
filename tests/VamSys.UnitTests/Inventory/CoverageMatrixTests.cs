@@ -36,7 +36,7 @@ public partial class CoverageMatrixTests
 
     // Test classes by full name, with their test methods. A file's test methods belong to the classes it declares
     // (test files declare one test class; helper types in the same file only widen the match).
-    static Dictionary<string, HashSet<string>> TestClasses()
+    internal static Dictionary<string, HashSet<string>> TestClasses()
     {
         var classes = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         foreach (var project in new[] { "VamSys.UnitTests", "VamSys.IntegrationTests", "VamSys.UiTests" })
@@ -81,7 +81,7 @@ public partial class CoverageMatrixTests
     }
 
     // Every class, method and wildcard a cell names, with what is wrong with it (null when it exists).
-    static IEnumerable<(string Name, string? Problem)> Resolve(string cell, Dictionary<string, HashSet<string>> classes)
+    internal static IEnumerable<(string Name, string? Problem)> Resolve(string cell, Dictionary<string, HashSet<string>> classes)
     {
         foreach (Match match in Reference().Matches(cell))
         {

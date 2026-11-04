@@ -14,7 +14,7 @@ dotnet test --project tests/VamSys.UiTests/VamSys.UiTests.csproj -c Release -- -
 ~~~
 
 - 每个测试在 artifacts/ui-tests/<名称>/data-<GUID> 新建数据目录，在进程内准备数据（与 `tools/VamSys.QaSeed` 的种子相同），不使用真实数据、不调用真实 API。
-- 每个测试选用的包写在 `AppWindow.Start` 的参数里，默认 QA 包（artifacts/v3-qa，`VAMSYS_QA_EXE` 可指定另一个）；要检查正式构建的用正式包（artifacts/flightops-app，没有 QA 管道）。
+- 每个测试选用的包写在 `AppWindow.Start` 的参数里，默认 QA 包（artifacts/v3-qa，`VAMSYS_QA_EXE` 可指定另一个）；要检查正式构建的用正式包（artifacts/flightops-app，`VAMSYS_APP_EXE` 可指定另一个，没有 QA 管道）。
 - 测试只结束自己启动的进程；已有 FlightOps Desk 窗口时直接失败。
 - 键盘和鼠标输入前会把窗口切到前台，切不过去就失败，避免输入落到别的窗口。
 - 普通用例运行约 4 分钟；基线测量（`Category=Measurement`，只测量、不设门槛）要另外运行。截图和测量结果（布局组合截图、`summary.json`、`benchmark.json`、`baseline.json` 等）留在测试的输出目录，供人工查看。
