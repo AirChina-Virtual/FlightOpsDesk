@@ -62,7 +62,7 @@ public static class DataUiFixture
         SaveInEnglish(directory, workspace);
     }
 
-    /// <summary>An online workspace without credentials with one fleet from the server and one new fleet.</summary>
+    /// <summary>A workspace, which opens offline, with one fleet from the server and one new fleet.</summary>
     public static void SeedParameters(string directory)
     {
         RequireEmptyDirectory(directory);
@@ -95,6 +95,58 @@ public static class DataUiFixture
         RequireEmptyDirectory(directory);
         var workspace = new Workspace { Name = "QA import", Mode = RunMode.Demo };
         CsvAdapter.Import(ResourceKind.Airports, workspace.Resources[ResourceKind.Airports], [Airport("EGLL", "Heathrow")], true);
+        SaveInEnglish(directory, workspace);
+    }
+
+    /// <summary>A demo workspace whose four airports have all lost their required name in the draft, so validation has something to say.</summary>
+    public static void SeedInvalid(string directory)
+    {
+        RequireEmptyDirectory(directory);
+        var workspace = new Workspace { Name = "QA invalid", Mode = RunMode.Demo };
+        var airports = workspace.Resources[ResourceKind.Airports];
+        CsvAdapter.Import(ResourceKind.Airports, airports, [Airport("EGLL", "One"), Airport("EGKK", "Two"), Airport("EGCC", "Three"), Airport("EGSS", "Four")], true);
+        for (var n = 0; n < airports.Draft.Count; n++)
+            airports.Draft[n] = airports.Draft[n].With("Name", "");
+        SaveInEnglish(directory, workspace);
+    }
+
+    /// <summary>A demo workspace with one fleet, two airports and two scheduled routes between them, so deleting an airport is refused.</summary>
+    public static void SeedBatch(string directory)
+    {
+        RequireEmptyDirectory(directory);
+        DataRow Route(string id) => new()
+        {
+            Fields = new Dictionary<string, string>
+            {
+                ["ID"] = id, ["Departure Airport (ICAO/IATA)"] = "EGLL", ["Arrival Airport (ICAO/IATA)"] = "EGKK", ["Type"] = "scheduled", ["Callsign"] = "QA" + id,
+                ["Flight Number"] = id, ["Fleet IDs"] = "1", ["End Date"] = "2099-01-01 00:00:00"
+            }
+        };
+        var workspace = new Workspace { Name = "QA batch", Mode = RunMode.Demo };
+        CsvAdapter.Import(ResourceKind.Fleets, workspace.Resources[ResourceKind.Fleets], [new DataRow { Fields = new Dictionary<string, string> { ["ID"] = "1", ["Name"] = "Boeing 737-800", ["Type Code"] = "B738", ["Type (pax/cargo/...)"] = "pax" } }], true);
+        CsvAdapter.Import(ResourceKind.Airports, workspace.Resources[ResourceKind.Airports], [Airport("EGLL", "Heathrow"), Airport("EGKK", "Gatwick")], true);
+        CsvAdapter.Import(ResourceKind.Routes, workspace.Resources[ResourceKind.Routes], [Route("1"), Route("2")], true);
+        SaveInEnglish(directory, workspace);
+    }
+
+    /// <summary>A workspace, which opens offline, whose online task has three different unknown results.</summary>
+    public static void SeedUnknownResults(string directory)
+    {
+        RequireEmptyDirectory(directory);
+        var workspace = new Workspace { Name = "QA unknown results", Mode = RunMode.Online, AirlineId = "7" };
+        var airports = workspace.Resources[ResourceKind.Airports];
+        CsvAdapter.Import(ResourceKind.Airports, airports, [Airport("EGLL", "Heathrow"), Airport("EGKK", "Gatwick"), Airport("EGCC", "Manchester")], true);
+        ChangeItem Item(ChangeKind kind, DataRow row, bool accepted) => new()
+        {
+            Resource = ResourceKind.Airports, Kind = kind, State = ItemState.Unknown, After = row, WriteAccepted = accepted,
+            Fields = kind == ChangeKind.Update ? new() { ["Name"] = new(FieldIntent.Set, "Changed") } : new()
+        };
+        workspace.Jobs.Add(new()
+        {
+            Mode = RunMode.Online,
+            // A delete the server accepted; an update it may never have received; an update it accepted, with no ID to read it back by.
+            Items = [Item(ChangeKind.Delete, airports.Draft[0], true), Item(ChangeKind.Update, airports.Draft[1], false), Item(ChangeKind.Update, airports.Draft[2], true)]
+        });
         SaveInEnglish(directory, workspace);
     }
 

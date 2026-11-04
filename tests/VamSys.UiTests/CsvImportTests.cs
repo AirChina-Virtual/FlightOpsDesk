@@ -56,4 +56,39 @@ public class CsvImportTests
         var imported = airports.Draft.Single(r => r.Get("ICAO/IATA") == "EGSS");
         Assert.Equal(("Stansted", "first note"), (imported.Get("Name"), imported.Get("Internal Note")));
     }
+
+    [WindowFact]
+    public void Replacing_the_snapshot_under_existing_drafts_warns_first()
+    {
+        using var app = Start("csv-baseline", DataUiFixture.SeedImport, Package.Product);
+        app.Context = () => app.Name("StatusLabel");
+        var csv = Path.Combine(app.OutputDirectory, $"import-{Guid.NewGuid():N}.csv");
+        File.WriteAllText(csv, "ICAO/IATA,Name\nEGSS,Stansted\n");
+        void ImportAsBaseline()
+        {
+            app.ClickUntilFilePicker("Choose CSV and map columns");
+            app.ChooseFile(csv);
+            app.First("Use as original snapshot (replace this resource's snapshot and drafts)", ControlType.CheckBox).Toggle();
+            app.DialogPrimary("Import into workspace").Invoke();
+            app.WaitText("Replace workspace snapshot");
+        }
+
+        app.SelectItem("Data management");
+        app.One("ResourcePicker").Expand();
+        app.SelectItem("Airports");
+        app.SelectItem("Import wizard");
+
+        ImportAsBaseline();
+        app.DialogPrimary("Replace");
+        app.DialogCancel();
+        ImportAsBaseline();
+        app.DialogPrimary("Replace").Invoke();
+        app.DialogClosed();
+        app.StatusStarting("Imported 1 records");
+        app.Close();
+
+        var airports = Stored(app.DataDirectory).Resources[ResourceKind.Airports];
+        Assert.Equal(["EGSS"], airports.Snapshot.Select(r => r.Get("ICAO/IATA")));
+        Assert.Equal(["EGSS"], airports.Draft.Select(r => r.Get("ICAO/IATA")));
+    }
 }

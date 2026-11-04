@@ -27,13 +27,15 @@ dotnet test --project tests/VamSys.UiTests/VamSys.UiTests.csproj -c Release -- -
 | `Driver/WindowFactAttribute.cs` | 显式窗口测试 |
 
 ## 新增的流程
-：
+
+以下流程原来没有窗口测试：
 
 | 测试类 | 内容 | 包 |
 |---|---|---|
 | `ConflictReviewTests` | 审阅页处理冲突：保留本地、采用远端、中途停下、服务器已删除的记录 | 正式包 |
 | `CsvImportTests` | 真实系统文件选择框、列映射、未知列、只生成草稿 | 正式包 |
 | `SubmissionHandoffTests` | 演示提交：两步确认可取消、切到任务中心、只运行本次任务 | 正式包 |
+| `DialogTests` | 其他测试没打开过的文字、列表对话框：新建工作区、校验结果、审阅问题、删除被阻止、批量规则与到期预览、机队校验失败、导出（含真实文件夹选择框）、放弃未发送项、备份并清空、离线时的未知结果 | 正式包 |
 | `ParameterPickerTests` | 单元格按钮的两种拒绝；选择框用 QA 包虚构的参数，因为真实列表需要服务器 | QA 包 |
 
 ## 已替换的脚本
@@ -54,4 +56,5 @@ dotnet test --project tests/VamSys.UiTests/VamSys.UiTests.csproj -c Release -- -
 
 - 产品字符串用 `WaitText`、`Click` 等，AutomationId 清单会核对；测试自己的数据或运行时拼出的文字用 `WaitData`，或把名称放进变量，不进清单。
 - 对话框的按钮按下后，程序内部的操作还要过一会儿才结束，这期间的点击和关闭会被程序拒绝。用 `ClickUntilFilePicker` 这样重复点击，或在 QA 包里等 `state` 的 `idle`。
+- 工作区打开时总是离线（`WorkspaceSession` 把存储的在线模式重置），只有连上服务器才切回在线。种子写在线模式也没用，在线校验、人工确认删除、核实未生效以及显示服务器读取结果的恢复对话框，窗口测试都打不开。
 - 系统文件选择框里 id `1`、`2` 不止一个元素在用（文件列表项也有），`1` 有时还是按钮外面的容器，要同时看控件类型。

@@ -16,7 +16,7 @@ public class ParameterPickerTests
     const string Second = "BBB / BB · 12";
 
     [WindowFact]
-    public void The_cell_refuses_existing_fleets_and_missing_credentials_and_the_picker_sets_a_new_fleets_parameter()
+    public void The_cell_refuses_existing_fleets_and_an_unconnected_workspace_and_the_picker_sets_a_new_fleets_parameter()
     {
         using var app = Start("parameters", DataUiFixture.SeedParameters);
         app.Context = () => app.Name("StatusLabel");

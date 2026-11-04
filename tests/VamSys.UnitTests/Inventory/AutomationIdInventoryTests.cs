@@ -87,7 +87,7 @@ public partial class AutomationIdInventoryTests
     [GeneratedRegex(@"\b(?:One|Find|Enabled|Name)\(""(?<id>[^""]+)""\)|\w*Ids\s*=\s*\[(?<list>[^\]]*)\]")]
     private static partial Regex WindowTestId();
 
-    [GeneratedRegex(@"\b(?:Named|First|SelectionMenu|Click|Button|InvokeNamed|Overflow|SelectItem|Edit|Value|Language|WaitText|HasText|Cells|SavesTrimmed|ListItemsNamed|DialogPrimary|DialogSecondary|ClickUntilFilePicker)\(""(?<name>[^""]+)""|\bName\(""[^""]+""\)\s*==\s*""(?<name2>[^""]+)""|Assert\.Equal\(""(?<name3>[^""]+)"",\s*(?:[^;]*\.Current\.Name|Title)\)|\b(?:Shown|FindNamed)\(""(?<name4>[^""]+)""|\.Current\.Name\.Contains\(""(?<name5>[^""]+)""")]
+    [GeneratedRegex(@"\b(?:Named|First|SelectionMenu|Click|Button|InvokeNamed|Overflow|SelectItem|Edit|Value|Language|WaitText|HasText|Cells|SavesTrimmed|ListItemsNamed|DialogPrimary|DialogSecondary|ClickUntilFilePicker|ClickUntilDialog)\(""(?<name>[^""]+)""|\bName\(""[^""]+""\)\s*==\s*""(?<name2>[^""]+)""|Assert\.Equal\(""(?<name3>[^""]+)"",\s*(?:[^;]*\.Current\.Name|Title)\)|\b(?:Shown|FindNamed)\(""(?<name4>[^""]+)""|\.Current\.Name\.Contains\(""(?<name5>[^""]+)""")]
     private static partial Regex WindowTestName();
 
     static (SortedSet<string> Ids, SortedSet<string> Names, SortedSet<string> Commands) ScriptLookups()

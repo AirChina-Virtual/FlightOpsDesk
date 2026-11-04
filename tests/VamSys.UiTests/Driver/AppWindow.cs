@@ -186,7 +186,7 @@ public sealed partial class AppWindow : IDisposable
                 if (until() is { } value)
                     return value;
             }
-            catch (Exception e) when (e is ElementNotAvailableException or COMException) { }
+            catch (Exception e) when (e is ElementNotAvailableException or ElementNotEnabledException or COMException) { }
             if (DateTime.UtcNow >= end)
                 return null;
             Thread.Sleep(100);
@@ -323,11 +323,28 @@ public sealed partial class AppWindow : IDisposable
         DialogClosed();
     }
 
+    /// <summary>
+    /// Clicks a button until its dialog opens, identified by its primary button. A dialog's task can complete after its button's
+    /// Invoke returns, and a command can still be disabled just after a selection, so the click repeats.
+    /// </summary>
+    public AutomationElement ClickUntilDialog(string button, string primary) => Wait(() =>
+    {
+        Click(button);
+        return Poll(() => Find("PrimaryButton").FirstOrDefault(b => b.Current.Name == primary), PageLayoutWait);
+    }, $"'{button}' opens the dialog with '{primary}'");
+
+    /// <summary>The data table's rows on the current page.</summary>
+    public AutomationElement[] Rows() => ListItemsNamed("RowViewModel");
+
+    /// <summary>Waits until the status bar says something starting with this text, and returns all it says.</summary>
+    public string StatusStarting(string start) =>
+        Wait(() => Name("StatusLabel") is var status && status.StartsWith(start, StringComparison.Ordinal) ? status : null, $"status '{start}'");
+
     /// <summary>Waits until no dialog is open.</summary>
     public void DialogClosed() => Until(() => Find("CloseButton").Length == 0, "the dialog closes");
 
     // The common file dialog's controls have these AutomationIds in every Windows language.
-    const string FileNameBox = "1148", FileOpen = "1", FileCancel = "2";
+    const string FileNameBox = "1148", FolderNameBox = "1152", FileOpen = "1", FileCancel = "2";
 
     // Only a file dialog this window owns; another program's dialog on the desktop is never touched.
     AutomationElement? FilePickerOrNull()
@@ -381,6 +398,13 @@ public sealed partial class AppWindow : IDisposable
             box.SetFocus();
             Press(Keys.Enter);
         }
+    }
+
+    /// <summary>Picks this folder in the system's folder picker the window opened; its name box has its own AutomationId.</summary>
+    public void ChooseFolder(string path)
+    {
+        PickerControl(FolderNameBox, e => e.Current.ControlType == ControlType.Edit).SetText(path);
+        PickerControl(FileOpen, IsDialogButton).Invoke();
     }
 
     /// <summary>Cancels the system's file picker the window opened and waits for it to go.</summary>
