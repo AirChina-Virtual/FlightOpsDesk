@@ -81,14 +81,16 @@ pwsh -File scripts/check-all.ps1
 artifacts、archive、`.tools`、bin 和 obj 都只保存在本机，不会提交到 GitHub。
 
 - **artifacts**
-  - flightops-app：保留的 2026-10-20 阶段 1 正式包；2026-10-22 读取 DLL 的 ProductVersion 为 `1.0.0+3cc71c595ddb129a6a6450fcc91d58ea7939da27`。本轮没有替换该目录，R2 新包单独存放。
-  - FlightOpsDesk-2026-10-20-phase1-win-x64.zip 及 .sha256：当前正式交付压缩包与校验文件；上一版（审阅修复版）的正式目录和 ZIP 已归档到 archive/2026-10-20-phase1-release。
+  - flightops-app：当前正式包，ProductVersion 为 `1.0.0+7af65f3621efae1cffe37d66056f2824de2aaf6a`。
+  - FlightOpsDesk-2026-11-03-r8-win-x64.zip 及 .sha256：当前正式交付压缩包与校验文件，558 个文件逐项与 flightops-app 相同；上一版（阶段 1）ZIP 已归档到 archive/2026-11-03-r8。
   - step5-v3-baseline：真实旧版程序的回归基线，测试会用到，不能当作普通旧包清理。
-  - r2-closeout-20261022：R2 的独立正式包 `after-product`、修正窗口检查后的 QA 包 `after-qa-recheck`、初始 QA 包、重构前对照包，以及测试日志、性能原始数据、源码和程序集哈希。现有正式交付目录与 ZIP 保留。
-  - v3-qa、test-build 和各项目 bin/obj：可重建输出；此前整理曾删除，本轮测试已重新生成部分构建缓存。
+  - r0-baseline、r0-real-db：重构前的性能基线和真实数据库副本（2026-10-20），用于对比，不能当作普通旧包清理。
+  - _pending-delete-r8：R8 整理时移出的可重新生成内容，约 21.5 GB，只等手动删除，见 archive/2026-11-03-r8/README.txt。
+  - v3-qa、test-build、manual-datagrid 和各项目 bin/obj：可重建输出。
 - **archive**：按日期存放已归档的内容。每个目录都有说明、逐文件 SHA-256 清单（*-files.csv）、ZIP 校验值及清理记录。2026-10-19-performance 保存此前测量、窗口结果和旧包；2026-10-20-cleanup 保存本次被替换的正式包，以及 core-performance（含修改前源码）、checkbox-theme、encoding-verification、cache-cleanup、repository-metadata、step5-performance、storage-v3-20260922 和 step5 日志。
 - **阶段 1 提交后整理**：删除构建输出（src／tests 的 bin、obj，artifacts/test-build）和测试生成的 artifacts/step5-performance，共 1,503 个文件、约 601 MB，均可重新生成；逐文件清单在 archive/2026-10-20-phase1-cleanup。
 - **此前的构建后整理**：archive/2026-10-20-startup-fix-cleanup 保存 152 个项目文件的清理前备份、未提交差异、重新生成的 6 份 step5-performance 结果、逐文件清单与删除记录。已删除重新构建产生的 test-build 及 src/tests 的 bin/obj；当前正式目录、ZIP、SDK 和旧版兼容性基线保留。
+- **R8 整理**：archive/2026-11-03-r8 保存重构各轮的测量结果、日志和截图（measurements.zip，824 个文件，附逐文件 SHA-256）、上一版 ZIP，以及移出文件的记录 cleanup.csv。
 - **恢复**：先把 ZIP 解压到单独的目录，再按清单取回需要的文件。报告中提到的旧 artifacts 路径，都可以在清单中查到。
 
 可以重新生成的内容会直接删除，不归档，包括合成测试数据库、各轮 QA 构建，以及调试用的内存转储；删除记录保存在各归档目录的 cleanup.csv。

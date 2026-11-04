@@ -19,7 +19,7 @@
 | 真实数据库副本 | 用 R0 保存副本的再复制目录，计数、内容键和 Pending 任务与 R0 的预期摘要一致；没有访问用户原目录，没有联网。这份副本是 2026-10-20 的数据 |
 | 性能 | 与 R0 同机对比见[性能报告](PERFORMANCE.md#重构前后对比r82026-11-03)，三项超过 10%，都不判定为退化，根因未查明 |
 
-人工查看（明暗主题、高对比度、100%／150%／200% 缩放、读屏抽查、单元格首次点击）以及软件真实写入验收不在上表内；云端 CI 尚未运行。
+人工查看（明暗主题、高对比度、100%／150%／200% 缩放、读屏抽查、单元格首次点击）以及软件真实写入验收不在上表内；云端 CI 尚未运行。原始结果归档在 `archive/2026-11-03-r8/measurements.zip`。
 
 
 ## R2 领域与 I/O 边界验收（2026-10-22）
@@ -32,7 +32,7 @@
 
 `test-history-mutations.ps1`（2026-11-03 由 `test-mutations.ps1` 取代）已适配 Domain 路径及格式化后的锚点。两个隔离副本分别省略同一步 After 更新、保留应删除的 redo 历史，均成功编译并被历史行为断言拒绝。Release 中四个行属性 setter 的空守卫调用已在 IL 中移除，Debug 行守卫测试仍通过。
 
-正式包与最终 QA 包分别发布到本机 `artifacts/r2-closeout-20261022/after-product`、`after-qa-recheck`，包检查均通过。正式包 541 个文件、245,534,638 字节；QA 包 545 个文件、245,905,632 字节。两者包含 Domain、Application 和中英文资源；正式包检查覆盖测试入口、故障注入、PDB、运行文件、依赖及文档链接。现有 `artifacts/flightops-app` 没有替换。
+正式包与最终 QA 包当时发布到 `artifacts/r2-closeout-20261022/after-product`、`after-qa-recheck`，包检查均通过；这两个包在 R8 整理时移除，可从当时的提交重新构建。正式包 541 个文件、245,534,638 字节；QA 包 545 个文件、245,905,632 字节。两者包含 Domain、Application 和中英文资源；正式包检查覆盖测试入口、故障注入、PDB、运行文件、依赖及文档链接。现有 `artifacts/flightops-app` 没有替换。
 
 首轮窗口检查在 `data-edit-rebound` 失败：QA 代码读取了编辑前的旧行对象，而 R2 编辑会替换行。该检查已改为按 LocalId 重新取得当前草稿中的目标行与上一页行，同时断言新值与上一页内容。生产编辑逻辑未变。修正后 5 万行数据页脚本通过，初始失败日志单独保留为 `after-data-ui-initial-failure.log`。
 
@@ -51,7 +51,7 @@
 
 鼠标脚本此前在新旧版本均出现点击后焦点仍在标题栏的失败。UIA 返回物理像素坐标，原 PowerShell 进程未启用 DPI 感知；在启用 DPI 感知且保持 QA 前台后，全流程通过。脚本现显式启用 DPI 感知、刷新窗口句柄并在点击前核验前台窗口。诊断中另有一次在 UIA SetValue 后仍存在编辑框的失败，重跑完整通过；这些失败日志均保留，没有删除断言。坐标依据见 [Microsoft UI Automation 缩放说明](https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-screenscaling)。
 
-最终构建、测试、包哈希和源码清单在 `artifacts/r2-closeout-20261022`：`final-analyzer.log`、`final-VamSys.*.log`、`final-debug-tests.log`、`history-mutations.log`、`*-package.log`、`*-sha256.csv`、`product-source-sha256.csv`。原始数据只在本机保存，不提交真实数据库。功能检查通过，性能验收未通过，因此 R2 保持未关闭；全部完成的性能对照及原始失败记录见 [性能报告](PERFORMANCE.md)。云端 CI 尚未运行，旧本地化脚本的已知问题仍按 R6／R7 处理。
+最终构建、测试、包哈希和源码清单在 `archive/2026-11-03-r8/measurements.zip` 的 `artifacts/r2-closeout-20261022`：`final-analyzer.log`、`final-VamSys.*.log`、`final-debug-tests.log`、`history-mutations.log`、`*-package.log`、`*-sha256.csv`、`product-source-sha256.csv`。原始数据只在本机保存，不提交真实数据库。功能检查通过，性能验收未通过，因此 R2 保持未关闭；全部完成的性能对照及原始失败记录见 [性能报告](PERFORMANCE.md)。云端 CI 尚未运行，旧本地化脚本的已知问题仍按 R6／R7 处理。
 
 ## 自动测试（2026-10-20）
 
