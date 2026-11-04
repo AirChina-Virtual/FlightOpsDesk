@@ -8,9 +8,9 @@
 | `VamSys.IntegrationTests` | 真实 SQLite 存储、迁移、故障注入、模拟服务器上的 API 与执行流水线、进程终止恢复、金样 |
 | `VamSys.TestSupport` | 虚拟时钟、模拟 Operations 服务器、隔离数据目录、存储与窗口测试数据夹具、旧式 HTTP 桩 |
 | `VamSys.ProcessChild` | 进程终止测试中被强制结束的子进程 |
-| `VamSys.UiTests` | C# 窗口测试：用 Windows 自带的 UI 自动化客户端驱动 QA 包，逐个替换窗口脚本；显式运行，见 [说明](VamSys.UiTests/README.md) |
+| `VamSys.UiTests` | C# 窗口测试：用 Windows 自带的 UI 自动化客户端驱动 QA 包和正式包；显式运行，见 [说明](VamSys.UiTests/README.md) |
 | `VamSys.Benchmarks` | 性能基准（`--benchmark-*`），只测量、写 JSON，见 [说明](VamSys.Benchmarks/README.md) |
-| `../tools/VamSys.QaSeed` | 窗口测试的数据准备、重启后断言、打包检查与诊断回放，见 [说明](../tools/VamSys.QaSeed/README.md) |
+| `../tools/VamSys.QaSeed` | 人工查看的数据准备、打包检查与诊断回放，见 [说明](../tools/VamSys.QaSeed/README.md) |
 | `UiVerification`、`TestSupport` | 只编译进 QA 包的窗口控制命令，以及只编译进测试构建的存储故障注入与友元授权 |
 
 测试与工具启用 `VamSysTestSupport=true` 引用存储和基础设施，这些依赖编译到 artifacts/test-build，正式构建不会复用。
@@ -45,15 +45,9 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 
 ## 实际窗口检查
 
-窗口脚本位于 ../scripts，会实际操作窗口，需要可用的 Windows 桌面，并通过 `UiVerification=true` 构建的 QA 版本运行（`./scripts/build.ps1 -Publish -UiVerification` 输出到 artifacts/v3-qa）。脚本用 `tools/VamSys.QaSeed` 准备数据，所有 `--seed-*` 入口在写入前都会拒绝已有文件的目录；脚本默认在 artifacts 下新建 GUID 目录，只结束自己启动的进程，不调用真实 API。R7 正把这些脚本逐个改写为 [C# 窗口测试](VamSys.UiTests/README.md)，已改写的脚本会删除，对照表见那里的说明。
+窗口检查都是 [C# 窗口测试](VamSys.UiTests/README.md)，用 Windows 自带的 UI 自动化客户端实际操作窗口，需要可用的 Windows 桌面，并使用 `./scripts/build.ps1 -Publish` 生成的正式包和 `-UiVerification` 生成的 QA 包。测试都在 artifacts/ui-tests 下新建数据目录，只结束自己启动的进程，不调用真实 API。原来的 PowerShell 窗口脚本已全部改写并删除，对照表见窗口测试的说明。
 
-| 脚本 | 用途 |
-|---|---|
-| `test-data-performance-ui.ps1 -Rows 20000|50000` | 数据页打开、搜索、分页、编辑框重绑、撤销／重做（只做行级保存、不重新查询），并测量计时 |
-| `test-baseline-ui.ps1 -Rows 20000|50000` | 启动、工作区读取与切换、审阅、逐帧滚动、内存；只测量，不设门槛 |
-| `open-datagrid-qa.ps1` | 不是测试：在测试数据上打开 QA 包，供人工查看主题、高对比度与缩放 |
-
-性能和基线脚本可以用 `-Executable` 指定要测试的程序；其余脚本使用 artifacts 下的正式包或 QA 包。只有 Windows PowerShell 5.1 时，含中文字面量、且未带 BOM 的脚本需要另存为带 BOM 的 UTF-8 才能运行。
+`scripts/open-datagrid-qa.ps1` 不是测试：它在测试数据上打开 QA 包，供人工查看主题、高对比度与缩放。
 
 自动测试通过后，仍要查看不同显示缩放下的布局、图标、滚动和双语显示，也仍然需要用真实账号检查 API 操作。
 

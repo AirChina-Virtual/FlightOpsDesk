@@ -131,14 +131,14 @@ public sealed partial class AppWindow : IDisposable
     }
 
     /// <summary>Closes the window as the title bar's close button does and waits for the process to end.</summary>
-    public void Close()
+    public void Close(TimeSpan? limit = null)
     {
         if (writer is not null)
         {
             // A dialog's task can complete after its button's Invoke returns; the program rightly refuses to close until then.
-            Until(() => Query("state").Bool("idle"), "the window is idle before closing");
-            Query("close");
-            if (!process.WaitForExit(30000))
+            Until(() => Query("state").Bool("idle"), "the window is idle before closing", limit);
+            Query("close", limit);
+            if (!process.WaitForExit(limit ?? TimeSpan.FromSeconds(30)))
                 throw new TimeoutException("Close did not finish.");
             return;
         }
@@ -223,6 +223,16 @@ public sealed partial class AppWindow : IDisposable
     /// <summary>Every element under <paramref name="parent"/> that meets the condition.</summary>
     public static AutomationElement[] Below(AutomationElement parent, Condition condition) =>
         [.. parent.FindAll(TreeScope.Descendants, condition).Cast<AutomationElement>()];
+
+    /// <summary>The process's working set now, in bytes.</summary>
+    public long WorkingSetBytes
+    {
+        get
+        {
+            process.Refresh();
+            return process.WorkingSet64;
+        }
+    }
 
     /// <summary>The window's title.</summary>
     public string Title => AutomationElement.FromHandle(Handle).Current.Name;

@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- Command-line QA tool: seeds isolated data for the remaining window scripts, checks the
+  <!-- Command-line QA tool: seeds isolated data for looking at the data page by hand, checks the
        product and QA packages, and exports diagnostic replays. Built against the test-support storage build. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>

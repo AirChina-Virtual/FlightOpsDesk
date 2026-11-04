@@ -98,6 +98,19 @@ public static class DataUiFixture
         SaveInEnglish(directory, workspace);
     }
 
+    /// <summary>A demo workspace with 20,000 routes of few fields, in the default language.</summary>
+    public static void SeedDemoRoutes(string directory)
+    {
+        RequireEmptyDirectory(directory);
+        DataRow Row(params (string Field, string Value)[] fields) => new() { Fields = fields.ToDictionary(p => p.Field, p => p.Value) };
+        var workspace = new Workspace { Name = "QA 20000 航线", Mode = RunMode.Demo };
+        CsvAdapter.Import(ResourceKind.Airports, workspace.Resources[ResourceKind.Airports], [Row(("ICAO/IATA", "ZBAA"), ("Name", "北京")), Row(("ICAO/IATA", "ZSPD"), ("Name", "上海"))], true);
+        CsvAdapter.Import(ResourceKind.Routes, workspace.Resources[ResourceKind.Routes],
+            Enumerable.Range(0, 20000).Select(i => Row(("ID", i.ToString(System.Globalization.CultureInfo.InvariantCulture)), ("Departure Airport (ICAO/IATA)", "ZBAA"), ("Arrival Airport (ICAO/IATA)", "ZSPD"), ("Type", "jumpseat"), ("Tags", "性能测试"))).ToList(), true);
+        new WorkspaceStore(directory).Save(workspace);
+        Console.WriteLine("Seeded isolated UI workspace");
+    }
+
     /// <summary>A demo workspace whose four airports have all lost their required name in the draft, so validation has something to say.</summary>
     public static void SeedInvalid(string directory)
     {

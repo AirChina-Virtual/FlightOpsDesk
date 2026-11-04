@@ -195,10 +195,10 @@ JSON 加载中位数：1,000 行 24.9043 → 15.5515 ms，2 万行 437.2899 → 
 ./.tools/dotnet/dotnet.exe publish src/VamSys.App/VamSys.App.csproj -c Release -p:Platform=x64 -p:UiVerification=true -p:VamSysTestSupport=true -o artifacts/v3-qa
 
 # 数据页：打开、搜索、翻页、语言、编辑、撤销
-./scripts/test-data-performance-ui.ps1 -Rows 50000 -Executable "$PWD/artifacts/v3-qa/FlightOpsDesk.exe"
+dotnet test --project tests/VamSys.UiTests/VamSys.UiTests.csproj -c Release -- --explicit only --filter-class VamSys.UiTests.DataPerformanceTests
 
 # 启动、工作区读取与切换、审阅、逐帧滚动、内存
-./scripts/test-baseline-ui.ps1 -Rows 50000 -Executable "$PWD/artifacts/v3-qa/FlightOpsDesk.exe"
+dotnet test --project tests/VamSys.UiTests/VamSys.UiTests.csproj -c Release -- --explicit only --filter-trait Category=Measurement
 
 # 核心计算基准（不含窗口和数据库）
 ./.tools/dotnet/dotnet.exe run --project tests/VamSys.Benchmarks -c Release -- --benchmark-core artifacts/core-performance/current.json

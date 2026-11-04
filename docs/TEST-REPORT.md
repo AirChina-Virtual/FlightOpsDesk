@@ -77,14 +77,14 @@
 
 | 脚本 | 检查内容 | 结果 |
 |---|---|---|
-| `test-data-performance-ui.ps1`（2 万／5 万行） | 打开、搜索、分页、跨页选择、编辑框重绑、撤销／重做只做行级保存且不重新查询、当前页与草稿一致、最后关闭 | 通过 |
+| `UiTests.DataPerformanceTests`（2 万／5 万行；原 `test-data-performance-ui.ps1`） | 打开、搜索、分页、跨页选择、编辑框重绑、撤销／重做只做行级保存且不重新查询、当前页与草稿一致、最后关闭 | 通过 |
 | `UiTests.DataInteractionTests`（原 `test-ui-interactions.ps1`） | 宽／窄窗口、中英文、明暗主题、两种密度共 16 种组合；可见行数、批量范围、预览锁、审阅分组 | 通过 |
 | `test-cell-editing-ui.ps1` | 使用真实鼠标和键盘点击、输入、Tab、Esc；自动化读写和删除行只读 | 通过；2026-11-03 改写为 `UiTests.CellEditingTests`（脚本已删除），通过 |
 | `test-data-footer-ui.ps1`（D4 前带 `-DataGrid old\|new`） | 经 UI 自动化操作数据表页脚：翻页按钮与可用状态、跳页（按钮、Enter、无效页码）、每页条数换算锚点、选择菜单、中英文读屏名称 | 旧控件与 R6 新控件均通过（2026-10-28）；首次运行发现旧页脚的跳页框和每页条数换语言后仍读旧语言名称，已修正。2026-11-02 改写为 C# 窗口测试 `UiTests.DataFooterTests`（脚本已删除），通过 |
 | `UiTests.ClosingAndHistoryTests.Undo_*`（原脚本 `-History`） | 真实撤销／重做按钮（不触发完整保存）、跨自动保存续写、切换工作区和重启后的历史 | 通过 |
 | `UiTests.ClosingAndHistoryTests.Autosave_*`（原脚本 `-Autosave`） | 自动保存只写行；强制结束后重新读取 | 通过 |
 | `UiTests.ClosingAndHistoryTests.Closing_*`（原 `test-v3-verification-ui.ps1`） | 关闭时冻结、注入保存失败后恢复、重试关闭 | 通过 |
-| `test-baseline-ui.ps1`（2 万／5 万行） | 启动、读取、切换、审阅、滚动帧、内存（只测量，不设门槛） | 完成，数值见性能报告 |
+| `UiTests.BaselineMeasurements`（2 万／5 万行；原 `test-baseline-ui.ps1`） | 启动、读取、切换、审阅、滚动帧、内存（只测量，不设门槛） | 完成，数值见性能报告 |
 
 窗口实测时的显示缩放为 150%；100% 缩放没有实机复核。
 
