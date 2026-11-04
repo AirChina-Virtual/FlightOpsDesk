@@ -19,10 +19,6 @@ public partial class CoverageMatrixTests
         ("Presentation.", "VamSys.UnitTests.Presentation."), ("Storage.", "VamSys.UnitTests.Storage.")
     ];
 
-    // Requirements that so far have only command-line measurements (the benchmarks). R7 gives
-    // them tests; once one has a test it must leave this list.
-    static readonly HashSet<string> KnownGaps = ["I14", "J07"];
-
     [GeneratedRegex(@"(?<![\w.])((?:VamSys\.)?(?:UnitTests|IntegrationTests|UiTests|Domain|Application|Transport|Inventory|Api|Review|Presentation|Storage)(?:\.[A-Za-z_]\w*)+\*?)(?:\.\{([^}]*)\})?")]
     private static partial Regex Reference();
     [GeneratedRegex(@"\btest-[a-z0-9-]+-ui\b")]
@@ -117,10 +113,8 @@ public partial class CoverageMatrixTests
         var classes = TestClasses();
         var rows = Rows().ToList();
         Assert.True(rows.Count >= 48, $"Only {rows.Count} requirement rows were read from the matrix");
-        var uncovered = rows.Where(r => !Resolve(r.Tests, classes).Any(n => n.Problem is null)).Select(r => r.Requirement.Split(' ')[0]).ToHashSet();
-        Assert.True(uncovered.SetEquals(KnownGaps),
-            "Requirements without a test that exists: " + string.Join(", ", uncovered.Order()) + "; known gaps: " + string.Join(", ", KnownGaps.Order())
-            + ". Give a new gap a test, or remove a covered requirement from KnownGaps.");
+        var uncovered = rows.Where(r => !Resolve(r.Tests, classes).Any(n => n.Problem is null)).Select(r => r.Requirement.Split(' ')[0]).Order().ToList();
+        Assert.True(uncovered.Count == 0, "Requirements without a test that exists: " + string.Join(", ", uncovered));
     }
 
     [Fact]

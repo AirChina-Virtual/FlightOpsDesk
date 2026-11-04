@@ -339,8 +339,6 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 做法：
 
-做法：
-
 1. **以需求为准，不以旧测试为准。** 建立需求覆盖矩阵：第 3.1 节每个功能（F01–F26）、第 3.2 节每条规则（I01–I15）列出它的新测试。CI 检查矩阵中每一行至少有一条通过的测试；没有测试的需求不能宣布完成。
 2. **按新结构分层设计。**
    - 单元测试针对 R2–R6 的新组件：字段规格表、`LocalReference`、`ChangeJournal`、工作单元、`ResponseClassifier`、`RequestBudget`、`Pager`、`ReadbackVerifier`、`InteractionGate`、各用例服务、各 ViewModel 和对话框模型。

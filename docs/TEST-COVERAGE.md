@@ -6,7 +6,7 @@
 
 测试名称：行内写成 `命名空间简写.类名.{方法, 方法}`，也可以只写类名（类中全部测试）或 `类名.方法`；`Write_*` 这类带 `*` 的名称代表所有以它开头的方法。完整名称由前缀加上简写得到：`Domain.`、`Application.`、`Transport.`、`Inventory.`、`Api.`、`Review.`、`Presentation.`、`Storage.` ＝ `VamSys.UnitTests.` 下的同名命名空间；`UnitTests.` ＝ `VamSys.UnitTests.`；`UiTests.` ＝ `VamSys.UiTests.`；以 `IntegrationTests.` 开头的为 `VamSys.IntegrationTests.…`；以 `VamSys.UnitTests.` 开头的已写全（BatchShiftMinutesTests、LocalReferenceTests、RowReplacementTests 在根命名空间）。含 `Theory` 的方法名代表它的全部数据行。
 
-自动检查：`Inventory.CoverageMatrixTests` 读本文件 3.1–3.3 节，要求每一行至少有一条存在的测试，并且行里写到的每个测试类、方法、通配名称和窗口测试都存在；只有列为“待办”的 I14、J07（只有基准测量）例外，它们一旦有了测试，检查会要求从例外名单中去掉。
+自动检查：`Inventory.CoverageMatrixTests` 读本文件 3.1–3.3 节，要求每一行至少有一条存在的测试，并且行里写到的每个测试类、方法、通配名称和窗口测试都存在，没有例外。
 
 ## 3.1 功能
 
@@ -56,7 +56,7 @@
 | I11 能力键、契约哈希、外部证据基线不变 | Domain、Infrastructure | Inventory.ConstantsInventoryTests.{Capability_keys_are_locked, Contract_hashes_are_locked_and_consistent}（R0）；Domain.FieldSpecTests.{Evidence_scope_per_operation, Evidence_covers_follows_the_table}；Application.ExternalEvidenceReviewTests（全部） | — | 完成 |
 | I12 AutomationId 与控件名称不变 | UI | Inventory.AutomationIdInventoryTests（R0） | 各窗口脚本按 AutomationId 查找控件；Inventory.AutomationIdInventoryTests 另核对脚本用到的 id 与名称都存在 | 完成 |
 | I13 “明确禁用”的操作仍禁用 | Domain、Infrastructure | Domain.FieldSpecTests.{Jumpseat_identity_and_create_only_fields_are_blocked_on_update, Clearing_decisions_follow_the_table}；IntegrationTests.Golden.Requests.RequestGoldenTests.Update_with_cleared_draft_field_is_blocked_before_any_request（R0）；Domain.FleetAssignmentServiceTests.An_aircraft_has_exactly_one_fleet_and_only_replace_is_allowed；IntegrationTests.Api.AircraftMoveTests（全部）；IntegrationTests.Api.LiveCompatibilityTests.A_created_jumpseat_sends_its_identity_and_comes_back_with_explicit_nulls_that_the_workspace_keeps_valid；Api.RecoveryEvidenceRulesTests.A_move_cleared_to_no_fleet_is_invalid_and_never_planned | — | 完成 |
-| I14 性能不退化 | 基准 | 待办（基准项目 R7） | `--benchmark-core`、`--benchmark-journal`、UiTests.DataPerformanceTests（窗口里的时间门槛）、`UiTests.BaselineMeasurements`（只测量，显式运行） | 待办：基准项目（R7） |
+| I14 性能不退化 | 基准、UI | UiTests.DataPerformanceTests（窗口里的时间门槛） | `--benchmark-core`、`UiTests.BaselineMeasurements`（只测量）；与 R0 基线同机对比比基线慢不超过 10%，在 R8 手工比对，结果见 [性能报告](PERFORMANCE.md) | 部分：10% 对比不是自动判定 |
 | I15 EXE 名、数据目录、环境变量、图标 | 打包 | Inventory.ConstantsInventoryTests.Endpoint_data_directory_and_executable_identity_are_locked（R0） | 打包检查（见 F26） | 完成 |
 
 ## 3.3 R3 变更日志与定向读写（新行为）
@@ -69,7 +69,7 @@
 | J04 日志不可信时回退完整保存：从未保存的工作区、版本号被其他写入者推进、增量写入与数据库不符、加载到的位置有空洞（检查点或旧程序留下） | Storage | IntegrationTests.Storage.JournalWriteScopeTests.{A_new_workspace_is_written_in_full_and_then_incrementally, A_loaded_workspace_is_trusted_and_a_workspace_changed_by_another_writer_is_saved_in_full, A_database_that_does_not_hold_what_the_journal_assumes_is_repaired_by_a_full_save, Gaps_in_the_stored_positions_are_repaired_instead_of_colliding_with_an_appended_row} | — | 完成 |
 | J05 任务检查点与日志共存：任务检查点后日志仍可信且只重写该任务；变基检查点后重写所属资源的全部行 | Storage | IntegrationTests.Storage.JournalWriteScopeTests.{A_task_checkpoint_keeps_the_journal_valid_and_only_its_job_is_written_again, A_rebase_checkpoint_marks_the_rows_of_its_resource_for_rewriting}；JournalEquivalenceTests（随机序列中的任务检查点） | IntegrationTests.Storage.StorageCheckpointTests、IntegrationTests.Storage.ProcessTermination.ProcessTerminationTests | 完成 |
 | J06 定向读写：`JobExists`、`LoadJob`、`CountRows` 与完整加载的结果一致；维护预览用它们 | Storage | IntegrationTests.Storage.JournalWriteScopeTests.Targeted_reads_agree_with_a_full_load | — | 完成 |
-| J07 5 万行工作区的保存开销（批量编辑、新增、解决冲突、只写头部、提交任务、无改动切换、保存连接设置） | 基准 | `dotnet run --project tests/VamSys.Benchmarks -c Release -- --benchmark-journal <full｜journal> <输出目录>`，改造前后对照见 [性能报告](PERFORMANCE.md) | `--benchmark-journal`（命令行，不是测试） | 待办：基准项目（R7） |
+| J07 5 万行工作区的保存开销（批量编辑、新增、解决冲突、只写头部、提交任务、无改动切换、保存连接设置） | Storage、基准 | IntegrationTests.Storage.JournalWriteScopeTests.{A_batch_edit_*, Adding_one_*, Resolving_many_*, A_header_only_*, A_jobs_only_*, Nothing_changed_*, Connection_settings_*}（每种保存只写该写的行） | `dotnet run --project tests/VamSys.Benchmarks -c Release -- --benchmark-journal <full｜journal> <输出目录>`（耗时，不是测试），前后对照见 [性能报告](PERFORMANCE.md) | 完成 |
 
 ## 只在旧测试里出现（或旧测试表达得更多）的行为
 
