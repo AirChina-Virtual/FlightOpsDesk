@@ -84,10 +84,10 @@ public partial class AutomationIdInventoryTests
 
     // C# window tests (tests/VamSys.UiTests): the driver's lookups by AutomationId and by name, the id lists they loop
     // over, and comparisons of a control's name with a literal.
-    [GeneratedRegex(@"\b(?:One|Find|Enabled|Name)\(""(?<id>[^""]+)""\)|\bIds\s*=\s*\[(?<list>[^\]]*)\]")]
+    [GeneratedRegex(@"\b(?:One|Find|Enabled|Name)\(""(?<id>[^""]+)""\)|\w*Ids\s*=\s*\[(?<list>[^\]]*)\]")]
     private static partial Regex WindowTestId();
 
-    [GeneratedRegex(@"\b(?:Named|First|SelectionMenu)\(""(?<name>[^""]+)""|\bName\(""[^""]+""\)\s*==\s*""(?<name2>[^""]+)""|Assert\.Equal\(""(?<name3>[^""]+)"",[^;]*\.Current\.Name\)")]
+    [GeneratedRegex(@"\b(?:Named|First|SelectionMenu|Click|Button|SelectItem|Edit|Value|Language|WaitText|HasText|Cells|SavesTrimmed)\(""(?<name>[^""]+)""|\bName\(""[^""]+""\)\s*==\s*""(?<name2>[^""]+)""|Assert\.Equal\(""(?<name3>[^""]+)"",[^;]*\.Current\.Name\)|\b(?:Shown|FindNamed)\(""(?<name4>[^""]+)""")]
     private static partial Regex WindowTestName();
 
     static (SortedSet<string> Ids, SortedSet<string> Names, SortedSet<string> Commands) ScriptLookups()
@@ -107,7 +107,7 @@ public partial class AutomationIdInventoryTests
                     foreach (var literal in SourceScan.Literals(m.Groups["list"].Value))
                         ids.Add(literal);
             foreach (Match m in WindowTestName().Matches(text))
-                foreach (var group in new[] { "name", "name2", "name3" })
+                foreach (var group in new[] { "name", "name2", "name3", "name4" })
                     if (m.Groups[group].Success)
                         names.Add(m.Groups[group].Value);
         }

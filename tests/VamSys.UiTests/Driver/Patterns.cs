@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Windows.Automation;
 
@@ -15,6 +16,9 @@ public static class Patterns
     public static string Text(this AutomationElement element) =>
         ((ValuePattern)element.GetCurrentPattern(ValuePattern.Pattern)).Current.Value;
 
+    public static bool IsReadOnly(this AutomationElement element) =>
+        ((ValuePattern)element.GetCurrentPattern(ValuePattern.Pattern)).Current.IsReadOnly;
+
     public static void Expand(this AutomationElement element) =>
         ((ExpandCollapsePattern)element.GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
 
@@ -29,9 +33,14 @@ public static class Patterns
     public static void Select(this AutomationElement element) =>
         ((SelectionItemPattern)element.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
 
+    public static void Toggle(this AutomationElement element) =>
+        ((TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern)).Toggle();
+
     // ---- QA pipe answers ----------------------------------------------------------------------------------------------
 
-    public static int Int(this JsonNode node, string key) => int.Parse(node[key]!.ToString(), System.Globalization.CultureInfo.InvariantCulture);
+    public static int Int(this JsonNode node, string key) => int.Parse(node[key]!.ToString(), CultureInfo.InvariantCulture);
 
     public static string? Str(this JsonNode node, string key) => node[key]?.ToString();
+
+    public static bool Bool(this JsonNode node, string key) => node[key]?.GetValue<bool>() ?? false;
 }

@@ -11,6 +11,35 @@ public static class DataUiFixture
             throw new InvalidOperationException("QA seeding requires a new empty directory; existing data is never overwritten.");
     }
 
+    /// <summary>A database of the old format, or with <paramref name="future"/> one of a newer version than the program knows.</summary>
+    public static void SeedStorage(string directory, bool future)
+    {
+        RequireEmptyDirectory(directory);
+        Directory.CreateDirectory(directory);
+        using var db = StorageScenarios.Legacy(directory, StorageScenarios.Fixture());
+        if (future)
+            StorageScenarios.Sql(db, "PRAGMA user_version=5");
+        Console.WriteLine("Seeded isolated storage UI");
+    }
+
+    /// <summary>A task with an unknown result on a legacy candidate ID and pending identities, without credentials.</summary>
+    public static void SeedRecovery(string directory)
+    {
+        RequireEmptyDirectory(directory);
+        DataRow Row(params (string Field, string Value)[] fields) => new() { Fields = fields.ToDictionary(p => p.Field, p => p.Value) };
+        var workspace = new Workspace { Name = "QA recovery candidates", Mode = RunMode.Online, AirlineId = "7" };
+        var item = new ChangeItem { Resource = ResourceKind.Airports, Kind = ChangeKind.Create, State = ItemState.Unknown, RemoteId = "102",
+            After = Row(("ICAO/IATA", "EGLL"), ("Name", "Hub")), Fields = new() { ["ICAO/IATA"] = new(FieldIntent.Set, "EGLL"), ["Name"] = new(FieldIntent.Set, "Hub") } };
+        var pendingAirport = new ChangeItem { Resource = ResourceKind.Airports, Kind = ChangeKind.Create, State = ItemState.Pending, After = Row(("ICAO/IATA", "EGLL")) };
+        pendingAirport.SetMessage(Messages.Define("ApiAirportCreatePending"));
+        var pendingFleet = new ChangeItem { Resource = ResourceKind.Fleets, Kind = ChangeKind.Create, State = ItemState.Pending, After = Row(("Name", "Pending fleet")) };
+        pendingFleet.SetMessage(Messages.Define("ApiIdentityPending"));
+        workspace.Resources[ResourceKind.Airports].Draft.Add(item.After.Dup());
+        workspace.Jobs.Add(new() { Mode = RunMode.Online, Items = [item, pendingAirport, pendingFleet] });
+        new WorkspaceStore(directory).Save(workspace);
+        Console.WriteLine("Seeded recovery UI without credentials");
+    }
+
     public static void Seed(string directory, int count)
     {
         if (count is not (20000 or 50000)) throw new ArgumentOutOfRangeException(nameof(count));

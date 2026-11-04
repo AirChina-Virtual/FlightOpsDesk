@@ -9,6 +9,9 @@ public static class Repo
     public static string QaExecutable =>
         Environment.GetEnvironmentVariable("VAMSYS_QA_EXE") is { Length: > 0 } path ? path : Path.Combine(Root, "artifacts", "v3-qa", "FlightOpsDesk.exe");
 
+    /// <summary>The product package, as scripts/build.ps1 -Publish leaves it.</summary>
+    public static string ProductExecutable => Path.Combine(Root, "artifacts", "flightops-app", "FlightOpsDesk.exe");
+
     /// <summary>A directory under the git-ignored artifacts folder, created if missing.</summary>
     public static string Artifacts(params string[] parts) =>
         Directory.CreateDirectory(Path.Combine([Root, "artifacts", .. parts])).FullName;

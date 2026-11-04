@@ -367,6 +367,8 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-11-02，R7 第④块第一步）：** 新增 `tests/VamSys.UiTests`（net10.0-windows，Windows 自带的 UIAutomationClient，不新增依赖）。驱动 `QaWindow` 负责在 artifacts/ui-tests 下新建数据目录并在进程内准备数据、启动 QA 包、发 QA 管道命令、等待、按 AutomationId 或名称找元素，按键前要求窗口在前台；只结束自己启动的进程。窗口测试用 `[WindowFact]` 标为显式，`check-all` 与 CI 只编译。第一个改写的是 `test-data-footer-ui.ps1` → `DataFooterTests`，真实窗口通过（约 12 秒），旧脚本已删除。覆盖矩阵检查与 AutomationId 清单检查改为也读 C# 窗口测试；旧页脚脚本的 `One 'X'` 写法原本没被清单读到，改写后多核对 12 个 id 与名称，均存在。
 
+**进度（2026-11-03，R7 第④块第二批）：** 5 个脚本改写为 C#（`test-cell-editing-ui` → `CellEditingTests`；`test-credentials-ui`、`test-settings-save-ui` → `ConnectionSettingsTests`；`test-storage-ui` → `StorageStartupTests`；`test-recovery-ui` → `RecoveryTests`），旧脚本已删除。驱动 `QaWindow` 改名 `AppWindow`，可驱动没有 QA 管道的正式包，并支持重启、第二实例和真实鼠标。恢复与存储种子移入 `DataUiFixture`，`--seed-recovery-ui` 删除。7 个窗口测试在真实窗口全部通过（35 秒）。AutomationId 清单只增不减。
+
 ### R8 验收与收尾
 
 1. 全部单元、集成和窗口测试，正式包与 QA 包检查；需求覆盖矩阵每一行都有通过的测试，回植错误全部被发现；旧运行器和旧脚本已删除。

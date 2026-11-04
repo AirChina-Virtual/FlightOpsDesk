@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 using System.Windows.Automation;
 using VamSys.TestSupport;
 using VamSys.UiTests.Driver;
-using static VamSys.UiTests.Driver.QaWindow;
+using static VamSys.UiTests.Driver.AppWindow;
 
 namespace VamSys.UiTests;
 

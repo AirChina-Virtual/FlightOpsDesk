@@ -2,16 +2,11 @@ using System.Diagnostics;
 using VamSys.Core;
 using VamSys.Infrastructure;
 
-if(args.Length >= 2 && args[0] is "--seed-storage-ui" or "--seed-task-ui" or "--seed-data-ui" or "--seed-recovery-ui" or "--seed-ui")
+if(args.Length >= 2 && args[0] is "--seed-storage-ui" or "--seed-task-ui" or "--seed-data-ui" or "--seed-ui")
     DataUiFixture.RequireEmptyDirectory(args[1]);
 if(args.Length==2 && args[0] is "--verify-package" or "--verify-qa-package")
 {PackageChecks.Verify(args[1],args[0]=="--verify-qa-package");return;}
-if(args.Length==3 && args[0]=="--seed-storage-ui")
-{
-    Directory.CreateDirectory(args[1]);var w=StorageScenarios.Fixture();using var db=StorageScenarios.Legacy(args[1],w);
-    if(args[2]=="future")StorageScenarios.Sql(db,"PRAGMA user_version=5");
-    Console.WriteLine("Seeded isolated storage UI");return;
-}
+if(args.Length==3 && args[0]=="--seed-storage-ui"){DataUiFixture.SeedStorage(args[1],args[2]=="future");return;}
 if(args.Length==2 && args[0]=="--seed-task-ui")
 {
     var w=StorageScenarios.Fixture();w.Jobs.Clear();w.Mode=RunMode.Offline;
@@ -40,18 +35,6 @@ if(args.Length==4 && args[0]=="--assert-history-ui")
 }
 DataRow Row(params (string, string)[] fields) => new() { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
 if(args.Length==3 && args[0]=="--seed-data-ui"){DataUiFixture.Seed(args[1],int.Parse(args[2]));return;}
-if (args.Length == 2 && args[0] == "--seed-recovery-ui")
-{
-    var w=new Workspace { Name="QA recovery candidates",Mode=RunMode.Online,AirlineId="7" };
-    var item=new ChangeItem { Resource=ResourceKind.Airports,Kind=ChangeKind.Create,State=ItemState.Unknown,RemoteId="102",
-        After=Row(("ICAO/IATA","EGLL"),("Name","Hub")),Fields=new(){["ICAO/IATA"]=new(FieldIntent.Set,"EGLL"),["Name"]=new(FieldIntent.Set,"Hub")} };
-    var pendingAirport=new ChangeItem { Resource=ResourceKind.Airports,Kind=ChangeKind.Create,State=ItemState.Pending,After=Row(("ICAO/IATA","EGLL")) };
-    pendingAirport.SetMessage(Messages.Define("ApiAirportCreatePending"));
-    var pendingFleet=new ChangeItem { Resource=ResourceKind.Fleets,Kind=ChangeKind.Create,State=ItemState.Pending,After=Row(("Name","Pending fleet")) };
-    pendingFleet.SetMessage(Messages.Define("ApiIdentityPending"));
-    w.Resources[ResourceKind.Airports].Draft.Add(item.After.Dup());w.Jobs.Add(new(){Mode=RunMode.Online,Items=[item,pendingAirport,pendingFleet]});
-    new WorkspaceStore(args[1]).Save(w);Console.WriteLine("Seeded recovery UI without credentials");return;
-}
 if (args.Length == 2 && args[0] == "--seed-ui")
 {
     var w = new Workspace { Name = "QA 20000 航线", Mode = RunMode.Demo };

@@ -45,20 +45,18 @@ dotnet run --project tests/VamSys.IntegrationTests -c Release -p:RestoreLockedMo
 
 ## 实际窗口检查
 
-窗口脚本位于 ../scripts，会实际操作窗口，需要可用的 Windows 桌面，并通过 `UiVerification=true` 构建的 QA 版本运行（`./scripts/build.ps1 -Publish -UiVerification` 输出到 artifacts/v3-qa）。脚本用 `tools/VamSys.QaSeed` 准备数据，所有 `--seed-*` 入口在写入前都会拒绝已有文件的目录；脚本默认在 artifacts 下新建 GUID 目录，只结束自己启动的进程，不调用真实 API。R7 正把这些脚本逐个改写为 [C# 窗口测试](VamSys.UiTests/README.md)，已改写的脚本会删除（页脚：`DataFooterTests`）。
+窗口脚本位于 ../scripts，会实际操作窗口，需要可用的 Windows 桌面，并通过 `UiVerification=true` 构建的 QA 版本运行（`./scripts/build.ps1 -Publish -UiVerification` 输出到 artifacts/v3-qa）。脚本用 `tools/VamSys.QaSeed` 准备数据，所有 `--seed-*` 入口在写入前都会拒绝已有文件的目录；脚本默认在 artifacts 下新建 GUID 目录，只结束自己启动的进程，不调用真实 API。R7 正把这些脚本逐个改写为 [C# 窗口测试](VamSys.UiTests/README.md)，已改写的脚本会删除，对照表见那里的说明。
 
 | 脚本 | 用途 |
 |---|---|
 | `test-data-performance-ui.ps1 -Rows 20000|50000` | 数据页打开、搜索、分页、编辑框重绑、撤销／重做（只做行级保存、不重新查询），并测量计时 |
 | `test-baseline-ui.ps1 -Rows 20000|50000` | 启动、工作区读取与切换、审阅、逐帧滚动、内存；只测量，不设门槛 |
 | `test-ui-interactions.ps1 -Rows 20000` | 16 种布局组合、密度、批量范围、预览锁、审阅分组 |
-| `test-cell-editing-ui.ps1` | 用真实鼠标和键盘点击、输入、Tab、Esc；自动化读写与只读状态 |
 | `test-v3-verification-ui.ps1 [-History|-Autosave|-Tasks]` | 真实撤销／重做按钮、自动保存后强制结束、关闭失败恢复、大任务页 |
 | `test-localization-ui.ps1` | 中英文即时切换、草稿与筛选、机队对话框、删除与恢复、审阅 |
-| `test-storage-ui.ps1`、`test-recovery-ui.ps1`、`test-credentials-ui.ps1`、`test-settings-save-ui.ps1` | 旧数据库升级、待核对 ID、凭据与设置保存 |
 | `open-datagrid-qa.ps1` | 不是测试：在测试数据上打开 QA 包，供人工查看主题、高对比度与缩放 |
 
-性能、基线、交互、单元格编辑和 v3 验证脚本可以用 `-Executable` 指定要测试的程序；其余脚本使用 artifacts 下的正式包或 QA 包。只有 Windows PowerShell 5.1 时，含中文字面量、且未带 BOM 的脚本需要另存为带 BOM 的 UTF-8 才能运行；`test-localization-ui.ps1` 已带 BOM（5.1 下尚未实测）。
+性能、基线、交互和 v3 验证脚本可以用 `-Executable` 指定要测试的程序；其余脚本使用 artifacts 下的正式包或 QA 包。只有 Windows PowerShell 5.1 时，含中文字面量、且未带 BOM 的脚本需要另存为带 BOM 的 UTF-8 才能运行；`test-localization-ui.ps1` 已带 BOM（5.1 下尚未实测）。
 
 自动测试通过后，仍要查看不同显示缩放下的布局、图标、滚动和双语显示，也仍然需要用真实账号检查 API 操作。
 
