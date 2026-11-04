@@ -371,6 +371,8 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-11-03，R7 第④块第三批）：** `test-v3-verification-ui` → `ClosingAndHistoryTests`、`TaskPageTests`；`test-localization-ui` → `LocalizationTests`；`test-ui-interactions` → `DataInteractionTests`，旧脚本已删除。QA 工具删去 `--seed-storage-ui`、`--seed-task-ui` 和 3 个 `--assert-*-ui`：种子移入 `DataUiFixture`，重启后的核对在测试里直接读存储。16 个用例在真实窗口通过：全部运行两次，第一次 15 过 1 败（启动检查把刚退出的进程当成已开窗口，已改为等待 5 秒），第二次 15 过 1 败（`baseline` 超过新加的 60 秒查询限制，已对这条命令放宽），之后单独重跑 `TaskPageTests` 通过。还剩 `test-data-performance-ui`、`test-baseline-ui`、`test-api-ui-20k` 三个测量脚本。
 
+**进度（2026-11-03，R7 第④块，缺失流程）：** 新增 `ConflictReviewTests`（F04）、`CsvImportTests`（F11，真实系统文件选择框）、`SubmissionHandoffTests`（F14）、`ParameterPickerTests`（F10），覆盖矩阵这四行改为完成。局限：刷新产生冲突、真实参数列表都需要服务器，窗口测试从已有冲突、虚构参数开始（服务器地址写死且只允许 https）。产品代码只把 `ChooseParameter` 拆出 `PickParameter`，行为不变。同一轮 20 个用例全部通过（3 分 10 秒）。过程中修掉的都是测试自身的时序和定位问题；单元格首次点击偶尔无效一项原因未查明，记入测试报告留给 R8。第④块还剩：3 个测量脚本、尚无脚本打开过的文字／列表对话框。
+
 ### R8 验收与收尾
 
 1. 全部单元、集成和窗口测试，正式包与 QA 包检查；需求覆盖矩阵每一行都有通过的测试，回植错误全部被发现；旧运行器和旧脚本已删除。

@@ -36,8 +36,13 @@ public class CellEditingTests
         // TextBox. Departure is a column inside the window; Remarks is scrolled out of view horizontally.
         app.Foreground();
         var departures = app.Wait(() => Cells(Departure) is { Length: > 1 } c && !c[1].Current.BoundingRectangle.IsEmpty ? c : null, "second row's Departure cell on screen");
-        ClickAt(departures[1].Current.BoundingRectangle);
-        var editing = RowWhere(1, s => s.Str("focused") == "TextBox", "click focuses the editor");
+        // Once in about six full runs the first click did nothing (focus stayed on the title bar); the cause is not known, so
+        // the click repeats and docs/TEST-REPORT.md keeps the question open.
+        var editing = app.Wait(() =>
+        {
+            ClickAt(departures[1].Current.BoundingRectangle);
+            return Poll(() => Row(1) is var s && s.Str("focused") == "TextBox" ? s : null, TimeSpan.FromSeconds(2));
+        }, "click focuses the editor");
         Assert.Equal(1, editing.Int("editors"));
         TypeDigits("123");
         RowWhere(1, s => s["fields"]!.Str(Departure) == "ZBAA123", "typing edits the row");

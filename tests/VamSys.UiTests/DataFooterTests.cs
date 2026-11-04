@@ -26,8 +26,12 @@ public class DataFooterTests
         AutomationElement SelectionMenu(string button, string item)
         {
             // The selection menu button has no AutomationId; it is the one button named by TableSelection.
-            app.Named(button, ControlType.Button).Invoke();
-            return app.One(item);
+            // A popup closing a moment ago (the page size list) can take a menu opening now with it, so the click repeats.
+            return app.Wait(() =>
+            {
+                app.Named(button, ControlType.Button).Invoke();
+                return Poll(() => app.Find(item) is [var e] ? e : null, TimeSpan.FromSeconds(2));
+            }, $"the menu with {item}");
         }
         void PickPageSize(int size)
         {

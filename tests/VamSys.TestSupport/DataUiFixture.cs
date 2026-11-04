@@ -38,6 +38,66 @@ public static class DataUiFixture
         Console.WriteLine("Seeded 1000 histories / 20000 history items + 20000 active items");
     }
 
+    static DataRow Airport(string code, string name) => new() { Fields = new Dictionary<string, string> { ["ICAO/IATA"] = code, ["Name"] = name } };
+
+    static void SaveInEnglish(string directory, Workspace workspace)
+    {
+        var store = new WorkspaceStore(directory);
+        store.Save(workspace);
+        store.SaveLanguage("en-US");
+    }
+
+    /// <summary>An online workspace after a refresh left three conflicts: two on a field, one on a record the server deleted.</summary>
+    public static void SeedConflicts(string directory)
+    {
+        RequireEmptyDirectory(directory);
+        var workspace = new Workspace { Name = "QA conflicts", Mode = RunMode.Online, AirlineId = "7" };
+        var airports = workspace.Resources[ResourceKind.Airports];
+        CsvAdapter.Import(ResourceKind.Airports, airports, [Airport("EGLL", "original one"), Airport("EGKK", "original two"), Airport("EGCC", "original three")], true);
+        airports.Draft[0] = airports.Draft[0].With("Name", "mine one");
+        airports.Draft[1] = airports.Draft[1].With("Name", "mine two");
+        airports.Conflicts.Add(new(airports.Draft[0].LocalId, "Name", "original one", "mine one", "server one"));
+        airports.Conflicts.Add(new(airports.Draft[1].LocalId, "Name", "original two", "mine two", "server two"));
+        airports.Conflicts.Add(new(airports.Draft[2].LocalId, "*", null, null, null));
+        SaveInEnglish(directory, workspace);
+    }
+
+    /// <summary>An online workspace without credentials with one fleet from the server and one new fleet.</summary>
+    public static void SeedParameters(string directory)
+    {
+        RequireEmptyDirectory(directory);
+        var workspace = new Workspace { Name = "QA parameters", Mode = RunMode.Online, AirlineId = "7" };
+        var fleets = workspace.Resources[ResourceKind.Fleets];
+        var existing = new DataRow { Identity = new("6", "conn"), Fields = new Dictionary<string, string> { ["ID"] = "6", ["Name"] = "Existing fleet", ["Parameter IDs"] = "1" } };
+        fleets.Snapshot.Add(existing);
+        fleets.Draft.Add(existing);
+        fleets.Draft.Add(new DataRow { Fields = new Dictionary<string, string> { ["Name"] = "New fleet" } });
+        fleets.SnapshotAt = DateTimeOffset.UtcNow;
+        SaveInEnglish(directory, workspace);
+    }
+
+    /// <summary>A demo workspace with one edited and one deleted airport, and an older task still pending.</summary>
+    public static void SeedSubmission(string directory)
+    {
+        RequireEmptyDirectory(directory);
+        var workspace = new Workspace { Name = "QA submission", Mode = RunMode.Demo };
+        var airports = workspace.Resources[ResourceKind.Airports];
+        CsvAdapter.Import(ResourceKind.Airports, airports, [Airport("EGLL", "Heathrow"), Airport("EGKK", "Gatwick"), Airport("EGCC", "Manchester")], true);
+        airports.Draft[0] = airports.Draft[0].With("Name", "Renamed");
+        airports.Draft[1] = airports.Draft[1].With("_delete", "TRUE");
+        workspace.Jobs.Add(new() { Mode = RunMode.Demo, Items = [new ChangeItem { Resource = ResourceKind.Airports, Kind = ChangeKind.Update, State = ItemState.Pending, After = airports.Draft[2] }] });
+        SaveInEnglish(directory, workspace);
+    }
+
+    /// <summary>A demo workspace with one airport in its snapshot, for importing drafts on top.</summary>
+    public static void SeedImport(string directory)
+    {
+        RequireEmptyDirectory(directory);
+        var workspace = new Workspace { Name = "QA import", Mode = RunMode.Demo };
+        CsvAdapter.Import(ResourceKind.Airports, workspace.Resources[ResourceKind.Airports], [Airport("EGLL", "Heathrow")], true);
+        SaveInEnglish(directory, workspace);
+    }
+
     /// <summary>A task with an unknown result on a legacy candidate ID and pending identities, without credentials.</summary>
     public static void SeedRecovery(string directory)
     {

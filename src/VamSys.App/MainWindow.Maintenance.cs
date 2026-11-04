@@ -11,9 +11,9 @@ public sealed partial class MainWindow
         var count = await maintenance.LoadParametersAsync();
         Status(() => L("ApiParametersLoaded", ("count", count)));
     });
-    Task ChooseParameter(DataRow row) => LocalOperation(async () =>
+    Task ChooseParameter(DataRow row) => LocalOperation(async () => await PickParameter(row, await maintenance.ChoosableParametersAsync(row)));
+    async Task PickParameter(DataRow row, IReadOnlyList<AirlineParameter> parameters)
     {
-        var parameters = await maintenance.ChoosableParametersAsync(row);
         var choices = parameters.Select(p => new DialogChoice(p.Label, p.Id)).ToList();
         // The row's current parameter, or the first one.
         var dialog = new ChoiceDialogViewModel
@@ -27,7 +27,8 @@ public sealed partial class MainWindow
         if (!await Confirm(dialog) || dialog.Selected is not { } chosen)
             return;
         await maintenance.AssignParameterAsync(resource, row, chosen.Value);
-    });    Task BackupAndClearWorkspace() => LocalOperation(async () =>
+    }
+    Task BackupAndClearWorkspace() => LocalOperation(async () =>
     {
         var preview = await maintenance.PrepareBackupAsync();
         if (!await ConfirmMessage(L("BackupClear"), L("BackupClearPreview", ("name", preview.Name), ("path", preview.DataDirectory),

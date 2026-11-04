@@ -39,6 +39,9 @@ public static class Patterns
     public static void Toggle(this AutomationElement element) =>
         ((TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern)).Toggle();
 
+    public static ToggleState ToggleState(this AutomationElement element) =>
+        ((TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern)).Current.ToggleState;
+
     public static ScrollPattern Scroll(this AutomationElement element) =>
         (ScrollPattern)element.GetCurrentPattern(ScrollPattern.Pattern);
 

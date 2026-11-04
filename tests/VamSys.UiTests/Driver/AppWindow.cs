@@ -135,6 +135,8 @@ public sealed partial class AppWindow : IDisposable
     {
         if (writer is not null)
         {
+            // A dialog's task can complete after its button's Invoke returns; the program rightly refuses to close until then.
+            Until(() => Query("state").Bool("idle"), "the window is idle before closing");
             Query("close");
             if (!process.WaitForExit(30000))
                 throw new TimeoutException("Close did not finish.");
@@ -173,7 +175,8 @@ public sealed partial class AppWindow : IDisposable
     public T Wait<T>(Func<T?> until, string what, TimeSpan? limit = null) where T : class =>
         Poll(until, limit ?? DefaultWait) ?? throw new TimeoutException($"Timeout: {what}{Describe()}");
 
-    static T? Poll<T>(Func<T?> until, TimeSpan limit) where T : class
+    /// <summary>Polls until <paramref name="until"/> returns a value, or returns null after the limit.</summary>
+    public static T? Poll<T>(Func<T?> until, TimeSpan limit) where T : class
     {
         var end = DateTime.UtcNow + limit;
         while (true)
@@ -268,6 +271,9 @@ public sealed partial class AppWindow : IDisposable
     /// <summary>Waits until some element's name contains this text, allowing for a slow startup.</summary>
     public void WaitText(string text) => Until(() => HasText(text), $"text '{text}'");
 
+    /// <summary>Like <see cref="WaitText"/>, for the test's own data or text composed at run time: not a product string, so the AutomationId inventory leaves it out.</summary>
+    public void WaitData(string text) => WaitText(text);
+
     // A dialog button wins over a page button of the same name behind the dialog.
     AutomationElement? ButtonOrNull(string name) =>
         FindNamed(name, ControlType.Button) is var buttons && buttons.FirstOrDefault(b => DialogButtonIds.Contains(b.Current.AutomationId)) is { } dialog ? dialog : buttons.FirstOrDefault();
@@ -298,6 +304,101 @@ public sealed partial class AppWindow : IDisposable
     public void Edit(string name, string value) => First(name, ControlType.Edit).SetText(value);
 
     public string Value(string name) => First(name, ControlType.Edit).Text();
+
+    // ---- dialogs ----------------------------------------------------------------------------------------------------
+
+    /// <summary>Waits for the open dialog's primary button with this name (the page may have a button of the same name behind it).</summary>
+    public AutomationElement DialogPrimary(string name) => DialogButton("PrimaryButton", name);
+
+    /// <summary>Waits for the open dialog's secondary button with this name.</summary>
+    public AutomationElement DialogSecondary(string name) => DialogButton("SecondaryButton", name);
+
+    AutomationElement DialogButton(string automationId, string name) =>
+        Wait(() => Find(automationId).FirstOrDefault(b => b.Current.Name == name), $"dialog button '{name}'");
+
+    /// <summary>Cancels the open dialog with its close button and waits for it to go.</summary>
+    public void DialogCancel()
+    {
+        Wait(() => Find("CloseButton").FirstOrDefault(), "the dialog's close button").Invoke();
+        DialogClosed();
+    }
+
+    /// <summary>Waits until no dialog is open.</summary>
+    public void DialogClosed() => Until(() => Find("CloseButton").Length == 0, "the dialog closes");
+
+    // The common file dialog's controls have these AutomationIds in every Windows language.
+    const string FileNameBox = "1148", FileOpen = "1", FileCancel = "2";
+
+    // Only a file dialog this window owns; another program's dialog on the desktop is never touched.
+    AutomationElement? FilePickerOrNull()
+    {
+        var dialogs = new PropertyCondition(AutomationElement.ClassNameProperty, "#32770");
+        return FindAll(dialogs).FirstOrDefault() ?? AutomationElement.RootElement.FindAll(TreeScope.Children, dialogs).Cast<AutomationElement>()
+            .FirstOrDefault(d => GetWindow(new IntPtr(d.Current.NativeWindowHandle), OwnerWindow) == Handle);
+    }
+
+    AutomationElement FilePicker() => Wait(FilePickerOrNull, "the file picker");
+
+    /// <summary>
+    /// Clicks a button that opens the file picker. A dialog's task can complete after its button's Invoke returns, and the
+    /// program rightly ignores clicks until then, so the click repeats until the picker is up.
+    /// </summary>
+    public void ClickUntilFilePicker(string button) => Wait(() =>
+    {
+        Click(button);
+        return Poll(FilePickerOrNull, PageLayoutWait);
+    }, "the file picker opens");
+
+    // The picker's window appears before its controls do.
+    AutomationElement PickerControl(string automationId, Func<AutomationElement, bool> usable)
+    {
+        var found = Poll(() => Below(FilePicker(), new PropertyCondition(AutomationElement.AutomationIdProperty, automationId)).FirstOrDefault(usable), DefaultWait);
+        return found ?? throw new TimeoutException($"Timeout: file picker control {automationId}; the picker holds: {DescribePicker()}");
+    }
+
+    string DescribePicker()
+    {
+        var picker = FilePickerOrNull();
+        return picker is null ? "(no picker)" : $"[{picker.Current.Name} {picker.Current.ClassName}] " + string.Join(", ",
+            Below(picker, Condition.TrueCondition).Where(e => e.Current.AutomationId.Length is > 0 and < 6).Select(e => $"{e.Current.AutomationId}:{e.Current.ControlType.ProgrammaticName.Replace("ControlType.", "", StringComparison.Ordinal)}"));
+    }
+
+    // The open button is a plain or a split button, depending on the dialog's state; other elements (the file list's) can
+    // have the same small AutomationIds.
+    static bool IsDialogButton(AutomationElement element) => element.Current.ControlType == ControlType.Button || element.Current.ControlType == ControlType.SplitButton;
+
+    /// <summary>Picks this file in the system's file picker the window opened.</summary>
+    public void ChooseFile(string path)
+    {
+        var box = PickerControl(FileNameBox, e => e.Current.ControlType == ControlType.Edit);
+        box.SetText(path);
+        // Depending on the dialog's state the open control is the button itself or a pane around it.
+        var open = PickerControl(FileOpen, e => e.Current.ControlType != ControlType.ListItem);
+        if ((IsDialogButton(open) ? open : Below(open, Condition.TrueCondition).FirstOrDefault(IsDialogButton)) is { } button)
+            button.Invoke();
+        else
+        {
+            box.SetFocus();
+            Press(Keys.Enter);
+        }
+    }
+
+    /// <summary>Cancels the system's file picker the window opened and waits for it to go.</summary>
+    public void CancelFilePicker()
+    {
+        PickerControl(FileCancel, IsDialogButton).Invoke();
+        Until(() => FilePickerOrNull() is null, "the file picker closes");
+    }
+
+    /// <summary>The combo box of the open dialog, found from its primary button because it has no name of its own.</summary>
+    public AutomationElement DialogComboBox() => Wait(() =>
+    {
+        var comboBoxes = new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ComboBox);
+        for (var node = Find("PrimaryButton").FirstOrDefault(); node is not null; node = TreeWalker.ControlViewWalker.GetParent(node))
+            if (Below(node, comboBoxes).FirstOrDefault() is { } box)
+                return box;
+        return null;
+    }, "the dialog's combo box");
 
     /// <summary>Picks a language on the settings page. The brand name in the title never changes with it.</summary>
     public void Language(string name)
@@ -369,6 +470,11 @@ public sealed partial class AppWindow : IDisposable
     }
 
     const uint KeyUp = 0x0002, MouseLeftDown = 0x0002, MouseLeftUp = 0x0004, PrintFullContent = 2;
+
+    const uint OwnerWindow = 4;
+
+    [LibraryImport("user32.dll")]
+    private static partial IntPtr GetWindow(IntPtr window, uint relation);
 
     [StructLayout(LayoutKind.Sequential)]
     struct WindowBounds { public int Left, Top, Right, Bottom; }

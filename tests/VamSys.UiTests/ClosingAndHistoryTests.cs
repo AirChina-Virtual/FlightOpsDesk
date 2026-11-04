@@ -1,8 +1,8 @@
 using VamSys.Core;
-using VamSys.Infrastructure;
 using VamSys.TestSupport;
 using VamSys.UiTests.Driver;
 using static VamSys.UiTests.Driver.AppWindow;
+using static VamSys.UiTests.Driver.Disk;
 
 namespace VamSys.UiTests;
 
@@ -12,13 +12,6 @@ namespace VamSys.UiTests;
 /// </summary>
 public class ClosingAndHistoryTests
 {
-    // The stored workspace as a restarted program reads it.
-    static Workspace Stored(string directory, Func<string, bool>? named = null)
-    {
-        var store = new WorkspaceStore(directory);
-        return store.Load(store.List().First(w => named?.Invoke(w.Name) ?? true).Id);
-    }
-
     static string? FirstFleetName(Workspace workspace) => workspace.Resources[ResourceKind.Fleets].Draft[0].Get("Name");
 
     [WindowFact]

@@ -91,6 +91,15 @@ public sealed partial class MainWindow
                 verificationLocalTask = EditRules();
                 await Task.Delay(80);
                 return new { locked = gate.LocalOperationActive && !CanEditData() && !Navigation.IsEnabled && !WorkspacePicker.IsEnabled && !ResourcePicker.IsEnabled && !PageHost.IsEnabled };
+            case "parameter-dialog":
+            {
+                // The picker over made-up parameters: the real list needs the server (filtering it is MaintenanceServiceTests' job).
+                if(verificationLocalTask!=null)await verificationLocalTask;
+                var row=workspace.Resources[ResourceKind.Fleets].Draft.First(r=>r.Identity is null);
+                verificationLocalTask=LocalOperation(()=>PickParameter(row,[new("11","7","AAA","AA",true,false,[]),new("12","7","BBB","BB",true,false,[])]));
+                await Task.Delay(80);
+                return new{opened=verificationDialog!=null};
+            }
             case "dialog-cancel":
             {
                 (verificationDialog ?? throw new InvalidOperationException("No QA dialog is open")).Hide();
