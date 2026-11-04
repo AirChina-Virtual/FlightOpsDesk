@@ -2,37 +2,10 @@ using System.Diagnostics;
 using VamSys.Core;
 using VamSys.Infrastructure;
 
-if(args.Length >= 2 && args[0] is "--seed-storage-ui" or "--seed-task-ui" or "--seed-data-ui" or "--seed-ui")
+if(args.Length >= 2 && args[0] is "--seed-data-ui" or "--seed-ui")
     DataUiFixture.RequireEmptyDirectory(args[1]);
 if(args.Length==2 && args[0] is "--verify-package" or "--verify-qa-package")
 {PackageChecks.Verify(args[1],args[0]=="--verify-qa-package");return;}
-if(args.Length==3 && args[0]=="--seed-storage-ui"){DataUiFixture.SeedStorage(args[1],args[2]=="future");return;}
-if(args.Length==2 && args[0]=="--seed-task-ui")
-{
-    var w=StorageScenarios.Fixture();w.Jobs.Clear();w.Mode=RunMode.Offline;
-    for(var n=0;n<1000;n++)w.Jobs.Add(new(){Created=DateTimeOffset.UnixEpoch.AddMinutes(n),Mode=RunMode.Online,Items=Enumerable.Range(0,20).Select(k=>new ChangeItem{State=ItemState.Succeeded}).ToList()});
-    w.Jobs.Add(new(){Created=DateTimeOffset.UtcNow,Mode=RunMode.Online,Items=Enumerable.Range(0,20000).Select(k=>new ChangeItem{State=ItemState.Pending}).ToList()});
-    var taskStore=new WorkspaceStore(args[1]);taskStore.Save(w);taskStore.SaveLanguage("en-US");Console.WriteLine("Seeded 1000 histories / 20000 history items + 20000 active items");return;
-}
-if(args.Length==2 && args[0]=="--assert-close-ui")
-{
-    var store=new WorkspaceStore(args[1]);var w=store.Load(store.List()[0].Id);
-    if(w.Resources[ResourceKind.Fleets].Draft[0].Get("Name")!="accepted after failure")throw new Exception("Closing retry did not persist draft");
-    Console.WriteLine("PASS restart reads the last accepted draft after failed close and retry");return;
-}
-if(args.Length==3 && args[0]=="--assert-autosave-ui")
-{
-    var store=new WorkspaceStore(args[1]);var w=store.Load(store.List()[0].Id);var name=w.Resources[ResourceKind.Fleets].Draft[0].Get("Name");
-    if(name!=args[2])throw new Exception($"Autosaved draft lost after forced exit: '{name}'");
-    Console.WriteLine("PASS restart reads the autosaved row after a forced exit");return;
-}
-if(args.Length==4 && args[0]=="--assert-history-ui")
-{
-    var store=new WorkspaceStore(args[1]);var w=store.Load(store.List().First(w=>w.Name!="QA other").Id);var d=w.Resources[ResourceKind.Fleets];
-    if(d.Draft[0].Get("Name")!=args[2])throw new Exception("Current history value lost");
-    d.UndoEdit();if(d.Draft[0].Get("Name")!=args[3])throw new Exception("Undo boundary lost");d.RedoEdit();if(d.Draft[0].Get("Name")!=args[2])throw new Exception("Redo boundary lost");
-    Console.WriteLine("PASS restart restores complete last history step");return;
-}
 DataRow Row(params (string, string)[] fields) => new() { Fields = fields.ToDictionary(p => p.Item1, p => p.Item2) };
 if(args.Length==3 && args[0]=="--seed-data-ui"){DataUiFixture.Seed(args[1],int.Parse(args[2]));return;}
 if (args.Length == 2 && args[0] == "--seed-ui")
@@ -45,6 +18,6 @@ if (args.Length == 2 && args[0] == "--seed-ui")
 
 if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await DiagnosticReplayExport.ExportDiagnostics(args[1]);return;}
 
-// Seeds, restart assertions, package checks and diagnostic replays for the window tests; benchmarks are in tests/VamSys.Benchmarks.
+// Seeds, package checks and diagnostic replays for the remaining window scripts and the packaging script; benchmarks are in tests/VamSys.Benchmarks.
 Console.Error.WriteLine("Unknown or missing command. See tools/VamSys.QaSeed/README.md for the command-line entries.");
 Environment.ExitCode = 2;

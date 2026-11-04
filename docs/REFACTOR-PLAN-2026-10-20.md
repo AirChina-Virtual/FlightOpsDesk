@@ -369,6 +369,8 @@ R7 不是排在最后才开始：R0 引入新框架后，每个阶段重构完�
 
 **进度（2026-11-03，R7 第④块第二批）：** 5 个脚本改写为 C#（`test-cell-editing-ui` → `CellEditingTests`；`test-credentials-ui`、`test-settings-save-ui` → `ConnectionSettingsTests`；`test-storage-ui` → `StorageStartupTests`；`test-recovery-ui` → `RecoveryTests`），旧脚本已删除。驱动 `QaWindow` 改名 `AppWindow`，可驱动没有 QA 管道的正式包，并支持重启、第二实例和真实鼠标。恢复与存储种子移入 `DataUiFixture`，`--seed-recovery-ui` 删除。7 个窗口测试在真实窗口全部通过（35 秒）。AutomationId 清单只增不减。
 
+**进度（2026-11-03，R7 第④块第三批）：** `test-v3-verification-ui` → `ClosingAndHistoryTests`、`TaskPageTests`；`test-localization-ui` → `LocalizationTests`；`test-ui-interactions` → `DataInteractionTests`，旧脚本已删除。QA 工具删去 `--seed-storage-ui`、`--seed-task-ui` 和 3 个 `--assert-*-ui`：种子移入 `DataUiFixture`，重启后的核对在测试里直接读存储。16 个用例在真实窗口通过：全部运行两次，第一次 15 过 1 败（启动检查把刚退出的进程当成已开窗口，已改为等待 5 秒），第二次 15 过 1 败（`baseline` 超过新加的 60 秒查询限制，已对这条命令放宽），之后单独重跑 `TaskPageTests` 通过。还剩 `test-data-performance-ui`、`test-baseline-ui`、`test-api-ui-20k` 三个测量脚本。
+
 ### R8 验收与收尾
 
 1. 全部单元、集成和窗口测试，正式包与 QA 包检查；需求覆盖矩阵每一行都有通过的测试，回植错误全部被发现；旧运行器和旧脚本已删除。

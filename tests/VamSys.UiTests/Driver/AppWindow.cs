@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Text.Json.Nodes;
@@ -17,9 +19,9 @@ public enum Package { Qa, Product }
 /// </summary>
 public sealed partial class AppWindow : IDisposable
 {
-    public static readonly TimeSpan DefaultWait = TimeSpan.FromSeconds(15);
+    public static readonly TimeSpan DefaultWait = TimeSpan.FromSeconds(20);
     static readonly TimeSpan QueryTimeout = TimeSpan.FromSeconds(60);
-    static readonly TimeSpan StartupWait = TimeSpan.FromSeconds(20);
+    static readonly TimeSpan PageLayoutWait = TimeSpan.FromSeconds(2);
     static readonly string[] DialogButtonIds = ["PrimaryButton", "SecondaryButton", "CloseButton"];
 
     readonly Process process;
@@ -30,6 +32,9 @@ public sealed partial class AppWindow : IDisposable
 
     /// <summary>The isolated data directory the window runs on (under artifacts/ui-tests).</summary>
     public string DataDirectory { get; }
+
+    /// <summary>The test's directory above the data directory, for screenshots and summaries (git-ignored).</summary>
+    public string OutputDirectory => Path.GetDirectoryName(DataDirectory)!;
 
     /// <summary>Describes the window's state in failure messages, for example the data table state.</summary>
     public Func<string>? Context { get; set; }
@@ -56,12 +61,23 @@ public sealed partial class AppWindow : IDisposable
     /// </summary>
     public static AppWindow Start(string name, Action<string>? seed = null, Package package = Package.Qa)
     {
-        if (Process.GetProcessesByName("FlightOpsDesk").Length > 0)
+        // A process that just exited stays listed while something (UI Automation) still holds a handle to it, so the previous
+        // test's window gets a moment to go away; a window that is really open fails.
+        if (Poll(() => OpenWindows() == 0 ? "none" : null, TimeSpan.FromSeconds(5)) is null)
             throw new InvalidOperationException("An existing FlightOps Desk window is open; isolate QA before running.");
         var directory = Path.Combine(Repo.Artifacts("ui-tests", name), "data-" + Guid.NewGuid().ToString("N"));
         DataUiFixture.RequireEmptyDirectory(directory);
         seed?.Invoke(directory);
         return Open(directory, package);
+    }
+
+    static int OpenWindows()
+    {
+        var processes = Process.GetProcessesByName("FlightOpsDesk");
+        var open = processes.Count(p => !p.HasExited);
+        foreach (var process in processes)
+            process.Dispose();
+        return open;
     }
 
     /// <summary>Starts the same package on the same data directory: a restart once this window is closed, otherwise a second instance.</summary>
@@ -99,13 +115,13 @@ public sealed partial class AppWindow : IDisposable
     // ---- the QA pipe ----------------------------------------------------------------------------------------------
 
     /// <summary>Sends one QA command and returns its answer; an answer with an error fails the test.</summary>
-    public JsonNode Query(string command)
+    public JsonNode Query(string command, TimeSpan? timeout = null)
     {
         if (writer is null)
             throw new InvalidOperationException("The product package has no QA pipe.");
         writer.WriteLine(command);
         var read = reader!.ReadLineAsync();
-        if (!read.Wait(QueryTimeout))
+        if (!read.Wait(timeout ?? QueryTimeout))
             throw new TimeoutException($"Timed out: {command}");
         var line = read.Result ?? throw new InvalidOperationException($"The QA pipe closed during: {command}");
         var answer = JsonNode.Parse(line)!;
@@ -137,12 +153,29 @@ public sealed partial class AppWindow : IDisposable
         throw new TimeoutException("The window did not close.");
     }
 
+    /// <summary>Ends the process without letting the program save or close, as a crash or power loss would.</summary>
+    public void Kill()
+    {
+        process.Kill();
+        process.WaitForExit();
+    }
+
+    /// <summary>Waits for the process to end after a close the test has already asked for.</summary>
+    public void WaitForExit()
+    {
+        if (!process.WaitForExit(30000))
+            throw new TimeoutException("Close did not finish.");
+    }
+
     // ---- waiting ----------------------------------------------------------------------------------------------------
 
     /// <summary>Polls until <paramref name="until"/> returns a value, then returns it. An element that goes away during a poll is retried.</summary>
-    public T Wait<T>(Func<T?> until, string what, TimeSpan? limit = null) where T : class
+    public T Wait<T>(Func<T?> until, string what, TimeSpan? limit = null) where T : class =>
+        Poll(until, limit ?? DefaultWait) ?? throw new TimeoutException($"Timeout: {what}{Describe()}");
+
+    static T? Poll<T>(Func<T?> until, TimeSpan limit) where T : class
     {
-        var end = DateTime.UtcNow + (limit ?? DefaultWait);
+        var end = DateTime.UtcNow + limit;
         while (true)
         {
             try
@@ -152,7 +185,7 @@ public sealed partial class AppWindow : IDisposable
             }
             catch (Exception e) when (e is ElementNotAvailableException or COMException) { }
             if (DateTime.UtcNow >= end)
-                throw new TimeoutException($"Timeout: {what}{Describe()}");
+                return null;
             Thread.Sleep(100);
         }
     }
@@ -182,7 +215,23 @@ public sealed partial class AppWindow : IDisposable
 
     /// <summary>Every element in the window that meets the condition, popups included; none while the window is not up yet.</summary>
     public AutomationElement[] FindAll(Condition condition) =>
-        Handle is var handle && handle == IntPtr.Zero ? [] : [.. AutomationElement.FromHandle(handle).FindAll(TreeScope.Descendants, condition).Cast<AutomationElement>()];
+        Handle is var handle && handle == IntPtr.Zero ? [] : Below(AutomationElement.FromHandle(handle), condition);
+
+    /// <summary>Every element under <paramref name="parent"/> that meets the condition.</summary>
+    public static AutomationElement[] Below(AutomationElement parent, Condition condition) =>
+        [.. parent.FindAll(TreeScope.Descendants, condition).Cast<AutomationElement>()];
+
+    /// <summary>The window's title.</summary>
+    public string Title => AutomationElement.FromHandle(Handle).Current.Name;
+
+    /// <summary>Every list item whose name starts with this text (data rows and task cards are named after their view model).</summary>
+    public AutomationElement[] ListItemsNamed(string start) => ListItems(start, FindAll);
+
+    /// <summary>Every list item under <paramref name="parent"/>.</summary>
+    public static AutomationElement[] ListItemsBelow(AutomationElement parent) => ListItems("", c => Below(parent, c));
+
+    static AutomationElement[] ListItems(string start, Func<Condition, AutomationElement[]> find) =>
+        [.. find(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ListItem)).Where(e => e.Current.Name.StartsWith(start, StringComparison.Ordinal))];
 
     /// <summary>Every element with this AutomationId.</summary>
     public AutomationElement[] Find(string automationId) =>
@@ -217,21 +266,32 @@ public sealed partial class AppWindow : IDisposable
         FindAll(Condition.TrueCondition).Any(e => e.Current.Name.Contains(text, StringComparison.Ordinal));
 
     /// <summary>Waits until some element's name contains this text, allowing for a slow startup.</summary>
-    public void WaitText(string text) => Until(() => HasText(text), $"text '{text}'", StartupWait);
+    public void WaitText(string text) => Until(() => HasText(text), $"text '{text}'");
 
     // A dialog button wins over a page button of the same name behind the dialog.
     AutomationElement? ButtonOrNull(string name) =>
         FindNamed(name, ControlType.Button) is var buttons && buttons.FirstOrDefault(b => DialogButtonIds.Contains(b.Current.AutomationId)) is { } dialog ? dialog : buttons.FirstOrDefault();
 
-    /// <summary>Waits for a button by name, opening the command bar's overflow if it is not on screen.</summary>
+    /// <summary>
+    /// Waits for a button by name, opening the command bar's overflow if it is not on screen. A page selected a moment ago
+    /// may not be laid out yet, and opening the overflow of a page still being replaced fails, so the button gets time first.
+    /// </summary>
     public AutomationElement Button(string name)
     {
-        if (ButtonOrNull(name) is null && Find("MoreButton").FirstOrDefault() is { } more)
-            more.Invoke();
+        if (Poll(() => ButtonOrNull(name), PageLayoutWait) is { } button)
+            return button;
+        ClickMore();
         return Wait(() => ButtonOrNull(name), $"button '{name}'");
     }
 
     public void Click(string name) => Button(name).Invoke();
+
+    /// <summary>Opens the command bar's overflow.</summary>
+    public void ClickMore() => Wait(() => Find("MoreButton").FirstOrDefault(), "the overflow button").Invoke();
+
+    /// <summary>Invokes the first element with this name that can be invoked, whatever its control type (overflow commands).</summary>
+    public void InvokeNamed(string name) =>
+        Wait(() => FindAll(new PropertyCondition(AutomationElement.NameProperty, name)).FirstOrDefault(e => e.GetSupportedPatterns().Contains(InvokePattern.Pattern)), $"invokable '{name}'").Invoke();
 
     public void SelectItem(string name) => First(name, ControlType.ListItem).Select();
 
@@ -239,11 +299,34 @@ public sealed partial class AppWindow : IDisposable
 
     public string Value(string name) => First(name, ControlType.Edit).Text();
 
-    /// <summary>Picks a language on the settings page.</summary>
+    /// <summary>Picks a language on the settings page. The brand name in the title never changes with it.</summary>
     public void Language(string name)
     {
         One("LanguagePicker").Expand();
         SelectItem(name);
+        Assert.Equal("FlightOps Desk", Title);
+    }
+
+    // ---- screenshots ------------------------------------------------------------------------------------------------
+
+    /// <summary>Saves what the window shows, dialogs included, as a PNG in the test's output directory for a person to look at.</summary>
+    public void Screenshot(string fileName)
+    {
+        Thread.Sleep(400);
+        if (!GetWindowRect(Handle, out var bounds))
+            throw new InvalidOperationException("Cannot read the window's bounds.");
+        using var bitmap = new Bitmap(bounds.Right - bounds.Left, bounds.Bottom - bounds.Top);
+        using (var graphics = Graphics.FromImage(bitmap))
+        {
+            var dc = graphics.GetHdc();
+            try
+            {
+                if (!PrintWindow(Handle, dc, PrintFullContent))
+                    throw new InvalidOperationException("Window capture failed.");
+            }
+            finally { graphics.ReleaseHdc(dc); }
+        }
+        bitmap.Save(Path.Combine(OutputDirectory, fileName), ImageFormat.Png);
     }
 
     // ---- keyboard and mouse -----------------------------------------------------------------------------------------
@@ -285,7 +368,18 @@ public sealed partial class AppWindow : IDisposable
         public const byte Enter = 0x0D, Escape = 0x1B, Tab = 0x09;
     }
 
-    const uint KeyUp = 0x0002, MouseLeftDown = 0x0002, MouseLeftUp = 0x0004;
+    const uint KeyUp = 0x0002, MouseLeftDown = 0x0002, MouseLeftUp = 0x0004, PrintFullContent = 2;
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct WindowBounds { public int Left, Top, Right, Bottom; }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetWindowRect(IntPtr window, out WindowBounds bounds);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool PrintWindow(IntPtr window, IntPtr dc, uint flags);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

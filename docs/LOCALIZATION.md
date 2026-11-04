@@ -25,7 +25,7 @@
 ## 验证入口
 
 - `scripts/build.ps1 -Publish`：行为回归与自包含发布，包含英文卫星程序集。
-- `scripts/test-localization-ui.ps1 -DataDirectory <新的隔离目录>`：真实 WinUI 双向切换、未保存输入、筛选选择、机型选择及删除恢复。运行前关闭本程序的其他实例。
+- 窗口测试 `UiTests.LocalizationTests`（运行方式见[窗口测试说明](../tests/VamSys.UiTests/README.md)，每次在新的隔离目录运行）：真实 WinUI 双向切换、未保存输入、筛选选择、机型选择及删除恢复。运行前关闭本程序的其他实例。
 - 测试覆盖资源键／占位符一致、显示文化隔离、历史消息、CSV 字节一致、业务结果一致以及执行中切换语言不重复写入。
 
 本轮不增加在线能力，不改变 CSV/API 契约，也不提供自动翻译或联网语言包。

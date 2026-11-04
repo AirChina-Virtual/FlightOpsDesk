@@ -14,7 +14,8 @@ dotnet test --project tests/VamSys.UiTests/VamSys.UiTests.csproj -c Release -- -
 - 每个测试在 artifacts/ui-tests/<名称>/data-<GUID> 新建数据目录，在进程内准备数据（与 `tools/VamSys.QaSeed` 的种子相同），不使用真实数据、不调用真实 API。
 - 每个测试选用的包写在 `AppWindow.Start` 的参数里，默认 QA 包（artifacts/v3-qa，`VAMSYS_QA_EXE` 可指定另一个）；要检查正式构建的用正式包（artifacts/flightops-app，没有 QA 管道）。
 - 测试只结束自己启动的进程；已有 FlightOps Desk 窗口时直接失败。
-- 键盘输入前会把窗口切到前台，切不过去就失败，避免按键落到别的窗口。
+- 键盘和鼠标输入前会把窗口切到前台，切不过去就失败，避免输入落到别的窗口。
+- 全部运行约 3 分钟。截图和测量结果（布局组合截图、`summary.json`、`task-ui-benchmark.json`）留在测试的输出目录，供人工查看。
 
 ## 驱动
 
@@ -33,3 +34,7 @@ dotnet test --project tests/VamSys.UiTests/VamSys.UiTests.csproj -c Release -- -
 | `ConnectionSettingsTests` | `test-credentials-ui.ps1`、`test-settings-save-ui.ps1` |
 | `StorageStartupTests` | `test-storage-ui.ps1` |
 | `RecoveryTests` | `test-recovery-ui.ps1` |
+| `ClosingAndHistoryTests` | `test-v3-verification-ui.ps1`（默认、`-Autosave`、`-History`） |
+| `TaskPageTests` | `test-v3-verification-ui.ps1 -Tasks`、`-InteractionsOnly` |
+| `LocalizationTests` | `test-localization-ui.ps1` |
+| `DataInteractionTests` | `test-ui-interactions.ps1`（2 万行、5 万行、`-ReviewOnly`） |

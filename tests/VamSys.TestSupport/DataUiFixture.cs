@@ -22,6 +22,22 @@ public static class DataUiFixture
         Console.WriteLine("Seeded isolated storage UI");
     }
 
+    /// <summary>A large task page: 1,000 finished tasks of 20 items each and one active task of 20,000 items.</summary>
+    public static void SeedTasks(string directory)
+    {
+        RequireEmptyDirectory(directory);
+        var workspace = StorageScenarios.Fixture();
+        workspace.Jobs.Clear();
+        workspace.Mode = RunMode.Offline;
+        for (var n = 0; n < 1000; n++)
+            workspace.Jobs.Add(new() { Created = DateTimeOffset.UnixEpoch.AddMinutes(n), Mode = RunMode.Online, Items = Enumerable.Range(0, 20).Select(k => new ChangeItem { State = ItemState.Succeeded }).ToList() });
+        workspace.Jobs.Add(new() { Created = DateTimeOffset.UtcNow, Mode = RunMode.Online, Items = Enumerable.Range(0, 20000).Select(k => new ChangeItem { State = ItemState.Pending }).ToList() });
+        var store = new WorkspaceStore(directory);
+        store.Save(workspace);
+        store.SaveLanguage("en-US");
+        Console.WriteLine("Seeded 1000 histories / 20000 history items + 20000 active items");
+    }
+
     /// <summary>A task with an unknown result on a legacy candidate ID and pending identities, without credentials.</summary>
     public static void SeedRecovery(string directory)
     {

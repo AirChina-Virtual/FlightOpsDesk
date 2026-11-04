@@ -66,7 +66,7 @@ static class JournalBenchmark
         return result;
     }
 
-    // Cost of the job safety net: 1,000 history jobs x 20 items plus one active job of 20,000 items (the --seed-task-ui shape).
+    // Cost of the job safety net: 1,000 history jobs x 20 items plus one active job of 20,000 items (the shape of DataUiFixture.SeedTasks).
     public static async Task JobsCost()
     {
         var dir = StorageScenarios.Temp();

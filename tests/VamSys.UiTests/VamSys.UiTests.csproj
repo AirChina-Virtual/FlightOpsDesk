@@ -7,8 +7,9 @@
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
-    <!-- For UIAutomationClient and UIAutomationTypes only; no WPF window is created. -->
+    <!-- For UIAutomationClient and UIAutomationTypes, and System.Drawing for window screenshots; no WPF or Forms window is created. -->
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
     <!-- The generated user32 imports (focus and keyboard input). -->
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -21,6 +22,6 @@
     <ProjectReference Include="../../src/VamSys.Storage/VamSys.Storage.csproj" AdditionalProperties="VamSysTestSupport=true" />
     <ProjectReference Include="../../src/VamSys.Infrastructure/VamSys.Infrastructure.csproj" AdditionalProperties="VamSysTestSupport=true" />
   </ItemGroup>
-  <!-- UseWPF leaves System.IO out of the implicit usings. -->
-  <ItemGroup><Using Include="Xunit" /><Using Include="System.IO" /></ItemGroup>
+  <!-- UseWPF leaves System.IO out of the implicit usings; the Forms and Drawing ones would clash with the driver's names. -->
+  <ItemGroup><Using Include="Xunit" /><Using Include="System.IO" /><Using Remove="System.Windows.Forms" /><Using Remove="System.Drawing" /></ItemGroup>
 </Project>

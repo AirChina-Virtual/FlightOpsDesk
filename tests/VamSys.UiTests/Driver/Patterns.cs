@@ -33,12 +33,20 @@ public static class Patterns
     public static void Select(this AutomationElement element) =>
         ((SelectionItemPattern)element.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
 
+    public static bool IsSelected(this AutomationElement element) =>
+        ((SelectionItemPattern)element.GetCurrentPattern(SelectionItemPattern.Pattern)).Current.IsSelected;
+
     public static void Toggle(this AutomationElement element) =>
         ((TogglePattern)element.GetCurrentPattern(TogglePattern.Pattern)).Toggle();
+
+    public static ScrollPattern Scroll(this AutomationElement element) =>
+        (ScrollPattern)element.GetCurrentPattern(ScrollPattern.Pattern);
 
     // ---- QA pipe answers ----------------------------------------------------------------------------------------------
 
     public static int Int(this JsonNode node, string key) => int.Parse(node[key]!.ToString(), CultureInfo.InvariantCulture);
+
+    public static double Number(this JsonNode node, string key) => double.Parse(node[key]!.ToString(), CultureInfo.InvariantCulture);
 
     public static string? Str(this JsonNode node, string key) => node[key]?.ToString();
 

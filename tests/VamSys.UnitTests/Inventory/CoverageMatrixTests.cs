@@ -31,7 +31,7 @@ public partial class CoverageMatrixTests
     private static partial Regex Namespace();
     [GeneratedRegex(@"\b(?:class|record)\s+(\w+)")]
     private static partial Regex ClassName();
-    [GeneratedRegex(@"\[(?:Fact|Theory|WindowFact)\b[^\n]*\n(?:\s*\[[^\n]*\n)*\s*public\s+(?:async\s+)?(?:void|Task)\s+(\w+)\s*\(")]
+    [GeneratedRegex(@"\[(?:Fact|Theory|WindowFact|WindowTheory)\b[^\n]*\n(?:\s*\[[^\n]*\n)*\s*public\s+(?:async\s+)?(?:void|Task)\s+(\w+)\s*\(")]
     private static partial Regex TestMethod();
 
     // Test classes by full name, with their test methods. A file's test methods belong to the classes it declares
