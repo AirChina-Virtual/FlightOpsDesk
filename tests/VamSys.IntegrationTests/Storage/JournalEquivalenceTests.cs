@@ -12,9 +12,10 @@ namespace VamSys.IntegrationTests.Storage;
 /// job changes and header changes are mixed in; an injected failure now and then must leave the database as it was and the
 /// following save must repair everything.
 /// </summary>
-// About three minutes; scripts/check-all.ps1 runs it only in Full mode.
+// One class per seed, because a class is one test collection and collections run in parallel: run one after another the
+// eight seeds took about 100 seconds. Still too slow for scripts/check-all.ps1 Quick, which leaves it to Full mode.
 [Trait("Category", "Slow")]
-public class JournalEquivalenceTests
+public abstract class JournalEquivalenceTests(int seed)
 {
     sealed class Run : IDisposable
     {
@@ -398,16 +399,10 @@ public class JournalEquivalenceTests
         static string Clip(string s) => s.Length > 300 ? s[..300] + "..." : s;
     }
 
-    [Theory]
-    [InlineData(101, 700)]
-    [InlineData(202, 700)]
-    [InlineData(303, 700)]
-    [InlineData(404, 700)]
-    [InlineData(505, 700)]
-    [InlineData(606, 700)]
-    [InlineData(20261022, 700)]
-    [InlineData(31415926, 700)]
-    public async Task A_journal_database_equals_a_full_save_database_after_every_step(int seed, int steps)
+    const int steps = 700;
+
+    [Fact]
+    public async Task A_journal_database_equals_a_full_save_database_after_every_step()
     {
         using var run = new Run(seed);
         for (var n = 0; n < steps; n++)
@@ -419,3 +414,12 @@ public class JournalEquivalenceTests
         Assert.True(run.FullFallbacks < run.Compared / 2, "most saves should have been incremental");
     }
 }
+
+public class JournalEquivalenceSeed101() : JournalEquivalenceTests(101);
+public class JournalEquivalenceSeed202() : JournalEquivalenceTests(202);
+public class JournalEquivalenceSeed303() : JournalEquivalenceTests(303);
+public class JournalEquivalenceSeed404() : JournalEquivalenceTests(404);
+public class JournalEquivalenceSeed505() : JournalEquivalenceTests(505);
+public class JournalEquivalenceSeed606() : JournalEquivalenceTests(606);
+public class JournalEquivalenceSeed20261022() : JournalEquivalenceTests(20261022);
+public class JournalEquivalenceSeed31415926() : JournalEquivalenceTests(31415926);
