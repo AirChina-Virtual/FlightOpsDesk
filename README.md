@@ -81,11 +81,11 @@ pwsh -File scripts/check-all.ps1
 artifacts、archive、`.tools`、bin 和 obj 都只保存在本机，不会提交到 GitHub。
 
 - **artifacts**
-  - flightops-app：当前正式包，ProductVersion 为 `1.0.0+da9b583adf7b2cd539f3999d5974b19555e049e7`。
-  - FlightOpsDesk-2026-11-04-r8-win-x64.zip 及 .sha256：当前正式交付压缩包与校验文件，558 个文件逐项与 flightops-app 相同；上一版（阶段 1）ZIP 已归档到 archive/2026-11-03-r8。
+  - flightops-app：当前正式包，ProductVersion 为 `1.0.0+b9b272e9547d02bb98e6aa9c022dd09cedfa0972`。
+  - FlightOpsDesk-2026-11-04-r8-2-win-x64.zip 及 .sha256：当前正式交付压缩包与校验文件，558 个文件逐项与 flightops-app 相同；上一版（阶段 1）ZIP 已归档到 archive/2026-11-03-r8。
   - step5-v3-baseline：真实旧版程序的回归基线，测试会用到，不能当作普通旧包清理。
   - r0-baseline、r0-real-db：重构前的性能基线和真实数据库副本（2026-10-20），用于对比，不能当作普通旧包清理。
-  - _pending-delete-r8：只剩一份被替换、没有交付过的 ZIP（FlightOpsDesk-2026-11-03-r8-win-x64.zip），可以删除，见 archive/2026-11-03-r8/README.txt。
+  - _pending-delete-r8：被新版替换的旧 ZIP，等手动删除，见 archive/2026-11-03-r8/README.txt。
   - v3-qa、test-build、manual-datagrid 和各项目 bin/obj：可重建输出。
 - **archive**：按日期存放已归档的内容。每个目录都有说明、逐文件 SHA-256 清单（*-files.csv）、ZIP 校验值及清理记录。2026-10-19-performance 保存此前测量、窗口结果和旧包；2026-10-20-cleanup 保存本次被替换的正式包，以及 core-performance（含修改前源码）、checkbox-theme、encoding-verification、cache-cleanup、repository-metadata、step5-performance、storage-v3-20260922 和 step5 日志。
 - **阶段 1 提交后整理**：删除构建输出（src／tests 的 bin、obj，artifacts/test-build）和测试生成的 artifacts/step5-performance，共 1,503 个文件、约 601 MB，均可重新生成；逐文件清单在 archive/2026-10-20-phase1-cleanup。
