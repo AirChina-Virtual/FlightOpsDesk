@@ -124,21 +124,26 @@ public static class DataUiFixture
     }
 
     /// <summary>A demo workspace with one fleet, two airports and two scheduled routes between them, so deleting an airport is refused.</summary>
-    public static void SeedBatch(string directory)
+    public static void SeedBatch(string directory) => SeedRoutes(directory, "2099-01-01 00:00:00");
+
+    /// <summary>The batch workspace, except that the second route has no end date.</summary>
+    public static void SeedUndatedRoute(string directory) => SeedRoutes(directory, "");
+
+    static void SeedRoutes(string directory, string secondEndDate)
     {
         RequireEmptyDirectory(directory);
-        DataRow Route(string id) => new()
+        DataRow Route(string id, string endDate) => new()
         {
             Fields = new Dictionary<string, string>
             {
                 ["ID"] = id, ["Departure Airport (ICAO/IATA)"] = "EGLL", ["Arrival Airport (ICAO/IATA)"] = "EGKK", ["Type"] = "scheduled", ["Callsign"] = "QA" + id,
-                ["Flight Number"] = id, ["Fleet IDs"] = "1", ["End Date"] = "2099-01-01 00:00:00"
+                ["Flight Number"] = id, ["Fleet IDs"] = "1", ["End Date"] = endDate
             }
         };
         var workspace = new Workspace { Name = "QA batch", Mode = RunMode.Demo };
         CsvAdapter.Import(ResourceKind.Fleets, workspace.Resources[ResourceKind.Fleets], [new DataRow { Fields = new Dictionary<string, string> { ["ID"] = "1", ["Name"] = "Boeing 737-800", ["Type Code"] = "B738", ["Type (pax/cargo/...)"] = "pax" } }], true);
         CsvAdapter.Import(ResourceKind.Airports, workspace.Resources[ResourceKind.Airports], [Airport("EGLL", "Heathrow"), Airport("EGKK", "Gatwick")], true);
-        CsvAdapter.Import(ResourceKind.Routes, workspace.Resources[ResourceKind.Routes], [Route("1"), Route("2")], true);
+        CsvAdapter.Import(ResourceKind.Routes, workspace.Resources[ResourceKind.Routes], [Route("1", "2099-01-01 00:00:00"), Route("2", secondEndDate)], true);
         SaveInEnglish(directory, workspace);
     }
 

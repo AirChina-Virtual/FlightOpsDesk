@@ -33,6 +33,9 @@ public static class Patterns
     public static void Select(this AutomationElement element) =>
         ((SelectionItemPattern)element.GetCurrentPattern(SelectionItemPattern.Pattern)).Select();
 
+    public static void AddToSelection(this AutomationElement element) =>
+        ((SelectionItemPattern)element.GetCurrentPattern(SelectionItemPattern.Pattern)).AddToSelection();
+
     public static bool IsSelected(this AutomationElement element) =>
         ((SelectionItemPattern)element.GetCurrentPattern(SelectionItemPattern.Pattern)).Current.IsSelected;
 

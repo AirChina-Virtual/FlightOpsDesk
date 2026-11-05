@@ -17,6 +17,8 @@ public class DialogTests
 {
     // Composed from the resource name at run time.
     const string ExportAirports = "Export Airports CSV";
+    const string FarFuture = "2099-01-01 00:00:00";
+    const string EndDateChange = $"End Date: {FarFuture} → ";
 
     static void PickResource(AppWindow app, string resource)
     {
@@ -132,6 +134,7 @@ public class DialogTests
     [WindowFact]
     public void Expiring_a_route_previews_the_end_date_and_only_applying_changes_the_draft()
     {
+        var before = DateTime.UtcNow;
         using var app = Start("dialog-expire", DataUiFixture.SeedBatch, Package.Product);
         app.Context = () => app.Name("StatusLabel");
 
@@ -139,16 +142,101 @@ public class DialogTests
         SelectRow(app, 0);
         app.ClickUntilDialog("Expire routes", "Set end date");
         app.WaitText("Expire routes (CSV)");
+        app.WaitData(EndDateChange);
         app.DialogCancel();
+        Assert.All(Stored(app.DataDirectory).Resources[ResourceKind.Routes].Draft, r => Assert.Equal(FarFuture, r.Get("End Date")));
         SelectRow(app, 0);
         app.ClickUntilDialog("Expire routes", "Set end date");
         app.DialogPrimary("Set end date").Invoke();
         app.DialogClosed();
         app.Close();
 
+        AssertOneRouteExpiredOneDayBack(app, before);
+    }
+
+    [WindowFact]
+    public void The_expire_batch_rule_sets_the_same_end_date_as_the_toolbar()
+    {
+        var before = DateTime.UtcNow;
+        using var app = Start("dialog-expire-rule", DataUiFixture.SeedBatch, Package.Product);
+        app.Context = () => app.Name("StatusLabel");
+
+        PickResource(app, "Routes");
+        SelectRow(app, 0);
+        app.ClickUntilDialog("Batch rules", "Preview");
+        app.DialogComboBox(1).Expand();
+        app.First("Expire routes", ControlType.ListItem).Select();
+        app.DialogPrimary("Preview").Invoke();
+        app.WaitText("Review rule impact");
+        app.WaitData(EndDateChange);
+        app.DialogPrimary("Apply to drafts").Invoke();
+        app.DialogClosed();
+        app.Close();
+
+        AssertOneRouteExpiredOneDayBack(app, before);
+    }
+
+    [WindowFact]
+    public void Shifting_days_reports_bad_input_skips_a_route_without_a_date_and_only_applying_changes_the_draft()
+    {
+        using var app = Start("dialog-shift-days", DataUiFixture.SeedUndatedRoute, Package.Product);
+        app.Context = () => app.Name("StatusLabel");
+        const string Skip = "1 record(s) skipped: the date is empty or invalid.";
+        void ShiftBy(string days)
+        {
+            app.ClickUntilDialog("Batch rules", "Preview");
+            app.DialogComboBox(0).Expand();
+            app.First("End Date", ControlType.ListItem).Select();
+            app.DialogComboBox(1).Expand();
+            app.First("Shift date (days)", ControlType.ListItem).Select();
+            app.Edit("New value / offset", days);
+            app.DialogPrimary("Preview").Invoke();
+        }
+        void PreviewBothRows()
+        {
+            SelectRow(app, 0);
+            app.Rows()![1].AddToSelection();
+            ShiftBy("7");
+            app.WaitText("Review rule impact");
+            app.WaitData("Selected 2 · Skipped 1 · Unchanged 0 · Changed 1");
+            // The whole text: the status bar behind the dialog still ends with this reason.
+            app.First(Skip, ControlType.Text);
+            app.WaitData($"End Date: {FarFuture} → 2099-01-08 00:00:00");
+        }
+
+        PickResource(app, "Routes");
+        SelectRow(app, 0);
+        ShiftBy("soon");
+        app.StatusStarting("Shift days must be a whole number. Nothing was changed.");
+
+        // Nothing can shift, so no preview opens and the status says why.
+        SelectRow(app, 1);
+        ShiftBy("7");
+        app.StatusStarting($"Selected 1 · Skipped 1 · Unchanged 0 · Changed 0 {Skip}");
+
+        PreviewBothRows();
+        app.DialogCancel();
+        Assert.Equal([FarFuture, ""], Stored(app.DataDirectory).Resources[ResourceKind.Routes].Draft.Select(r => r.Get("End Date")));
+
+        PreviewBothRows();
+        app.DialogPrimary("Apply to drafts").Invoke();
+        app.DialogClosed();
+        app.Close();
+
+        var routes = Stored(app.DataDirectory).Resources[ResourceKind.Routes];
+        Assert.Equal(["2099-01-08 00:00:00", ""], routes.Draft.Select(r => r.Get("End Date")));
+        Assert.Equal([FarFuture, ""], routes.Snapshot.Select(r => r.Get("End Date")));
+    }
+
+    // The first route now ends one day before the moment it was expired, in UTC; the second is untouched.
+    static void AssertOneRouteExpiredOneDayBack(AppWindow app, DateTime before)
+    {
+        var after = DateTime.UtcNow;
         var routes = Stored(app.DataDirectory).Resources[ResourceKind.Routes].Draft;
-        Assert.Equal(1, routes.Count(r => string.CompareOrdinal(r.Get("End Date"), DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture)) < 0));
-        Assert.Equal(1, routes.Count(r => r.Get("End Date") == "2099-01-01 00:00:00"));
+        Assert.Equal(FarFuture, routes[1].Get("End Date"));
+        var ended = DateTime.ParseExact(routes[0].Get("End Date"), "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+        // The stored value has no fraction of a second.
+        Assert.InRange(ended, before.AddDays(-1).AddSeconds(-1), after.AddDays(-1));
     }
 
     [WindowFact]

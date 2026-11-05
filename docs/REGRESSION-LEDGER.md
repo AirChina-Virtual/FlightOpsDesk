@@ -49,12 +49,12 @@
 | R39 | 10-19 | 没有变化的批量操作仍新增撤销步骤 | Application.BatchEditServiceTests.A_rule_that_changes_nothing_* |
 | R40 | B2 | 处理冲突时每解决一个就完整保存一次 | Application.ConflictServiceTests；UiTests.ConflictReviewTests |
 | R41 | R6 | 页脚的跳页框和每页条数换语言后仍读旧名称 | UiTests.DataFooterTests |
-| R42 | A3，11-04 | 工具栏停用航线用 UTC −2 天，批量规则用 −1 天；决定统一为 −1 天 | Application.BatchEditServiceTests.Retirement_sets_an_end_date_one_day_back_on_routes_only；Domain.RuleEngineTests.Retire_sets_the_end_date_to_yesterday_in_utc_whatever_field_the_rule_names |
-| R43 | 11-04 | 平移天数：无效输入抛原始异常，一行有问题整批不能预览 | Domain.RuleEngineTests.{A_day_count_that_is_not_a_whole_number_gives_a_validation_message_and_no_rows, A_date_that_cannot_shift_is_skipped_with_its_reason_and_the_other_rows_still_shift, A_shift_that_leaves_the_calendar_is_skipped_without_throwing} |
+| R42 | A3，11-04 | 工具栏停用航线用 UTC −2 天，批量规则用 −1 天；决定统一为 −1 天 | Application.BatchEditServiceTests.Retirement_sets_an_end_date_one_day_back_on_routes_only；Domain.RuleEngineTests.Retire_sets_the_end_date_to_yesterday_in_utc_whatever_field_the_rule_names；UiTests.DialogTests.{Expiring_a_route_previews_the_end_date_and_only_applying_changes_the_draft, The_expire_batch_rule_sets_the_same_end_date_as_the_toolbar} |
+| R43 | 11-04 | 平移天数：无效输入抛原始异常，一行有问题整批不能预览 | Domain.RuleEngineTests.{A_day_count_that_is_not_a_whole_number_gives_a_validation_message_and_no_rows, A_date_that_cannot_shift_is_skipped_with_its_reason_and_the_other_rows_still_shift, A_shift_that_leaves_the_calendar_is_skipped_without_throwing}；UiTests.DialogTests.Shifting_days_reports_bad_input_skips_a_route_without_a_date_and_only_applying_changes_the_draft |
 
 ## 回植检查
 
-`scripts/test-mutations.ps1` 把代码复制到 artifacts 下，逐个植入已知错误，确认对应的测试会失败；不改动工作区的代码。R8 验收要求全部被发现。2026-11-03：不开窗口 20 个、窗口 7 个，全部被发现。2026-11-04 为 A3 和平移天数新增 4 个不开窗口的回植，这 4 个也被发现，其余的没有重跑。植入点找不到或不能编译时脚本报错，不算通过，代码改动后要跟着更新。
+`scripts/test-mutations.ps1` 把代码复制到 artifacts 下，逐个植入已知错误，确认对应的测试会失败；不改动工作区的代码。R8 验收要求全部被发现。2026-11-03：不开窗口 20 个、窗口 7 个，全部被发现。2026-11-04 为 A3 和平移天数新增 4 个不开窗口的回植，这 4 个也被发现；又为这两处新增 2 个窗口回植，也被发现。其余的没有重跑。植入点找不到或不能编译时脚本报错，不算通过，代码改动后要跟着更新。
 
 ~~~powershell
 ./scripts/test-mutations.ps1                  # 不开窗口：写入安全、回读、判重、版本号、陈旧覆盖等

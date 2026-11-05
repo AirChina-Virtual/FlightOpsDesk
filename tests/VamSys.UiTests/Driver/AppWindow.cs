@@ -424,15 +424,15 @@ public sealed partial class AppWindow : IDisposable
         Until(() => FilePickerOrNull() is null, "the file picker closes");
     }
 
-    /// <summary>The combo box of the open dialog, found from its primary button because it has no name of its own.</summary>
-    public AutomationElement DialogComboBox() => Wait(() =>
+    /// <summary>A combo box of the open dialog by its position, found from the primary button because it has no name of its own.</summary>
+    public AutomationElement DialogComboBox(int index = 0) => Wait(() =>
     {
         var comboBoxes = new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ComboBox);
         for (var node = Find("PrimaryButton").FirstOrDefault(); node is not null; node = TreeWalker.ControlViewWalker.GetParent(node))
-            if (Below(node, comboBoxes).FirstOrDefault() is { } box)
-                return box;
+            if (Below(node, comboBoxes) is { Length: > 0 } boxes)
+                return boxes.ElementAtOrDefault(index);
         return null;
-    }, "the dialog's combo box");
+    }, $"the dialog's combo box {index}");
 
     /// <summary>Picks a language on the settings page. The brand name in the title never changes with it.</summary>
     public void Language(string name)
