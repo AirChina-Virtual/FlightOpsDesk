@@ -15,6 +15,7 @@ public sealed partial class MainWindow
     CancellationTokenSource? dataQueryCancellation;
     long dataQueryGeneration;
     Task dataQueryTask = Task.CompletedTask;
+    bool keepStatusThroughRefresh;
     readonly Dictionary<ResourceData, int> changeCounts = [];
     Dictionary<Guid, DataRow> tableBaseline = [];
     HashSet<Guid> tableConflicts = [];
@@ -181,6 +182,8 @@ public sealed partial class MainWindow
     {
         if (!gate.CanStartQuery || table is null)
             return;
+        // Read before the first await: the flag only holds during the render that starts this query.
+        var announce = !keepStatusThroughRefresh;
         CancelDataQuery();
         var cancellation = new CancellationTokenSource();
         dataQueryCancellation = cancellation;
@@ -209,7 +212,8 @@ public sealed partial class MainWindow
                     ChangePlanner.GetChangeKind(row, baseline.GetValueOrDefault(row.LocalId)) != null, Schemas.Deleted(row)));
                 if (slice.ElapsedMilliseconds >= 8)
                 {
-                    Status(() => L("TableLoading"));
+                    if (announce)
+                        Status(() => L("TableLoading"));
                     await Task.Yield();
                     slice.Restart();
                 }
@@ -232,7 +236,8 @@ public sealed partial class MainWindow
             changeCounts[source] = result.ModifiedCount;
             ShowDataPageRows(false);
             RestoreDataOffsets(state);
-            Status(() => L("TableReady", ("count", result.RowIds.Length)));
+            if (announce)
+                Status(() => L("TableReady", ("count", result.RowIds.Length)));
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         finally

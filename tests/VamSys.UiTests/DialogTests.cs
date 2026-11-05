@@ -221,6 +221,12 @@ public class DialogTests
         PreviewBothRows();
         app.DialogPrimary("Apply to drafts").Invoke();
         app.DialogClosed();
+        // The table has refreshed once the new date is in it: the result must still be in the status bar.
+        app.Until(() => app.FindNamed("End Date", ControlType.Edit).Any(c => c.Text() == "2099-01-08 00:00:00"), "the table shows the new date");
+        Assert.StartsWith("Selected 2 · Skipped 1 · Unchanged 0 · Changed 1", app.Name("StatusLabel"), StringComparison.Ordinal);
+        // A refresh the user asks for reports as usual.
+        app.Click("Filter / sort");
+        app.StatusStarting("Loaded 2 matching records.");
         app.Close();
 
         var routes = Stored(app.DataDirectory).Resources[ResourceKind.Routes];

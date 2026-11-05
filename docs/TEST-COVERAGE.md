@@ -84,6 +84,7 @@
 | X07 | 审计、重审、生命周期三组旧场景逐个检查后，没有仅依赖领域层的场景（都使用 `OperationsAdapter`／`OperationsBatchExecutor`／模拟 HTTP／`WorkspaceStore`） | 已全部迁移并删除，对应新测试见 F04、F15、I01、I02、I04 行 |
 | X08 | “停用航线”两个入口的结束日期曾不同（工具栏 UTC −2 天，批量规则 −1 天；审查文档 A3） | 2026-11-04 决定为 −1 天，两个入口共用 `RuleEngine.RetireEndDate`：Domain.RuleEngineTests.Retire_sets_the_end_date_to_yesterday_in_utc_whatever_field_the_rule_names；Application.BatchEditServiceTests.Retirement_sets_an_end_date_one_day_back_on_routes_only；UiTests.DialogTests.{Expiring_a_route_previews_the_end_date_and_only_applying_changes_the_draft, The_expire_batch_rule_sets_the_same_end_date_as_the_toolbar} |
 | X09 | `ShiftDays` 对空日期、格式错误日期或非整数天数曾直接抛出原始异常，一行有问题整批都不能预览 | 2026-11-04 修复，与 A4 的 `ShiftMinutes` 相同：无效天数给校验消息，不能平移的行跳过并说明原因：Domain.RuleEngineTests.{A_day_count_that_is_not_a_whole_number_gives_a_validation_message_and_no_rows, A_date_that_cannot_shift_is_skipped_with_its_reason_and_the_other_rows_still_shift, A_shift_that_leaves_the_calendar_is_skipped_without_throwing, A_batch_preview_counts_the_day_shift_skips_and_applies_only_the_rows_that_moved}；UiTests.DialogTests.Shifting_days_reports_bad_input_skips_a_route_without_a_date_and_only_applying_changes_the_draft |
+| X10 | 批量操作应用后，状态栏的结果被表格刷新盖掉 | 2026-11-04 修复：UiTests.DialogTests.Shifting_days_reports_bad_input_skips_a_route_without_a_date_and_only_applying_changes_the_draft |
 
 ## 回归测试对照（CHANGELOG／审查文档登记的已修复领域问题）
 

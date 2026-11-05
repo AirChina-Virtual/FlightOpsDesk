@@ -26,6 +26,7 @@ public sealed partial class MainWindow
             return;
         ApplyShellState();
         RefreshDataAvailability();
+        var statusBefore = statusText;
         try
         {
             await session.FlushAutosaveAsync();
@@ -36,7 +37,10 @@ public sealed partial class MainWindow
             // A review worker started inside this operation still reads the workspace: the shell stays locked until it is done.
             scope.Dispose();
             ApplyShellState();
+            // The table refresh this render starts must not replace what the operation just reported.
+            keepStatusThroughRefresh = !ReferenceEquals(statusText, statusBefore);
             Render();
+            keepStatusThroughRefresh = false;
         }
     }
 
