@@ -91,22 +91,78 @@ public class RuleEngineTests
         Assert.Equal("n", preview.Get("Name"));
     }
 
-    // Product gap found while writing these tests (not fixed here: src/ is out of scope for R2 tests). The minute-shift rule
-    // got input validation and per-row skips in A4; the day-shift rule still lets the raw parser exceptions escape.
-    [Theory(Skip = "Product gap: ShiftDays throws a raw FormatException / OverflowException for an empty or malformed date or a non-numeric day count instead of a localized validation message or a per-row skip (compare A4 for ShiftMinutes).")]
-    [InlineData("", "1")]
-    [InlineData("2026-12-31", "1")]
-    [InlineData("2026-12-31 12:00:00", "x")]
-    public void ShiftDays_reports_unusable_input_as_a_message_instead_of_a_raw_parser_exception(string date, string days)
+    [Theory]
+    [InlineData("x")]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("1.5")]
+    [InlineData("99999999999")]
+    public void A_day_count_that_is_not_a_whole_number_gives_a_validation_message_and_no_rows(string days)
     {
-        var error = Record.Exception(() => RuleEngine.Preview([Row(("Date", date))], new(RuleKind.ShiftDays, "Date", days)));
+        var outcome = RuleEngine.Evaluate([Row(("Date", "2026-12-31 12:00:00"))], new(RuleKind.ShiftDays, "Date", days));
 
-        Assert.IsNotType<FormatException>(error);
-        Assert.IsNotType<OverflowException>(error);
+        Assert.Equal("BatchShiftInvalidDays", outcome.Validation?.Code);
+        Assert.Empty(outcome.Rows);
+        Assert.Empty(outcome.Skips);
+    }
+
+    [Theory]
+    [InlineData("", "BatchShiftSkippedInvalidDate")]
+    [InlineData("2026-12-31", "BatchShiftSkippedInvalidDate")]
+    [InlineData("2026-13-01 12:00:00", "BatchShiftSkippedInvalidDate")]
+    [InlineData("9999-12-31 23:59:59", "BatchShiftSkippedDateOutOfRange")]
+    public void A_date_that_cannot_shift_is_skipped_with_its_reason_and_the_other_rows_still_shift(string date, string reason)
+    {
+        var bad = Row(("Date", date));
+        var good = Row(("Date", "2026-12-31 12:00:00"));
+
+        var outcome = RuleEngine.Evaluate([bad, good], new(RuleKind.ShiftDays, "Date", " 1 "));
+
+        Assert.Null(outcome.Validation);
+        Assert.Equal(date, outcome.Rows[0].Get("Date"));
+        Assert.Equal("2027-01-01 12:00:00", outcome.Rows[1].Get("Date"));
+        Assert.Equal([new RuleSkip(bad.LocalId, reason)], outcome.Skips);
+    }
+
+    [Theory]
+    [InlineData("0001-01-01 00:00:00", "-1", "BatchShiftSkippedDateOutOfRange")]
+    [InlineData("2026-12-31 12:00:00", "2147483647", "BatchShiftSkippedDateOutOfRange")]
+    [InlineData("2026-12-31 12:00:00", "-2147483648", "BatchShiftSkippedDateOutOfRange")]
+    public void A_shift_that_leaves_the_calendar_is_skipped_without_throwing(string date, string days, string reason)
+    {
+        var row = Row(("Date", date));
+
+        var outcome = RuleEngine.Evaluate([row], new(RuleKind.ShiftDays, "Date", days));
+
+        Assert.Equal(date, outcome.Rows.Single().Get("Date"));
+        Assert.Equal([new RuleSkip(row.LocalId, reason)], outcome.Skips);
     }
 
     [Fact]
-    public void Evaluate_reports_no_skips_and_no_validation_message_for_rules_other_than_minute_shift()
+    public void A_shift_may_land_on_the_last_day_the_calendar_supports()
+    {
+        var outcome = RuleEngine.Evaluate([Row(("Date", "9999-12-30 23:59:59"))], new(RuleKind.ShiftDays, "Date", "1"));
+
+        Assert.Equal("9999-12-31 23:59:59", outcome.Rows.Single().Get("Date"));
+        Assert.Empty(outcome.Skips);
+    }
+
+    [Fact]
+    public void A_batch_preview_counts_the_day_shift_skips_and_applies_only_the_rows_that_moved()
+    {
+        var bad = Row(("Date", ""));
+        var good = Row(("Date", "2026-12-31 12:00:00"));
+
+        var preview = BatchEditPreview.Rule(BatchSelection.Capture([bad, good]), new(RuleKind.ShiftDays, "Date", "1"));
+
+        Assert.Equal([good.LocalId], preview.Changes.Select(r => r.LocalId));
+        Assert.Equal(1, preview.TotalSkipped);
+        Assert.Equal(0, preview.Unchanged);
+        Assert.Equal("BatchShiftSkippedInvalidDate", Assert.Single(preview.SkipReasons).Code);
+    }
+
+    [Fact]
+    public void Evaluate_reports_no_skips_and_no_validation_message_for_rules_other_than_the_shifts()
     {
         var outcome = RuleEngine.Evaluate([Row(("Remarks", "x"))], new(RuleKind.Set, "Remarks", "y"));
 

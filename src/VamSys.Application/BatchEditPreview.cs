@@ -1,5 +1,3 @@
-using System.Globalization;
-
 namespace VamSys.Core;
 
 public sealed record BatchSelection(IReadOnlyList<DataRow> Selected, IReadOnlyList<DataRow> Eligible)
@@ -31,7 +29,7 @@ public sealed record BatchEditPreview(BatchSelection Selection, string Field, IR
     {
         // Capture the date once so preview and apply use the identical value for every row.
         if (rule.Kind == RuleKind.Retire)
-            rule = new(RuleKind.Set, "End Date", DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
+            rule = new(RuleKind.Set, "End Date", RuleEngine.RetireEndDate());
         var before = selection.Eligible.ToDictionary(r => r.LocalId);
         var outcome = RuleEngine.Evaluate(selection.Eligible, rule);
         var changes = outcome.Rows.Where(r => r.Get(rule.Field) != before[r.LocalId].Get(rule.Field)).ToArray();

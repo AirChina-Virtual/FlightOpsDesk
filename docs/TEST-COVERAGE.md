@@ -82,8 +82,8 @@
 | X05 | `v4 batch history…` 旧场景还会把每个 K 的保留内存字节数和 JSON 字节数写入 `artifacts/step5-performance/batch.json` | 场景已删除，结构断言（只保留 K 行、结构步骤带行序）已迁移；内存字节数这项测量不再自动产生，若还需要应放入 R7 基准项目 |
 | X06 | 旧场景 188 对 2 万条航线的规划＋校验加了 10 秒计时断言 | 改为 Domain.SchemaValidationTests.Twenty_thousand_unchanged_routes_validate_and_plan_clean，只验证结果；速度由 `--benchmark-core`（I14）度量，单元测试里不做计时断言 |
 | X07 | 审计、重审、生命周期三组旧场景逐个检查后，没有仅依赖领域层的场景（都使用 `OperationsAdapter`／`OperationsBatchExecutor`／模拟 HTTP／`WorkspaceStore`） | 已全部迁移并删除，对应新测试见 F04、F15、I01、I02、I04 行 |
-| X08 | “停用航线”两个入口结束日期不同（工具栏 UTC −2 天，批量规则 −1 天；审查文档 A3）仍未决定 | Domain.RuleEngineTests.Retire_sets_the_end_date_to_yesterday_in_utc_whatever_field_the_rule_names 只固定了规则引擎现在的 −1 天，不代表这就是预期值 |
-| X09 | **产品缺口**：`ShiftDays` 对空日期、格式错误日期或非整数天数直接抛出原始 `FormatException`，没有像 A4 的 `ShiftMinutes` 那样给校验消息或按行跳过 | Domain.RuleEngineTests.ShiftDays_reports_unusable_input_as_a_message_instead_of_a_raw_parser_exception，标 `Skip`，待产品修复后启用；R2 不改 `src/` |
+| X08 | “停用航线”两个入口的结束日期曾不同（工具栏 UTC −2 天，批量规则 −1 天；审查文档 A3） | 2026-11-04 决定为 −1 天，两个入口共用 `RuleEngine.RetireEndDate`：Domain.RuleEngineTests.Retire_sets_the_end_date_to_yesterday_in_utc_whatever_field_the_rule_names；Application.BatchEditServiceTests.Retirement_sets_an_end_date_one_day_back_on_routes_only |
+| X09 | `ShiftDays` 对空日期、格式错误日期或非整数天数曾直接抛出原始异常，一行有问题整批都不能预览 | 2026-11-04 修复，与 A4 的 `ShiftMinutes` 相同：无效天数给校验消息，不能平移的行跳过并说明原因：Domain.RuleEngineTests.{A_day_count_that_is_not_a_whole_number_gives_a_validation_message_and_no_rows, A_date_that_cannot_shift_is_skipped_with_its_reason_and_the_other_rows_still_shift, A_shift_that_leaves_the_calendar_is_skipped_without_throwing, A_batch_preview_counts_the_day_shift_skips_and_applies_only_the_rows_that_moved} |
 
 ## 回归测试对照（CHANGELOG／审查文档登记的已修复领域问题）
 

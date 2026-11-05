@@ -173,7 +173,7 @@ public class BatchEditServiceTests
     }
 
     [Fact]
-    public async Task Retirement_sets_an_end_date_two_days_back_on_routes_only()
+    public async Task Retirement_sets_an_end_date_one_day_back_on_routes_only()
     {
         var f = new Fixture();
         var route = Row(("ID", "1"), ("Callsign", "X1"), ("End Date", ""));
@@ -182,7 +182,8 @@ public class BatchEditServiceTests
         var proposal = f.Service.ProposeRetire(ResourceKind.Routes, [route])!;
         var end = Assert.Single(proposal.Preview!.Changes).Get("End Date");
         Assert.Equal(19, end.Length);
-        Assert.True(DateTime.Parse(end, System.Globalization.CultureInfo.InvariantCulture) < DateTime.UtcNow.AddDays(-1.9));
+        // The same value the batch rule gives: one day back, not two (A3).
+        Assert.InRange(DateTime.Parse(end, System.Globalization.CultureInfo.InvariantCulture), DateTime.UtcNow.AddDays(-1).AddMinutes(-2), DateTime.UtcNow.AddDays(-1).AddMinutes(2));
         await f.Service.ApplyEditAsync(ResourceKind.Routes, proposal.Preview);
         Assert.Equal(end, f.Routes.FindDraftRow(route.LocalId)!.Get("End Date"));
         Assert.Null(f.Service.ProposeRetire(ResourceKind.Routes, [])!.Preview);

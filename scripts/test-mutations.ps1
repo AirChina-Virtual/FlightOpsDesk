@@ -46,6 +46,10 @@ $core = @(
     @{ Name = 'path-masked'; File = 'src/VamSys.Infrastructure/Transport/ApiDiagnostics.cs'; From = 'Path = uri.AbsolutePath + Mask(uri.Query, secrets),'; To = 'Path = Mask(uri.AbsolutePath + uri.Query, secrets),'; Project = $integration; Class = 'VamSys.IntegrationTests.Api.ApiDiagnosticsTests' }
     @{ Name = 'recovery-after-every-review'; File = 'src/VamSys.Application/UnknownReview.cs'; From = 'recovery |= await review(item);'; To = 'if (await review(item)) await recover();'; Project = $unit; Class = 'VamSys.UnitTests.Application.UnknownReviewTests' }
     @{ Name = 'conflict-stop-goes-on'; File = 'src/VamSys.Application/ConflictService.cs'; From = "if (choice == ConflictChoice.Stop)`n                    return;"; To = 'if (choice == ConflictChoice.Stop) continue;'; Project = $unit; Class = 'VamSys.UnitTests.Application.ConflictServiceTests' }
+    @{ Name = 'retire-toolbar-two-days'; File = 'src/VamSys.Application/BatchEditService.cs'; From = 'new(RuleKind.Retire, "End Date", "")'; To = 'new(RuleKind.Set, "End Date", DateTime.UtcNow.AddDays(-2).ToString("yyyy-MM-dd HH:mm:ss"))'; Project = $unit; Class = 'VamSys.UnitTests.Application.BatchEditServiceTests' }
+    @{ Name = 'retire-rule-two-days'; File = 'src/VamSys.Domain/ChangePlanner.cs'; From = 'DateTime.UtcNow.AddDays(-1).ToString(DateTimeFormat'; To = 'DateTime.UtcNow.AddDays(-2).ToString(DateTimeFormat'; Project = $unit; Class = 'VamSys.UnitTests.Domain.RuleEngineTests' }
+    @{ Name = 'shift-days-bad-date-throws'; File = 'src/VamSys.Domain/ChangePlanner.cs'; From = '{ result.Add(row); skips.Add(new(row.LocalId, "BatchShiftSkippedInvalidDate")); continue; }'; To = 'throw new FormatException();'; Project = $unit; Class = 'VamSys.UnitTests.Domain.RuleEngineTests' }
+    @{ Name = 'shift-days-range-unchecked'; File = 'src/VamSys.Domain/ChangePlanner.cs'; From = 'if (ticks < DateTime.MinValue.Ticks || ticks > DateTime.MaxValue.Ticks)'; To = 'if (ticks < 0)'; Project = $unit; Class = 'VamSys.UnitTests.Domain.RuleEngineTests' }
 )
 
 $window = @(

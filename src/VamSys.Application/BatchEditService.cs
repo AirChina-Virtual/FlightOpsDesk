@@ -1,4 +1,3 @@
-using System.Globalization;
 
 namespace VamSys.Core;
 
@@ -74,8 +73,7 @@ public sealed class BatchEditService(WorkspaceSession session)
         var selection = BatchSelection.Capture(selected);
         if (selection.Eligible.Count == 0)
             return new(selection, null);
-        var end = DateTime.UtcNow.AddDays(-2).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-        return new(selection, BatchEditPreview.Rule(selection, new(RuleKind.Set, "End Date", end)));
+        return new(selection, BatchEditPreview.Rule(selection, new(RuleKind.Retire, "End Date", "")));
     }
 
     // --- Fleet assignment ---

@@ -106,6 +106,9 @@ public sealed record RuleOutcome(List<DataRow> Rows, List<RuleSkip> Skips, Messa
 public static class RuleEngine
 {
     public const int MaxShiftMinutes = 1439;
+    const string DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
+    /// <summary>The end date that retires a route: one day before now, in UTC. Every retirement path uses this value.</summary>
+    public static string RetireEndDate() => DateTime.UtcNow.AddDays(-1).ToString(DateTimeFormat, CultureInfo.InvariantCulture);
     public static List<DataRow> Preview(IEnumerable<DataRow> rows, EditRule rule)
     {
         var outcome = Evaluate(rows, rule);
@@ -114,7 +117,12 @@ public static class RuleEngine
         return outcome.Rows;
     }
     public static RuleOutcome Evaluate(IEnumerable<DataRow> rows, EditRule rule)
-        => rule.Kind == RuleKind.ShiftMinutes ? ShiftMinutes(rows, rule) : new(Apply(rows, rule), []);
+        => rule.Kind switch
+        {
+            RuleKind.ShiftMinutes => ShiftMinutes(rows, rule),
+            RuleKind.ShiftDays => ShiftDays(rows, rule),
+            _ => new(Apply(rows, rule), [])
+        };
 
     static RuleOutcome ShiftMinutes(IEnumerable<DataRow> rows, EditRule rule)
     {
@@ -137,6 +145,25 @@ public static class RuleEngine
         return new(result, skips);
     }
 
+    static RuleOutcome ShiftDays(IEnumerable<DataRow> rows, EditRule rule)
+    {
+        if (!int.TryParse(rule.Value.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var days))
+            return new([], [], Messages.Define("BatchShiftInvalidDays"));
+        var result = new List<DataRow>();
+        var skips = new List<RuleSkip>();
+        foreach (var row in rows)
+        {
+            if (!DateTime.TryParseExact(row.Get(rule.Field), DateTimeFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+            { result.Add(row); skips.Add(new(row.LocalId, "BatchShiftSkippedInvalidDate")); continue; }
+            // A far-future placeholder such as 9999-12-31 can leave the calendar DateTime supports.
+            var ticks = date.Ticks + (decimal)days * TimeSpan.TicksPerDay;
+            if (ticks < DateTime.MinValue.Ticks || ticks > DateTime.MaxValue.Ticks)
+            { result.Add(row); skips.Add(new(row.LocalId, "BatchShiftSkippedDateOutOfRange")); continue; }
+            result.Add(row.With(rule.Field, date.AddDays(days).ToString(DateTimeFormat, CultureInfo.InvariantCulture)));
+        }
+        return new(result, skips);
+    }
+
     static List<DataRow> Apply(IEnumerable<DataRow> rows, EditRule rule)
     {
         return rows.Select(row =>
@@ -149,8 +176,7 @@ public static class RuleEngine
                 RuleKind.Replace => throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_6216D1C3A0")), Messages.Define("Text_6216D1C3A0")),
                 RuleKind.AddTags => string.Join(',', old.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Concat(rule.Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)).Distinct()),
                 RuleKind.RemoveTags => string.Join(',', old.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Except(rule.Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))),
-                RuleKind.ShiftDays => DateTime.ParseExact(old, "yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture).AddDays(int.Parse(rule.Value, CultureInfo.InvariantCulture)).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
-                RuleKind.Retire => DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture),
+                RuleKind.Retire => RetireEndDate(),
                 _ => throw MessageErrors.Attach(new ArgumentException(Messages.Define("Text_5CBDBA3063")), Messages.Define("Text_5CBDBA3063"))
             };
             return row.With(rule.Kind == RuleKind.Retire ? "End Date" : rule.Field, value);
