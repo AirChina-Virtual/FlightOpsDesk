@@ -79,12 +79,43 @@ internal static class ChildProcess
             }
             await process.WaitForExitAsync(timeout.Token);
             Assert.True(killAt != null ? killed : done && process.ExitCode == 0, "Child failed: " + await stdout + await stderr);
+            if (killed)
+                await WaitUntilReleasedAsync(directory, timeout.Token);
         }
         finally
         {
             if (!process.HasExited)
             { process.Kill(true); await process.WaitForExitAsync(); }
         }
+    }
+
+    /// <summary>
+    /// After a kill the process has exited, but on Windows its handles on the database files (or a scanner's) can outlive that
+    /// for a moment; SQLite then reports "disk I/O error" while recovering the journal (seen once on a GitHub runner,
+    /// 2026-11-09). A restarted program cannot start before the old one is gone either, so the checks wait until every
+    /// database file can be opened exclusively. A file still held after the timeout fails the test by name.
+    /// </summary>
+    static async Task WaitUntilReleasedAsync(string directory, CancellationToken ct)
+    {
+        // The test's own setup may have left pooled connections (WorkspaceStore uses the default pooled string) on this one
+        // database; they are not the child's, so close them first. Never ClearAllPools: other tests run in parallel.
+        using (var pooled = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = Path.Combine(directory, "workspaces.db") }.ToString()))
+            Microsoft.Data.Sqlite.SqliteConnection.ClearPool(pooled);
+        foreach (var file in Directory.GetFiles(directory, "workspaces.db*"))
+            while (true)
+            {
+                try
+                {
+                    using (new FileStream(file, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+                    break;
+                }
+                catch (FileNotFoundException) { break; }
+                catch (IOException) when (!ct.IsCancellationRequested)
+                {
+                    try { await Task.Delay(50, ct); }
+                    catch (OperationCanceledException) { Assert.Fail("Still held after the child was killed: " + file); }
+                }
+            }
     }
 
     /// <summary>
