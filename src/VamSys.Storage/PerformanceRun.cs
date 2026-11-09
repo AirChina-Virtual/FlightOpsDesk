@@ -32,6 +32,9 @@ public sealed class PerformanceRun : IDisposable
     public double? CancellationMs { get; private set; }
     public double DurationMs { get; private set; }
     public string Outcome { get; private set; } = "Running";
+    // How the job's items stood when the run ended, counted by "Resource/Kind/State/message code" (no values, no ids):
+    // the baseline for how many items still need a person after a run, and why.
+    public SortedDictionary<string, long> ItemResults { get; } = new(StringComparer.Ordinal);
     PerformanceRun(Guid workspaceId, Guid jobId) { WorkspaceId = workspaceId; JobId = jobId; previous = ambient.Value; ambient.Value = this; }
     public static PerformanceRun Begin(Guid workspaceId, Guid jobId) => new(workspaceId, jobId);
     public void Request(string resource, string method) { lock (gate) { var key = $"{resource}/{Phase}/{method}"; Requests[key] = Requests.GetValueOrDefault(key) + 1; } }
@@ -44,6 +47,15 @@ public sealed class PerformanceRun : IDisposable
     public void Checkpoint(string kind) { lock (gate) Checkpoints[kind] = Checkpoints.GetValueOrDefault(kind) + 1; }
     public void Serialized(long bytes, TimeSpan time) { lock (gate) { JsonBytes += bytes; SerializationMs += time.TotalMilliseconds; } }
     public void Saved(bool success, TimeSpan time) { lock (gate) { if (success) SaveSuccesses++; else SaveFailures++; SqliteMs += time.TotalMilliseconds; } }
+    public void RecordItems(IEnumerable<VamSys.Core.ChangeItem> items)
+    {
+        lock (gate)
+            foreach (var item in items)
+            {
+                var key = $"{item.Resource}/{item.Kind}/{item.State}/{item.Description?.Code ?? "-"}";
+                ItemResults[key] = ItemResults.GetValueOrDefault(key) + 1;
+            }
+    }
     public void MarkCancellation() { lock (gate) canceled ??= Stopwatch.GetTimestamp(); }
     public void Finish(string outcome) { lock (gate) { Outcome = outcome; DurationMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds; if (canceled is long t) CancellationMs = Stopwatch.GetElapsedTime(t).TotalMilliseconds; } }
     public bool TryWrite(string directory)

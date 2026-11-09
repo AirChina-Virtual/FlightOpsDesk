@@ -61,6 +61,7 @@ public sealed class OnlineGateway(WorkspaceStoreAdapter storage) : IOnlineGatewa
             }
             finally
             {
+                performance.RecordItems(job.Items);
                 performance.Finish(outcome);
                 performance.TryWrite(Path.Combine(AppPaths.DataDirectory, "performance"));
             }
