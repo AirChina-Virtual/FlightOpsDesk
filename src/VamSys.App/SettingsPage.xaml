@@ -4,31 +4,69 @@
     xmlns:vm="using:VamSys.Presentation">
   <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch">
-    <StackPanel Spacing="{StaticResource SpacingLarge}">
-      <ComboBox AutomationProperties.AutomationId="LanguagePicker" MinWidth="{StaticResource LanguagePickerMinWidth}"
-          Header="{x:Bind Model.LanguageHeader, Mode=OneWay}" ItemsSource="{x:Bind vm:SettingsViewModel.Languages}"
-          SelectedIndex="{x:Bind Model.LanguageIndex, Mode=OneWay}" SelectionChanged="LanguageChanged"/>
-      <TextBlock Text="{x:Bind Model.ApiSettingsTitle, Mode=OneWay}" FontSize="{StaticResource SectionFontSize}" TextWrapping="Wrap"/>
-      <TextBlock Text="{x:Bind Model.ApiSettingsHelp, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-      <TextBox Header="{x:Bind Model.EndpointHeader, Mode=OneWay}" Text="{x:Bind Model.EndpointUrl}" IsReadOnly="True"
-          MaxWidth="{StaticResource SettingsFieldMaxWidth}" HorizontalAlignment="Stretch"/>
-      <TextBox Header="Client ID" Text="{x:Bind Model.ClientId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-          MaxWidth="{StaticResource SettingsFieldMaxWidth}" HorizontalAlignment="Stretch"/>
-      <PasswordBox Header="{x:Bind Model.SecretHeader, Mode=OneWay}" Loaded="SecretLoaded"
-          MaxWidth="{StaticResource SettingsFieldMaxWidth}" HorizontalAlignment="Stretch"/>
-      <CheckBox Content="{x:Bind Model.LocalRouteTimesLabel, Mode=OneWay}" IsChecked="{x:Bind Model.LocalRouteTimes, Mode=TwoWay}"/>
-      <Button Content="{x:Bind Model.SaveLabel, Mode=OneWay}" Click="SaveConnection"/>
-      <Button Content="{x:Bind Model.UpdateCredentialsLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanUpdateCredentials}" Click="UpdateCredentials"/>
-      <TextBlock Text="{x:Bind Model.CredentialsHelp, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-      <Button Content="{x:Bind Model.ConnectLabel, Mode=OneWay}" Click="Connect"/>
-      <Button Content="{x:Bind Model.RefreshLabel, Mode=OneWay}" Click="Refresh"/>
-      <TextBlock Text="{x:Bind Model.Capability, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-      <TextBlock Text="{x:Bind Model.IndependentScope, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-      <TextBlock Text="{x:Bind Model.Verified, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-      <TextBlock Text="{x:Bind Model.Target, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-      <Button Content="{x:Bind Model.LoadParametersLabel, Mode=OneWay}" Click="LoadParameters"/>
-      <TextBlock Text="{x:Bind Model.MaintenanceTitle, Mode=OneWay}" FontSize="{StaticResource SubsectionFontSize}" TextWrapping="Wrap"/>
-      <Button Content="{x:Bind Model.BackupClearLabel, Mode=OneWay}" Click="BackupClear"/>
+    <StackPanel Spacing="{StaticResource SpacingPage}" MaxWidth="{StaticResource PageContentMaxWidth}">
+      <Border Style="{StaticResource CardStyle}">
+        <StackPanel Spacing="{StaticResource SpacingLarge}">
+          <TextBlock Text="{x:Bind Model.ApiSettingsTitle, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
+          <TextBlock Text="{x:Bind Model.ApiSettingsHelp, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+          <!-- The column keeps the fields to a readable width and at the card's left edge. -->
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsFieldMaxWidth}"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel Spacing="{StaticResource SpacingLarge}">
+              <TextBox Header="{x:Bind Model.EndpointHeader, Mode=OneWay}" Text="{x:Bind Model.EndpointUrl}" IsReadOnly="True"/>
+              <TextBox Header="Client ID" Text="{x:Bind Model.ClientId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+              <PasswordBox Header="{x:Bind Model.SecretHeader, Mode=OneWay}" Loaded="SecretLoaded"/>
+            </StackPanel>
+          </Grid>
+          <CheckBox Content="{x:Bind Model.LocalRouteTimesLabel, Mode=OneWay}" IsChecked="{x:Bind Model.LocalRouteTimes, Mode=TwoWay}"/>
+          <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMedium}">
+            <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind Model.SaveLabel, Mode=OneWay}" Click="SaveConnection"/>
+            <Button Content="{x:Bind Model.UpdateCredentialsLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanUpdateCredentials}" Click="UpdateCredentials"/>
+          </StackPanel>
+          <TextBlock Text="{x:Bind Model.CredentialsHelp, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource CardStyle}">
+        <StackPanel Spacing="{StaticResource SpacingLarge}">
+          <TextBlock Text="{x:Bind Model.ServerTitle, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
+          <TextBlock Text="{x:Bind Model.Target, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+          <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMedium}">
+            <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind Model.ConnectLabel, Mode=OneWay}" Click="Connect"/>
+            <Button Content="{x:Bind Model.RefreshLabel, Mode=OneWay}" Click="Refresh"/>
+            <Button Content="{x:Bind Model.LoadParametersLabel, Mode=OneWay}" Click="LoadParameters"/>
+          </StackPanel>
+          <TextBlock Text="{x:Bind Model.Capability, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+          <TextBlock Text="{x:Bind Model.IndependentScope, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+          <TextBlock Text="{x:Bind Model.Verified, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource CardStyle}">
+        <StackPanel Spacing="{StaticResource SpacingLarge}">
+          <TextBlock Text="{x:Bind Model.GeneralTitle, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
+          <ComboBox AutomationProperties.AutomationId="LanguagePicker" MinWidth="{StaticResource LanguagePickerMinWidth}"
+              Header="{x:Bind Model.LanguageHeader, Mode=OneWay}" ItemsSource="{x:Bind vm:SettingsViewModel.Languages}"
+              SelectedIndex="{x:Bind Model.LanguageIndex, Mode=OneWay}" SelectionChanged="LanguageChanged"/>
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource CardStyle}">
+        <StackPanel Spacing="{StaticResource SpacingLarge}">
+          <TextBlock Text="{x:Bind Model.DataLocationTitle, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
+          <TextBlock Text="{x:Bind Model.DataLocationHelp, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+          <TextBlock AutomationProperties.AutomationId="DataLocationPath" Text="{x:Bind Model.DataLocation}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap" IsTextSelectionEnabled="True"/>
+          <TextBlock Text="{x:Bind Model.DataLocationManagedText, Mode=OneWay}" Visibility="{x:Bind Model.DataLocationManaged}" Style="{StaticResource SecondaryTextStyle}"/>
+          <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMedium}">
+            <Button Content="{x:Bind Model.DataLocationChangeLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanChangeDataLocation}" Click="ChangeDataLocation"/>
+            <Button Content="{x:Bind Model.DataLocationOpenLabel, Mode=OneWay}" Click="OpenDataFolder"/>
+            <Button Content="{x:Bind Model.DataLocationRestoreLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanRestoreDataLocation}" Click="RestoreDataLocation"/>
+          </StackPanel>
+        </StackPanel>
+      </Border>
+      <Border Style="{StaticResource CardStyle}">
+        <StackPanel Spacing="{StaticResource SpacingLarge}">
+          <TextBlock Text="{x:Bind Model.MaintenanceTitle, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
+          <Button Content="{x:Bind Model.BackupClearLabel, Mode=OneWay}" Click="BackupClear"/>
+        </StackPanel>
+      </Border>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

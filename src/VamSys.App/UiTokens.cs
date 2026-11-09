@@ -29,11 +29,29 @@ public static class UiTokens
     public static Thickness WorkspaceCardPadding => Get<Thickness>("WorkspaceCardPadding");
     public static CornerRadius CardCornerRadius => Get<CornerRadius>("CardCornerRadius");
     public static Brush CardBackgroundBrush => Get<Brush>("CardBackgroundBrush");
+    public static Style SecondaryTextStyle => Get<Style>("SecondaryTextStyle");
+    public static Style CardStyle => Get<Style>("CardStyle");
+    public static Style CardTitleStyle => Get<Style>("CardTitleStyle");
+    public static double DetailsPaneWidth => Get<double>("DetailsPaneWidth");
+    public static Thickness DetailsFieldsPadding => Get<Thickness>("DetailsFieldsPadding");
+    public static Thickness DetailsLabelMargin => Get<Thickness>("DetailsLabelMargin");
+    public static Thickness IconButtonPadding => Get<Thickness>("IconButtonPadding");
+    public static double SpacingTight => Get<double>("SpacingTight");
+    public static Style ColumnHeaderTextStyle => Get<Style>("ColumnHeaderTextStyle");
+    public static Style StatusTextStyle => Get<Style>("StatusTextStyle");
+    public static Style StatusErrorTextStyle => Get<Style>("StatusErrorTextStyle");
+    public static Style ModeOfflineBadgeStyle => Get<Style>("ModeOfflineBadgeStyle");
+    public static Style ModeDemoBadgeStyle => Get<Style>("ModeDemoBadgeStyle");
+    public static Style ModeOnlineBadgeStyle => Get<Style>("ModeOnlineBadgeStyle");
 
     public static double DataRowHeight(bool compact) => Get<double>(compact ? "DataRowHeightCompact" : "DataRowHeightComfortable");
     public static double CellHeight(bool compact) => Get<double>(compact ? "CellHeightCompact" : "CellHeightComfortable");
     public static Thickness CellMargin(bool compact) => Get<Thickness>(compact ? "CellMarginCompact" : "CellMarginComfortable");
     public static Thickness CellEditorPadding => Get<Thickness>("CellEditorPadding");
+    public static Thickness CellPickerPadding => Get<Thickness>("CellPickerPadding");
+    public static double HintDelayMilliseconds => Get<double>("HintDelayMilliseconds");
+    // The cell box for its look (CellViewModel.Look): plain, changed from the server's value, or with a problem.
+    public static Style CellBoxStyle(int look) => Get<Style>(look switch { 2 => "CellIssueBoxStyle", 1 => "CellChangedBoxStyle", _ => "CellBoxStyle" });
     public static Thickness ColumnHeaderMargin => Get<Thickness>("ColumnHeaderMargin");
     public static Thickness DataHeaderInset => Get<Thickness>("DataHeaderInset");
     public static double LockedTableOpacity => Get<double>("LockedTableOpacity");

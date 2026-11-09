@@ -1032,4 +1032,86 @@ Remote: {remote}</value>
   <data name="BatchShiftSkippedDateOutOfRange" xml:space="preserve"><value>{count} record(s) skipped: the shifted date would be outside the supported range.</value></data>
   <data name="BatchShiftSkippedInvalidTime" xml:space="preserve"><value>{count} record(s) skipped: the time is empty or invalid.</value></data>
   <data name="BatchShiftSkippedCrossesMidnight" xml:space="preserve"><value>{count} record(s) skipped: the shift would cross midnight (outside 00:00-23:59).</value></data>
+  <data name="DataLocationTitle" xml:space="preserve"><value>Data location</value></data>
+  <data name="DataLocationHelp" xml:space="preserve"><value>Workspaces, drafts, tasks, backups and encrypted credentials are stored here. The program restarts after the location changes.</value></data>
+  <data name="DataLocationManaged" xml:space="preserve"><value>The location is set by the VAMSYS_DATA_DIR environment variable and cannot be changed here.</value></data>
+  <data name="DataLocationChange" xml:space="preserve"><value>Change location…</value></data>
+  <data name="DataLocationOpen" xml:space="preserve"><value>Open folder</value></data>
+  <data name="DataLocationRestore" xml:space="preserve"><value>Restore default location</value></data>
+  <data name="DataLocationCopyConfirm" xml:space="preserve"><value>Your data will be copied to the new location and verified, then the program switches to it and restarts.&#10;From: {from}&#10;To: {to}&#10;&#10;The database in the old location is renamed and kept, not deleted, and is not opened again. Avoid folders synced by a cloud drive: syncing can damage a database in use.</value></data>
+  <data name="DataLocationExistingConfirm" xml:space="preserve"><value>This location already holds data: {to}&#10;&#10;The program will switch to it and restart. Your current data is neither copied nor changed. If that data is older, its task states may be out of date: check them before continuing any remote task.</value></data>
+  <data name="DataLocationCopyAction" xml:space="preserve"><value>Copy and restart</value></data>
+  <data name="DataLocationExistingAction" xml:space="preserve"><value>Switch and restart</value></data>
+  <data name="DataLocationCopying" xml:space="preserve"><value>Copying and verifying data. Editing is paused.</value></data>
+  <data name="DataLocationFailed" xml:space="preserve"><value>The data could not be copied or verified. The location was not changed and your current data is unaffected.</value></data>
+  <data name="DataLocationInvalid" xml:space="preserve"><value>The database in that location is damaged or was created by a newer version, so it cannot be used. The location was not changed.</value></data>
+  <data name="DataLocationSame" xml:space="preserve"><value>Your data is already in this location: {path}</value></data>
+  <data name="DataLocationNetwork" xml:space="preserve"><value>A network location cannot be used: {path}. The database cannot write reliably on a network drive, so choose a local disk.</value></data>
+  <data name="DataLocationNested" xml:space="preserve"><value>The new location cannot be inside the current data folder or one of its parent folders: {path}</value></data>
+  <data name="DataLocationBeingRetired" xml:space="preserve"><value>The old data in this location has not been set aside yet: {path}. Restart the program and try again.</value></data>
+  <data name="DataLocationUnusable" xml:space="preserve"><value>This location cannot be written to: {path}</value></data>
+  <data name="DataLocationNotEnoughSpace" xml:space="preserve"><value>There is not enough free space on the target disk: {path}</value></data>
+  <data name="DataLocationMissing" xml:space="preserve"><value>The data location was not found: {path}. If it is on a removable drive, connect it and retry. You can also use the default location; the original data is not deleted.</value></data>
+  <data name="DataLocationUnreadable" xml:space="preserve"><value>The data location setting could not be read: {path}. You can retry or return to the default location; existing data is not deleted.</value></data>
+  <data name="DataLocationRetry" xml:space="preserve"><value>Retry</value></data>
+  <data name="DataLocationUseDefault" xml:space="preserve"><value>Use default location</value></data>
+  <data name="SettingsGeneral" xml:space="preserve"><value>General</value></data>
+  <data name="SettingsServer" xml:space="preserve"><value>Server</value></data>
+  <data name="OverviewRecords" xml:space="preserve"><value>Records</value></data>
+  <data name="OverviewPending" xml:space="preserve"><value>Pending changes</value></data>
+  <data name="OverviewTasks" xml:space="preserve"><value>Tasks</value></data>
+  <data name="OverviewNextTitle" xml:space="preserve"><value>Next step</value></data>
+  <data name="NextStepTasks" xml:space="preserve"><value>Some tasks are unfinished. Check them in the task center first.</value></data>
+  <data name="NextStepTasksAction" xml:space="preserve"><value>Open task center</value></data>
+  <data name="NextStepReview" xml:space="preserve"><value>{count} change(s) are waiting for review and submission.</value></data>
+  <data name="NextStepReviewAction" xml:space="preserve"><value>Go to review</value></data>
+  <data name="NextStepConnect" xml:space="preserve"><value>Not connected to a server yet. Connect to load data from the API.</value></data>
+  <data name="NextStepConnectAction" xml:space="preserve"><value>Go to connection</value></data>
+  <data name="NextStepData" xml:space="preserve"><value>No changes are pending. You can start editing data.</value></data>
+  <data name="NextStepDataAction" xml:space="preserve"><value>Open data management</value></data>
+  <data name="TableEmpty" xml:space="preserve"><value>No matching records. Adjust the search and filter, or add or import data.</value></data>
+  <data name="TasksEmpty" xml:space="preserve"><value>No tasks yet. Tasks appear here after you submit from the review page.</value></data>
+  <data name="ShortcutUndo" xml:space="preserve"><value>Undo (Ctrl+Z)</value></data>
+  <data name="ShortcutRedo" xml:space="preserve"><value>Redo (Ctrl+Y)</value></data>
+  <data name="SearchShortcutHint" xml:space="preserve"><value>Press Ctrl+F to search, F5 to query again</value></data>
+  <data name="CellServerValue" xml:space="preserve"><value>Value on the server: {value}</value></data>
+  <data name="CellEmptyValue" xml:space="preserve"><value>(empty)</value></data>
+  <data name="CellReadOnlyDeleted" xml:space="preserve"><value>This record is marked for deletion. Restore it to edit it.</value></data>
+  <data name="CellReadOnlyServer" xml:space="preserve"><value>The server does not keep this value online, so it cannot be changed.</value></data>
+  <data name="CellPickDate" xml:space="preserve"><value>Pick a date</value></data>
+  <data name="CellPickDays" xml:space="preserve"><value>Pick days</value></data>
+  <data name="CellDaysEvery" xml:space="preserve"><value>Every day</value></data>
+  <data name="CellDaysWorking" xml:space="preserve"><value>Weekdays</value></data>
+  <data name="CellDaysNone" xml:space="preserve"><value>Clear</value></data>
+  <data name="PasteNothing" xml:space="preserve"><value>Nothing to paste ({kept} read-only cells or cells beyond this page skipped).</value></data>
+  <data name="PasteTitle" xml:space="preserve"><value>Paste into several cells</value></data>
+  <data name="PasteConfirm" xml:space="preserve"><value>{cells} cells in {rows} records will change. {kept} read-only cells or cells beyond this page stay as they are. One undo takes it back.</value></data>
+  <data name="PasteApply" xml:space="preserve"><value>Paste</value></data>
+  <data name="PasteDone" xml:space="preserve"><value>Pasted {cells} cells ({rows} records), skipped {kept}.</value></data>
+  <data name="FillDownNothing" xml:space="preserve"><value>Select the other records to fill (check boxes) first, then press Ctrl+D on a cell.</value></data>
+  <data name="FillDownTitle" xml:space="preserve"><value>Fill down</value></data>
+  <data name="FillDownConfirm" xml:space="preserve"><value>Set &quot;{field}&quot; of {rows} selected records to: {value}</value></data>
+  <data name="FillDownApply" xml:space="preserve"><value>Fill</value></data>
+  <data name="FillDownDone" xml:space="preserve"><value>Filled &quot;{field}&quot; of {rows} records with the same value.</value></data>
+  <data name="RowDuplicateDone" xml:space="preserve"><value>Copied {count} records as new records with an empty key. Complete them before submitting.</value></data>
+  <data name="RowDetails" xml:space="preserve"><value>Record details</value></data>
+  <data name="RowDuplicate" xml:space="preserve"><value>Copy as new record</value></data>
+  <data name="RowDetailsClose" xml:space="preserve"><value>Close details</value></data>
+  <data name="RowDetailsHint" xml:space="preserve"><value>Fields marked * are required. Changes show in the table at once and can be undone.</value></data>
+  <data name="RowDetailsNew" xml:space="preserve"><value>New record</value></data>
+  <data name="TableSortBy" xml:space="preserve"><value>Sort: </value></data>
+  <data name="TableSortNone" xml:space="preserve"><value>No sort</value></data>
+  <data name="TableSortAscending" xml:space="preserve"><value>Ascending</value></data>
+  <data name="TableSortDescending" xml:space="preserve"><value>Descending</value></data>
+  <data name="TableSortHint" xml:space="preserve"><value>Click to sort by this column, again to reverse, a third time to clear</value></data>
+  <data name="TableView" xml:space="preserve"><value>View</value></data>
+  <data name="TableColumns" xml:space="preserve"><value>Columns shown</value></data>
+  <data name="TableColumnsAll" xml:space="preserve"><value>Show all columns</value></data>
+  <data name="AddFromCsv" xml:space="preserve"><value>Import from CSV…</value></data>
+  <data name="BatchMenu" xml:space="preserve"><value>Selected records</value></data>
+  <data name="BatchMenuSelected" xml:space="preserve"><value>Selected records · {count}</value></data>
+  <data name="DataMenu" xml:space="preserve"><value>Data</value></data>
+  <data name="DataMenuConflicts" xml:space="preserve"><value>Data · {count} conflicts</value></data>
+  <data name="CellCopy" xml:space="preserve"><value>Copy cell</value></data>
+  <data name="CellRestoreServer" xml:space="preserve"><value>Restore the server value</value></data>
 </root>

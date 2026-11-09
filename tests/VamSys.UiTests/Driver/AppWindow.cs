@@ -81,20 +81,63 @@ public sealed partial class AppWindow : IDisposable
     }
 
     /// <summary>Starts the same package on the same data directory: a restart once this window is closed, otherwise a second instance.</summary>
-    public AppWindow Reopen() => Open(DataDirectory, package);
+    public AppWindow Reopen() => reopenPackage is { } qa ? Open(DataDirectory, qa, defaultDirectory, pipeless: true) : Open(DataDirectory, package, defaultDirectory);
 
-    static AppWindow Open(string directory, Package package)
+    /// <summary>
+    /// Starts the QA package without VAMSYS_DATA_DIR, with its default directory redirected into the test's own folder, so
+    /// the data location can be changed in the settings. <paramref name="target"/> is an empty place to move the data to.
+    /// </summary>
+    public static AppWindow StartWithDefaultDirectory(string name, Action<string> seed, out string defaults, out string target)
+    {
+        if (Poll(() => OpenWindows() == 0 ? "none" : null, TimeSpan.FromSeconds(5)) is null)
+            throw new InvalidOperationException("An existing FlightOps Desk window is open; isolate QA before running.");
+        var root = Path.Combine(Repo.Artifacts("ui-tests", name), "run-" + Guid.NewGuid().ToString("N"));
+        defaults = Path.Combine(root, "default");
+        target = Path.Combine(root, "chosen");
+        Directory.CreateDirectory(target);
+        DataUiFixture.RequireEmptyDirectory(defaults);
+        seed(defaults);
+        // The seed ran in this process: its pooled connection would hold the database the program later sets aside.
+        using (var seeded = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = Path.Combine(defaults, "workspaces.db") }.ToString()))
+            Microsoft.Data.Sqlite.SqliteConnection.ClearPool(seeded);
+        return Open(defaults, Package.Qa, defaults);
+    }
+
+    /// <summary>Waits for this window to close after a change of data location and returns the window that replaced it.</summary>
+    public AppWindow FollowRestart(string directory)
+    {
+        WaitForExit();
+        writer?.Dispose();
+        reader?.Dispose();
+        pipe?.Dispose();
+        writer = null;
+        reader = null;
+        var next = Wait(() => Process.GetProcessesByName("FlightOpsDesk").FirstOrDefault(p => p.Id != process.Id && !p.HasExited), "the restarted program");
+        return new AppWindow(next, Package.Product, null, directory) { defaultDirectory = defaultDirectory, reopenPackage = package };
+    }
+
+    string? defaultDirectory;
+    Package? reopenPackage;
+
+    // Pipeless: a start that may stop at the data location problem window never opens the QA pipe.
+    static AppWindow Open(string directory, Package package, string? defaults = null, bool pipeless = false)
     {
         var executable = package == Package.Qa ? Repo.QaExecutable : Repo.ProductExecutable;
         if (!File.Exists(executable))
             throw new FileNotFoundException("Build the packages first: scripts/build.ps1 -Publish, and with -UiVerification for the QA package.", executable);
-        var pipeName = package == Package.Qa ? "flightops-ui-" + Guid.NewGuid().ToString("N") : null;
+        var pipeName = package == Package.Qa && !pipeless ? "flightops-ui-" + Guid.NewGuid().ToString("N") : null;
         var start = new ProcessStartInfo(executable) { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(executable)! };
-        start.Environment["VAMSYS_DATA_DIR"] = directory;
+        if (defaults is null)
+            start.Environment["VAMSYS_DATA_DIR"] = directory;
+        else
+        {
+            start.Environment.Remove("VAMSYS_DATA_DIR");
+            start.Environment["VAMSYS_QA_DEFAULT_DIR"] = defaults;
+        }
         start.Environment.Remove("VAMSYS_QA_PIPE");
         if (pipeName is not null)
             start.Environment["VAMSYS_QA_PIPE"] = pipeName;
-        var window = new AppWindow(Process.Start(start)!, package, pipeName, directory);
+        var window = new AppWindow(Process.Start(start)!, package, pipeName, directory) { defaultDirectory = defaults };
         try
         {
             if (window.pipe is { } pipe)
@@ -296,9 +339,36 @@ public sealed partial class AppWindow : IDisposable
     {
         if (Poll(() => ButtonOrNull(name), PageLayoutWait) is { } button)
             return button;
-        ClickMore();
-        return Wait(() => ButtonOrNull(name), $"button '{name}'");
+        return Wait(() => ButtonOrNull(name) ?? FromMenus(name), $"button '{name}'");
     }
+
+    // The data page keeps its commands in drop-down menus; another page may still have a command bar's overflow.
+    static readonly string[] CommandMenus = ["DataBatchMenu", "DataMenu", "MoreButton"];
+
+    /// <summary>Opens each command menu that is on screen and enabled in turn and returns the item with this name.</summary>
+    AutomationElement? FromMenus(string name)
+    {
+        foreach (var id in CommandMenus)
+        {
+            if (Find(id).FirstOrDefault() is not { } menu || !menu.Current.IsEnabled)
+                continue;
+            var expand = menu.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out var pattern) ? (ExpandCollapsePattern)pattern : null;
+            if (expand != null)
+                expand.Expand();
+            else
+                menu.Invoke();
+            if (Poll(() => FindNamed(name, ControlType.MenuItem).FirstOrDefault() ?? ButtonOrNull(name), TimeSpan.FromSeconds(1)) is { } found)
+                return found;
+            if (expand?.Current.ExpandCollapseState == ExpandCollapseState.Expanded)
+                expand.Collapse();
+        }
+        return null;
+    }
+
+    /// <summary>Shows the resource with this name (its tab's name starts with it; a pending count may follow).</summary>
+    public void SelectResource(string name) =>
+        Wait(() => Below(One("ResourcePicker"), Condition.TrueCondition).FirstOrDefault(e => e.Current.Name.StartsWith(name, StringComparison.Ordinal)
+            && e.GetSupportedPatterns().Contains(SelectionItemPattern.Pattern)), $"resource tab '{name}'").Select();
 
     public void Click(string name) => Button(name).Invoke();
 
@@ -483,11 +553,29 @@ public sealed partial class AppWindow : IDisposable
         mouse_event(MouseLeftUp, 0, 0, 0, 0);
     }
 
+    /// <summary>Clicks the right mouse button at the centre of a rectangle given in physical pixels.</summary>
+    public static void RightClickAt(System.Windows.Rect target)
+    {
+        SetCursorPos((int)(target.X + target.Width / 2), (int)(target.Y + target.Height / 2));
+        mouse_event(MouseRightDown, 0, 0, 0, 0);
+        mouse_event(MouseRightUp, 0, 0, 0, 0);
+    }
+
     /// <summary>Presses and releases a key (a virtual-key code such as <see cref="Keys.Enter"/>).</summary>
     public static void Press(byte key)
     {
         keybd_event(key, 0, 0, 0);
         keybd_event(key, 0, KeyUp, 0);
+        Thread.Sleep(50);
+    }
+
+    /// <summary>Presses a key with Ctrl held.</summary>
+    public static void PressWithControl(byte key)
+    {
+        const byte control = 0x11;
+        keybd_event(control, 0, 0, 0);
+        Press(key);
+        keybd_event(control, 0, KeyUp, 0);
         Thread.Sleep(50);
     }
 
@@ -503,7 +591,7 @@ public sealed partial class AppWindow : IDisposable
         public const byte Enter = 0x0D, Escape = 0x1B, Tab = 0x09;
     }
 
-    const uint KeyUp = 0x0002, MouseLeftDown = 0x0002, MouseLeftUp = 0x0004, PrintFullContent = 2;
+    const uint KeyUp = 0x0002, MouseLeftDown = 0x0002, MouseLeftUp = 0x0004, MouseRightDown = 0x0008, MouseRightUp = 0x0010, PrintFullContent = 2;
 
     const uint OwnerWindow = 4;
 

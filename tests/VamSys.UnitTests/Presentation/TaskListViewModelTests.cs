@@ -135,7 +135,7 @@ public class TaskListViewModelTests
         fixture.List.RefreshLanguage();
         Assert.False(fixture.Timer.IsEnabled);
         Assert.NotEqual(english, fixture.List.CancelLabel);
-        Assert.Equal([nameof(TaskListViewModel.Header), nameof(TaskListViewModel.CancelLabel)], page);
+        Assert.Equal([nameof(TaskListViewModel.Header), nameof(TaskListViewModel.CancelLabel), nameof(TaskListViewModel.EmptyText)], page);
     }
 
     [Fact]

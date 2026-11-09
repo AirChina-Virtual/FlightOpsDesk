@@ -61,13 +61,13 @@ public sealed partial class MainWindow
         switch(command)
         {
             case "prepare":
-                resource=ResourceKind.Fleets;ResourcePicker.SelectedIndex=(int)resource;SelectPane(ShellPage.Data);Render();
+                resource=ResourceKind.Fleets;SelectResourceTab(resource);SelectPane(ShellPage.Data);Render();
                 await dataQueryTask;RootGrid.UpdateLayout();
                 return new{prepared=true};
             case "data-open":
             {
                 var timer=Stopwatch.StartNew();
-                ResourcePicker.SelectedIndex=(int)ResourceKind.Routes;
+                SelectResourceTab(ResourceKind.Routes);
                 if(page=="data")Render();else SelectPane(ShellPage.Data);
                 await dataQueryTask;RootGrid.UpdateLayout();
                 await WaitForDataPageReady();
@@ -294,7 +294,8 @@ public sealed partial class MainWindow
             using var doc=JsonDocument.Parse(command[11..]);var value=doc.RootElement;
             var search=value.GetProperty("search").GetString()!;var filter=value.GetProperty("filter").GetInt32();
             var sort=value.TryGetProperty("sort",out var s)&&s.ValueKind==JsonValueKind.String?s.GetString():null;
-            searchBox!.Text=search;filterBox!.SelectedIndex=filter;if(sort!=null)sortBox!.SelectedItem=sort;
+            // This command runs the query itself: the controls show its conditions and do not start another one.
+            settingQueryControls=true;searchBox!.Text=search;filterBox!.SelectedIndex=filter;sortBox!.SelectedItem=string.IsNullOrEmpty(sort)?null:sort;settingQueryControls=false;queryPause?.Stop();
             var timer=Stopwatch.StartNew();await LoadRowsAsync(search,filter,sort);RootGrid.UpdateLayout();
             return new{milliseconds=timer.Elapsed.TotalMilliseconds,state=DataVerificationState()};
         }
@@ -352,7 +353,7 @@ public sealed partial class MainWindow
             vertical=scroll?.VerticalOffset,horizontal=horizontalTable?.HorizontalOffset,anchor=FirstVisibleDataRow()?.Id,
             windowWidth=RootGrid.ActualWidth,windowHeight=RootGrid.ActualHeight,rasterizationScale=RootGrid.XamlRoot?.RasterizationScale,
             theme=RootGrid.ActualTheme.ToString(),pageInput=DataPageJumpBox?.Text,unapplied=queryNotice?.Visibility==Visibility.Visible,
-            batchEnabled=dataActions?.PrimaryCommands.Concat(dataActions.SecondaryCommands).OfType<AppBarButton>().Where(b=>b.Tag is string).Select(b=>new{target=b.Tag,enabled=b.IsEnabled}).ToArray(),
+            batchEnabled=BatchCommandStates(),
             draftSaves=verificationDraftCommits,fullSaves=verificationFullCommits,undo=Data.Undo.Count };
     }
     // Every shown row is bound to the live draft row and every editor shows that row's value.

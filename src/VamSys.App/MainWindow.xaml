@@ -7,7 +7,7 @@
       <TitleBar.Content>
         <StackPanel Orientation="Horizontal" Spacing="8">
         <ComboBox x:Name="WorkspacePicker" Width="{StaticResource WorkspacePickerWidth}" Margin="{StaticResource WorkspacePickerMargin}" VerticalAlignment="Center" DisplayMemberPath="Name" SelectionChanged="WorkspaceChanged"/>
-        <Border CornerRadius="{StaticResource BadgeCornerRadius}" Padding="{StaticResource BadgePadding}" Background="{ThemeResource BadgeBackgroundBrush}" VerticalAlignment="Center"><TextBlock x:Name="ModeBadge" FontSize="{StaticResource BadgeFontSize}"/></Border>
+        <Border x:Name="ModeBadgeHost" CornerRadius="{StaticResource BadgeCornerRadius}" Padding="{StaticResource BadgePadding}" Style="{StaticResource ModeOfflineBadgeStyle}" VerticalAlignment="Center"><TextBlock x:Name="ModeBadge" FontSize="{StaticResource BadgeFontSize}"/></Border>
         </StackPanel>
       </TitleBar.Content>
     </TitleBar>
@@ -18,23 +18,29 @@
         <NavigationViewItem Tag="import" Icon="Import"/>
         <NavigationViewItem Tag="review" Icon="Edit"/>
         <NavigationViewItem Tag="tasks" Icon="List"/>
-        <NavigationViewItem Tag="settings" Icon="Setting"/>
       </NavigationView.MenuItems>
+      <NavigationView.FooterMenuItems>
+        <NavigationViewItem Tag="settings" Icon="Setting"/>
+      </NavigationView.FooterMenuItems>
       <Grid x:Name="BodyGrid" Margin="{StaticResource PageMargin}" RowSpacing="{StaticResource SpacingPage}" ColumnSpacing="16">
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <TextBlock x:Name="PageTitle" FontSize="{StaticResource PageTitleFontSize}" FontWeight="SemiBold"/>
         <StackPanel x:Name="ResourceBar" Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="{StaticResource SpacingLarge}" VerticalAlignment="Center">
-          <ComboBox x:Name="ResourcePicker" Width="{StaticResource ResourcePickerWidth}" SelectionChanged="ResourceChanged"/>
+          <SelectorBar x:Name="ResourcePicker" SelectionChanged="ResourceChanged"/>
           <TextBlock x:Name="SnapshotLabel" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource SecondaryTextBrush}"/>
         </StackPanel>
         <ContentControl x:Name="PageHost" Grid.Row="2" Grid.ColumnSpan="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
       </Grid>
     </NavigationView>
-    <Grid Grid.Row="2" Padding="{StaticResource StatusBarPadding}" ColumnSpacing="{StaticResource SpacingLarge}">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-      <ProgressRing x:Name="BusyRing" Width="{StaticResource BusyIndicatorSize}" Height="{StaticResource BusyIndicatorSize}" IsActive="False"/>
-      <TextBlock x:Name="StatusLabel" Grid.Column="1" TextWrapping="Wrap"/>
-    </Grid>
+    <!-- The status bar is set off from the page, and an error in it has its own icon and colour. -->
+    <Border Grid.Row="2" BorderThickness="0,1,0,0" BorderBrush="{ThemeResource DividerBrush}">
+      <Grid Padding="{StaticResource StatusBarPadding}" ColumnSpacing="{StaticResource SpacingMedium}">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <ProgressRing x:Name="BusyRing" Width="{StaticResource BusyIndicatorSize}" Height="{StaticResource BusyIndicatorSize}" IsActive="False"/>
+        <FontIcon x:Name="StatusIcon" Grid.Column="1" Glyph="&#xE783;" FontSize="{StaticResource BodyFontSize}" Foreground="{ThemeResource StatusErrorBrush}" Visibility="Collapsed"/>
+        <TextBlock x:Name="StatusLabel" Grid.Column="2" Style="{StaticResource StatusTextStyle}"/>
+      </Grid>
+    </Border>
   </Grid>
 </Window>

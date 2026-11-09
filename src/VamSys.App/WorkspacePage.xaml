@@ -4,29 +4,66 @@
     xmlns:vm="using:VamSys.Presentation">
   <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch">
-    <StackPanel Spacing="{StaticResource SpacingLarge}">
-      <TextBlock Text="{x:Bind Model.Intro, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-      <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLarge}">
-        <Button Content="{x:Bind Model.NewWorkspaceLabel, Mode=OneWay}" Click="NewWorkspace"/>
-        <Button Content="{x:Bind Model.DemoWorkspaceLabel, Mode=OneWay}" Click="CreateDemo"/>
-      </StackPanel>
+    <StackPanel Spacing="{StaticResource SpacingPage}" MaxWidth="{StaticResource PageContentMaxWidth}" HorizontalAlignment="Stretch">
+      <!-- What matters now, and the one button that goes there. -->
+      <Border Style="{StaticResource CardStyle}">
+        <Grid ColumnSpacing="{StaticResource SpacingLarge}">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <StackPanel Spacing="{StaticResource SpacingTight}">
+            <TextBlock Text="{x:Bind Model.NextTitle, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+            <TextBlock Text="{x:Bind Model.NextText, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
+          </StackPanel>
+          <Button Grid.Column="1" Style="{StaticResource AccentButtonStyle}" VerticalAlignment="Center" Content="{x:Bind Model.NextAction, Mode=OneWay}" Click="OpenNextStep"/>
+        </Grid>
+      </Border>
+      <Grid ColumnSpacing="{StaticResource SpacingLarge}">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Border Style="{StaticResource CardStyle}">
+          <StackPanel>
+            <TextBlock Text="{x:Bind Model.Records}" FontSize="{StaticResource StatNumberFontSize}" FontWeight="SemiBold"/>
+            <TextBlock Text="{x:Bind Model.RecordsLabel, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="1" Style="{StaticResource CardStyle}">
+          <StackPanel>
+            <TextBlock Text="{x:Bind Model.Pending}" FontSize="{StaticResource StatNumberFontSize}" FontWeight="SemiBold"/>
+            <TextBlock Text="{x:Bind Model.PendingLabel, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+          </StackPanel>
+        </Border>
+        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+          <StackPanel>
+            <TextBlock Text="{x:Bind Model.Tasks}" FontSize="{StaticResource StatNumberFontSize}" FontWeight="SemiBold"/>
+            <TextBlock Text="{x:Bind Model.TasksLabel, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+          </StackPanel>
+        </Border>
+      </Grid>
       <ItemsControl ItemsSource="{x:Bind Model.Cards}">
         <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate><StackPanel Spacing="{StaticResource SpacingLarge}"/></ItemsPanelTemplate>
+          <ItemsPanelTemplate><StackPanel Spacing="{StaticResource SpacingMedium}"/></ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:ResourceCardViewModel">
-            <Border Padding="{StaticResource WorkspaceCardPadding}" CornerRadius="{StaticResource CardCornerRadius}" Background="{ThemeResource CardBackgroundBrush}">
-              <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLarge}">
-                <TextBlock Text="{x:Bind Title, Mode=OneWay}" FontSize="{StaticResource SectionFontSize}" TextWrapping="Wrap"/>
-                <TextBlock Text="{x:Bind Summary, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-                <Button Content="{x:Bind OpenLabel, Mode=OneWay}" Click="OpenResource"/>
-              </StackPanel>
+            <Border Style="{StaticResource CardStyle}" Padding="{StaticResource ResourceRowPadding}">
+              <Grid ColumnSpacing="{StaticResource SpacingLarge}">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="{x:Bind Title, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
+                  <TextBlock Text="{x:Bind Summary, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+                </StackPanel>
+                <Button Grid.Column="1" VerticalAlignment="Center" Content="{x:Bind OpenLabel, Mode=OneWay}" Click="OpenResource"/>
+              </Grid>
             </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-      <TextBlock Text="{x:Bind Model.StorageNote, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMedium}">
+        <Button Content="{x:Bind Model.NewWorkspaceLabel, Mode=OneWay}" Click="NewWorkspace"/>
+        <Button Content="{x:Bind Model.DemoWorkspaceLabel, Mode=OneWay}" Click="CreateDemo"/>
+      </StackPanel>
+      <StackPanel Spacing="{StaticResource SpacingTight}">
+        <TextBlock Text="{x:Bind Model.Intro, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+        <TextBlock Text="{x:Bind Model.StorageNote, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+      </StackPanel>
     </StackPanel>
   </ScrollViewer>
 </UserControl>

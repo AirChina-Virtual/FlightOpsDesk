@@ -23,8 +23,7 @@ public class DialogTests
     static void PickResource(AppWindow app, string resource)
     {
         app.SelectItem("Data management");
-        app.One("ResourcePicker").Expand();
-        app.SelectItem(resource);
+        app.SelectResource(resource);
     }
 
     // Repeats while a closing dialog still locks the page.
@@ -224,9 +223,9 @@ public class DialogTests
         // The table has refreshed once the new date is in it: the result must still be in the status bar.
         app.Until(() => app.FindNamed("End Date", ControlType.Edit).Any(c => c.Text() == "2099-01-08 00:00:00"), "the table shows the new date");
         Assert.StartsWith("Selected 2 · Skipped 1 · Unchanged 0 · Changed 1", app.Name("StatusLabel"), StringComparison.Ordinal);
-        // A refresh the user asks for reports as usual.
-        app.Click("Filter / sort");
-        app.StatusStarting("Loaded 2 matching records.");
+        // A query the user starts reports as usual.
+        app.Edit("Search all fields", "2099-01-08");
+        app.StatusStarting("Loaded 1 matching records.");
         app.Close();
 
         var routes = Stored(app.DataDirectory).Resources[ResourceKind.Routes];

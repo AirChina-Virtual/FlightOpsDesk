@@ -24,15 +24,17 @@ public sealed partial class DataGrid : UserControl
         InitializeComponent();
         var root = (Grid)Content;
         var horizontal = (ScrollViewer)root.Children[0];
-        View = new DataTableView((ListView)horizontal.Content, horizontal, rowTemplate, rowHeight, language);
-        ArrangeFooter((Grid)root.Children[1]);
+        var table = (Grid)horizontal.Content;
+        View = new DataTableView((ListView)table.Children[1], (Border)table.Children[0], horizontal, rowTemplate, rowHeight, language);
+        ArrangeFooter(FooterGrid);
     }
+    Grid FooterGrid => (Grid)((Grid)Content).Children[2];
 
     public DataGridFooterViewModel Footer { get; }
     internal DataTableView View { get; }
     internal TextBox PageJump => (TextBox)Navigation.Children[4];
     internal ComboBox PageSize => (ComboBox)Navigation.Children[6];
-    StackPanel Navigation => (StackPanel)((StackPanel)((ScrollViewer)((Grid)((Grid)Content).Children[1]).Children[1]).Content).Children[0];
+    StackPanel Navigation => (StackPanel)((StackPanel)((ScrollViewer)FooterGrid.Children[1]).Content).Children[0];
 
     void FooterSizeChanged(object sender, SizeChangedEventArgs e) => ArrangeFooter((Grid)sender);
     // Selection and paging share a row when both fit, and paging moves below the selection otherwise.

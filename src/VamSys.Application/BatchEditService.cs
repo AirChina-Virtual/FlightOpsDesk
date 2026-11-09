@@ -110,6 +110,27 @@ public sealed class BatchEditService(WorkspaceSession session)
         await session.SaveAsync();
     }
 
+    // Copies of records as new records: no server identity, no key, not marked for deletion. Returns the copies' ids.
+    public async Task<IReadOnlyList<Guid>> DuplicateRowsAsync(ResourceKind kind, IEnumerable<DataRow> rows)
+    {
+        var data = Data(kind);
+        var key = Schemas.All[kind].Key;
+        var copies = rows.Select(r => new DataRow { Fields = r.Fields }.With(key, "").With("_delete", "FALSE")).ToList();
+        if (copies.Count == 0)
+            return [];
+        data.Edit(copies.Select(c => c.LocalId), () => data.Draft.AddRange(copies), structural: true);
+        await session.SaveAsync();
+        return copies.Select(c => c.LocalId).ToList();
+    }
+    // Replaced values of existing records (a pasted block, a value filled down) as one undo step, saved with that step.
+    public async Task ReplaceRowsAsync(ResourceKind kind, IReadOnlyList<DataRow> replacements)
+    {
+        var data = Data(kind);
+        var ids = replacements.Select(r => r.LocalId).ToArray();
+        data.Edit(ids, () => data.ReplaceDraftRows(replacements));
+        await session.SaveReplacedRowsAsync(kind, ids);
+    }
+
     // Undo or redo one step. A step that only replaced rows saves those rows and the moved history step; adding, removing
     // or reordering rows takes a full save. Nothing to move changes nothing and saves nothing.
     public HistoryMove MoveHistory(ResourceKind kind, bool undo)

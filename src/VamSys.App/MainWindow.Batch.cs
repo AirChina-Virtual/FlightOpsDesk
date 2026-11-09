@@ -104,7 +104,7 @@ public sealed partial class MainWindow
         var selection = batch.Capture(SelectedRows());
         if (selection.Eligible.Count == 0)
         { Status(() => L("BatchNothing")); return; }
-        var form = new BatchRuleDialogViewModel(BatchTargetsText(selection), batch.RuleFields(DisplayColumns()), batch.RuleKinds(resource), localization)
+        var form = new BatchRuleDialogViewModel(BatchTargetsText(selection), batch.RuleFields(AllColumns()), batch.RuleKinds(resource), localization)
         { Title = L("Text_E306752B35"), PrimaryLabel = L("Text_13D61FEA9F") };
         if (!await Confirm(form) || form.Rule is not { } rule)
             return;

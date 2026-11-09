@@ -49,7 +49,33 @@ public class WorkspaceViewModelTests
         model.RefreshLanguage();
         Assert.NotEqual(chinese, model.NewWorkspaceLabel);
         Assert.Equal("Create demo workspace", model.DemoWorkspaceLabel);
-        Assert.Equal([nameof(WorkspaceViewModel.Intro), nameof(WorkspaceViewModel.NewWorkspaceLabel), nameof(WorkspaceViewModel.DemoWorkspaceLabel), nameof(WorkspaceViewModel.StorageNote)], pageChanges);
+        Assert.Equal([nameof(WorkspaceViewModel.Intro), nameof(WorkspaceViewModel.NewWorkspaceLabel), nameof(WorkspaceViewModel.DemoWorkspaceLabel), nameof(WorkspaceViewModel.StorageNote),
+            nameof(WorkspaceViewModel.RecordsLabel), nameof(WorkspaceViewModel.PendingLabel), nameof(WorkspaceViewModel.TasksLabel),
+            nameof(WorkspaceViewModel.NextTitle), nameof(WorkspaceViewModel.NextText), nameof(WorkspaceViewModel.NextAction)], pageChanges);
         Assert.Equal([nameof(ResourceCardViewModel.Title), nameof(ResourceCardViewModel.Summary), nameof(ResourceCardViewModel.OpenLabel)], cardChanges);
+    }
+
+    [Theory]
+    [InlineData(RunMode.Offline, 0, ShellPage.Settings)]
+    [InlineData(RunMode.Offline, 3, ShellPage.Review)]
+    [InlineData(RunMode.Online, 3, ShellPage.Review)]
+    [InlineData(RunMode.Online, 0, ShellPage.Data)]
+    [InlineData(RunMode.Demo, 0, ShellPage.Data)]
+    public void The_next_step_follows_the_workspace(RunMode mode, int changes, ShellPage expected)
+    {
+        var workspace = new Workspace { Mode = mode };
+        var pending = workspace.Resources[ResourceKind.Fleets];
+        var model = new WorkspaceViewModel(workspace, new LocalizationService(), data => ReferenceEquals(data, pending) ? changes : 0);
+        Assert.Equal(expected, model.NextPage);
+        Assert.DoesNotContain("[", model.NextText, StringComparison.Ordinal);
+        Assert.DoesNotContain("[", model.NextAction, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Unfinished_remote_writes_come_before_new_changes()
+    {
+        var workspace = new Workspace { Mode = RunMode.Online };
+        workspace.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [new ChangeItem { State = ItemState.Unknown }] });
+        Assert.Equal(ShellPage.Tasks, new WorkspaceViewModel(workspace, new LocalizationService(), _ => 5).NextPage);
     }
 }

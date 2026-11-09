@@ -21,6 +21,12 @@ public interface IDataGridHost
     void CellEdited(Workspace owner, ResourceKind kind, ResourceData data, Guid rowId, int changedDelta);
     Task ChooseFleets(DataRow row);
     Task ChooseParameter(DataRow row);
+    // Text from the clipboard pasted from this cell rightwards and downwards over the shown page.
+    Task PasteCells(RowViewModel row, string field, string text);
+    // This cell's value copied to the same column of the other selected records.
+    Task FillDown(RowViewModel row, string field);
+    // Shows the record in the details pane.
+    void OpenDetails(Guid rowId);
 }
 
 // The shown page's row and cell models. Only the current page has models; they are kept in a pool and rebound in place
@@ -76,6 +82,7 @@ public sealed class DataGridViewModel(IDataGridHost host, CellEditCommitter edit
     {
         if (link is null)
             throw new InvalidOperationException("Bind the grid before filling it.");
+        ForgetLookups();
         var rows = new List<RowViewModel>(pageSize);
         foreach (var id in ids)
         {
@@ -100,9 +107,97 @@ public sealed class DataGridViewModel(IDataGridHost host, CellEditCommitter edit
         return rows;
     }
 
+    // The checks and suggestions read the other resources, which can only change while this page is not shown: they are
+    // built again for every filled page.
+    ValidationPass? pass;
+    List<CellSuggestion>? airports;
+    List<string>? tags;
+    readonly List<Issue> found = [];
+    void ForgetLookups() { pass = null; airports = null; tags = null; }
+
+    // Marks each cell with the first problem the single-row checks find in it, and with the server's value when the
+    // record exists there and the cell differs from it.
+    void Check(RowViewModel view)
+    {
+        if (link?.Owner is not { } owner || link.Data is null || !ReferenceEquals(owner, host.Workspace))
+            return;
+        pass ??= new ValidationPass(owner);
+        found.Clear();
+        var row = view.Row;
+        host.Baseline.TryGetValue(row.LocalId, out var before);
+        Schemas.CheckRow(owner, link.Kind, row, before, pass, found);
+        var deleted = Schemas.Deleted(row);
+        foreach (var cell in view.Cells)
+        {
+            if (cell.Field == "_delete")
+                continue;
+            MessageDescriptor? issue = null;
+            foreach (var item in found)
+                if (item.Field == cell.Field)
+                { issue = item.Description; break; }
+            var server = before != null && !deleted ? before.Get(cell.Field) : null;
+            // The row, not the cell: an edit checks the row before the cell takes the new value.
+            cell.ShowState(issue, server != null && server != row.Get(cell.Field) ? server : null);
+        }
+    }
+
+    const int SuggestionCount = 12;
+    IReadOnlyList<CellSuggestion> SuggestAirports(string text)
+    {
+        airports ??= host.Workspace.Resources[ResourceKind.Airports].Draft.Where(r => !Schemas.Deleted(r))
+            .Select(r => new CellSuggestion(Schemas.Key(ResourceKind.Airports, r), r.Get("Name")))
+            .Where(s => s.Value.Length > 0).DistinctBy(s => s.Value).OrderBy(s => s.Value, StringComparer.Ordinal).ToList();
+        var typed = text.Trim();
+        if (typed.Length == 0)
+            return airports.Take(SuggestionCount).ToList();
+        var starts = airports.Where(s => s.Value.StartsWith(typed, StringComparison.OrdinalIgnoreCase));
+        var names = airports.Where(s => !s.Value.StartsWith(typed, StringComparison.OrdinalIgnoreCase) && s.Label.Contains(typed, StringComparison.OrdinalIgnoreCase));
+        return starts.Concat(names).Take(SuggestionCount).ToList();
+    }
+    // Tags complete the last entry of the list; the ones already in the cell are not offered again.
+    IReadOnlyList<CellSuggestion> SuggestTags(string field, string text)
+    {
+        tags ??= host.Data.Draft.SelectMany(r => r.Get(field).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToList();
+        var cut = text.LastIndexOf(',');
+        var head = cut < 0 ? "" : text[..(cut + 1)];
+        var last = text[(cut + 1)..].Trim();
+        var present = head.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);
+        // Lists are kept comma separated without spaces, as the server returns them.
+        var prefix = head.Length == 0 ? "" : head.TrimEnd();
+        return tags.Where(t => !present.Contains(t) && t.Contains(last, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(t => t.StartsWith(last, StringComparison.OrdinalIgnoreCase) ? 0 : 1).Take(SuggestionCount)
+            .Select(t => new CellSuggestion(prefix + t, "", t)).ToList();
+    }
+    IReadOnlyList<CellSuggestion> SuggestChoices(IReadOnlyList<string> choices, string text)
+    {
+        var typed = text.Trim();
+        // The full list while the cell holds one of the choices, so another can be picked without clearing it.
+        return choices.Contains(typed) || typed.Length == 0 ? choices.Select(c => new CellSuggestion(c, "")).ToList()
+            : choices.Where(c => c.Contains(typed, StringComparison.OrdinalIgnoreCase)).Select(c => new CellSuggestion(c, "")).ToList();
+    }
+    static IReadOnlyList<string> ChoicesFor(string field) => field switch
+    {
+        "Type" => Schemas.RouteTypeOrder,
+        "Type (pax/cargo/...)" => Schemas.FleetTypeOrder,
+        _ => []
+    };
+    Func<string, IReadOnlyList<CellSuggestion>>? SuggestFor(string field)
+    {
+        var choices = ChoicesFor(field);
+        if (choices.Count > 0)
+            return text => SuggestChoices(choices, text);
+        if (FieldSpecs.Column(field) is { Reference: ResourceKind.Airports })
+            return SuggestAirports;
+        if (FieldSpecs.Is(field, FieldType.TagList))
+            return text => SuggestTags(field, text);
+        return null;
+    }
+
     // Drops the pooled models (the page is built again, for example after a density change).
     public void Reset()
     {
+        ForgetLookups();
         link?.Detach();
         link = null;
         pool.Clear();
@@ -113,18 +208,23 @@ public sealed class DataGridViewModel(IDataGridHost host, CellEditCommitter edit
     // The workspace was replaced: the pooled rows stay for the next bind, but no longer reach the old data.
     public void Release()
     {
+        ForgetLookups();
         link?.Detach();
         bound = null;
     }
 
-    RowViewModel Create(DataRow row, RowLink rowLink)
+    // One record's cells outside the table (the record details pane), editing the same draft as the table's cells.
+    public RowViewModel? Detached(Guid id, IReadOnlyList<string> fields)
+        => link is null || host.Data.FindDraftRow(id) is not { } row ? null : Create(row, link, fields, compact: false);
+
+    RowViewModel Create(DataRow row, RowLink rowLink) => Create(row, rowLink, columns, density == "compact");
+    RowViewModel Create(DataRow row, RowLink rowLink, IReadOnlyList<string> fields, bool compact)
     {
         RowViewModel? view = null;
-        var compact = density == "compact";
         bool Editable() => host.CanEdit && ReferenceEquals(rowLink.Owner, host.Workspace) && rowLink.Kind == host.Resource
             && view != null && ReferenceEquals(rowLink.Data, host.Data) && ReferenceEquals(host.Data.FindDraftRow(view.Row.LocalId), view.Row)
             && !Schemas.Deleted(view.Row);
-        var cells = columns.Select(field => new CellViewModel(field, row.Get(field), value =>
+        var cells = fields.Select(field => new CellViewModel(field, row.Get(field), value =>
         {
             if (!Editable() || field == "_delete")
                 return;
@@ -140,6 +240,23 @@ public sealed class DataGridViewModel(IDataGridHost host, CellEditCommitter edit
         })
         {
             CanEdit = Editable,
+            Choices = ChoicesFor(field),
+            Suggest = SuggestFor(field),
+            Required = FieldSpecs.Get(rowLink.Kind).Required.Contains(field),
+            Format = language.Format,
+            DayName = day => Enum.TryParse<DayOfWeek>(day, true, out var weekday) ? language.DisplayCulture.DateTimeFormat.GetDayName(weekday) : day,
+            Label = key => language.Get(key),
+            OriginalLabel = value => language.Get("CellServerValue", ("value", value.Length == 0 ? language.Get("CellEmptyValue") : value)),
+            ReadOnlyReason = () => view is null ? "" : Schemas.Deleted(view.Row) ? language.Get("CellReadOnlyDeleted") : language.Get("CellReadOnlyServer"),
+            EditEnded = reverted =>
+            {
+                edits.ResetContinuation();
+                if (reverted)
+                    rowLink.Data?.History.DiscardEmptyStep();
+            },
+            Paste = text => view is null ? Task.CompletedTask : host.PasteCells(view, field, text),
+            FillDown = () => view is null ? Task.CompletedTask : host.FillDown(view, field),
+            OpenDetails = () => { if (view != null) host.OpenDetails(view.Row.LocalId); },
             IsReadOnly = DataGridRules.CellReadOnly(row, field, host.Workspace.Mode),
             ReadOnlyForRow = r => DataGridRules.CellReadOnly(r, field, host.Workspace.Mode),
             FleetName = () => field == "Parameter IDs" ? language.Get("AirlineParameter") : language.Get("ChooseFleet"),
@@ -154,6 +271,8 @@ public sealed class DataGridViewModel(IDataGridHost host, CellEditCommitter edit
                 : field is "Fleet ID" or "Fleet IDs" ? new AsyncRelayCommand(() => host.ChooseFleets(view!.Row)) : null
         }).ToList();
         view = new(row, cells) { CellTemplates = host.CellTemplates };
+        view.Check = Check;
+        Check(view);
         return view;
     }
 }

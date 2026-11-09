@@ -22,6 +22,9 @@ public class DataGridViewModelTests
         public readonly List<DataRow> FleetChoices = [], ParameterChoices = [];
         public Task ChooseFleets(DataRow row) { FleetChoices.Add(row); return Task.CompletedTask; }
         public Task ChooseParameter(DataRow row) { ParameterChoices.Add(row); return Task.CompletedTask; }
+        public Task PasteCells(RowViewModel row, string field, string text) => Task.CompletedTask;
+        public Task FillDown(RowViewModel row, string field) => Task.CompletedTask;
+        public void OpenDetails(Guid rowId) { }
     }
 
     static readonly List<string> Columns = ["_delete", "Name", "Fleet IDs"];

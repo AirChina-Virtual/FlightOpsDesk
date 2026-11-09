@@ -25,7 +25,7 @@ public sealed partial class MainWindow
     readonly Dictionary<Guid, SettingsPage> settingsPages = [];
     DataPageState? shownState;
     UIElement? shownDataPage;
-    TextBox? searchBox; ComboBox? filterBox, sortBox;
+    TextBox? searchBox; ChoiceChips? filterBox; SortPicker? sortBox;
     ScrollViewer? horizontalTable => tableView?.Horizontal;
     DataPageState CurrentDataState => dataStates.TryGetValue((workspace.Id, resource), out var state) ? state : dataStates[(workspace.Id, resource)] = new();
     internal static T? FindVisual<T>(DependencyObject parent) where T : DependencyObject
@@ -81,7 +81,8 @@ public sealed partial class MainWindow
     {
         if (!settingsPages.TryGetValue(workspace.Id, out var content))
             settingsPages[workspace.Id] = content = new SettingsPage(
-                new SettingsViewModel(session, gate, settings, localization, online.EndpointUrl, online.Release),
+                new SettingsViewModel(session, gate, settings, localization, online.EndpointUrl, online.Release,
+                    new DataLocationView(AppPaths.DataDirectory, AppPaths.ManagedByEnvironment, string.Equals(Path.GetFullPath(AppPaths.DataDirectory), Path.GetFullPath(AppPaths.DefaultDirectory), StringComparison.OrdinalIgnoreCase))),
                 new SettingsPageActions(
                     Invoke: async action => { if (gate.CanInvokeCommand) await UserAction(action); },
                     Guard: Guard,
@@ -89,7 +90,10 @@ public sealed partial class MainWindow
                     Connect: ConnectApi,
                     Refresh: RefreshApi,
                     LoadParameters: LoadParameters,
-                    BackupClear: BackupAndClearWorkspace));
+                    BackupClear: BackupAndClearWorkspace,
+                    ChangeDataLocation: ChooseDataLocation,
+                    RestoreDataLocation: UseDefaultDataLocation,
+                    OpenDataFolder: OpenDataFolder));
         return content;
     }
 }

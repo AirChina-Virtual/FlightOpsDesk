@@ -8,7 +8,6 @@ namespace VamSys.App;
 public sealed partial class MainWindow
 {
     string tableDensity = "comfortable";
-    ComboBox? densityPicker;
     TextBlock? queryNotice;
     double DataRowHeight => UiTokens.DataRowHeight(tableDensity == "compact");
 
@@ -22,33 +21,8 @@ public sealed partial class MainWindow
         Grid.SetRow(ResourceBar, merged ? 0 : 1);
         Grid.SetColumn(ResourceBar, merged ? 1 : 0);
         Grid.SetColumnSpan(ResourceBar, merged ? 1 : 2);
-        SnapshotLabel.MaxWidth = Math.Max(120, BodyGrid.ActualWidth - (merged ? 340 : 200));
-    }
-
-    ComboBox DensityPicker()
-    {
-        var picker = new ComboBox { Width = UiTokens.DensityPickerWidth };
-        picker.Items.Add(new ComboBoxItem().Localize(localization, "Content", () => L("DensityComfortable")));
-        picker.Items.Add(new ComboBoxItem().Localize(localization, "Content", () => L("DensityCompact")));
-        picker.SelectedIndex = tableDensity == "compact" ? 1 : 0;
-        AutomationProperties.SetAutomationId(picker, "TableDensity");
-        AutomationProperties.SetName(picker, L("TableDensity"));
-        picker.SelectionChanged += async (_, _) =>
-        {
-            if (picker.SelectedIndex < 0 || !ReferenceEquals(picker, densityPicker))
-                return;
-            var target = picker.SelectedIndex == 1 ? "compact" : "comfortable";
-            if (target == tableDensity || !CanEditData())
-                return;
-            await UserAction(async () =>
-            {
-                try
-                { await ChangeTableDensity(target); }
-                catch { picker.SelectedIndex = tableDensity == "compact" ? 1 : 0; throw; }
-            });
-        };
-        densityPicker = picker;
-        return picker;
+        // The resource tabs take their own width; the snapshot text is cut to what is left.
+        SnapshotLabel.MaxWidth = Math.Max(120, BodyGrid.ActualWidth - (merged ? 180 : 40) - ResourcePicker.ActualWidth);
     }
 
     async Task ChangeTableDensity(string target)
@@ -60,9 +34,9 @@ public sealed partial class MainWindow
         var state = CurrentDataState;
         var anchor = FirstVisibleDataRow();
         var anchorIndex = anchor is null ? -1 : visible.FindIndex(r => r.Row.LocalId == anchor.Value.Id);
-        var headerHeight = tableView?.HeaderHeight ?? 0;
         tableDensity = target;
-        var targetOffset = DataGridScroll.AnchoredOffset(anchorIndex, anchor?.Top ?? 0, headerHeight, DataRowHeight, state.Vertical);
+        // The column headers stay above the list and take no part in its scrolling.
+        var targetOffset = DataGridScroll.AnchoredOffset(anchorIndex, anchor?.Top ?? 0, 0, DataRowHeight, state.Vertical);
         // Row heights live in the item container style: build the page again.
         shownDataPage = null;
         dataPageOwner = null;
@@ -81,7 +55,7 @@ public sealed partial class MainWindow
     {
         if (queryNotice is null || shownState is null)
             return;
-        var changed = searchBox?.Text != shownState.AppliedSearch || filterBox?.SelectedIndex != shownState.AppliedFilter || sortBox?.SelectedItem as string != shownState.AppliedSort;
+        var changed = searchBox?.Text != shownState.AppliedSearch || filterBox?.SelectedIndex != shownState.AppliedFilter || (sortBox?.SelectedItem as string ?? "") != (shownState.AppliedSort ?? "");
         queryNotice.Text = changed ? L("TableUnapplied") : "";
         queryNotice.Visibility = changed ? Visibility.Visible : Visibility.Collapsed;
     }

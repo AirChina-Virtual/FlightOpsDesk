@@ -7,8 +7,15 @@
     <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <!-- The rows scroll vertically inside the list; the columns scroll horizontally with the header. -->
     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" VerticalScrollMode="Disabled">
-      <ListView SelectionMode="Multiple" HorizontalContentAlignment="Stretch"/>
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <!-- Outside the list, so the column names stay in view while the rows scroll and move with them sideways. -->
+        <Border BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerBrush}" Padding="0,6"/>
+        <ListView Grid.Row="1" SelectionMode="Multiple" HorizontalContentAlignment="Stretch"/>
+      </Grid>
     </ScrollViewer>
+    <TextBlock Text="{x:Bind Footer.EmptyText, Mode=OneWay}" Visibility="{x:Bind Footer.IsEmpty, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"
+        HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" IsHitTestVisible="False"/>
     <Grid Grid.Row="1" RowSpacing="{StaticResource SpacingTight}" ColumnSpacing="{StaticResource SpacingMedium}" SizeChanged="FooterSizeChanged">
       <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
       <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -24,7 +31,7 @@
                 </MenuFlyout>
               </Button.Flyout>
             </Button>
-            <TextBlock Text="{x:Bind Footer.SelectionSummary, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.SelectionHint, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+            <TextBlock Text="{x:Bind Footer.SelectionSummary, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.SelectionHint, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap" VerticalAlignment="Center"/>
             <Button Content="{x:Bind Footer.CancelQueryLabel, Mode=OneWay}" Visibility="{x:Bind Footer.QueryInProgress, Mode=OneWay}" AutomationProperties.AutomationId="DataQueryCancel" Click="CancelQuery"/>
           </StackPanel>
         </StackPanel>
@@ -57,7 +64,7 @@
             <ComboBox Width="{StaticResource PageSizePickerWidth}" ItemsSource="{x:Bind Footer.PageSizeChoices}" SelectedItem="{x:Bind Footer.PageSize, Mode=OneWay}" IsEnabled="{x:Bind Footer.CanEdit, Mode=OneWay}"
                 AutomationProperties.AutomationId="DataPageSize" AutomationProperties.Name="{x:Bind Footer.PageSizeLabel, Mode=OneWay}" SelectionChanged="PageSizeChanged"/>
             <TextBlock Text="{x:Bind Footer.PageText, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.PageSummary, Mode=OneWay}" AutomationProperties.Name="{x:Bind Footer.PageSummary, Mode=OneWay}"
-                FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+                FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap" VerticalAlignment="Center"/>
           </StackPanel>
         </StackPanel>
       </ScrollViewer>

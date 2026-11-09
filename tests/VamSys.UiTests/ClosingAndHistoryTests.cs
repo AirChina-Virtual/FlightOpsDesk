@@ -79,9 +79,8 @@ public class ClosingAndHistoryTests
         void Overflow(string command)
         {
             Idle();
-            app.ClickMore();
-            Idle();
-            app.InvokeNamed(command);
+            // On the toolbar, or in its overflow when the window is too narrow for it.
+            app.Click(command);
         }
         void NameBecomes(string? name) => app.Until(() => app.Query("state").Str("name") == name, $"the first fleet is named '{name}'");
 

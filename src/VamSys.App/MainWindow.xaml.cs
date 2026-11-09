@@ -34,7 +34,7 @@ public sealed partial class MainWindow : Window
     bool ready;
     readonly CellEditCommitter cellEdits = new();
     ListView? table => tableView?.Table;
-    List<RowViewModel> visible = []; AppBarButton? fleetCommand, retireCommand;
+    List<RowViewModel> visible = [];
     CancellationTokenSource? running;
     ResourceData Data => workspace.Resources[resource];
 
@@ -71,8 +71,7 @@ public sealed partial class MainWindow : Window
         RootGrid.Loaded += (_, _) => UpdateCaptionTheme();
         RootGrid.SizeChanged += (_, _) => { WorkspacePicker.Width = RootGrid.ActualWidth < 800 ? 140 : 230; AppTitleBar.Subtitle = RootGrid.ActualWidth < 1100 ? "" : L("Text_9750099F9F"); };
         session.Open(L("Text_707DBE0213"));
-        ResourcePicker.ItemsSource = Enum.GetValues<ResourceKind>().Select(k => L(Schemas.All[k].Name)).ToList();
-        ResourcePicker.SelectedIndex = (int)resource;
+        InitializeResourceTabs();
         ReloadWorkspaces();
         autosave.Tick += async (_, _) => await Guard(async () => { await session.AutosaveElapsedAsync(); if (!gate.WorkInProgress) Status(() => L("Text_11584EAAA5")); });
         AppWindow.Closing += async (_, e) =>
@@ -92,6 +91,7 @@ public sealed partial class MainWindow : Window
             }
             catch { Status(() => L("Text_7AF24B0E8E")); }
         };
+        AddShortcuts();
         ready = true;
         SelectPane(ShellPage.Workspace);
         Render();
@@ -107,10 +107,20 @@ public sealed partial class MainWindow : Window
     }
     IWindowVerification? verification;
     partial void CreateVerification(ref IWindowVerification? hooks);
-    void Status(Func<string> message) { statusText = message; StatusLabel.Text = message(); }
+    void Status(Func<string> message) => ShowStatus(message, false);
+    void StatusError(Func<string> message) => ShowStatus(message, true);
+    void ShowStatus(Func<string> message, bool error)
+    {
+        statusText = message;
+        StatusLabel.Text = message();
+        StatusIcon.Visibility = error ? Visibility.Visible : Visibility.Collapsed;
+        StatusLabel.Style = error ? UiTokens.StatusErrorTextStyle : UiTokens.StatusTextStyle;
+    }
     void ToggleNavigation(TitleBar sender, object args) => Navigation.IsPaneOpen = !Navigation.IsPaneOpen;
+    // Settings sits at the foot of the pane, apart from the pages of the working flow.
+    NavigationViewItem PaneItem(ShellPage page) => (NavigationViewItem)(page == ShellPage.Settings ? Navigation.FooterMenuItems[0] : Navigation.MenuItems[page.PaneIndex()]);
     // Selects the pane item; its SelectionChanged asks the shell, which applies the gate.
-    void SelectPane(ShellPage target) => Navigation.SelectedItem = Navigation.MenuItems[target.PaneIndex()];
+    void SelectPane(ShellPage target) => Navigation.SelectedItem = PaneItem(target);
     void UpdateCaptionTheme()
     {
         var caption = AppWindow.TitleBar;
@@ -135,7 +145,7 @@ public sealed partial class MainWindow : Window
     {
         try
         { await operation(); }
-        catch (Exception e) { var description = MessageErrors.Describe(e); Status(() => L("Text_AEB8A69DBE") + L(description)); }
+        catch (Exception e) { var description = MessageErrors.Describe(e); StatusError(() => L("Text_AEB8A69DBE") + L(description)); }
     }
     async Task Work(Func<Task> operation)
     {
@@ -234,8 +244,6 @@ public sealed partial class MainWindow : Window
         CancelDataQuery();
         await UserAction(async () => { await session.SwitchWorkspaceAsync(id); online.Release(id); Render(); });
     }
-    void ResourceChanged(object sender, SelectionChangedEventArgs e)
-    { if (!ready || !gate.CanSwitchContext) return; CancelDataQuery(); resource = (ResourceKind)ResourcePicker.SelectedIndex; Render(); }
     void Render()
     {
         if (!ready)
@@ -265,7 +273,8 @@ public sealed partial class MainWindow : Window
             Invoke: async action => { if (gate.CanInvokeCommand) await UserAction(action); },
             NewWorkspace: NewWorkspace,
             CreateDemo: CreateDemoWorkspace,
-            OpenResource: kind => { resource = kind; ResourcePicker.SelectedIndex = (int)resource; SelectPane(ShellPage.Data); }));
+            OpenResource: kind => { resource = kind; SelectResourceTab(kind); SelectPane(ShellPage.Data); },
+            OpenPage: SelectPane));
     async Task NewWorkspace()
     {
         if (!gate.CanAct)
@@ -292,58 +301,34 @@ public sealed partial class MainWindow : Window
         grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
         grid.RowDefinitions.Add(new() { Height = new GridLength(1, GridUnitType.Star) });
         grid.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        var search = new TextBox { Width = UiTokens.SearchBoxWidth }.Localize(localization, "PlaceholderText", () => L("Text_762B9F2664"));
-        var filter = new ComboBox { Width = UiTokens.FilterPickerWidth, SelectedIndex = 0 }.Localize(localization, "ItemsSource", () => new[] { L("Text_5C55A67935"), L("Text_682D211B71"), L("Text_549986E82C") });
-        var sort = new ComboBox { Width = UiTokens.SortPickerWidth, ItemsSource = Data.Columns.Count > 0 ? Data.Columns : Schemas.All[resource].Columns.ToList(), SelectedIndex = -1 }
-            .Localize(localization, "PlaceholderText", () => L("TableSort"));
-        searchBox = search;
-        filterBox = filter;
-        sortBox = sort;
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(search, "DataSearch");
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(filter, "DataFilter");
-        Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(sort, "DataSort");
-        search.Text = state.Search;
-        filter.SelectedIndex = state.Filter;
-        if (state.Sort != null && sort.Items.Contains(state.Sort))
-            sort.SelectedItem = state.Sort;
-        var apply = Button(() => L("Text_0DE280B4DF"), () => LoadRowsAsync(search.Text, filter.SelectedIndex, sort.SelectedItem?.ToString()));
-        queryNotice = Text(() => "");
-        var toolbar = Row(search, filter, sort, queryNotice, apply, DensityPicker());
-        toolbar.Spacing = UiTokens.SpacingMedium;
-        search.TextChanged += (_, _) => RefreshQueryNotice();
-        filter.SelectionChanged += (_, _) => RefreshQueryNotice();
-        sort.SelectionChanged += (_, _) => RefreshQueryNotice();
-        search.KeyDown += async (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter && CanEditData()) { e.Handled = true; await UserAction(() => LoadRowsAsync(search.Text, filter.SelectedIndex, sort.SelectedItem?.ToString())); } };
-        grid.Children.Add(new ScrollViewer { Content = toolbar, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled });
-        var actions = new CommandBar { DefaultLabelPosition = CommandBarDefaultLabelPosition.Right, HorizontalContentAlignment = HorizontalAlignment.Left, IsDynamicOverflowEnabled = true };
-        dataActions = actions;
-        actions.PrimaryCommands.Add(Command(() => L("ApiRefresh"), Symbol.Refresh, RefreshApi, gate.CanRequestOnline));
-        actions.PrimaryCommands.Add(BatchCommand(() => L("Text_E306752B35"), Symbol.Edit, EditRules, "active"));
-        actions.PrimaryCommands.Add(Command(() => L("Text_48A195CA7E"), Symbol.View, () => { SelectPane(ShellPage.Review); return Task.CompletedTask; }));
-        actions.PrimaryCommands.Add(Command(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts, gate.CanRequestOnline && Data.Conflicts.Count > 0));
-        actions.PrimaryCommands.Add(Command(() => L("Text_0006D696D8"), Symbol.Add, async () => { if (!gate.CanAct) return; await batch.AddRowAsync(resource); Render(); }));
-        // Kept for every resource and shown only where it applies, since the page outlives a resource switch.
-        fleetCommand = BatchCommand(() => L("Text_95DD1FDDFE"), Symbol.Edit, () => resource is ResourceKind.Aircraft or ResourceKind.Routes ? ChooseFleets(null) : Task.CompletedTask, "active");
-        fleetCommand.Visibility = resource is ResourceKind.Aircraft or ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
-        actions.PrimaryCommands.Add(fleetCommand);
-        actions.PrimaryCommands.Add(BatchCommand(() => L("Text_435BF8A234"), Symbol.Delete, DeleteSelected, "delete"));
-        actions.SecondaryCommands.Add(BatchCommand(() => L("Text_A6926595CE"), Symbol.Undo, RestoreSelected, "deleted"));
-        retireCommand = BatchCommand(() => L("Text_7AA882D2FE"), Symbol.Clock, () => resource == ResourceKind.Routes ? RetireSelected() : Task.CompletedTask, "active");
-        retireCommand.Visibility = resource == ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
-        actions.SecondaryCommands.Add(retireCommand);
-        actions.SecondaryCommands.Add(Command(() => L("Text_926A50B98E"), Symbol.Undo, () => MoveHistory(undo: true)));
-        actions.SecondaryCommands.Add(Command(() => L("Text_03717B6F10"), Symbol.Redo, () => MoveHistory(undo: false)));
-        actions.SecondaryCommands.Add(Command(() => L("Text_41B0AF8C5C"), Symbol.Accept, Validate));
+        // The record details pane opens beside the table.
+        grid.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new() { Width = GridLength.Auto });
+        var query = BuildQueryBar(state);
+        Grid.SetColumnSpan((FrameworkElement)query, 2);
+        grid.Children.Add(query);
+        var actions = BuildActionBar();
         Grid.SetRow(actions, 1);
+        Grid.SetColumnSpan(actions, 2);
         grid.Children.Add(actions);
         var control = dataGrid = new DataGrid(dataFooter = new(localization), DataGridControlActions(), tableTemplates!.Template("RowTemplate"), DataRowHeight, localization);
         control.View.UserSelectionChanged += DataSelectionChanged;
+        control.View.HeaderClicked += SortByHeader;
+        control.View.RowMenuRequested += ShowRowMenu;
         control.View.ShowHeaders(DisplayColumns());
+        control.View.ShowSort(sortBox!.Current);
         shownDataPage = grid;
         // The table and its footer share the remaining rows.
         Grid.SetRow(control, 2);
         Grid.SetRowSpan(control, 2);
         grid.Children.Add(control);
+        var details = BuildDetailsPane();
+        Grid.SetRow(details, 2);
+        Grid.SetRowSpan(details, 2);
+        Grid.SetColumn(details, 1);
+        // A margin, not column spacing: the closed pane leaves no gap.
+        details.Margin = new Thickness(UiTokens.SpacingLarge, 0, 0, 0);
+        grid.Children.Add(details);
         control.View.Table.Loaded += (_, _) => { if (shownState != null) RestoreDataOffsets(shownState); };
         return grid;
     }
@@ -374,12 +359,19 @@ public sealed partial class MainWindow : Window
         Render();
         Status(() => L(undo ? "Text_E5CE954248" : "Text_1F00D27BEE"));
     }
-    List<string> DisplayColumns()
+    // Every column of the resource, in table order: the status, the key, the fleet, then the data's own order.
+    List<string> AllColumns()
     {
         var leading = new List<string> { "_delete", Schemas.All[resource].Key };
         if (resource is ResourceKind.Aircraft or ResourceKind.Routes)
             leading.Add(FleetAssignmentService.Field(resource));
         return leading.Concat(Data.Columns.Count == 0 ? Schemas.All[resource].Columns : Data.Columns).Distinct().ToList();
+    }
+    // The columns the table shows: all but the ones hidden from the view menu (never the status or the key).
+    List<string> DisplayColumns()
+    {
+        var all = AllColumns();
+        return hiddenColumns.TryGetValue(resource, out var hidden) && hidden.Count > 0 ? all.Where(c => !hidden.Contains(c)).ToList() : all;
     }
     // Rebuilt on every render; the shown one is refreshed when the language changes.
     ImportPage? shownImportPage;

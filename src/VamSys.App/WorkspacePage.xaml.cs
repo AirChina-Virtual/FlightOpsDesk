@@ -10,7 +10,8 @@ public sealed record WorkspacePageActions(
     Func<Func<Task>, Task> Invoke,
     Func<Task> NewWorkspace,
     Func<Task> CreateDemo,
-    Action<ResourceKind> OpenResource);
+    Action<ResourceKind> OpenResource,
+    Action<ShellPage> OpenPage);
 
 public sealed partial class WorkspacePage : UserControl
 {
@@ -27,6 +28,7 @@ public sealed partial class WorkspacePage : UserControl
 
     async void NewWorkspace(object sender, RoutedEventArgs e) => await actions.Invoke(actions.NewWorkspace);
     async void CreateDemo(object sender, RoutedEventArgs e) => await actions.Invoke(actions.CreateDemo);
+    async void OpenNextStep(object sender, RoutedEventArgs e) => await actions.Invoke(() => { actions.OpenPage(Model.NextPage); return Task.CompletedTask; });
     async void OpenResource(object sender, RoutedEventArgs e)
     {
         var card = (ResourceCardViewModel)((FrameworkElement)sender).DataContext;

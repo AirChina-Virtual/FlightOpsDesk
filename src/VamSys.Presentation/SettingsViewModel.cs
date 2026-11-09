@@ -6,8 +6,11 @@ namespace VamSys.Presentation;
 // The connection and settings page of one workspace. The window keeps one per workspace, so unsaved input survives
 // navigation and a language switch; the window calls RefreshLanguage, the localization service holds no reference.
 // The client secret never enters this model: the page passes it from its password box to the save calls.
+public sealed record DataLocationView(string Current, bool Managed, bool IsDefault);
+
 public sealed class SettingsViewModel : ObservableObject
 {
+    readonly DataLocationView location;
     readonly WorkspaceSession session;
     readonly IUserSettings settings;
     readonly ILocalizationService language;
@@ -15,8 +18,9 @@ public sealed class SettingsViewModel : ObservableObject
     string clientId;
     bool localRouteTimes;
 
-    public SettingsViewModel(WorkspaceSession session, InteractionGate gate, IUserSettings settings, ILocalizationService language, string endpointUrl, Action<Guid> releaseConnection)
+    public SettingsViewModel(WorkspaceSession session, InteractionGate gate, IUserSettings settings, ILocalizationService language, string endpointUrl, Action<Guid> releaseConnection, DataLocationView? location = null)
     {
+        this.location = location ?? new("", true, true);
         this.session = session;
         this.settings = settings;
         this.language = language;
@@ -59,8 +63,21 @@ public sealed class SettingsViewModel : ObservableObject
     public string LoadParametersLabel => L("ApiParametersLoad");
     public string MaintenanceTitle => L("MaintenanceTitle");
     public string BackupClearLabel => L("BackupClear");
+    public string GeneralTitle => L("SettingsGeneral");
+    public string ServerTitle => L("SettingsServer");
+    public string DataLocation => location.Current;
+    public bool DataLocationManaged => location.Managed;
+    public bool CanChangeDataLocation => !location.Managed;
+    public bool CanRestoreDataLocation => !location.Managed && !location.IsDefault;
+    public string DataLocationTitle => L("DataLocationTitle");
+    public string DataLocationHelp => L("DataLocationHelp");
+    public string DataLocationManagedText => L("DataLocationManaged");
+    public string DataLocationChangeLabel => L("DataLocationChange");
+    public string DataLocationOpenLabel => L("DataLocationOpen");
+    public string DataLocationRestoreLabel => L("DataLocationRestore");
 
-    static readonly string[] Texts = [nameof(LanguageIndex), nameof(LanguageHeader), nameof(ApiSettingsTitle), nameof(ApiSettingsHelp), nameof(EndpointHeader),
+    static readonly string[] Texts = [nameof(GeneralTitle), nameof(ServerTitle), nameof(DataLocationTitle), nameof(DataLocationHelp), nameof(DataLocationManagedText),
+        nameof(DataLocationChangeLabel), nameof(DataLocationOpenLabel), nameof(DataLocationRestoreLabel), nameof(LanguageIndex), nameof(LanguageHeader), nameof(ApiSettingsTitle), nameof(ApiSettingsHelp), nameof(EndpointHeader),
         nameof(SecretHeader), nameof(LocalRouteTimesLabel), nameof(SaveLabel), nameof(UpdateCredentialsLabel), nameof(CredentialsHelp), nameof(ConnectLabel),
         nameof(RefreshLabel), nameof(Capability), nameof(IndependentScope), nameof(Verified), nameof(Target), nameof(LoadParametersLabel),
         nameof(MaintenanceTitle), nameof(BackupClearLabel)];

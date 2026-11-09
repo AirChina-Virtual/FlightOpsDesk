@@ -1032,4 +1032,86 @@
   <data name="BatchShiftSkippedDateOutOfRange" xml:space="preserve"><value>{count} 条记录平移后的日期超出支持范围，已跳过。</value></data>
   <data name="BatchShiftSkippedInvalidTime" xml:space="preserve"><value>{count} 条记录的时间为空或格式无效，已跳过。</value></data>
   <data name="BatchShiftSkippedCrossesMidnight" xml:space="preserve"><value>{count} 条记录平移后会跨越午夜（超出 00:00–23:59），已跳过。</value></data>
+  <data name="DataLocationTitle" xml:space="preserve"><value>数据存放位置</value></data>
+  <data name="DataLocationHelp" xml:space="preserve"><value>工作区、草稿、任务、备份和加密后的凭据都保存在这里。更改位置后程序会自动重启。</value></data>
+  <data name="DataLocationManaged" xml:space="preserve"><value>当前位置由环境变量 VAMSYS_DATA_DIR 指定，不能在这里更改。</value></data>
+  <data name="DataLocationChange" xml:space="preserve"><value>更改位置…</value></data>
+  <data name="DataLocationOpen" xml:space="preserve"><value>打开文件夹</value></data>
+  <data name="DataLocationRestore" xml:space="preserve"><value>恢复默认位置</value></data>
+  <data name="DataLocationCopyConfirm" xml:space="preserve"><value>将当前数据复制到新位置并校验，成功后切换并重启程序。&#10;从：{from}&#10;到：{to}&#10;&#10;原位置的数据库会改名保留，不会删除，也不会再被打开。不要选择网盘同步文件夹，同步可能损坏正在使用的数据库。</value></data>
+  <data name="DataLocationExistingConfirm" xml:space="preserve"><value>这个位置已有数据：{to}&#10;&#10;将改用那里的数据并重启程序，当前数据不会复制过去，也不会改动。如果那份数据比较旧，其中的任务状态可能已过期，继续远端任务前请先核对。</value></data>
+  <data name="DataLocationCopyAction" xml:space="preserve"><value>复制并重启</value></data>
+  <data name="DataLocationExistingAction" xml:space="preserve"><value>切换并重启</value></data>
+  <data name="DataLocationCopying" xml:space="preserve"><value>正在复制并校验数据，暂时禁止编辑。</value></data>
+  <data name="DataLocationFailed" xml:space="preserve"><value>数据复制或校验未通过，位置没有更改，当前数据未受影响。</value></data>
+  <data name="DataLocationInvalid" xml:space="preserve"><value>该位置的数据库已损坏，或由更新版本的程序创建，无法使用。位置没有更改。</value></data>
+  <data name="DataLocationSame" xml:space="preserve"><value>数据已经保存在这个位置：{path}</value></data>
+  <data name="DataLocationNetwork" xml:space="preserve"><value>不能使用网络位置：{path}。数据库在网络盘上无法可靠地写入，请选择本机磁盘。</value></data>
+  <data name="DataLocationNested" xml:space="preserve"><value>新位置不能位于当前数据文件夹之内或之外的上级：{path}</value></data>
+  <data name="DataLocationBeingRetired" xml:space="preserve"><value>这个位置的旧数据还没有处理完：{path}。请重启程序后再试。</value></data>
+  <data name="DataLocationUnusable" xml:space="preserve"><value>无法写入这个位置：{path}</value></data>
+  <data name="DataLocationNotEnoughSpace" xml:space="preserve"><value>目标磁盘空间不足：{path}</value></data>
+  <data name="DataLocationMissing" xml:space="preserve"><value>找不到数据位置：{path}。如果它在移动硬盘上，请接上后重试。也可以先使用默认位置，原来的数据不会被删除。</value></data>
+  <data name="DataLocationUnreadable" xml:space="preserve"><value>无法读取数据位置设置：{path}。可以重试，也可以恢复为默认位置，已有数据不会被删除。</value></data>
+  <data name="DataLocationRetry" xml:space="preserve"><value>重试</value></data>
+  <data name="DataLocationUseDefault" xml:space="preserve"><value>使用默认位置</value></data>
+  <data name="SettingsGeneral" xml:space="preserve"><value>常规</value></data>
+  <data name="SettingsServer" xml:space="preserve"><value>服务器</value></data>
+  <data name="OverviewRecords" xml:space="preserve"><value>记录总数</value></data>
+  <data name="OverviewPending" xml:space="preserve"><value>待提交变更</value></data>
+  <data name="OverviewTasks" xml:space="preserve"><value>任务</value></data>
+  <data name="OverviewNextTitle" xml:space="preserve"><value>下一步</value></data>
+  <data name="NextStepTasks" xml:space="preserve"><value>有未完成的任务需要处理，请先在任务中心核对。</value></data>
+  <data name="NextStepTasksAction" xml:space="preserve"><value>打开任务中心</value></data>
+  <data name="NextStepReview" xml:space="preserve"><value>有 {count} 条变更等待审阅和提交。</value></data>
+  <data name="NextStepReviewAction" xml:space="preserve"><value>去审阅</value></data>
+  <data name="NextStepConnect" xml:space="preserve"><value>还没有连接服务器。连接后可以从 API 载入数据。</value></data>
+  <data name="NextStepConnectAction" xml:space="preserve"><value>去连接</value></data>
+  <data name="NextStepData" xml:space="preserve"><value>没有待提交的变更，可以开始编辑数据。</value></data>
+  <data name="NextStepDataAction" xml:space="preserve"><value>打开数据管理</value></data>
+  <data name="TableEmpty" xml:space="preserve"><value>没有符合条件的记录。可以调整搜索和筛选，或新增、导入数据。</value></data>
+  <data name="TasksEmpty" xml:space="preserve"><value>还没有任务。在变更审阅中提交后，任务会显示在这里。</value></data>
+  <data name="ShortcutUndo" xml:space="preserve"><value>撤销（Ctrl+Z）</value></data>
+  <data name="ShortcutRedo" xml:space="preserve"><value>重做（Ctrl+Y）</value></data>
+  <data name="SearchShortcutHint" xml:space="preserve"><value>按 Ctrl+F 搜索，按 F5 重新查询</value></data>
+  <data name="CellServerValue" xml:space="preserve"><value>服务器上的值：{value}</value></data>
+  <data name="CellEmptyValue" xml:space="preserve"><value>（空）</value></data>
+  <data name="CellReadOnlyDeleted" xml:space="preserve"><value>这条记录已标记删除，取消删除后才能修改。</value></data>
+  <data name="CellReadOnlyServer" xml:space="preserve"><value>在线模式下服务器不保留这个值，不能修改。</value></data>
+  <data name="CellPickDate" xml:space="preserve"><value>选择日期</value></data>
+  <data name="CellPickDays" xml:space="preserve"><value>选择星期</value></data>
+  <data name="CellDaysEvery" xml:space="preserve"><value>每天</value></data>
+  <data name="CellDaysWorking" xml:space="preserve"><value>工作日</value></data>
+  <data name="CellDaysNone" xml:space="preserve"><value>清除</value></data>
+  <data name="PasteNothing" xml:space="preserve"><value>没有可粘贴的改动（跳过只读或超出本页的单元格 {kept} 个）。</value></data>
+  <data name="PasteTitle" xml:space="preserve"><value>粘贴到多个单元格</value></data>
+  <data name="PasteConfirm" xml:space="preserve"><value>将修改 {rows} 条记录中的 {cells} 个单元格。只读或超出本页的 {kept} 个单元格保持不变。可以用撤销一次恢复。</value></data>
+  <data name="PasteApply" xml:space="preserve"><value>粘贴</value></data>
+  <data name="PasteDone" xml:space="preserve"><value>已粘贴 {cells} 个单元格（{rows} 条记录），跳过 {kept} 个。</value></data>
+  <data name="FillDownNothing" xml:space="preserve"><value>先选中要填充的其他记录（复选框），再在一个单元格上按 Ctrl+D。</value></data>
+  <data name="FillDownTitle" xml:space="preserve"><value>向下填充</value></data>
+  <data name="FillDownConfirm" xml:space="preserve"><value>将 {rows} 条已选记录的“{field}”设为：{value}</value></data>
+  <data name="FillDownApply" xml:space="preserve"><value>填充</value></data>
+  <data name="FillDownDone" xml:space="preserve"><value>已将 {rows} 条记录的“{field}”填充为同一个值。</value></data>
+  <data name="RowDuplicateDone" xml:space="preserve"><value>已复制 {count} 条记录为新记录，主键已清空，请补全后再提交。</value></data>
+  <data name="RowDetails" xml:space="preserve"><value>记录详情</value></data>
+  <data name="RowDuplicate" xml:space="preserve"><value>复制为新记录</value></data>
+  <data name="RowDetailsClose" xml:space="preserve"><value>关闭详情</value></data>
+  <data name="RowDetailsHint" xml:space="preserve"><value>带 * 的是必填项。改动会立即显示在表格中，也可以撤销。</value></data>
+  <data name="RowDetailsNew" xml:space="preserve"><value>新记录</value></data>
+  <data name="TableSortBy" xml:space="preserve"><value>排序：</value></data>
+  <data name="TableSortNone" xml:space="preserve"><value>不排序</value></data>
+  <data name="TableSortAscending" xml:space="preserve"><value>升序</value></data>
+  <data name="TableSortDescending" xml:space="preserve"><value>降序</value></data>
+  <data name="TableSortHint" xml:space="preserve"><value>点击按此列排序，再点反向，第三次取消</value></data>
+  <data name="TableView" xml:space="preserve"><value>视图</value></data>
+  <data name="TableColumns" xml:space="preserve"><value>显示的列</value></data>
+  <data name="TableColumnsAll" xml:space="preserve"><value>显示全部列</value></data>
+  <data name="AddFromCsv" xml:space="preserve"><value>从 CSV 导入…</value></data>
+  <data name="BatchMenu" xml:space="preserve"><value>批量操作</value></data>
+  <data name="BatchMenuSelected" xml:space="preserve"><value>批量操作 · 已选 {count}</value></data>
+  <data name="DataMenu" xml:space="preserve"><value>数据</value></data>
+  <data name="DataMenuConflicts" xml:space="preserve"><value>数据 · 冲突 {count}</value></data>
+  <data name="CellCopy" xml:space="preserve"><value>复制单元格</value></data>
+  <data name="CellRestoreServer" xml:space="preserve"><value>还原为服务器上的值</value></data>
 </root>

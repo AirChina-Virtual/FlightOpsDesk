@@ -39,7 +39,6 @@ public class LocalizationTests
         app.SelectItem("Data management");
         app.Edit("Callsign", "DEM999");
         app.Edit("Search all fields", "DEM999");
-        app.Click("Filter / sort");
         app.Until(() => Rows().Length == 1, "the filter leaves one row");
         Rows()[0].Select();
         app.SelectItem("Connection & settings");
@@ -62,7 +61,7 @@ public class LocalizationTests
         app.First("Airbus A320 · A320 · 2", ControlType.CheckBox).Toggle();
         app.Click("Preview changes");
         app.Click("Apply to drafts");
-        app.First("Assign fleets", ControlType.Button);
+        app.Until(() => app.Name("DataBatchMenu").StartsWith("Selected records", StringComparison.Ordinal), "the selection menu follows the language");
         app.Click("Delete selected");
         app.Click("Confirm deletion");
         app.First("Pending deletion", ControlType.Text);

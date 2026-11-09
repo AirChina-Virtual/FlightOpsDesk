@@ -26,7 +26,6 @@ public sealed partial class MainWindow
     DataTableView? tableView => dataGrid?.View;
     TextBox? DataPageJumpBox => dataGrid?.PageJump;
     ComboBox? DataPageSizeBox => dataGrid?.PageSize;
-    CommandBar? dataActions;
     int dataPageBuilds, dataRowBuilds;
     DataGridViewModel? pageRows;
     DataGridViewModel PageRows => pageRows ??= new(new DataGridHost(this), cellEdits, localization);
@@ -50,9 +49,14 @@ public sealed partial class MainWindow
                 window.changeCounts[data] = count + changedDelta;
             window.session.RecordCellEdit(owner, kind, rowId);
             window.Status(() => window.L("Text_75141EDE81"));
+            window.RefreshReviewBadge();
+            window.SyncEditedRow(rowId);
         }
         public Task ChooseFleets(DataRow row) => window.Guard(() => window.ChooseFleets(row));
         public Task ChooseParameter(DataRow row) => window.Guard(() => window.ChooseParameter(row));
+        public Task PasteCells(RowViewModel row, string field, string text) => window.Guard(() => window.PasteCells(row, field, text));
+        public Task FillDown(RowViewModel row, string field) => window.Guard(() => window.FillDown(row, field));
+        public void OpenDetails(Guid rowId) => window.OpenDetails(rowId);
     }
 
     UIElement GetDataPage()
@@ -95,16 +99,17 @@ public sealed partial class MainWindow
         var state = CurrentDataState;
         ClearDataRows();
         shownState = state;
-        if (searchBox != null)
-            searchBox.Text = state.Search;
-        if (filterBox != null)
-            filterBox.SelectedIndex = state.Filter;
-        SyncSortColumns(state.Sort);
+        settingQueryControls = true;
+        try
+        {
+            if (searchBox != null)
+                searchBox.Text = state.Search;
+            if (filterBox != null)
+                filterBox.SelectedIndex = state.Filter;
+            SyncSortColumns(state.Sort);
+        }
+        finally { settingQueryControls = false; }
         EnsureDataHeaders(DisplayColumns());
-        if (fleetCommand != null)
-            fleetCommand.Visibility = resource is ResourceKind.Aircraft or ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
-        if (retireCommand != null)
-            retireCommand.Visibility = resource == ResourceKind.Routes ? Visibility.Visible : Visibility.Collapsed;
         dataFooter?.ShowPage(state.Model.Page);
     }
     void ClearDataRows()
@@ -117,11 +122,18 @@ public sealed partial class MainWindow
     {
         if (sortBox is null)
             return;
-        sortBox.ItemsSource = Data.Columns.Count > 0 ? Data.Columns : Schemas.All[resource].Columns.ToList();
-        if (selected != null && sortBox.Items.Contains(selected))
-            sortBox.SelectedItem = selected;
-        else
-            sortBox.SelectedIndex = -1;
+        var outer = settingQueryControls;
+        settingQueryControls = true;
+        try
+        {
+            sortBox.ItemsSource = AllColumns();
+            if (DataSort.Parse(selected).Field is { } field && sortBox.Items.Contains(field))
+                sortBox.SelectedItem = selected;
+            else
+                sortBox.SelectedIndex = -1;
+            tableView?.ShowSort(DataSort.Parse(sortBox.SelectedItem as string));
+        }
+        finally { settingQueryControls = outer; }
     }
     void StartDataQuery()
     {
@@ -156,6 +168,8 @@ public sealed partial class MainWindow
         foreach (var view in visible)
             if (replaced.Contains(view.Row.LocalId) && source.FindDraftRow(view.Row.LocalId) is { } row)
                 view.Rebind(row);
+        if (detailsRow is { } details && replaced.Contains(details.Row.LocalId))
+            SyncEditedRow(details.Row.LocalId);
         cellEdits.ResetContinuation();
     }
     int CountChanges(ResourceData data)
@@ -202,13 +216,14 @@ public sealed partial class MainWindow
             await Task.Yield();
             token.ThrowIfCancellationRequested();
             var baseline = source.Snapshot.ToDictionary(r => r.LocalId);
+            var (sortField, descending) = DataSort.Parse(sort);
             var inputs = new List<DataQueryRow>(source.Draft.Count);
             var slice = Stopwatch.StartNew();
             for (var n = 0; n < source.Draft.Count; n++)
             {
                 token.ThrowIfCancellationRequested();
                 var row = source.Draft[n];
-                inputs.Add(new(row.LocalId, search.Length == 0 ? [] : row.Fields.Values.ToImmutableArray(), sort is null ? "" : row.Get(sort),
+                inputs.Add(new(row.LocalId, search.Length == 0 ? [] : row.Fields.Values.ToImmutableArray(), sortField is null ? "" : row.Get(sortField),
                     ChangePlanner.GetChangeKind(row, baseline.GetValueOrDefault(row.LocalId)) != null, Schemas.Deleted(row)));
                 if (slice.ElapsedMilliseconds >= 8)
                 {
@@ -218,7 +233,7 @@ public sealed partial class MainWindow
                     slice.Restart();
                 }
             }
-            var result = await Task.Run(() => DataTableViewModel.Query(inputs, search, filter, sort != null, token), token);
+            var result = await Task.Run(() => DataTableViewModel.Query(inputs, search, filter, sortField != null, token, descending), token);
             token.ThrowIfCancellationRequested();
             if (generation != dataQueryGeneration || !ReferenceEquals(owner, workspace) || kind != resource || page != "data")
                 return;
@@ -279,6 +294,7 @@ public sealed partial class MainWindow
         finally { restoringDataSelection = false; }
         if (resetVertical)
         { shownState.Vertical = 0; tableView.ScrollTo(0, null); }
+        RefreshDetails();
         RefreshDataAvailability();
     }
     void ChangeDataPage(int target)
@@ -328,16 +344,7 @@ public sealed partial class MainWindow
         var counts = SelectionCounts();
         var can = DataGridAvailability.For(model, enabled, visible.Count);
         LockDataTable(!enabled);
-        if (dataActions != null)
-            foreach (var command in dataActions.PrimaryCommands.Concat(dataActions.SecondaryCommands).OfType<AppBarButton>())
-            {
-                var conflictCommand = command.Icon is SymbolIcon { Symbol: Symbol.Important };
-                command.IsEnabled = DataGridAvailability.Command(enabled, command.Tag as string, conflictCommand, counts, Data.Conflicts.Count);
-                if (conflictCommand)
-                    command.Label = L("ApiConflicts", ("count", Data.Conflicts.Count));
-            }
-        if (densityPicker != null)
-        { densityPicker.IsEnabled = can.Edit; AutomationProperties.SetName(densityPicker, L("TableDensity")); }
+        RefreshCommands(enabled, counts);
         dataFooter?.Apply(can, model, gate.QueryInProgress, PageSummary(), SelectionSummary());
         RefreshQueryNotice();
     }
@@ -345,7 +352,7 @@ public sealed partial class MainWindow
     void LockDataTable(bool locked)
     {
         if (tableView?.Lock(locked) == true && searchBox?.Focus(FocusState.Programmatic) != true)
-            dataActions?.Focus(FocusState.Programmatic);
+            addButton?.Focus(FocusState.Programmatic);
     }
     void RestoreDataSelection()
     {

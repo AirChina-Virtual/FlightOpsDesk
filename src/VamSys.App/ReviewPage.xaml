@@ -8,10 +8,11 @@
     <local:ReviewRowTemplateSelector x:Key="RowTemplates">
       <local:ReviewRowTemplateSelector.Heading>
         <DataTemplate x:DataType="vm:ReviewRowViewModel">
-          <StackPanel Spacing="{StaticResource SpacingSmall}" Margin="{StaticResource ReviewGroupMargin}">
-            <TextBlock Text="{x:Bind Heading, Mode=OneWay}" FontSize="{StaticResource SectionFontSize}"/>
-            <Button Content="{x:Bind ExportLabel, Mode=OneWay}" Command="{x:Bind ExportCommand}" HorizontalAlignment="Left"/>
-          </StackPanel>
+          <Grid Margin="{StaticResource ReviewGroupMargin}" ColumnSpacing="{StaticResource SpacingLarge}">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBlock Text="{x:Bind Heading, Mode=OneWay}" Style="{StaticResource CardTitleStyle}" VerticalAlignment="Center"/>
+            <Button Grid.Column="1" Content="{x:Bind ExportLabel, Mode=OneWay}" Command="{x:Bind ExportCommand}"/>
+          </Grid>
         </DataTemplate>
       </local:ReviewRowTemplateSelector.Heading>
       <local:ReviewRowTemplateSelector.Change>
@@ -33,11 +34,22 @@
     </StackPanel>
     <Grid RowSpacing="{StaticResource SpacingRelaxed}" Visibility="{x:Bind Model.IsShown, Mode=OneWay}">
       <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <StackPanel Spacing="{StaticResource SpacingLarge}">
-        <TextBlock Text="{x:Bind Model.Title, Mode=OneWay}" FontSize="{StaticResource SubsectionFontSize}" TextWrapping="Wrap"/>
-        <TextBlock Text="{x:Bind Model.Target, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-        <TextBlock Text="{x:Bind Model.Counts, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-        <TextBlock Text="{x:Bind Model.Mode, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+      <!-- The summary and the submit button stay above the list while the changes scroll. -->
+      <Border Style="{StaticResource CardStyle}">
+      <StackPanel Spacing="{StaticResource SpacingMedium}">
+        <Grid ColumnSpacing="{StaticResource SpacingLarge}">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+          <StackPanel Spacing="{StaticResource SpacingTight}">
+            <TextBlock Text="{x:Bind Model.Title, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
+            <TextBlock Text="{x:Bind Model.Counts, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="{StaticResource SpacingMedium}" VerticalAlignment="Center">
+            <Button Content="{x:Bind Model.ConflictsLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanResolveConflicts, Mode=OneWay}" Click="ResolveConflicts"/>
+            <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind Model.SubmitLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanSubmit, Mode=OneWay}" Click="Submit"/>
+          </StackPanel>
+        </Grid>
+        <TextBlock Text="{x:Bind Model.Target, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+        <TextBlock Text="{x:Bind Model.Mode, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
         <TextBlock Text="{x:Bind Model.ConnectHint, Mode=OneWay}" Visibility="{x:Bind Model.ShowsConnectHint, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
         <!-- Collapsed when empty: a visible empty list would still take one spacing in this panel. -->
         <ItemsControl ItemsSource="{x:Bind Model.ShownBlockers, Mode=OneWay}" Visibility="{x:Bind Model.ShowsBlockers, Mode=OneWay}">
@@ -46,19 +58,14 @@
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="x:String">
-              <TextBlock Text="{x:Bind}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+              <TextBlock Text="{x:Bind}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap" Foreground="{ThemeResource StatusErrorBrush}"/>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         <Button Content="{x:Bind Model.IssuesLabel, Mode=OneWay}" Visibility="{x:Bind Model.ShowsIssues, Mode=OneWay}" Click="ShowIssues"/>
-        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-          <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLarge}">
-            <Button Content="{x:Bind Model.SubmitLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanSubmit, Mode=OneWay}" Click="Submit"/>
-            <Button Content="{x:Bind Model.ConflictsLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanResolveConflicts, Mode=OneWay}" Click="ResolveConflicts"/>
-          </StackPanel>
-        </ScrollViewer>
-        <TextBlock Text="{x:Bind Model.NothingToReview, Mode=OneWay}" Visibility="{x:Bind Model.ShowsNothingToReview, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
+        <TextBlock Text="{x:Bind Model.NothingToReview, Mode=OneWay}" Visibility="{x:Bind Model.ShowsNothingToReview, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
       </StackPanel>
+      </Border>
       <ListView Grid.Row="1" AutomationProperties.AutomationId="WorkspaceReview" ItemsSource="{x:Bind Model.Rows, Mode=OneWay}"
           ItemTemplateSelector="{StaticResource RowTemplates}" SelectionMode="None" HorizontalContentAlignment="Stretch"/>
     </Grid>

@@ -10,7 +10,8 @@ public sealed class DataGridFooterViewModel(ILocalizationService language) : Obs
     public static readonly int[] PageSizes = [100, 200, 500];
 
     bool canFirst, canPrevious, canNext, canLast, canGo, canEdit, canSelectPage, canSelectAll, canClearSelection, queryInProgress;
-    string pageText = "", pageSummary = "", selectionSummary = "", pageJumpText = "";
+    bool isEmpty;
+    string pageText = "", pageSummary = "", selectionSummary = "", pageJumpText = "", emptyText = "";
     object? pageSize;
     int? shownPage;
 
@@ -26,6 +27,9 @@ public sealed class DataGridFooterViewModel(ILocalizationService language) : Obs
     public bool CanSelectAll { get => canSelectAll; private set => SetProperty(ref canSelectAll, value); }
     public bool CanClearSelection { get => canClearSelection; private set => SetProperty(ref canClearSelection, value); }
     public bool QueryInProgress { get => queryInProgress; private set => SetProperty(ref queryInProgress, value); }
+    // The finished query found nothing: the table says so instead of staying blank.
+    public bool IsEmpty { get => isEmpty; private set => SetProperty(ref isEmpty, value); }
+    public string EmptyText { get => emptyText; private set => SetProperty(ref emptyText, value); }
     // "page / pages"; the full summary is its tooltip and automation name.
     public string PageText { get => pageText; private set => SetProperty(ref pageText, value); }
     public string PageSummary { get => pageSummary; private set => SetProperty(ref pageSummary, value); }
@@ -61,6 +65,8 @@ public sealed class DataGridFooterViewModel(ILocalizationService language) : Obs
         CanSelectAll = can.SelectAll;
         CanClearSelection = can.ClearSelection;
         QueryInProgress = querying;
+        IsEmpty = !querying && !model.IsDirty && model.Total == 0;
+        EmptyText = language.Get("TableEmpty");
         PageText = $"{model.Page} / {model.PageCount}";
         PageSummary = summary;
         SelectionSummary = selected;

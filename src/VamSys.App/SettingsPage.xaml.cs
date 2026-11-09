@@ -13,7 +13,10 @@ public sealed record SettingsPageActions(
     Func<Task> Connect,
     Func<Task> Refresh,
     Func<Task> LoadParameters,
-    Func<Task> BackupClear);
+    Func<Task> BackupClear,
+    Func<Task> ChangeDataLocation,
+    Func<Task> RestoreDataLocation,
+    Action OpenDataFolder);
 
 public sealed partial class SettingsPage : UserControl
 {
@@ -46,6 +49,9 @@ public sealed partial class SettingsPage : UserControl
     async void Refresh(object sender, RoutedEventArgs e) => await actions.Invoke(actions.Refresh);
     async void LoadParameters(object sender, RoutedEventArgs e) => await actions.Invoke(actions.LoadParameters);
     async void BackupClear(object sender, RoutedEventArgs e) => await actions.Invoke(actions.BackupClear);
+    async void ChangeDataLocation(object sender, RoutedEventArgs e) => await actions.Invoke(actions.ChangeDataLocation);
+    async void RestoreDataLocation(object sender, RoutedEventArgs e) => await actions.Invoke(actions.RestoreDataLocation);
+    async void OpenDataFolder(object sender, RoutedEventArgs e) => await actions.Invoke(() => { actions.OpenDataFolder(); return Task.CompletedTask; });
 
     // A completed save clears the secret field and reports; a refused one leaves both as they are.
     void Saved(string? status)

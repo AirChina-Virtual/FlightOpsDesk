@@ -12,11 +12,13 @@ namespace VamSys.App;
 sealed class DataTableView
 {
     readonly ILocalizationService language;
+    readonly Border headerHost;
     List<string> headerColumns = [];
 
-    public DataTableView(ListView table, ScrollViewer horizontal, DataTemplate rowTemplate, double rowHeight, ILocalizationService language)
+    public DataTableView(ListView table, Border headerHost, ScrollViewer horizontal, DataTemplate rowTemplate, double rowHeight, ILocalizationService language)
     {
         Table = table;
+        this.headerHost = headerHost;
         Horizontal = horizontal;
         this.language = language;
         AutomationProperties.SetAutomationId(table, "DataTable");
@@ -24,6 +26,24 @@ sealed class DataTableView
         table.GettingFocus += (_, e) => { if (!table.IsHitTestVisible) e.TryCancel(); };
         table.SelectionChanged += (_, e) => { if (!Restoring) UserSelectionChanged?.Invoke(e.AddedItems.Cast<RowViewModel>().ToList(), e.RemovedItems.Cast<RowViewModel>().ToList()); };
         table.ItemTemplate = rowTemplate;
+        // Right click, Shift+F10 or the menu key on a row: the window shows the row's menu.
+        table.ContextRequested += (_, e) =>
+        {
+            if (!table.IsHitTestVisible || e.OriginalSource is not DependencyObject source)
+                return;
+            ListViewItem? item = null;
+            EditableCell? cell = null;
+            for (var node = source; node != null && item is null; node = VisualTreeHelper.GetParent(node))
+            {
+                cell ??= node as EditableCell;
+                item = node as ListViewItem;
+            }
+            if (item?.Content is not RowViewModel row)
+                return;
+            e.Handled = true;
+            var target = (FrameworkElement?)cell ?? item;
+            RowMenuRequested?.Invoke(row, cell?.Cell, target, e.TryGetPosition(target, out var point) ? point : null);
+        };
         table.ItemContainerTransitions = new Microsoft.UI.Xaml.Media.Animation.TransitionCollection();
         // Keep WinUI's themed selection presenter, including the paired checkbox fill and glyph.
         var style = new Style(typeof(ListViewItem)) { BasedOn = (Style)Application.Current.Resources["DefaultListViewItemStyle"] };
@@ -39,32 +59,59 @@ sealed class DataTableView
     public ListView Table { get; }
     public ScrollViewer Horizontal { get; }
     public ScrollViewer? Vertical => MainWindow.FindVisual<ScrollViewer>(Table);
-    public double HeaderHeight => (Table.Header as FrameworkElement)?.ActualHeight ?? 0;
     // Set while this class changes the selection, so those changes are not reported as the user's.
     public bool Restoring { get; private set; }
     // Rows the user selected and deselected (pointer, keyboard, automation).
     public event Action<List<RowViewModel>, List<RowViewModel>>? UserSelectionChanged;
+    // A row's menu was asked for: the row, the cell it was asked on (if any), where to show it.
+    public event Action<RowViewModel, CellViewModel?, FrameworkElement, Windows.Foundation.Point?>? RowMenuRequested;
+
+    // A click on a column header asks to sort by it (the status column has no value to sort by).
+    public event Action<string>? HeaderClicked;
+    (string? Field, bool Descending) sortShown;
+    readonly Dictionary<string, TextBlock> headerLabels = [];
 
     public void ShowHeaders(List<string> columns)
     {
-        if (Table.Header != null && headerColumns.SequenceEqual(columns))
+        if (headerHost.Child != null && headerColumns.SequenceEqual(columns))
             return;
         headerColumns = columns;
+        headerLabels.Clear();
         var headers = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0, Margin = UiTokens.DataHeaderInset };
         foreach (var field in columns)
         {
-            string Label() => field == "_delete" ? language.Get("ColumnStatus") : ApiOperationPolicy.FieldLabel(field, language);
+            string Name() => field == "_delete" ? language.Get("ColumnStatus") : ApiOperationPolicy.FieldLabel(field, language);
+            string Label() => Name() + (sortShown.Field == field ? sortShown.Descending ? " ↓" : " ↑" : "");
             var label = new TextBlock
             {
                 Width = new CellViewModel(field, "", _ => { }).Width,
                 Margin = UiTokens.ColumnHeaderMargin,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                FontSize = UiTokens.BodyFontSize
+                Style = UiTokens.ColumnHeaderTextStyle
             }.Localize(language, "Text", Label);
-            ToolTipService.SetToolTip(label, new ToolTip().Localize(language, "Content", Label));
+            if (field != "_delete")
+            {
+                label.Tapped += (_, _) => HeaderClicked?.Invoke(field);
+                // A second click soon after the first is a double tap, not another tap: it turns the order round too.
+                label.DoubleTapped += (_, _) => HeaderClicked?.Invoke(field);
+                ToolTipService.SetToolTip(label, new ToolTip().Localize(language, "Content", () => Name() + " · " + language.Get("TableSortHint")));
+            }
+            else
+                ToolTipService.SetToolTip(label, new ToolTip().Localize(language, "Content", Name));
+            headerLabels[field] = label;
             headers.Children.Add(label);
         }
-        Table.Header = headers;
+        headerHost.Child = headers;
+        ShowSort(sortShown);
+    }
+    // The arrow on the sorted column's header.
+    public void ShowSort((string? Field, bool Descending) sort)
+    {
+        sortShown = sort;
+        foreach (var (field, label) in headerLabels)
+        {
+            var name = field == "_delete" ? language.Get("ColumnStatus") : ApiOperationPolicy.FieldLabel(field, language);
+            label.Text = name + (sort.Field == field ? sort.Descending ? " ↓" : " ↑" : "");
+        }
     }
 
     // A new ItemsSource makes WinUI create every row's controls again and keep native memory for the discarded ones,

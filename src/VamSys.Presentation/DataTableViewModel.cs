@@ -58,7 +58,7 @@ public sealed class DataTableViewModel
         Selected.UnionWith(ids);
     }
     public void SelectAll() => Selected.UnionWith(results);
-    public static DataQueryResult Query(IReadOnlyList<DataQueryRow> rows, string search, int filter, bool sort, CancellationToken ct)
+    public static DataQueryResult Query(IReadOnlyList<DataQueryRow> rows, string search, int filter, bool sort, CancellationToken ct, bool descending = false)
     {
         ct.ThrowIfCancellationRequested();
         var matches = new List<int>(rows.Count);
@@ -80,7 +80,8 @@ public sealed class DataTableViewModel
             matches.Sort((a, b) =>
         {
             var order = StringComparer.OrdinalIgnoreCase.Compare(rows[a].SortValue, rows[b].SortValue);
-            return order == 0 ? a.CompareTo(b) : order;
+            // Equal values keep the draft order in both directions.
+            return order == 0 ? a.CompareTo(b) : descending ? -order : order;
         });
         ct.ThrowIfCancellationRequested();
         var ids = new Guid[matches.Count];

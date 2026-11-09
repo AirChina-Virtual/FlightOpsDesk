@@ -39,6 +39,7 @@ dotnet test --project tests/VamSys.UiTests/VamSys.UiTests.csproj -c Release -- -
 | `SubmissionHandoffTests` | 演示提交：两步确认可取消、切到任务中心、只运行本次任务 | 正式包 |
 | `DialogTests` | 其他测试没打开过的文字、列表对话框：新建工作区、校验结果、审阅问题、删除被阻止、批量规则与到期预览（到期的结束日期、平移天数的无效输入和跳过行）、机队校验失败、导出（含真实文件夹选择框）、放弃未发送项、备份并清空、离线时的未知结果 | 正式包 |
 | `ParameterPickerTests` | 单元格按钮的两种拒绝；选择框用 QA 包虚构的参数，因为真实列表需要服务器 | QA 包 |
+| `DataLocationTests` | 更改数据目录：真实文件夹选择框、复制、重启、旧库改名、切回默认位置；位置缺失时的恢复窗口；环境变量锁定。默认目录用只存在于 QA 包的 `VAMSYS_QA_DEFAULT_DIR` 重定向，不碰真实的 `%LOCALAPPDATA%` | QA 包 |
 
 ## 已替换的脚本
 

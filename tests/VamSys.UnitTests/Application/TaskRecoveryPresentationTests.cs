@@ -9,6 +9,34 @@ public class TaskRecoveryPresentationTests
     static readonly Func<Task> Nothing = () => Task.CompletedTask;
 
     [Fact]
+    public void A_card_shows_only_the_actions_its_state_calls_for_and_how_far_it_got()
+    {
+        var pending = new ChangeItem { Resource = ResourceKind.Fleets, State = ItemState.Pending };
+        var unknown = new ChangeItem { Resource = ResourceKind.Fleets, State = ItemState.Unknown };
+        var job = new BatchJob { Mode = RunMode.Online, Items = [pending, unknown] };
+        // Offline: resuming cannot run now, but it stays in view, disabled, because this task needs it.
+        var model = new TaskJobViewModel(job, new LocalizationService(), () => true, () => RunMode.Offline, Nothing, Nothing, Nothing, Nothing);
+        Assert.True(model.ShowsReview);
+        Assert.True(model.ShowsResume);
+        Assert.False(model.Resume.CanExecute(null));
+        Assert.False(model.ShowsRetry);
+        Assert.Equal(0.5, model.Progress);
+
+        var notified = new List<string?>();
+        model.PropertyChanged += (_, e) => notified.Add(e.PropertyName);
+        pending.State = ItemState.Succeeded;
+        pending.Rebased = true;
+        unknown.State = ItemState.Succeeded;
+        unknown.Rebased = true;
+        model.Update(pending.Id);
+        model.Update(unknown.Id);
+        Assert.False(model.ShowsReview);
+        Assert.False(model.ShowsResume);
+        Assert.Equal(1, model.Progress);
+        Assert.Contains(nameof(TaskJobViewModel.ShowsReview), notified);
+    }
+
+    [Fact]
     public void Discarded_items_are_shown_apart_from_real_failures_and_discarding_is_offered_only_for_never_sent_items()
     {
         var language = new LocalizationService();

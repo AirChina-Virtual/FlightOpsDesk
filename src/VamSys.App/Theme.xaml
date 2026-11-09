@@ -7,27 +7,121 @@
   <!-- Brushes: aliases of the WinUI theme brushes, defined per theme so light, dark and high contrast switch together. -->
   <ResourceDictionary.ThemeDictionaries>
     <ResourceDictionary x:Key="Default">
+      <StaticResource x:Key="CardStrokeBrush" ResourceKey="CardStrokeColorDefaultBrush"/>
+      <StaticResource x:Key="DividerBrush" ResourceKey="DividerStrokeColorDefaultBrush"/>
+      <StaticResource x:Key="StatusErrorBrush" ResourceKey="SystemFillColorCriticalBrush"/>
+      <StaticResource x:Key="ModeOnlineBrush" ResourceKey="SystemFillColorCautionBackgroundBrush"/>
+      <StaticResource x:Key="ModeDemoBrush" ResourceKey="SystemFillColorAttentionBackgroundBrush"/>
       <StaticResource x:Key="CardBackgroundBrush" ResourceKey="CardBackgroundFillColorDefaultBrush"/>
       <StaticResource x:Key="SecondaryTextBrush" ResourceKey="TextFillColorSecondaryBrush"/>
       <StaticResource x:Key="BadgeBackgroundBrush" ResourceKey="SubtleFillColorSecondaryBrush"/>
       <StaticResource x:Key="CellBorderBrush" ResourceKey="ControlStrokeColorDefaultBrush"/>
       <StaticResource x:Key="CellBackgroundBrush" ResourceKey="ControlFillColorDefaultBrush"/>
+      <StaticResource x:Key="CellChangedBrush" ResourceKey="AccentFillColorDefaultBrush"/>
+      <StaticResource x:Key="CellChangedBackgroundBrush" ResourceKey="SystemFillColorAttentionBackgroundBrush"/>
+      <StaticResource x:Key="CellIssueBackgroundBrush" ResourceKey="SystemFillColorCriticalBackgroundBrush"/>
     </ResourceDictionary>
     <ResourceDictionary x:Key="Light">
+      <StaticResource x:Key="CardStrokeBrush" ResourceKey="CardStrokeColorDefaultBrush"/>
+      <StaticResource x:Key="DividerBrush" ResourceKey="DividerStrokeColorDefaultBrush"/>
+      <StaticResource x:Key="StatusErrorBrush" ResourceKey="SystemFillColorCriticalBrush"/>
+      <StaticResource x:Key="ModeOnlineBrush" ResourceKey="SystemFillColorCautionBackgroundBrush"/>
+      <StaticResource x:Key="ModeDemoBrush" ResourceKey="SystemFillColorAttentionBackgroundBrush"/>
       <StaticResource x:Key="CardBackgroundBrush" ResourceKey="CardBackgroundFillColorDefaultBrush"/>
       <StaticResource x:Key="SecondaryTextBrush" ResourceKey="TextFillColorSecondaryBrush"/>
       <StaticResource x:Key="BadgeBackgroundBrush" ResourceKey="SubtleFillColorSecondaryBrush"/>
       <StaticResource x:Key="CellBorderBrush" ResourceKey="ControlStrokeColorDefaultBrush"/>
       <StaticResource x:Key="CellBackgroundBrush" ResourceKey="ControlFillColorDefaultBrush"/>
+      <StaticResource x:Key="CellChangedBrush" ResourceKey="AccentFillColorDefaultBrush"/>
+      <StaticResource x:Key="CellChangedBackgroundBrush" ResourceKey="SystemFillColorAttentionBackgroundBrush"/>
+      <StaticResource x:Key="CellIssueBackgroundBrush" ResourceKey="SystemFillColorCriticalBackgroundBrush"/>
     </ResourceDictionary>
     <ResourceDictionary x:Key="HighContrast">
+      <StaticResource x:Key="CardStrokeBrush" ResourceKey="CardStrokeColorDefaultBrush"/>
+      <StaticResource x:Key="DividerBrush" ResourceKey="DividerStrokeColorDefaultBrush"/>
+      <StaticResource x:Key="StatusErrorBrush" ResourceKey="SystemFillColorCriticalBrush"/>
+      <StaticResource x:Key="ModeOnlineBrush" ResourceKey="SystemFillColorCautionBackgroundBrush"/>
+      <StaticResource x:Key="ModeDemoBrush" ResourceKey="SystemFillColorAttentionBackgroundBrush"/>
       <StaticResource x:Key="CardBackgroundBrush" ResourceKey="CardBackgroundFillColorDefaultBrush"/>
       <StaticResource x:Key="SecondaryTextBrush" ResourceKey="TextFillColorSecondaryBrush"/>
       <StaticResource x:Key="BadgeBackgroundBrush" ResourceKey="SubtleFillColorSecondaryBrush"/>
       <StaticResource x:Key="CellBorderBrush" ResourceKey="ControlStrokeColorDefaultBrush"/>
       <StaticResource x:Key="CellBackgroundBrush" ResourceKey="ControlFillColorDefaultBrush"/>
+      <StaticResource x:Key="CellChangedBrush" ResourceKey="AccentFillColorDefaultBrush"/>
+      <StaticResource x:Key="CellChangedBackgroundBrush" ResourceKey="SystemFillColorAttentionBackgroundBrush"/>
+      <StaticResource x:Key="CellIssueBackgroundBrush" ResourceKey="SystemFillColorCriticalBackgroundBrush"/>
     </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>
+
+  <!-- The one look of a card on every page. -->
+  <Style x:Key="CardStyle" TargetType="Border">
+    <Setter Property="Padding" Value="20"/>
+    <Setter Property="CornerRadius" Value="8"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="Background" Value="{ThemeResource CardBackgroundBrush}"/>
+    <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeBrush}"/>
+  </Style>
+  <Style x:Key="SecondaryTextStyle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="Foreground" Value="{ThemeResource SecondaryTextBrush}"/>
+  </Style>
+  <Style x:Key="CardTitleStyle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="17"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+  <!-- Colours that code switches or sets go through a style: a brush read in code stays in the theme it was read in,
+       while a style's ThemeResource follows the element's theme. -->
+  <Style x:Key="ColumnHeaderTextStyle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    <Setter Property="Foreground" Value="{ThemeResource SecondaryTextBrush}"/>
+  </Style>
+  <Style x:Key="StatusTextStyle" TargetType="TextBlock">
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="IsTextSelectionEnabled" Value="True"/>
+  </Style>
+  <Style x:Key="StatusErrorTextStyle" TargetType="TextBlock">
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+    <Setter Property="IsTextSelectionEnabled" Value="True"/>
+    <Setter Property="Foreground" Value="{ThemeResource StatusErrorBrush}"/>
+  </Style>
+  <!-- A table cell's box: plain, changed from the server's value, or with a problem the checks found. -->
+  <Style x:Key="CellBoxStyle" TargetType="Border">
+    <Setter Property="BorderThickness" Value="{StaticResource CellBorderThickness}"/>
+    <Setter Property="CornerRadius" Value="{StaticResource CellCornerRadius}"/>
+    <Setter Property="Padding" Value="{StaticResource CellBoxPadding}"/>
+    <Setter Property="BorderBrush" Value="{ThemeResource CellBorderBrush}"/>
+    <Setter Property="Background" Value="{ThemeResource CellBackgroundBrush}"/>
+  </Style>
+  <Style x:Key="CellChangedBoxStyle" TargetType="Border" BasedOn="{StaticResource CellBoxStyle}">
+    <Setter Property="BorderThickness" Value="{StaticResource CellMarkedBorderThickness}"/>
+    <Setter Property="BorderBrush" Value="{ThemeResource CellChangedBrush}"/>
+    <Setter Property="Background" Value="{ThemeResource CellChangedBackgroundBrush}"/>
+  </Style>
+  <Style x:Key="CellIssueBoxStyle" TargetType="Border" BasedOn="{StaticResource CellBoxStyle}">
+    <Setter Property="BorderThickness" Value="{StaticResource CellIssueBorderThickness}"/>
+    <Setter Property="BorderBrush" Value="{ThemeResource StatusErrorBrush}"/>
+    <Setter Property="Background" Value="{ThemeResource CellIssueBackgroundBrush}"/>
+  </Style>  <Style x:Key="ModeOfflineBadgeStyle" TargetType="Border">
+    <Setter Property="Background" Value="{ThemeResource BadgeBackgroundBrush}"/>
+  </Style>
+  <Style x:Key="ModeDemoBadgeStyle" TargetType="Border">
+    <Setter Property="Background" Value="{ThemeResource ModeDemoBrush}"/>
+  </Style>
+  <Style x:Key="ModeOnlineBadgeStyle" TargetType="Border">
+    <Setter Property="Background" Value="{ThemeResource ModeOnlineBrush}"/>
+  </Style>
+  <x:Double x:Key="PageContentMaxWidth">960</x:Double>
+  <x:Double x:Key="DetailsPaneWidth">360</x:Double>
+  <Thickness x:Key="DetailsFieldsPadding">0,0,12,12</Thickness>
+  <Thickness x:Key="DetailsLabelMargin">0,8,0,0</Thickness>
+  <Thickness x:Key="ResourceRowPadding">20,12</Thickness>
+  <x:Double x:Key="StatNumberFontSize">28</x:Double>
 
   <!-- Type -->
   <x:Double x:Key="BadgeFontSize">12</x:Double>
@@ -73,13 +167,17 @@
   <x:Double x:Key="CellHeightCompact">28</x:Double>
   <Thickness x:Key="CellMarginComfortable">0,3,6,3</Thickness>
   <Thickness x:Key="CellMarginCompact">0,1,6,1</Thickness>
-  <Thickness x:Key="CellBorderThickness">1</Thickness>
+  <Thickness x:Key="CellBorderThickness">0,0,0,1</Thickness>
+  <Thickness x:Key="CellMarkedBorderThickness">0,0,0,2</Thickness>
+  <Thickness x:Key="CellIssueBorderThickness">1</Thickness>
   <Thickness x:Key="CellTextPadding">8,0</Thickness>
   <Thickness x:Key="CellBoxPadding">9,0</Thickness>
   <Thickness x:Key="CellButtonPadding">8,2</Thickness>
   <Thickness x:Key="CellEditorPadding">8,2,8,2</Thickness>
+  <Thickness x:Key="CellPickerPadding">6,0</Thickness>
+  <x:Double x:Key="HintDelayMilliseconds">500</x:Double>
   <Thickness x:Key="ColumnHeaderMargin">0,0,6,0</Thickness>
-  <Thickness x:Key="DataHeaderInset">44,0,0,0</Thickness>
+  <Thickness x:Key="DataHeaderInset">36,0,0,0</Thickness>
   <x:Double x:Key="LockedTableOpacity">0.6</x:Double>
 
   <!-- Control widths -->

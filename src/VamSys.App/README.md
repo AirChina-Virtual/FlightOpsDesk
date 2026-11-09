@@ -28,6 +28,8 @@
 | MainWindow.DeleteVerification.cs | 显式只读核对 Unknown／人工确认删除项，不执行 Pending；失败重载本地状态 |
 | MainWindow.Tasks.cs、TaskViewModels.cs | 任务页只创建可见内容，进度变化只更新相关记录 |
 | MainWindow.Closing.cs | 关闭时冻结操作并保存；失败后恢复编辑并允许重试 |
+| MainWindow.DataLocation.cs | 更改数据目录：判断、确认，沿用关闭流程保存、复制并校验，然后重启 |
+| MainWindow.Shortcuts.cs | 数据页快捷键；搜索、筛选、排序自动生效；审阅导航项上的待提交数量 |
 | MainWindow.Localization.cs、UiLocalization.cs | 即时切换中英文，为读屏软件提供控件名称 |
 | ../../tests/UiVerification/MainWindow.Verification.cs | 只编译进 QA 版本：窗口控制、故障注入和测量命令；正式程序不包含此文件 |
 | Assets | SVG、PNG 和多尺寸 ICO 图标 |
@@ -65,6 +67,6 @@ R4 起，保存、状态判断和业务流程在 Application 的服务中；本�
 
 ## 品牌与兼容
 
-EXE 元数据、标题栏和系统窗口使用 FlightOps Desk；图标原始文件为 Assets/FlightOpsDesk.svg。默认数据目录仍为 `%LOCALAPPDATA%/VamSysBatch`，环境变量仍为 `VAMSYS_DATA_DIR`。
+EXE 元数据、标题栏和系统窗口使用 FlightOps Desk；图标原始文件为 Assets/FlightOpsDesk.svg。默认数据目录仍为 `%LOCALAPPDATA%/VamSysBatch`，环境变量仍为 `VAMSYS_DATA_DIR`；用户可在设置页更改位置（见 docs/STORAGE-MIGRATION.md）。
 
 [品牌说明](../../docs/BRANDING.md) · [测试报告](../../docs/TEST-REPORT.md) · [项目首页](../../README.md)

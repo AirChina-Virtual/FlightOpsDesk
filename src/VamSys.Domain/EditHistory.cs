@@ -65,6 +65,15 @@ public sealed class EditHistory
     public EditHistory Copy() => new() { undo = [.. undo], redo = [.. redo], saved = saved };
     public static EditHistory From(HistorySnapshot state) => new() { undo = [.. state.Undo], redo = [.. state.Redo] };
     public void Clear() { undo.Clear(); redo.Clear(); }
+    // An edit that was taken back before it ended (Escape in a cell) leaves a step that changes nothing; it is dropped so
+    // undo does not stop at it.
+    public bool DiscardEmptyStep()
+    {
+        if (undo.Count == 0 || undo[^1] is not { Rows.IsEmpty: true, BeforeOrder: null, AfterOrder: null })
+            return false;
+        undo.RemoveAt(undo.Count - 1);
+        return true;
+    }
     internal void Push(HistoryStep step) { undo.Add(step); if (undo.Count > 20) undo.RemoveAt(0); redo.Clear(); }
     internal void Amend(IReadOnlyList<RowEdit> edits, ImmutableArray<Guid>? oldOrder, ImmutableArray<Guid>? newOrder)
     {

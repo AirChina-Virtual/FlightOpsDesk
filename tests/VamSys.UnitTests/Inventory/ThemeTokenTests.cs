@@ -48,6 +48,8 @@ public partial class ThemeTokenTests
     public void Every_static_resource_in_the_app_is_a_theme_token()
     {
         var defined = TopLevelKeys(Theme());
+        // The accent button is WinUI's own style; a primary action uses it directly so it follows the system accent.
+        defined.Add("AccentButtonStyle");
         // A page may also reference resources it defines itself (a template selector in its UserControl.Resources).
         static HashSet<string> OwnKeys(string file) => file.EndsWith(".xaml", StringComparison.Ordinal)
             ? XDocument.Parse(SourceScan.Read(file)).Descendants().Select(e => (string?)e.Attribute(X + "Key")).OfType<string>().ToHashSet(StringComparer.Ordinal)

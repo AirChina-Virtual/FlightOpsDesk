@@ -3,8 +3,8 @@ using VamSys.Core;
 
 namespace VamSys.Presentation;
 
-// One resource of the workspace page: its name, how many rows it has and how many of them changed.
-// The change count is asked for when the summary is shown, so the window's cached count is used and not recomputed.
+// One resource's card on the workspace page. It reads the resource when asked, so the page does not count changes
+// before it shows them.
 public sealed class ResourceCardViewModel(ResourceKind kind, ResourceData data, ILocalizationService language, Func<ResourceData, int> countChanges) : ObservableObject
 {
     public ResourceKind Kind { get; } = kind;
@@ -20,15 +20,19 @@ public sealed class ResourceCardViewModel(ResourceKind kind, ResourceData data, 
     }
 }
 
-// The workspace page: creating a workspace, and one card per resource in the workspace's own order.
-// The page is rebuilt on every render; the window refreshes the shown one when the language changes.
+// The workspace page: what to do next, the workspace in numbers, one card per resource in the workspace's own order,
+// and creating a workspace. The page is rebuilt on every render; the window refreshes the shown one when the language changes.
 public sealed class WorkspaceViewModel : ObservableObject
 {
     readonly ILocalizationService language;
+    readonly Workspace workspace;
+    readonly Func<ResourceData, int> countChanges;
 
     public WorkspaceViewModel(Workspace workspace, ILocalizationService language, Func<ResourceData, int> countChanges)
     {
         this.language = language;
+        this.workspace = workspace;
+        this.countChanges = countChanges;
         Cards = workspace.Resources.Select(p => new ResourceCardViewModel(p.Key, p.Value, language, countChanges)).ToList();
     }
 
@@ -38,9 +42,40 @@ public sealed class WorkspaceViewModel : ObservableObject
     public string DemoWorkspaceLabel => language.Get("Text_57D4E0340D");
     public string StorageNote => language.Get("Text_8B0B7AD880");
 
+    public string Records => workspace.Resources.Values.Sum(d => d.Draft.Count).ToString("N0", language.DisplayCulture);
+    public string Pending => PendingCount.ToString("N0", language.DisplayCulture);
+    public string Tasks => workspace.Jobs.Count.ToString("N0", language.DisplayCulture);
+    public string RecordsLabel => language.Get("OverviewRecords");
+    public string PendingLabel => language.Get("OverviewPending");
+    public string TasksLabel => language.Get("OverviewTasks");
+
+    int PendingCount => workspace.Resources.Values.Sum(countChanges);
+
+    // Unfinished remote writes come first: nothing new should be submitted before they are checked. Then the changes
+    // waiting for review (the review page says when they need a connection), then connecting, then the data itself.
+    public ShellPage NextPage => ApiOperationPolicy.HasOpenOnlineItems(workspace) ? ShellPage.Tasks
+        : PendingCount > 0 ? ShellPage.Review
+        : workspace.Mode == RunMode.Offline ? ShellPage.Settings
+        : ShellPage.Data;
+    public string NextTitle => language.Get("OverviewNextTitle");
+    public string NextText => NextPage switch
+    {
+        ShellPage.Tasks => language.Get("NextStepTasks"),
+        ShellPage.Review => language.Get("NextStepReview", ("count", PendingCount)),
+        ShellPage.Settings => language.Get("NextStepConnect"),
+        _ => language.Get("NextStepData")
+    };
+    public string NextAction => language.Get(NextPage switch
+    {
+        ShellPage.Tasks => "NextStepTasksAction",
+        ShellPage.Review => "NextStepReviewAction",
+        ShellPage.Settings => "NextStepConnectAction",
+        _ => "NextStepDataAction"
+    });
+
     public void RefreshLanguage()
     {
-        foreach (var name in new[] { nameof(Intro), nameof(NewWorkspaceLabel), nameof(DemoWorkspaceLabel), nameof(StorageNote) })
+        foreach (var name in new[] { nameof(Intro), nameof(NewWorkspaceLabel), nameof(DemoWorkspaceLabel), nameof(StorageNote), nameof(RecordsLabel), nameof(PendingLabel), nameof(TasksLabel), nameof(NextTitle), nameof(NextText), nameof(NextAction) })
             OnPropertyChanged(name);
         foreach (var card in Cards)
             card.RefreshLanguage();

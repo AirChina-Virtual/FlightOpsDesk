@@ -5,27 +5,32 @@
   <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
   <Grid RowSpacing="{StaticResource SpacingLarge}">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <StackPanel Spacing="{StaticResource SpacingLarge}">
-      <TextBlock Text="{x:Bind Model.Header, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
-      <Button Content="{x:Bind Model.CancelLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanCancel, Mode=OneWay}" Click="Cancel"/>
-    </StackPanel>
+    <Grid ColumnSpacing="{StaticResource SpacingLarge}">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <TextBlock Text="{x:Bind Model.Header, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}" VerticalAlignment="Center"/>
+      <Button Grid.Column="1" Content="{x:Bind Model.CancelLabel, Mode=OneWay}" IsEnabled="{x:Bind Model.CanCancel, Mode=OneWay}" Click="Cancel"/>
+    </Grid>
+    <TextBlock Grid.Row="1" Text="{x:Bind Model.EmptyText, Mode=OneWay}" Visibility="{x:Bind Model.IsEmpty, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"
+        HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"/>
     <!-- A virtualizing list: only the visible cards are realized, and each card updates only its changed texts. -->
     <ListView Grid.Row="1" AutomationProperties.AutomationId="TaskJobsList" ItemsSource="{x:Bind Model.Jobs}"
         SelectionMode="Single" HorizontalContentAlignment="Stretch" Loaded="JobsLoaded">
       <ListView.ItemTemplate>
         <DataTemplate x:DataType="vm:TaskJobViewModel">
-          <Border Padding="{StaticResource TaskCardPadding}" Margin="{StaticResource TaskCardMargin}" CornerRadius="{StaticResource CardCornerRadius}" Background="{ThemeResource CardBackgroundBrush}">
+          <Border Style="{StaticResource CardStyle}" Margin="{StaticResource TaskCardMargin}">
             <StackPanel Spacing="{StaticResource SpacingRelaxed}">
-              <TextBlock Text="{x:Bind Title, Mode=OneWay}" FontSize="{StaticResource CardTitleFontSize}" TextWrapping="Wrap"/>
-              <TextBlock Text="{x:Bind Summary, Mode=OneWay}" TextWrapping="Wrap"/>
+              <TextBlock Text="{x:Bind Title, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
+              <ProgressBar Minimum="0" Maximum="1" Value="{x:Bind Progress, Mode=OneWay}"/>
+              <TextBlock Text="{x:Bind Summary, Mode=OneWay}" Style="{StaticResource SecondaryTextStyle}"/>
+              <!-- Only what this task's state calls for; an action that needs a connection shows, disabled, until connected. -->
               <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingRelaxed}">
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMedium}">
+                  <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ReviewLabel, Mode=OneWay}" Command="{x:Bind Review}" Visibility="{x:Bind ShowsReview, Mode=OneWay}"/>
+                  <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ResumeLabel, Mode=OneWay}" Command="{x:Bind Resume}" Visibility="{x:Bind ShowsResume, Mode=OneWay}"/>
+                  <Button Content="{x:Bind RetryLabel, Mode=OneWay}" Command="{x:Bind Retry}" Visibility="{x:Bind ShowsRetry, Mode=OneWay}"/>
+                  <Button Content="{x:Bind VerifyDeletesLabel, Mode=OneWay}" Command="{x:Bind VerifyDeletes}" Visibility="{x:Bind ShowsVerifyDeletes, Mode=OneWay}"/>
+                  <Button Content="{x:Bind DiscardLabel, Mode=OneWay}" Command="{x:Bind Discard}" Visibility="{x:Bind ShowsDiscard, Mode=OneWay}"/>
                   <Button Content="{x:Bind DetailsLabel, Mode=OneWay}" Command="{x:Bind Details}"/>
-                  <Button Content="{x:Bind ReviewLabel, Mode=OneWay}" Command="{x:Bind Review}"/>
-                  <Button Content="{x:Bind VerifyDeletesLabel, Mode=OneWay}" Command="{x:Bind VerifyDeletes}"/>
-                  <Button Content="{x:Bind ResumeLabel, Mode=OneWay}" Command="{x:Bind Resume}"/>
-                  <Button Content="{x:Bind DiscardLabel, Mode=OneWay}" Command="{x:Bind Discard}"/>
-                  <Button Content="{x:Bind RetryLabel, Mode=OneWay}" Command="{x:Bind Retry}"/>
                   <Button Content="{x:Bind ExportLabel, Mode=OneWay}" Command="{x:Bind Export}"/>
                 </StackPanel>
               </ScrollViewer>

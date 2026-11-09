@@ -40,9 +40,13 @@ public static class Schemas
         || int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var n) && n <= 999;
     public static bool Deleted(DataRow row) => row.Get("_delete").Equals("TRUE", StringComparison.OrdinalIgnoreCase);
     // Sets the validation rules test membership against; built once for the process.
-    static readonly HashSet<string> Weekdays = new(["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"], StringComparer.Ordinal);
-    static readonly HashSet<string> FleetTypes = new(["pax", "pax-cargo", "pax-containers", "cargo", "cargo-containers"], StringComparer.Ordinal);
-    public static readonly IReadOnlySet<string> RouteTypes = new HashSet<string>(["scheduled", "cargo", "charter", "training", "vfr", "repositioning", "jumpseat"], StringComparer.Ordinal);
+    // In week order, for the day pickers.
+    public static readonly IReadOnlyList<string> WeekdayOrder = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+    static readonly HashSet<string> Weekdays = new(WeekdayOrder, StringComparer.Ordinal);
+    public static readonly IReadOnlyList<string> FleetTypeOrder = ["pax", "pax-cargo", "pax-containers", "cargo", "cargo-containers"];
+    static readonly HashSet<string> FleetTypes = new(FleetTypeOrder, StringComparer.Ordinal);
+    public static readonly IReadOnlyList<string> RouteTypeOrder = ["scheduled", "cargo", "charter", "training", "vfr", "repositioning", "jumpseat"];
+    public static readonly IReadOnlySet<string> RouteTypes = new HashSet<string>(RouteTypeOrder, StringComparer.Ordinal);
     static readonly string[] RouteSignature = ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Flight Number"];
     static readonly string[] RoutingSignature = ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Route String"];
     static readonly string[] RegistrationSignature = ["Registration"];
@@ -55,7 +59,6 @@ public static class Schemas
         string Key(ResourceKind k, DataRow row) => pass.Key(k, row);
         var data = workspace.Resources[kind];
         var schema = All[kind];
-        var spec = FieldSpecs.Get(kind);
         var issues = new List<Issue>();
         var snapshot = data.Snapshot.ToDictionary(r => r.LocalId);
         void Add(DataRow r, string f, MessageDescriptor m) => issues.Add(new(r.LocalId, f, m));
@@ -66,13 +69,44 @@ public static class Schemas
         foreach (var r in data.Draft)
         {
             snapshot.TryGetValue(r.LocalId, out var before);
+            CheckRow(workspace, kind, r, before, pass, issues);
+        }
+        // Flag possible duplicate creates without silently treating flight numbers as identities.
+        var signatureFields = kind switch
+        {
+            ResourceKind.Routes => RouteSignature,
+            ResourceKind.Routings => RoutingSignature,
+            ResourceKind.Aircraft => RegistrationSignature,
+            _ => NameSignature
+        };
+        foreach (var group in data.Draft.Where(r => !Deleted(r)).GroupBy(r => kind == ResourceKind.Routes && r.Get("Type") == "jumpseat"
+            ? string.Join("\u001f", r.Get("Departure Airport (ICAO/IATA)"), r.Get("Arrival Airport (ICAO/IATA)"), ApiOperationPolicy.JumpseatSignature(r))
+            : string.Join("\u001f", signatureFields.Select(r.Get))))
+            if (group.Count() > 1 && group.Any(r => Key(kind, r) == ""))
+                foreach (var r in group.Where(r => Key(kind, r) == ""))
+                    Add(r, schema.Key, Messages.Define("Text_CDDA93CCD1"));
+        var deletedIds = data.Draft.Where(Deleted).Select(r => r.LocalId).ToHashSet();
+        if (deletedIds.Count > 0)
+            issues.AddRange(new DeletionService().CheckReferences(workspace, kind, deletedIds));
+        return issues;
+    }
+    // The rules that look at one row alone (and at the keys of other resources it refers to). The table shows these on
+    // the cells as they are edited; Validate adds the rules that compare rows with each other.
+    public static void CheckRow(Workspace workspace, ResourceKind kind, DataRow r, DataRow? before, ValidationPass pass, List<Issue> issues)
+    {
+        string Key(ResourceKind k, DataRow row) => pass.Key(k, row);
+        var schema = All[kind];
+        var spec = FieldSpecs.Get(kind);
+        void Add(DataRow row, string f, MessageDescriptor m) => issues.Add(new(row.LocalId, f, m));
+        // One row's rules, kept at the indentation of the loop they came from.
+        {
             if (Schemas.Deleted(r))
             {
                 if (Key(kind, r) == "" || before is null)
                     Add(r, schema.Key, Messages.Define("Text_73DF5EC597"));
                 if (before != null && Key(kind, before) != Key(kind, r))
                     Add(r, schema.Key, Messages.Define("Text_F9F0B63720"));
-                continue;
+                return;
             }
             foreach (var f in schema.Required)
             if (string.IsNullOrWhiteSpace(r.Get(f)))
@@ -151,24 +185,6 @@ public static class Schemas
             foreach (var reference in spec.References)
                 Reference(reference.Csv, reference.Reference!.Value);
         }
-        // Flag possible duplicate creates without silently treating flight numbers as identities.
-        var signatureFields = kind switch
-        {
-            ResourceKind.Routes => RouteSignature,
-            ResourceKind.Routings => RoutingSignature,
-            ResourceKind.Aircraft => RegistrationSignature,
-            _ => NameSignature
-        };
-        foreach (var group in data.Draft.Where(r => !Deleted(r)).GroupBy(r => kind == ResourceKind.Routes && r.Get("Type") == "jumpseat"
-            ? string.Join("\u001f", r.Get("Departure Airport (ICAO/IATA)"), r.Get("Arrival Airport (ICAO/IATA)"), ApiOperationPolicy.JumpseatSignature(r))
-            : string.Join("\u001f", signatureFields.Select(r.Get))))
-            if (group.Count() > 1 && group.Any(r => Key(kind, r) == ""))
-                foreach (var r in group.Where(r => Key(kind, r) == ""))
-                    Add(r, schema.Key, Messages.Define("Text_CDDA93CCD1"));
-        var deletedIds = data.Draft.Where(Deleted).Select(r => r.LocalId).ToHashSet();
-        if (deletedIds.Count > 0)
-            issues.AddRange(new DeletionService().CheckReferences(workspace, kind, deletedIds));
-        return issues;
     }
 }
 

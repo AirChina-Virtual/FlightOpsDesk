@@ -46,6 +46,14 @@ public sealed class TaskJobViewModel : ObservableObject
     public string Title => $"{Job.Created.ToLocalTime().ToString("g", language.DisplayCulture)} · {language.Get("Enum_RunMode_" + Job.Mode)} · {language.Format(displayDescription ?? Messages.FromLegacy(displayStatus))}";
     public string Summary => language.Get("ApiTaskCounts", ("success", counts[(int)ItemState.Succeeded]), ("total", Job.Items.Count), ("unknown", counts[(int)ItemState.Unknown]), ("manual", counts[(int)ItemState.ManuallyConfirmed]))
         + (discarded > 0 ? language.Get("ApiTaskDiscarded", ("count", discarded)) : "");
+    // How much of the task has an outcome, including an unknown one that waits to be checked.
+    public double Progress => Job.Items.Count == 0 ? 1 : 1 - (double)(counts[(int)ItemState.Pending] + counts[(int)ItemState.Running]) / Job.Items.Count;
+    // Which actions the task's own state calls for. Whether one can run right now (connection, other work) stays with its command.
+    public bool ShowsReview => Job.Mode == RunMode.Online && counts[(int)ItemState.Unknown] > 0;
+    public bool ShowsResume => Job.Mode != RunMode.Offline && counts[(int)ItemState.Pending] + counts[(int)ItemState.Running] + counts[(int)ItemState.Unknown] + unreBased > 0;
+    public bool ShowsRetry => Job.Mode == RunMode.Demo && counts[(int)ItemState.Failed] > 0;
+    public bool ShowsVerifyDeletes => Job.Mode == RunMode.Online && deletionChecks > 0;
+    public bool ShowsDiscard => Job.Mode == RunMode.Online && discardable > 0;
     public string DetailsLabel => language.Get("Text_979A332955");
     public string ReviewLabel => language.Get("ApiUnknownReview");
     public string ResumeLabel => language.Get("Text_9C4801C86B");
@@ -119,6 +127,12 @@ public sealed class TaskJobViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Summary));
+        OnPropertyChanged(nameof(Progress));
+        OnPropertyChanged(nameof(ShowsReview));
+        OnPropertyChanged(nameof(ShowsResume));
+        OnPropertyChanged(nameof(ShowsRetry));
+        OnPropertyChanged(nameof(ShowsVerifyDeletes));
+        OnPropertyChanged(nameof(ShowsDiscard));
         Review.NotifyCanExecuteChanged();
         Resume.NotifyCanExecuteChanged();
         Retry.NotifyCanExecuteChanged();

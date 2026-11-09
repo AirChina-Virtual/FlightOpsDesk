@@ -21,6 +21,7 @@ public sealed class TaskListViewModel : ObservableObject
         this.language = language;
         this.presentation = presentation;
         this.create = create;
+        Jobs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
     }
 
     public ObservableCollection<TaskJobViewModel> Jobs { get; } = [];
@@ -28,6 +29,8 @@ public sealed class TaskListViewModel : ObservableObject
     public Workspace? Owner { get; private set; }
     public string Header => language.Get("Text_59164F39E2");
     public string CancelLabel => language.Get("Text_14F7E13979");
+    public bool IsEmpty => Jobs.Count == 0;
+    public string EmptyText => language.Get("TasksEmpty");
     public bool CanCancel { get => canCancel; set => SetProperty(ref canCancel, value); }
 
     public bool TryGet(Guid jobId, out TaskJobViewModel job) => index.TryGetValue(jobId, out job!);
@@ -99,6 +102,7 @@ public sealed class TaskListViewModel : ObservableObject
         Flush();
         OnPropertyChanged(nameof(Header));
         OnPropertyChanged(nameof(CancelLabel));
+        OnPropertyChanged(nameof(EmptyText));
         foreach (var job in Jobs)
             job.RefreshLanguage();
     }

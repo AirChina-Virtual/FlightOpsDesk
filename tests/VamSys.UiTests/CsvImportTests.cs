@@ -25,8 +25,7 @@ public class CsvImportTests
 
         // The import goes to the resource picked on the data page.
         app.SelectItem("Data management");
-        app.One("ResourcePicker").Expand();
-        app.SelectItem("Airports");
+        app.SelectResource("Airports");
         app.SelectItem("Import wizard");
 
         // Cancelling the picker leaves the page usable.
@@ -74,8 +73,7 @@ public class CsvImportTests
         }
 
         app.SelectItem("Data management");
-        app.One("ResourcePicker").Expand();
-        app.SelectItem("Airports");
+        app.SelectResource("Airports");
         app.SelectItem("Import wizard");
 
         ImportAsBaseline();

@@ -8,8 +8,10 @@
     <local:DataRowPresenter Row="{x:Bind}"/>
   </DataTemplate>
   <DataTemplate x:Key="EditorTemplate" x:DataType="vm:CellViewModel">
+    <!-- The box's style marks a changed value or a problem. The cell makes its tooltip (which, or why it is read-only)
+         on hover: a bound tooltip per cell made page changes three times slower. -->
     <local:EditableCell Cell="{x:Bind}" Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind local:UiTokens.CellMargin(Compact)}" AutomationProperties.Name="{x:Bind Field}">
-      <Border BorderThickness="{StaticResource CellBorderThickness}" CornerRadius="{StaticResource CellCornerRadius}" Padding="{StaticResource CellBoxPadding}" BorderBrush="{ThemeResource CellBorderBrush}" Background="{ThemeResource CellBackgroundBrush}">
+      <Border Style="{x:Bind local:UiTokens.CellBoxStyle(Look), Mode=OneWay}">
         <TextBlock Text="{x:Bind VisibleText, Mode=OneWay}" Opacity="{x:Bind TextOpacity, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
       </Border>
     </local:EditableCell>
