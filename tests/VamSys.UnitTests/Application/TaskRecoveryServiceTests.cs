@@ -26,6 +26,10 @@ public class TaskRecoveryServiceTests
         public Task<bool> ConfirmAcceptAsync(ChangeItem item, ServerValueInspection review) { Calls.Add("accept?"); return Task.FromResult(ConfirmAnything); }
         public Task<bool> ShowUnknownAsync(ChangeItem item, bool canVerifyNotApplied) { Calls.Add("unknown:" + canVerifyNotApplied); return Task.FromResult(VerifyChosen); }
         public void Report(RecoveryOutcome outcome) => Reported.Add(outcome);
+        public RecoveryGroupAnswer GroupAnswer = RecoveryGroupAnswer.OneByOne;
+        public Task<RecoveryGroupAnswer> ConfirmGroupAsync(RecoveryGroup group, IReadOnlyList<RecoveryGroupEntry> entries)
+        { Calls.Add($"group:{group}:{entries.Count}"); return Task.FromResult(GroupAnswer); }
+        public void ReportGroup(RecoveryGroup group, int done, int total) => Calls.Add($"done:{group}:{done}/{total}");
     }
 
     sealed class Fixture
@@ -297,6 +301,129 @@ public class TaskRecoveryServiceTests
         Assert.Contains("manual", f.Api.Calls);
         Assert.Contains("unknown:False", f.UiScript.Calls);
         Assert.Equal(1, f.Api.Calls.Count(c => c == "manual"));
+    }
+
+    // --- 1.6: items in the same situation, confirmed together ---
+
+    static List<ChangeItem> AcceptedDeletes(Fixture f, int count)
+    {
+        var items = new List<ChangeItem>();
+        for (var n = 0; n < count; n++)
+        {
+            var item = f.Add(ItemState.Unknown, ChangeKind.Delete, n % 2 == 0 ? ResourceKind.Airports : ResourceKind.Routes);
+            item.WriteAccepted = true;
+            items.Add(item);
+        }
+        return items;
+    }
+
+    [Fact]
+    public async Task Two_deletes_answered_204_are_confirmed_by_hand_with_one_answer()
+    {
+        var f = new Fixture();
+        AcceptedDeletes(f, 2);
+        f.UiScript.GroupAnswer = RecoveryGroupAnswer.All;
+        await f.Review();
+        Assert.Equal("group:ManualDelete:2", f.UiScript.Calls[0]);
+        Assert.DoesNotContain("manual?", f.UiScript.Calls);
+        Assert.Equal(2, f.Api.Calls.Count(c => c == "manual"));
+        Assert.Contains("done:ManualDelete:2/2", f.UiScript.Calls);
+    }
+
+    [Fact]
+    public async Task One_by_one_leaves_the_group_to_the_item_review_and_cancel_stops_everything()
+    {
+        var f = new Fixture();
+        AcceptedDeletes(f, 2);
+        await f.Review();
+        Assert.Equal(["group:ManualDelete:2", "manual?"], f.UiScript.Calls.Where(c => !c.StartsWith("changed:", StringComparison.Ordinal)).Take(2));
+        Assert.Equal(2, f.UiScript.Calls.Count(c => c == "manual?"));
+
+        var g = new Fixture();
+        AcceptedDeletes(g, 2);
+        g.UiScript.GroupAnswer = RecoveryGroupAnswer.Cancel;
+        await g.Review();
+        Assert.Equal(["group:ManualDelete:2"], g.UiScript.Calls);
+        Assert.Empty(g.Api.Calls);
+    }
+
+    [Fact]
+    public async Task A_single_item_keeps_the_item_review()
+    {
+        var f = new Fixture();
+        AcceptedDeletes(f, 1);
+        await f.Review();
+        Assert.DoesNotContain(f.UiScript.Calls, c => c.StartsWith("group:", StringComparison.Ordinal));
+        Assert.Equal("manual?", f.UiScript.Calls[0]);
+    }
+
+    [Theory]
+    [InlineData(true, false, "DeletedWithoutReceipt", "confirm-no-receipt")]
+    [InlineData(false, true, "UnchangedWithoutReceipt", "mark-unchanged")]
+    public async Task Deletes_without_a_receipt_are_read_once_each_and_confirmed_together_by_what_the_read_showed(bool deleted, bool unchanged, string group, string call)
+    {
+        var f = new Fixture();
+        f.Add(ItemState.Unknown, ChangeKind.Delete);
+        f.Add(ItemState.Unknown, ChangeKind.Delete);
+        f.Online.NoReceiptAllowed = true;
+        f.Api.NoReceipt = new(deleted, unchanged, [], new object());
+        f.UiScript.GroupAnswer = RecoveryGroupAnswer.All;
+        await f.Review();
+        Assert.Equal(2, f.Api.Calls.Count(c => c == "inspect-no-receipt"));
+        Assert.Contains($"group:{group}:2", f.UiScript.Calls);
+        Assert.Equal(2, f.Api.Calls.Count(c => c == call));
+        Assert.DoesNotContain(f.UiScript.Calls, c => c.StartsWith("no-receipt?", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Accepted_writes_with_other_values_on_the_server_are_shown_with_their_differences_and_accepted_together()
+    {
+        var f = new Fixture();
+        f.Add(ItemState.Unknown, ChangeKind.Update, ResourceKind.Fleets).WriteAccepted = true;
+        f.Add(ItemState.Unknown, ChangeKind.Update, ResourceKind.Fleets).WriteAccepted = true;
+        f.Online.ServerValueAllowed = true;
+        f.Api.ServerValue = new(true, true, "4", [new("name", "\"a\"", "\"A\"")], new object());
+        RecoveryGroupEntry[]? shown = null;
+        var ui = new GroupUi(f.UiScript, entries => shown = [.. entries]);
+        await f.Service.ReviewUnknownAsync(f.Job, true, ui, () => Task.CompletedTask);
+        Assert.Equal(2, shown!.Length);
+        Assert.All(shown, e => Assert.Equal("name", Assert.Single(e.Differences).Field));
+        Assert.Equal(2, f.Api.Calls.Count(c => c == "accept"));
+        Assert.DoesNotContain("accept?", f.UiScript.Calls);
+    }
+
+    // The script UI, with the group answered "all" and the shown entries captured.
+    sealed class GroupUi(Ui inner, Action<IReadOnlyList<RecoveryGroupEntry>> shown) : IRecoveryUi
+    {
+        public Task RunReadAsync(Func<CancellationToken, Task> read) => inner.RunReadAsync(read);
+        public void ItemChanged(BatchJob job, ChangeItem item) => inner.ItemChanged(job, item);
+        public Task<RecoveryIdAnswer> AskRecoveryIdAsync(ChangeItem item, bool online, bool canVerifyNotApplied) => inner.AskRecoveryIdAsync(item, online, canVerifyNotApplied);
+        public Task<bool> ConfirmManualDeleteAsync(ChangeItem item) => inner.ConfirmManualDeleteAsync(item);
+        public Task ShowStillReadableAsync(ChangeItem item, NoReceiptInspection review) => inner.ShowStillReadableAsync(item, review);
+        public Task<bool> ConfirmNoReceiptAsync(ChangeItem item, NoReceiptInspection review, bool deleted) => inner.ConfirmNoReceiptAsync(item, review, deleted);
+        public Task ShowCannotAcceptAsync(ChangeItem item, ServerValueInspection review) => inner.ShowCannotAcceptAsync(item, review);
+        public Task<bool> ConfirmAcceptAsync(ChangeItem item, ServerValueInspection review) => inner.ConfirmAcceptAsync(item, review);
+        public Task<bool> ShowUnknownAsync(ChangeItem item, bool canVerifyNotApplied) => inner.ShowUnknownAsync(item, canVerifyNotApplied);
+        public void Report(RecoveryOutcome outcome) => inner.Report(outcome);
+        public Task<RecoveryGroupAnswer> ConfirmGroupAsync(RecoveryGroup group, IReadOnlyList<RecoveryGroupEntry> entries)
+        { shown(entries); return Task.FromResult(RecoveryGroupAnswer.All); }
+    }
+
+    [Fact]
+    public async Task Unanswered_writes_are_checked_by_reading_together_and_the_report_says_how_many_were_proven()
+    {
+        var f = new Fixture();
+        f.Add(ItemState.Unknown, ChangeKind.Update, ResourceKind.Fleets);
+        f.Add(ItemState.Unknown, ChangeKind.Update, ResourceKind.Fleets);
+        f.Add(ItemState.Unknown, ChangeKind.Update, ResourceKind.Fleets);
+        f.Online.VerifyNotApplied = true;
+        f.Api.NotApplied = false;
+        f.UiScript.GroupAnswer = RecoveryGroupAnswer.All;
+        await f.Review();
+        Assert.Contains("group:VerifyNotApplied:3", f.UiScript.Calls);
+        Assert.Equal(3, f.Api.Calls.Count(c => c == "not-applied"));
+        Assert.Contains("done:VerifyNotApplied:0/3", f.UiScript.Calls);
+        Assert.DoesNotContain(f.UiScript.Calls, c => c.StartsWith("unknown:", StringComparison.Ordinal));
     }
 
     [Fact]

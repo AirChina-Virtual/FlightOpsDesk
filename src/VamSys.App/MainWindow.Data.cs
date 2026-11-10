@@ -57,6 +57,7 @@ public sealed partial class MainWindow
         public Task PasteCells(RowViewModel row, string field, string text) => window.Guard(() => window.PasteCells(row, field, text));
         public Task FillDown(RowViewModel row, string field) => window.Guard(() => window.FillDown(row, field));
         public void OpenDetails(Guid rowId) => window.OpenDetails(rowId);
+        public IReadOnlyList<string> UnapprovedFleets(DataRow route) => window.UnapprovedFleets(route);
     }
 
     UIElement GetDataPage()

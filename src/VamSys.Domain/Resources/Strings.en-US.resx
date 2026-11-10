@@ -898,6 +898,9 @@ Remote: {remote}</value>
   <data name="ApiDuplicate" xml:space="preserve"><value>A possible duplicate exists remotely. Refresh and review before creating another record.</value></data>
   <data name="ApiCredentials" xml:space="preserve"><value>Enter the matching Secret when changing Client ID.</value></data>
   <data name="ApiRecoverId" xml:space="preserve"><value>Find this created record in Orwell and enter a candidate ID. You can correct it if verification fails. The app only binds a verified record and never creates it again.</value></data>
+  <data name="ApiDeletedWithoutReceipt" xml:space="preserve"><value>Deleted (no receipt): the delete request was not answered, and the record then read as 404. The app concluded this from the read; it does not count as a verified operation.</value></data>
+  <data name="ApiCreateCandidates" xml:space="preserve"><value>Found {count} records this create may have made; the app cannot tell which one. Choose one under Review.</value></data>
+  <data name="ApiCreateCandidateList" xml:space="preserve"><value>Records that appeared after this request, match the change and were created during it: {ids}. The first one is filled in; check it or enter another ID.</value></data>
   <data name="ApiManualDelete" xml:space="preserve"><value>First verify in Orwell that record {id} is deleted or disabled as intended. Confirmation archives the local deletion draft. This is manual confirmation, not API verification, and does not enable bulk deletion.</value></data>
   <data name="ApiManualConfirm" xml:space="preserve"><value>Verified in Orwell</value></data>
   <data name="Enum_ItemState_ManuallyConfirmed" xml:space="preserve"><value>Manually confirmed</value></data>
@@ -944,6 +947,20 @@ Remote: {remote}</value>
   <data name="ReviewDemoSubmit" xml:space="preserve"><value>Simulate workspace submission</value></data>
   <data name="ReviewExport" xml:space="preserve"><value>Export {resource} CSV</value></data>
   <data name="ReviewChanged" xml:space="preserve"><value>Changes or submission conditions have changed. Review the updated list and submit again.</value></data>
+  <data name="RecoveryGroup_ManualDelete" xml:space="preserve"><value>These {count} deletes were answered 204, but their records are still readable. First verify in Orwell that all of them are deleted or disabled as intended. Confirming marks them all as manually confirmed; this is not a verified operation.</value></data>
+  <data name="RecoveryGroup_DeletedWithoutReceipt" xml:space="preserve"><value>These {count} deletes were not answered, and each record now reads 404. First verify in Orwell. Confirming marks them all as manually confirmed (no write receipt) and archives the local delete drafts. Nothing is sent again.</value></data>
+  <data name="RecoveryGroup_UnchangedWithoutReceipt" xml:space="preserve"><value>These {count} deletes were not answered, and each record still reads exactly as before, so the delete seems not to have taken effect. First verify in Orwell. Confirming marks them all as not applied: they become Failed and keep their local delete drafts for a new review.</value></data>
+  <data name="RecoveryGroup_AcceptServerValue" xml:space="preserve"><value>The server accepted these {count} writes, but the values read back differ from those sent. Confirming accepts the server's current values for all of them: they are marked as manually confirmed, the snapshots take the server's values, and draft values that did not take effect become conflicts. Nothing is sent again. Each line shows the differences (sent → server).</value></data>
+  <data name="RecoveryGroup_VerifyNotApplied" xml:space="preserve"><value>The results of these {count} writes are unknown. The app will check each one by reading only: those proven not applied become Failed and keep their local drafts; the others stay unknown. Nothing is sent again.</value></data>
+  <data name="RecoveryGroupConfirmAll" xml:space="preserve"><value>Confirm all ({count})</value></data>
+  <data name="RecoveryGroupVerifyAll" xml:space="preserve"><value>Check all by reading ({count})</value></data>
+  <data name="RecoveryGroupOneByOne" xml:space="preserve"><value>One by one</value></data>
+  <data name="RecoveryGroupDone" xml:space="preserve"><value>Handled {done} of {total} items together.</value></data>
+  <data name="RecoveryGroupVerified" xml:space="preserve"><value>Checked by reading: {done} of {total} proven not applied; the others stay unknown.</value></data>
+  <data name="CellFleetsNotApproved" xml:space="preserve"><value>These fleets are not approved for this route's callsign and flight number prefixes and will be blocked before submission: {fleets}</value></data>
+  <data name="ReviewRemoveFleets" xml:space="preserve"><value>Remove {count} unapproved fleets</value></data>
+  <data name="ReviewFleetsRemoved" xml:space="preserve"><value>Removed {count} unapproved fleets from the route and updated the review. You can undo this.</value></data>
+  <data name="TaskRemoveFleets" xml:space="preserve"><value>Remove unapproved fleets ({count} routes) and review again</value></data>
   <data name="ReviewPreparing" xml:space="preserve"><value>Preparing the review list…</value></data>
   <data name="ReviewState_Ready" xml:space="preserve"><value>Submit now</value></data>
   <data name="ReviewState_Deferred" xml:space="preserve"><value>Deferred · stays in draft</value></data>
@@ -977,6 +994,7 @@ Remote: {remote}</value>
   <data name="ApiParameterRequired" xml:space="preserve"><value>Select one approved, unrestricted parameter belonging to the current airline.</value></data>
   <data name="ApiParameterCreateOnly" xml:space="preserve"><value>Parameter associations are supported only when creating a fleet. Reassigning or removing existing associations is unavailable.</value></data>
   <data name="ApiPrefixDenied" xml:space="preserve"><value>Fleet “{fleet}” is not approved for the prefixes of {callsign} / {flight}. Check its airline parameter association.</value></data>
+  <data name="ApiPrefixDeniedFleets" xml:space="preserve"><value>{count} fleets are not approved for the prefixes of {callsign} / {flight}: {fleets}. Remove these fleets, or check their airline parameter association.</value></data>
   <data name="ApiKnownWeightRestriction" xml:space="preserve"><value>This instance has weight-unit and SimBrief write errors. This version submits kg values only and blocks weight_unit and simbrief_overrides.</value></data>
   <data name="ApiJumpseatIdentity" xml:space="preserve"><value>The server does not retain jumpseat callsigns or flight numbers. Online changes to these fields on existing records are unavailable.</value></data>
   <data name="JumpseatNotPreserved" xml:space="preserve"><value>Not retained by server</value></data>

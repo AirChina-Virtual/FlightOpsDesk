@@ -32,9 +32,24 @@ public sealed class RecoveryOutcome
     public static readonly RecoveryOutcome ServerValueAccepted = new("ServerValueAccepted");
 }
 
+// 1.6: unknown items in the same situation, confirmed together. Each kind is one way out the item-by-item review offers:
+//   ManualDelete             a soft delete answered 204 whose record is still readable: confirmed by hand (no read)
+//   DeletedWithoutReceipt    a soft delete never answered whose record now reads 404: confirmed without a receipt
+//   UnchangedWithoutReceipt  a soft delete never answered whose record reads as before: marked not applied
+//   AcceptServerValue        an accepted write whose record keeps other values: the server's values are accepted
+//   VerifyNotApplied         a write never answered: proven not applied by reading (each one that is proven)
+public enum RecoveryGroup { ManualDelete, DeletedWithoutReceipt, UnchangedWithoutReceipt, AcceptServerValue, VerifyNotApplied }
+public enum RecoveryGroupAnswer { OneByOne, All, Cancel }
+// One item of a group, with the differences its read showed (empty when the group needs no read).
+public sealed record RecoveryGroupEntry(ChangeItem Item, IReadOnlyList<ApiFieldDifference> Differences);
+
 // The window's side of a recovery: dialogs, the exclusive-work state around server reads, and the refresh of a changed item.
 public interface IRecoveryUi
 {
+    // 1.6: asks once for a whole group; the default is the item-by-item review.
+    Task<RecoveryGroupAnswer> ConfirmGroupAsync(RecoveryGroup group, IReadOnlyList<RecoveryGroupEntry> entries) => Task.FromResult(RecoveryGroupAnswer.OneByOne);
+    // How a confirmed group ended: done of total items took the way out (VerifyNotApplied: were proven).
+    void ReportGroup(RecoveryGroup group, int done, int total) { }
     // Runs a read-only server call while the window is busy; the call does not run when the window refuses to start work.
     Task RunReadAsync(Func<CancellationToken, Task> read);
     // A stored item changed; the task page shows its saved state at once.
@@ -118,12 +133,100 @@ public sealed class TaskRecoveryService(WorkspaceSession session, IOnlineGateway
     {
         if (!available || job.Mode != RunMode.Online || session.Workspace.Mode == RunMode.Demo)
             return;
+        var handled = new HashSet<Guid>();
+        if (session.Workspace.Mode == RunMode.Online && !await ReviewGroupsAsync(job, ui, handled))
+            return;
         await UnknownReview.RunAsync(job, async item =>
         {
+            if (handled.Contains(item.Id))
+                return false;
             var outcome = await ReviewItemAsync(job, item, ui);
             ui.Report(outcome);
             return outcome.Recover;
         }, recover);
+    }
+
+    // 1.6: groups of at least two unknown items in the same situation are offered together, before the item-by-item
+    // review. Items of a group the person confirmed are not reviewed again; "one by one" leaves them to that review.
+    // Returns false when the person cancelled. Only reads are sent, as in the item-by-item review.
+    async Task<bool> ReviewGroupsAsync(BatchJob job, IRecoveryUi ui, HashSet<Guid> handled)
+    {
+        var api = online.Session(session.Workspace);
+        List<ChangeItem> Unknown() => job.Items.Where(i => i.State == ItemState.Unknown && !handled.Contains(i.Id)).ToList();
+        async Task<bool> Offer(RecoveryGroup group, IReadOnlyList<RecoveryGroupEntry> entries, Func<RecoveryGroupEntry, Task<bool>> apply)
+        {
+            if (entries.Count == 0)
+                return true;
+            var answer = await ui.ConfirmGroupAsync(group, entries);
+            if (answer == RecoveryGroupAnswer.Cancel)
+                return false;
+            if (answer != RecoveryGroupAnswer.All)
+                return true;
+            var done = 0;
+            foreach (var entry in entries)
+            {
+                handled.Add(entry.Item.Id);
+                try
+                { if (await apply(entry)) done++; }
+                catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
+                ui.ItemChanged(job, entry.Item);
+            }
+            ui.ReportGroup(group, done, entries.Count);
+            return true;
+        }
+
+        // Soft deletes answered 204 and still readable: confirmed by hand, nothing to read.
+        var manual = Unknown().Where(i => i.Kind == ChangeKind.Delete && i.WriteAccepted && i.Resource is ResourceKind.Airports or ResourceKind.Routes).ToList();
+        if (manual.Count >= 2 && !await Offer(RecoveryGroup.ManualDelete, manual.Select(i => new RecoveryGroupEntry(i, [])).ToList(),
+            async e => { await api.ConfirmManualDeleteAsync(job, e.Item, session.CheckpointWriter()); return true; }))
+            return false;
+
+        // Soft deletes never answered: read each once, then offer the ones that read 404 and the ones that read as before.
+        var noReceipt = Unknown().Where(online.CanConfirmWithoutReceipt).ToList();
+        if (noReceipt.Count >= 2)
+        {
+            var reviews = new List<(ChangeItem Item, NoReceiptInspection Review)>();
+            await ui.RunReadAsync(async ct =>
+            {
+                foreach (var item in noReceipt)
+                    reviews.Add((item, await api.InspectWithoutReceiptAsync(job, item, ct)));
+            });
+            var gone = reviews.Where(r => r.Review.CanConfirmDeleted).ToList();
+            if (!await Offer(RecoveryGroup.DeletedWithoutReceipt, gone.Select(r => new RecoveryGroupEntry(r.Item, [])).ToList(),
+                async e => { await api.ConfirmWithoutReceiptAsync(job, gone.Single(r => r.Item == e.Item).Review, session.CheckpointWriter()); return true; }))
+                return false;
+            var unchanged = reviews.Where(r => r.Review.CanMarkUnchanged).ToList();
+            if (!await Offer(RecoveryGroup.UnchangedWithoutReceipt, unchanged.Select(r => new RecoveryGroupEntry(r.Item, [])).ToList(),
+                async e => { await api.MarkUnchangedAsync(job, unchanged.Single(r => r.Item == e.Item).Review, session.CheckpointWriter()); return true; }))
+                return false;
+        }
+
+        // Accepted writes whose records keep other values: read each once, offer the ones whose values can be accepted.
+        var accept = Unknown().Where(online.CanAcceptServerValue).ToList();
+        if (accept.Count >= 2)
+        {
+            var reviews = new List<(ChangeItem Item, ServerValueInspection Review)>();
+            await ui.RunReadAsync(async ct =>
+            {
+                foreach (var item in accept)
+                    reviews.Add((item, await api.InspectServerValueAsync(job, item, ct)));
+            });
+            var acceptable = reviews.Where(r => r.Review.CanAccept).ToList();
+            if (!await Offer(RecoveryGroup.AcceptServerValue, acceptable.Select(r => new RecoveryGroupEntry(r.Item, r.Review.Differences)).ToList(),
+                async e => { await api.AcceptServerValueAsync(job, acceptable.Single(r => r.Item == e.Item).Review, session.CheckpointWriter()); return true; }))
+                return false;
+        }
+
+        // Writes never answered that a read can prove were not applied (a create without an id has its own dialog first).
+        var verify = Unknown().Where(i => online.CanVerifyNotApplied(i) && !i.CanProposeRecoveryId).ToList();
+        if (verify.Count >= 2 && !await Offer(RecoveryGroup.VerifyNotApplied, verify.Select(i => new RecoveryGroupEntry(i, [])).ToList(), async e =>
+            {
+                var proven = false;
+                await ui.RunReadAsync(async ct => proven = await api.ResolveNotAppliedAsync(job, e.Item, session.CheckpointWriter(), ct));
+                return proven;
+            }))
+            return false;
+        return true;
     }
 
     // Which way out an item has depends on what is known about its write.

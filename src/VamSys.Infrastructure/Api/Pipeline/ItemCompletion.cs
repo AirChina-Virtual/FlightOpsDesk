@@ -17,7 +17,9 @@ internal sealed class ItemCompletion(JobRun run)
         return found.Positions;
     }
 
-    public async Task CompleteAsync(ChangeItem item, DataRow? verified)
+    // verifiedOperation: false for an outcome the program concluded without full proof (a soft delete without a write
+    // receipt that reads 404): the item completes, but the operation does not count as verified.
+    public async Task CompleteAsync(ChangeItem item, DataRow? verified, bool verifiedOperation = true)
     {
         var api = run.Api;
         var workspace = run.Workspace;
@@ -25,7 +27,7 @@ internal sealed class ItemCompletion(JobRun run)
             api.InvalidateParameters();
         if (!run.Sink.HasWriter)
         {
-            var rebased = ApplyRebase(workspace, item, verified, Positions(item.Resource));
+            var rebased = ApplyRebase(workspace, item, verified, Positions(item.Resource), verifiedOperation);
             api.ConfirmCandidate(item, rebased, run.Queries);
             if (verified == null && (item.RemoteId ?? item.Before?.Identity?.RemoteId) is string id)
                 api.Forget(item.Resource, id);
@@ -37,11 +39,11 @@ internal sealed class ItemCompletion(JobRun run)
         var data = new ResourceData { Draft = current == null ? [] : [current], SnapshotAt = original.SnapshotAt };
         var staged = workspace.StageResource(item.Resource, data);
         var stagedItem = JobCheckpoint.Clone(item);
-        ApplyRebase(staged, stagedItem, verified, null);
+        ApplyRebase(staged, stagedItem, verified, null, verifiedOperation);
         var delta = new ResourceRebaseDelta(item.Resource, item.After.LocalId,
             new(verified == null ? RowMutationKind.Delete : RowMutationKind.Upsert, data.Snapshot.FirstOrDefault()),
             new(current == null ? RowMutationKind.Keep : data.Draft.Count == 0 ? RowMutationKind.Delete : RowMutationKind.Upsert, data.Draft.FirstOrDefault()),
-            data.SnapshotAt!.Value, true, ApiOperationPolicy.Key(item));
+            data.SnapshotAt!.Value, true, verifiedOperation ? ApiOperationPolicy.Key(item) : null);
         await run.Sink.WriteRebaseAsync(stagedItem, delta);
         var snapshot = Positions(item.Resource);
         snapshot.Remove(delta.LocalId);
@@ -71,7 +73,7 @@ internal sealed class ItemCompletion(JobRun run)
 
     // Returns the verified row as stored in the snapshot (carrying the draft row's id and any draft-only columns), or null after a delete.
     // snapshot: removes and appends by position in the (large) live snapshot; null on a one-row staging copy.
-    internal static DataRow? ApplyRebase(Workspace workspace, ChangeItem item, DataRow? verified, SnapshotPositions? snapshot)
+    internal static DataRow? ApplyRebase(Workspace workspace, ChangeItem item, DataRow? verified, SnapshotPositions? snapshot, bool verifiedOperation = true)
     {
         var data = workspace.Resources[item.Resource];
         if (snapshot != null)
@@ -116,11 +118,16 @@ internal sealed class ItemCompletion(JobRun run)
         }
         item.Rebased = true;
         item.State = ItemState.Succeeded;
-        item.SetMessage(Messages.Define(item.DeletionVerification?.Outcome == "ApiInvisible" ? "ApiDeletedInvisible" : "Text_631F4DBEC2"));
+        item.SetMessage(Messages.Define(item.DeletionVerification?.Outcome switch
+        {
+            "ApiInvisible" => "ApiDeletedInvisible",
+            DeletionVerifier.WithoutReceipt => "ApiDeletedWithoutReceipt",
+            _ => "Text_631F4DBEC2"
+        }));
         data.ClearHistory(invalidateIndex: verified is null);
         data.SnapshotAt = DateTimeOffset.UtcNow;
         var operation = ApiOperationPolicy.Key(item);
-        if (!workspace.VerifiedOperations.Contains(operation))
+        if (verifiedOperation && !workspace.VerifiedOperations.Contains(operation))
             workspace.VerifiedOperations.Add(operation);
         return verified;
     }

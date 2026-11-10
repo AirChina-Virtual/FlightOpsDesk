@@ -70,6 +70,14 @@ public static class PackageChecks
                         metadata.GetString(metadata.GetTypeReference((TypeReferenceHandle)parent).Name) == "InternalsVisibleToAttribute";
                 });
                 Require(friends == qa, $"Unexpected test friend assembly access (QA={qa})");
+                // The mock-server switch (VAMSYS_QA_OPERATIONS_ORIGIN) exists only in the QA build.
+                if (name == "VamSys.Infrastructure")
+                {
+                    var mockServer = false;
+                    for (var handle = MetadataTokens.UserStringHandle(1); !handle.IsNil && !mockServer; handle = metadata.GetNextHandle(handle))
+                        mockServer = metadata.GetUserString(handle) == "VAMSYS_QA_OPERATIONS_ORIGIN";
+                    Require(mockServer == qa, $"Unexpected mock-server switch in {name} (QA={qa})");
+                }
                 Require(name != "VamSys.Infrastructure" || metadata.ManifestResources.Any(handle => metadata.GetString(metadata.GetManifestResource(handle).Name) == "Operations.OpenApi.json"),
                     "Runtime API contract missing");
             }

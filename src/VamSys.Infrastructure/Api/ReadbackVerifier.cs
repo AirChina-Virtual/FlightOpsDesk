@@ -58,14 +58,31 @@ internal sealed class ReadbackVerifier(ApiContext ctx, RequestPlanners planners)
                 reasons.Add(new("request_window", "recorded", null));
             else
             {
-                var window = $"{step.StartedAt.Value.AddSeconds(-60):O} .. {end.Value.AddSeconds(60):O}";
+                // G5: created_at is the server's clock; the window is moved by how far it is from this machine's.
+                var shift = ServerClockOffset(ctx.Transport.LastResponse);
+                var (from, to) = (step.StartedAt.Value + shift - RecoveryWindowMargin, end.Value + shift + RecoveryWindowMargin);
+                var window = $"{from:O} .. {to:O}";
                 var present = raw.RootElement.TryGetProperty("created_at", out var createdAt);
                 if (!present || !DateTimeOffset.TryParse(createdAt.ToString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var created)
-                    || created < step.StartedAt.Value.AddSeconds(-60) || created > end.Value.AddSeconds(60))
+                    || created < from || created > to)
                     reasons.Add(new("created_at", window, present ? createdAt.GetRawText() : null));
             }
         }
         return new(reasons.Count == 0, reasons);
+    }
+
+    internal static readonly TimeSpan RecoveryWindowMargin = TimeSpan.FromSeconds(60);
+
+    // How far the server's clock is ahead of this machine's, from the Date header of a response (zero without one).
+    internal static TimeSpan ServerClockOffset(ApiDiagnostic? response)
+        => response?.ServerDate is { } server ? server - response.FinishedAt : TimeSpan.Zero;
+
+    // Whether a record carries every value the create sent, leaving out the checks that say whether it is new and
+    // when it was made (the caller decides those).
+    public bool ContentMatches(ChangeItem item, DataRow current)
+    {
+        ctx.CheckConnection(current);
+        return VerifyPlanned(item, current, item.After).Differences.All(d => d.Field is "pre_create_candidates" or "request_window" or "created_at");
     }
 
     // The values a write is expected to have left: those saved with the item, or what its plan says now.

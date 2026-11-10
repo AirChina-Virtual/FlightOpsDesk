@@ -27,6 +27,8 @@ public interface IDataGridHost
     Task FillDown(RowViewModel row, string field);
     // Shows the record in the details pane.
     void OpenDetails(Guid rowId);
+    // 2.5: the fleets of a route that are not approved for its prefixes, when the airline parameters are known (online).
+    IReadOnlyList<string> UnapprovedFleets(DataRow route) => [];
 }
 
 // The shown page's row and cell models. Only the current page has models; they are kept in a pool and rebound in place
@@ -135,6 +137,10 @@ public sealed class DataGridViewModel(IDataGridHost host, CellEditCommitter edit
             foreach (var item in found)
                 if (item.Field == cell.Field)
                 { issue = item.Description; break; }
+            if (issue is null && link.Kind == ResourceKind.Routes && cell.Field == "Fleet IDs" && !deleted
+                && host.UnapprovedFleets(row) is { Count: > 0 } unapproved)
+                issue = Messages.Define("CellFleetsNotApproved", ("fleets", string.Join(", ",
+                    unapproved.Select(t => host.FleetLabels.TryGetValue(t, out var option) ? $"{language.Format(option.Name)} ({t})" : t))));
             var server = before != null && !deleted ? before.Get(cell.Field) : null;
             // The row, not the cell: an edit checks the row before the cell takes the new value.
             cell.ShowState(issue, server != null && server != row.Get(cell.Field) ? server : null);

@@ -20,7 +20,7 @@ public sealed class TokenProvider(Func<CancellationToken, Task<AccessToken>> acq
     public void Invalidate() => cached = null;
     public static TokenProvider ClientCredentials(HttpClient client, OperationsCredentials credentials, TimeProvider? timeProvider = null) => new(async ct =>
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://vamsys.io/oauth/token");
+        using var request = new HttpRequestMessage(HttpMethod.Post, OperationsEndpoints.Token);
         request.Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["grant_type"] = "client_credentials", ["client_id"] = credentials.ClientId, ["client_secret"] = credentials.Secret, ["scope"] = "*" });
         request.Headers.Accept.Add(new("application/json"));
         PerformanceRun.Current?.Request("OAuth", "POST");

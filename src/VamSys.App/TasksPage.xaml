@@ -30,6 +30,7 @@
                   <Button Content="{x:Bind RetryLabel, Mode=OneWay}" Command="{x:Bind Retry}" Visibility="{x:Bind ShowsRetry, Mode=OneWay}"/>
                   <Button Content="{x:Bind VerifyDeletesLabel, Mode=OneWay}" Command="{x:Bind VerifyDeletes}" Visibility="{x:Bind ShowsVerifyDeletes, Mode=OneWay}"/>
                   <Button Content="{x:Bind DiscardLabel, Mode=OneWay}" Command="{x:Bind Discard}" Visibility="{x:Bind ShowsDiscard, Mode=OneWay}"/>
+                  <Button Content="{x:Bind RemoveFleetsLabel, Mode=OneWay}" Command="{x:Bind RemoveFleets}" Visibility="{x:Bind ShowsRemoveFleets, Mode=OneWay}"/>
                   <Button Content="{x:Bind DetailsLabel, Mode=OneWay}" Command="{x:Bind Details}"/>
                   <Button Content="{x:Bind ExportLabel, Mode=OneWay}" Command="{x:Bind Export}"/>
                 </StackPanel>

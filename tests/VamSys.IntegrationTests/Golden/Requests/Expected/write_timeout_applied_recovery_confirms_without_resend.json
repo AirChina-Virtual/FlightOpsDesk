@@ -8,7 +8,7 @@
   "runs": [
     {
       "label": "first run",
-      "requestCount": 2,
+      "requestCount": 3,
       "requests": [
         {
           "order": 0,
@@ -24,13 +24,7 @@
           "bodyJson": {
             "name": "Fleet 4 renamed"
           }
-        }
-      ]
-    },
-    {
-      "label": "recovery",
-      "requestCount": 1,
-      "requests": [
+        },
         {
           "order": 2,
           "method": "GET",
@@ -38,6 +32,11 @@
           "body": null
         }
       ]
+    },
+    {
+      "label": "recovery",
+      "requestCount": 0,
+      "requests": []
     }
   ]
 }

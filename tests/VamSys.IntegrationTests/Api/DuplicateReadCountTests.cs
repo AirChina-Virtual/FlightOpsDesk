@@ -200,6 +200,9 @@ public class DuplicateReadCountTests
         Assert.Equal(outcomeUnknown ? ItemState.Pending : ItemState.Failed, second.State);
         Assert.Equal(outcomeUnknown ? "ApiIdentityPending" : "ApiDuplicate", Code(second));
         Assert.Equal(1, Count(w, "POST"));
-        Assert.Equal(1, Gets(w, "fleet"));
+        // The second item is held back without a list of its own. An unanswered create is searched for once at the end
+        // of the round (E1, E2): that is the only other list.
+        Assert.Equal(outcomeUnknown ? 2 : 1, Gets(w, "fleet"));
+        Assert.Equal("GET", w.Remote.Server.Requests[^1].Method);
     }
 }

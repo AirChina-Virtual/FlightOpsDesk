@@ -132,7 +132,10 @@ public sealed class Workspace
     public static Workspace Deserialize(string json) => JsonSerializer.Deserialize<Workspace>(json)!;
 }
 
-public sealed record RecoveryCandidateAttempt(string RemoteId, DateTimeOffset ProposedAt);
+// Source is null for an ID the user entered and "Automatic" for one the program found itself (E1): exactly one record that
+// appeared after the request, matches the change and was created within the request window.
+public sealed record RecoveryCandidateAttempt(string RemoteId, DateTimeOffset ProposedAt,
+    [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Source = null);
 
 public sealed class ChangeItem
 {
@@ -158,7 +161,7 @@ public sealed class ChangeItem
     public bool CanProposeRecoveryId => State == ItemState.Unknown && Kind == ChangeKind.Create && !CreateCompleted && After.Identity == null;
     [System.Text.Json.Serialization.JsonIgnore]
     public string? EditableRecoveryId => RecoveryCandidateId ?? (CanProposeRecoveryId ? RemoteId : null);
-    public void ProposeRecoveryId(string value)
+    public void ProposeRecoveryId(string value, string? source = null)
     {
         if (!CanProposeRecoveryId)
             throw new InvalidOperationException(Messages.Define("ApiUnknown"));
@@ -169,7 +172,7 @@ public sealed class ChangeItem
             RecoveryCandidates.Add(new(RemoteId, DateTimeOffset.UtcNow));
         RemoteId = null;
         RecoveryCandidateId = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        RecoveryCandidates.Add(new(RecoveryCandidateId, DateTimeOffset.UtcNow));
+        RecoveryCandidates.Add(new(RecoveryCandidateId, DateTimeOffset.UtcNow, source));
     }
     public bool Rebased { get; set; }
     public bool CreateCompleted { get; set; }
@@ -177,6 +180,9 @@ public sealed class ChangeItem
     public string? Diagnostic { get; set; }
     public ApiDiagnostic? DiagnosticDetails { get; set; }
     public ApiDiagnostic? ReadbackDetails { get; set; }
+    // G3: the first read-back, kept when it did not show the write and the record was read a second time.
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public ApiDiagnostic? FirstReadbackDetails { get; set; }
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public ApiDeletionVerification? DeletionVerification { get; set; }
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
@@ -184,6 +190,10 @@ public sealed class ChangeItem
     public ApiSnapshotComparison? PreflightComparison { get; set; }
     public List<ApiFieldDifference> VerificationDifferences { get; set; } = [];
     public List<string>? PreCreateCandidateIds { get; set; }
+    // E1: the records an unanswered create may have made, as the last search found them (none, or more than one, when
+    // the program could not bind one itself); offered to the user to choose from.
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? FoundCreateCandidates { get; set; }
     public string Message { get; set; } = Messages.Define("Text_637DA56123");
     public MessageDescriptor? Description { get; set; }
     public void SetMessage(MessageDescriptor description) { Description = description; Message = description.ToString(); }

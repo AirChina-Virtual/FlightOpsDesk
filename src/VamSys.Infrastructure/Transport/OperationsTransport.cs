@@ -9,7 +9,7 @@ public sealed class OperationsTransport(HttpClient client, Uri origin, string va
 {
     public static HttpClient CreateHttpClient()
     {
-        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(30) };
+        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = RequestPipeline.WriteTimeout };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("FlightOpsDesk/1.0");
         return client;
     }
@@ -18,6 +18,7 @@ public sealed class OperationsTransport(HttpClient client, Uri origin, string va
     internal ApiDiagnostic DescribeReadback(ApiDiagnostic diagnostic, string body) => ApiDiagnosticCapture.Body(diagnostic, body, tokens.SensitiveValues);
     internal DateTimeOffset UtcNow => pipeline.Clock.GetUtcNow();
     internal TimeSpan RequestTimeout => pipeline.RequestTimeout;
+    internal Task DelayAsync(TimeSpan delay, CancellationToken ct) => pipeline.DelayAsync(delay, ct);
     public Task<JsonDocument> GetAsync(Uri uri, CancellationToken ct) => pipeline.SendReadAsync(uri, null, ct);
     // GET goes through the retrying read path; every other method is attempted once.
     public Task<JsonDocument> SendAsync(HttpMethod method, Uri uri, object? body, CancellationToken ct, Func<DateTimeOffset, Task>? beforeSend = null)

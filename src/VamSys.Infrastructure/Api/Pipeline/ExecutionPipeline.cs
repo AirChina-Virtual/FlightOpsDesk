@@ -8,6 +8,7 @@ namespace VamSys.Infrastructure;
 //   interrupted item   recovery   read what became of the write, settle from the answer, never repeat it
 //   fresh item         preflight (local) -> plan -> duplicate check (creates) -> preflight (server)
 //                      -> write -> read back -> complete        (each item ends with a checkpoint)
+//   end of the round   items this round left Unknown are looked up once more, read-only (see RecheckAsync)
 //
 // The order of the requests, of the saves and of the metrics phases is the write-safety contract and is locked by the
 // request goldens and the process-kill recovery tests. This class only sequences the stages and applies the job-level
@@ -34,6 +35,7 @@ internal sealed class ExecutionPipeline(OperationsAdapter api, Workspace workspa
         api.InvalidateParameters();
         api.SeedCandidates(job, run.Queries);
         job.SetStatus(JobStatus.Running, Messages.Define("Text_5026A63B58"));
+        var fresh = new List<ChangeItem>();
         foreach (var item in job.Items.OrderBy(i => i.Kind == ChangeKind.Delete ? 10 - (int)i.Resource : (int)i.Resource))
         {
             sink.Active = item;
@@ -66,6 +68,7 @@ internal sealed class ExecutionPipeline(OperationsAdapter api, Workspace workspa
                     continue;
                 if (await preflight.CheckRemoteAsync(r))
                     continue;
+                fresh.Add(item);
                 await write.RunAsync(r, steps);
                 await readback.RunAsync(r);
             }
@@ -81,9 +84,45 @@ internal sealed class ExecutionPipeline(OperationsAdapter api, Workspace workspa
             if (ct.IsCancellationRequested)
             { job.SetStatus(JobStatus.Canceled, Messages.Define("Text_6F312AE253")); break; }
         }
+        if (job.StatusCode == JobStatus.Running)
+            await RecheckAsync(fresh.Where(i => i.State == ItemState.Unknown).ToList(), run, recovery);
         sink.Active = null;
         if (job.StatusCode == JobStatus.Running)
             job.SetStatus(job.Items.All(i => i.State == ItemState.Succeeded) ? JobStatus.Completed : JobStatus.NeedsAttention, Messages.Define(job.Items.All(i => i.State == ItemState.Succeeded) ? "Text_140197D868" : "Text_E9008C53CF"));
         await sink.SaveAsync();
+    }
+
+    // E2: a write that ended Unknown in this round (timeout, 5xx, a read-back that did not match) is looked up once more
+    // after every other item, through the same read-only recovery path the "Continue" button uses, so what the server
+    // already shows is settled now instead of waiting for the user. Nothing is written: a legacy create whose later
+    // steps would still have to be sent, and a create with no id that cannot be searched for (E1), are left for the user. When the lookup
+    // fails, or still cannot settle the item, the item keeps the state and message it had; only newer evidence is kept.
+    static async Task RecheckAsync(List<ChangeItem> unknown, JobRun run, RecoveryStage recovery)
+    {
+        foreach (var item in unknown)
+        {
+            if (run.Ct.IsCancellationRequested)
+                return;
+            if (OperationsAdapter.CanResumeCreate(item))
+                continue;
+            var r = new ItemRun(item, Phase.Recovering) { Id = item.CanProposeRecoveryId ? item.EditableRecoveryId : item.RemoteId ?? item.Before?.Identity?.RemoteId };
+            if (r.Id == null && !CreatedRecordFinder.CanSearch(item))
+                continue;
+            run.Sink.Active = item;
+            if (PerformanceRun.Current is { } metrics)
+                metrics.Phase = r.Phase.ToString();
+            var (description, message, readback) = (item.Description, item.Message, item.ReadbackDetails);
+            try
+            {
+                await recovery.RunAsync(r);
+            }
+            catch (PersistenceException) { throw; }
+            catch (Exception)
+            { item.State = ItemState.Unknown; item.ReadbackDetails = readback; }
+            // A search that found several records the create may have made says so instead (E1).
+            if (item.State == ItemState.Unknown && item.Description?.Code != "ApiCreateCandidates")
+            { item.Description = description; item.Message = message; }
+            await run.Sink.SaveAsync();
+        }
     }
 }

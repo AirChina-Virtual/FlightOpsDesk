@@ -59,7 +59,30 @@ public sealed partial class AppWindow : IDisposable
     /// Creates a data directory under artifacts/ui-tests/<paramref name="name"/>, seeds it (without a seed the program starts
     /// on a new directory) and starts the package on it. Fails if any window of the program is already open.
     /// </summary>
-    public static AppWindow Start(string name, Action<string>? seed = null, Package package = Package.Qa)
+    public static AppWindow Start(string name, Action<string>? seed = null, Package package = Package.Qa) => Start(name, seed, package, null);
+
+    /// <summary>
+    /// As <see cref="Start(string, Action{string}?, Package)"/>, with the QA package pointed at a mock Operations server on
+    /// this machine (VAMSYS_QA_OPERATIONS_ORIGIN, read only by the QA build): the dialogs that need a connection can open.
+    /// </summary>
+    /// <remarks>The seed returns the fake server; it is served on the loopback address for as long as <paramref name="server"/> lives.</remarks>
+    public static AppWindow StartConnected(string name, Func<string, FakeOperationsServer> seed, out LoopbackOperationsServer server)
+    {
+        LoopbackOperationsServer? served = null;
+        try
+        {
+            var app = Start(name, directory => served = new LoopbackOperationsServer(seed(directory)), Package.Qa, () => served!.Origin);
+            server = served!;
+            return app;
+        }
+        catch
+        {
+            served?.Dispose();
+            throw;
+        }
+    }
+
+    static AppWindow Start(string name, Action<string>? seed, Package package, Func<Uri>? operations)
     {
         // A process that just exited stays listed while something (UI Automation) still holds a handle to it, so the previous
         // test's window gets a moment to go away; a window that is really open fails.
@@ -68,7 +91,7 @@ public sealed partial class AppWindow : IDisposable
         var directory = Path.Combine(Repo.Artifacts("ui-tests", name), "data-" + Guid.NewGuid().ToString("N"));
         DataUiFixture.RequireEmptyDirectory(directory);
         seed?.Invoke(directory);
-        return Open(directory, package);
+        return Open(directory, package, operations: operations?.Invoke());
     }
 
     static int OpenWindows()
@@ -120,7 +143,7 @@ public sealed partial class AppWindow : IDisposable
     Package? reopenPackage;
 
     // Pipeless: a start that may stop at the data location problem window never opens the QA pipe.
-    static AppWindow Open(string directory, Package package, string? defaults = null, bool pipeless = false)
+    static AppWindow Open(string directory, Package package, string? defaults = null, bool pipeless = false, Uri? operations = null)
     {
         var executable = package == Package.Qa ? Repo.QaExecutable : Repo.ProductExecutable;
         if (!File.Exists(executable))
@@ -135,6 +158,9 @@ public sealed partial class AppWindow : IDisposable
             start.Environment["VAMSYS_QA_DEFAULT_DIR"] = defaults;
         }
         start.Environment.Remove("VAMSYS_QA_PIPE");
+        start.Environment.Remove("VAMSYS_QA_OPERATIONS_ORIGIN");
+        if (operations is not null)
+            start.Environment["VAMSYS_QA_OPERATIONS_ORIGIN"] = operations.AbsoluteUri;
         if (pipeName is not null)
             start.Environment["VAMSYS_QA_PIPE"] = pipeName;
         var window = new AppWindow(Process.Start(start)!, package, pipeName, directory) { defaultDirectory = defaults };

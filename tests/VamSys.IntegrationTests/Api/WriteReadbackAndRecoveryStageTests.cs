@@ -152,7 +152,9 @@ public class WriteReadbackAndRecoveryStageTests
         Assert.True(item.WriteAccepted);
         Assert.Equal(new ApiFieldDifference("name", "\"renamed\"", "\"Fleet 4\""), Assert.Single(item.VerificationDifferences));
         Assert.Equal("Verifying", item.ReadbackDetails!.Phase);
-        Assert.Equal(["GET fleet/4", "PUT fleet/4", "GET fleet/4"], Calls(w));
+        // the read-back right after the PUT, its second read (G3), and the one more read at the end of the round (E2)
+        Assert.Equal(["GET fleet/4", "PUT fleet/4", "GET fleet/4", "GET fleet/4", "GET fleet/4"], Calls(w));
+        Assert.NotNull(item.FirstReadbackDetails);
         // the workspace did not learn anything from a write it could not confirm
         Assert.Equal("Fleet 4", w.Workspace.Resources[ResourceKind.Fleets].Snapshot.Single(r => r.Identity!.RemoteId == "4").Get("Name"));
         Assert.DoesNotContain("Fleets:Update", w.Workspace.VerifiedOperations);
@@ -365,6 +367,119 @@ public class WriteReadbackAndRecoveryStageTests
         Assert.DoesNotContain(w.Remote.Server.Requests.Skip(seen), IsWrite);
     }
 
+    // ---- G3: a read-back that does not show the write is read once more ---------------------------------------
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_read_back_showing_the_old_record_is_read_again_after_five_seconds_and_only_the_second_read_decides(bool stillOld)
+    {
+        var w = new GoldenWorld();
+        var reads = 0;
+        w.Remote.Intercept = r =>
+        {
+            // the first read after the PUT (and, when stillOld, every later one) still shows the old name
+            if (r.Method == "GET" && Count(w, "PUT") > 0 && (++reads == 1 || stillOld))
+                return FakeResponse.Ok("""{"data":{"id":4,"airline_id":7,"name":"Fleet 4","code":"B738","type":"pax","parameter_ids":[1]}}""");
+            return null;
+        };
+        w.Edit(ResourceKind.Fleets, "4", ("Name", "renamed"));
+        await w.RunAsync();
+
+        var item = w.Job!.Items.Single();
+        Assert.Equal(stillOld ? ItemState.Unknown : ItemState.Succeeded, item.State);
+        Assert.Equal(1, Count(w, "PUT"));
+        // first read, second read; an item left unknown is read once more at the end of the round
+        Assert.Equal(stillOld ? 4 : 3, Count(w, "GET"));
+        var first = Assert.IsType<ApiDiagnostic>(item.FirstReadbackDetails);
+        Assert.Contains("\"Fleet 4\"", first.ResponseBody ?? "", StringComparison.Ordinal);
+        Assert.True(item.ReadbackDetails!.StartedAt - first.FinishedAt >= TimeSpan.FromSeconds(5));
+        if (stillOld)
+        {
+            Assert.Equal("ApiReadbackMismatch", Code(item));
+            Assert.Equal(new ApiFieldDifference("name", "\"renamed\"", "\"Fleet 4\""), Assert.Single(item.VerificationDifferences));
+        }
+    }
+
+    [Fact]
+    public async Task A_hard_delete_still_readable_at_first_is_proven_by_the_404_of_the_second_read()
+    {
+        var w = new GoldenWorld();
+        var reads = 0;
+        w.Remote.Intercept = r => r.Method == "GET" && Count(w, "DELETE") > 0 && ++reads == 1
+            ? FakeResponse.Ok("""{"data":{"id":6,"airline_id":7,"name":"Fleet 6","code":"A320","type":"pax","parameter_ids":[1]}}""")
+            : null;
+        w.MarkDelete(ResourceKind.Fleets, "6");
+        await w.RunAsync();
+
+        var item = w.Job!.Items.Single();
+        Assert.Equal(ItemState.Succeeded, item.State);
+        Assert.Equal(1, Count(w, "DELETE"));
+        Assert.Equal(200, item.FirstReadbackDetails!.Status);
+        Assert.Empty(item.VerificationDifferences);
+    }
+
+    [Fact]
+    public async Task A_read_back_that_shows_the_write_at_once_is_not_read_again()
+    {
+        var w = new GoldenWorld();
+        w.Edit(ResourceKind.Fleets, "4", ("Name", "renamed"));
+        await w.RunAsync();
+        var item = w.Job!.Items.Single();
+        Assert.Equal(ItemState.Succeeded, item.State);
+        Assert.Null(item.FirstReadbackDetails);
+        Assert.Equal(["GET fleet/4", "PUT fleet/4", "GET fleet/4"], Calls(w));
+    }
+
+    // ---- E2: one more read at the end of the round ----------------------------------------------------------------
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_write_left_unknown_is_read_once_more_at_the_end_of_the_round_and_settled_only_by_what_the_read_shows(bool applied)
+    {
+        var w = new GoldenWorld();
+        w.Remote.Intercept = r =>
+        {
+            if (r.Method != "PUT" || !r.Path.EndsWith("/fleet/4", StringComparison.Ordinal)) return null;
+            if (applied) w.Remote.Respond(r);
+            return Status(500);
+        };
+        w.Edit(ResourceKind.Fleets, "4", ("Name", "renamed"));
+        w.Edit(ResourceKind.Fleets, "5", ("Name", "Fleet 5 renamed"));
+        await w.RunAsync();
+
+        var items = w.Job!.Items;
+        Assert.Equal(applied ? ItemState.Succeeded : ItemState.Unknown, items[0].State);
+        // every other item first, then the read; never a second PUT
+        Assert.Equal(["GET fleet/4", "PUT fleet/4", "GET fleet/5", "PUT fleet/5", "GET fleet/5", "GET fleet/4"], Calls(w));
+        Assert.Equal(ItemState.Succeeded, items[1].State);
+        Assert.Equal(applied ? JobStatus.Completed : JobStatus.NeedsAttention, w.Job.StatusCode);
+        if (!applied)
+            Assert.Equal("ApiUnknownError", Code(items[0])); // the 500 is still what the item says
+    }
+
+    [Fact]
+    public async Task A_failing_read_at_the_end_of_the_round_leaves_the_unknown_item_as_it_was()
+    {
+        var w = new GoldenWorld();
+        var put = false;
+        w.Remote.Intercept = r =>
+        {
+            if (r.Method == "PUT") { put = true; throw new TimeoutException("simulated"); }
+            return put && r.Method == "GET" ? Status(503) : null;
+        };
+        w.Edit(ResourceKind.Fleets, "4", ("Name", "renamed"));
+        await w.RunAsync();
+
+        var item = w.Job!.Items.Single();
+        Assert.Equal(ItemState.Unknown, item.State);
+        Assert.Equal("ApiUnknown", Code(item));
+        Assert.Null(item.ReadbackDetails);
+        Assert.Equal(["GET fleet/4", "PUT fleet/4"], Calls(w).Take(2));
+        Assert.All(Calls(w).Skip(2), c => Assert.Equal("GET fleet/4", c)); // the read, and the transport's own retries of it
+    }
+
     // ---- C11: assertions of the C3 scenarios that were only matched by test name ----------------------------------
 
     [Fact]
@@ -401,7 +516,8 @@ public class WriteReadbackAndRecoveryStageTests
         await Execute(w, job, () => { saved = (item.CreateCompleted, item.RemoteId); return Task.CompletedTask; });
 
         Assert.Equal((true, "90"), savedWhenPutWasSent);
-        Assert.Equal(ItemState.Unknown, item.State);
+        // The lost answer is settled by the read at the end of the same round (E2), not by sending anything again.
+        Assert.Equal(ItemState.Succeeded, item.State);
         Assert.Equal(1, Count(w, "POST"));
         Assert.Equal(1, Count(w, "PUT"));
 

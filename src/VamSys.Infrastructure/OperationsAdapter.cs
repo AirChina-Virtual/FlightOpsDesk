@@ -20,7 +20,7 @@ public interface IApiResourceAdapter
 // Keeping this surface lets the executor, the app and the tests stay as they are.
 public sealed class OperationsAdapter : IResourceReader, IResourceWriter, IApiResourceAdapter
 {
-    public static readonly Uri BaseUri = new("https://vamsys.io/api/v3/operations/");
+    public static readonly Uri BaseUri = OperationsEndpoints.Operations;
 
     readonly ApiContext ctx;
     readonly RequestPlanners planners;
@@ -34,6 +34,7 @@ public sealed class OperationsAdapter : IResourceReader, IResourceWriter, IApiRe
     readonly AirlineParameters parameters;
     readonly StepWriter writer;
     readonly SnapshotRefresher refresher;
+    readonly CreatedRecordFinder created;
 
     public OperationsAdapter(OperationsTransport transport, Workspace workspace)
     {
@@ -49,6 +50,7 @@ public sealed class OperationsAdapter : IResourceReader, IResourceWriter, IApiRe
         parameters = new AirlineParameters(ctx);
         writer = new StepWriter(ctx);
         refresher = new SnapshotRefresher(ctx);
+        created = new CreatedRecordFinder(ctx, finder, readback);
     }
 
     public string? SessionAirlineId => ctx.SessionAirlineId;
@@ -68,6 +70,8 @@ public sealed class OperationsAdapter : IResourceReader, IResourceWriter, IApiRe
     internal Task EnsureReadConnectionAsync(CancellationToken ct) => ctx.Reader.EnsureReadConnectionAsync(ct);
     // The GET that decides an item's outcome (a move is read under its new fleet).
     internal Task<DataRow?> FindResult(ChangeItem item, string? id, CancellationToken ct) => movement.FindResultAsync(item, id, ct);
+    internal Task WaitAsync(TimeSpan delay, CancellationToken ct) => ctx.Transport.DelayAsync(delay, ct);
+    internal Task<List<string>> FindCreatedAsync(ChangeItem item, CancellationToken ct) => created.FindAsync(item, ct);
 
     // ---- planning --------------------------------------------------------------------------------------------
     public List<ApiStep> Plan(ChangeItem c) => planners.Plan(c);
@@ -83,6 +87,8 @@ public sealed class OperationsAdapter : IResourceReader, IResourceWriter, IApiRe
     public Task<IReadOnlyList<AirlineParameter>> ReadParametersAsync(CancellationToken ct, bool force = false) => parameters.ReadAsync(ct, force);
     public bool NeedsParameterPreflight(ChangeItem item) => parameters.NeedsPreflight(item);
     public void ValidateParameterPreview(ChangeItem item) => parameters.ValidatePreview(item);
+    // The route's fleets that are not approved for its prefixes (from the parameters already read; no request).
+    public IReadOnlyList<(string Token, string Name)> DeniedFleets(ChangeItem item) => parameters.DeniedFleets(item);
     public Task PreflightParametersAsync(ChangeItem item, CancellationToken ct) => parameters.PreflightAsync(item, ct);
 
     // ---- writing ---------------------------------------------------------------------------------------------
@@ -99,6 +105,7 @@ public sealed class OperationsAdapter : IResourceReader, IResourceWriter, IApiRe
     internal List<ApiFieldDifference> BeforeDifferences(ChangeItem item, DataRow current) => readback.BeforeDifferences(item, current);
     internal static bool Equivalent(string field, string a, string b) => ReadbackVerifier.Equivalent(field, a, b);
     internal bool RecordDeletionVerification(ChangeItem item, DataRow? current) => deletion.Record(item, current);
+    internal bool RecordDeletionWithoutReceipt(ChangeItem item, DataRow? current) => deletion.RecordWithoutReceipt(item, current);
     internal Task PreflightMoveAsync(ChangeItem item, CancellationToken ct) => movement.PreflightAsync(item, ct);
     internal static bool CanResumeCreate(ChangeItem item) => UnknownResolver.CanResumeCreate(item);
     internal Task<bool> ProveNotAppliedAsync(ChangeItem item, CancellationToken ct) => unknown.ProveNotAppliedAsync(item, ct);

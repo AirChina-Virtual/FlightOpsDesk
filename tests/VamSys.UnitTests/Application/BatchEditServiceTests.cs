@@ -189,6 +189,68 @@ public class BatchEditServiceTests
         Assert.Null(f.Service.ProposeRetire(ResourceKind.Routes, [])!.Preview);
     }
 
+    // --- Unapproved fleets (2.3, 2.4) ---
+
+    static ChangeItem RefusedFor(DataRow route, params string[] fleets) => new()
+    {
+        Resource = ResourceKind.Routes, Kind = ChangeKind.Create, State = ItemState.Failed, After = route,
+        DiagnosticDetails = new()
+        {
+            Status = 422,
+            FieldErrors = fleets.Select((id, n) => (id, n)).ToDictionary(p => $"fleet_ids.{p.n}",
+                p => new[] { $"Fleet 'F{p.id}' (ID: {p.id}) is not approved for callsign prefix 'CCA' and flight number prefix 'CA'." })
+        }
+    };
+
+    [Fact]
+    public async Task Removing_the_refused_fleets_is_one_undoable_edit_and_then_nothing_is_left_to_remove()
+    {
+        var f = new Fixture();
+        f.Fleets.Draft.AddRange([Row(("ID", "1"), ("Name", "A")), Row(("ID", "2"), ("Name", "B")), Row(("ID", "3"), ("Name", "C"))]);
+        var route = Row(("Type", "repositioning"), ("Callsign", "CCA088"), ("Flight Number", "CA88"), ("Fleet IDs", "1,2,3"));
+        f.Routes.Draft.Add(route);
+        var item = RefusedFor(route, "2", "3");
+
+        Assert.Equal(["2", "3"], f.Service.RejectedFleetsToRemove(item));
+        Assert.Equal(2, await f.Service.RemoveRouteFleetsAsync(route.LocalId, f.Service.RejectedFleetsToRemove(item)));
+        Assert.Equal("1", f.Routes.FindDraftRow(route.LocalId)!.Get("Fleet IDs"));
+        Assert.Single(f.Routes.Undo);
+        Assert.Equal(1, f.Saves);
+        Assert.Empty(f.Service.RejectedFleetsToRemove(item));
+
+        f.Routes.UndoEdit();
+        Assert.Equal("1,2,3", f.Routes.FindDraftRow(route.LocalId)!.Get("Fleet IDs"));
+    }
+
+    [Fact]
+    public async Task A_route_would_not_be_left_without_fleets_and_nothing_changes()
+    {
+        var f = new Fixture();
+        f.Fleets.Draft.AddRange([Row(("ID", "1"), ("Name", "A"))]);
+        var route = Row(("Type", "charter"), ("Fleet IDs", "1"));
+        f.Routes.Draft.Add(route);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => f.Service.RemoveRouteFleetsAsync(route.LocalId, ["1"]));
+        Assert.Equal("1", f.Routes.FindDraftRow(route.LocalId)!.Get("Fleet IDs"));
+        Assert.Empty(f.Routes.Undo);
+        Assert.Equal(0, f.Saves);
+    }
+
+    [Fact]
+    public void Nothing_is_proposed_for_a_route_that_is_gone_deleted_or_did_not_fail()
+    {
+        var f = new Fixture();
+        var route = Row(("Type", "scheduled"), ("Fleet IDs", "1,2"));
+        Assert.Empty(f.Service.RejectedFleetsToRemove(RefusedFor(route, "2")));          // not in the draft
+        f.Routes.Draft.Add(route.With("_delete", "TRUE"));
+        Assert.Empty(f.Service.RejectedFleetsToRemove(RefusedFor(route, "2")));          // marked deleted
+        f.Routes.Draft.Clear();
+        f.Routes.Draft.Add(route);
+        var pending = RefusedFor(route, "2");
+        pending.State = ItemState.Pending;
+        Assert.Empty(f.Service.RejectedFleetsToRemove(pending));
+        Assert.Equal(["2"], f.Service.RejectedFleetsToRemove(RefusedFor(route, "2")));
+    }
+
     // --- Fleets ---
 
     [Fact]

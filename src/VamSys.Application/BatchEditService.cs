@@ -96,6 +96,30 @@ public sealed class BatchEditService(WorkspaceSession session)
         fleets.Apply(Data(kind), preview);
         await session.SaveAsync();
     }
+    // 2.4: the fleets a failed route item was refused for (422, prefixes) that its draft still names; empty when there is
+    // nothing left to remove (already removed, the route is gone or marked deleted, or the failure was about something else).
+    public IReadOnlyList<string> RejectedFleetsToRemove(ChangeItem item)
+    {
+        if (item.State != ItemState.Failed || PrefixRejection.DeniedFleetIds(item) is not { Count: > 0 } ids)
+            return [];
+        if (Data(ResourceKind.Routes).FindDraftRow(item.After.LocalId) is not { } row || Schemas.Deleted(row))
+            return [];
+        var current = FleetAssignmentService.Tokens(row.Get("Fleet IDs"));
+        return ids.Where(id => current.Contains(id, StringComparer.OrdinalIgnoreCase)).ToList();
+    }
+
+    // 2.3 / 2.4: removes the fleets that are not approved for a route's prefixes from its draft, as one undoable edit.
+    // Refused (nothing changes) when the route is gone, is marked deleted, or would be left with no fleet.
+    public async Task<int> RemoveRouteFleetsAsync(Guid localId, IReadOnlyCollection<string> tokens)
+    {
+        var row = Data(ResourceKind.Routes).FindDraftRow(localId)
+            ?? throw MessageErrors.Attach(new InvalidOperationException(Messages.Define("ReviewChanged")), Messages.Define("ReviewChanged"));
+        var preview = fleets.Preview(session.Workspace, ResourceKind.Routes, [row], tokens, FleetAssignmentMode.Remove);
+        if (preview.Issues.Count > 0)
+            throw MessageErrors.Attach(new InvalidOperationException(preview.Issues[0].Message), preview.Issues[0].Description);
+        await ApplyFleetsAsync(ResourceKind.Routes, preview);
+        return FleetAssignmentService.Tokens(row.Get("Fleet IDs")).Count(t => tokens.Contains(t, StringComparer.OrdinalIgnoreCase));
+    }
 
     // --- One row, and history ---
     public async Task AddRowAsync(ResourceKind kind)

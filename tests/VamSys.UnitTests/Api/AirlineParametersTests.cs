@@ -26,8 +26,8 @@ public class AirlineParametersTests
 
     static int Reads(ApiKit kit) => kit.Server.Requests.Count(r => r.Path.EndsWith("/parameters", StringComparison.Ordinal));
 
-    static ChangeItem ScheduledRoute(string callsign = "CAO200", string flight = "CA200", string fleets = "4")
-        => ApiKit.Create(ResourceKind.Routes, ("Type", "scheduled"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", callsign), ("Flight Number", flight), ("Fleet IDs", fleets));
+    static ChangeItem ScheduledRoute(string callsign = "CAO200", string flight = "CA200", string fleets = "4", string type = "scheduled")
+        => ApiKit.Create(ResourceKind.Routes, ("Type", type), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", callsign), ("Flight Number", flight), ("Fleet IDs", fleets));
 
     // ---- reading ----------------------------------------------------------------------------------------------
 
@@ -133,6 +133,57 @@ public class AirlineParametersTests
         Assert.Equal("ApiPrefixDenied", ApiKit.BlockedWith(() => kit.Api.ValidateParameterPreview(ScheduledRoute(fleets: "4,5"))));
         // fleets that do not exist cannot be checked
         Assert.Equal("ApiInvalid", ApiKit.BlockedWith(() => kit.Api.ValidateParameterPreview(ScheduledRoute(fleets: "99"))));
+    }
+
+    // D11: every route type that carries fleets is checked; a jumpseat (which need not name a fleet) is not.
+    [Theory]
+    [InlineData("repositioning")]
+    [InlineData("cargo")]
+    [InlineData("charter")]
+    [InlineData("training")]
+    [InlineData("vfr")]
+    public async Task Every_route_type_with_fleets_is_checked_like_a_scheduled_route(string type)
+    {
+        var kit = Kit(Parameter(1, fleets: "[4]"));
+        await kit.Api.ReadParametersAsync(Ct);
+        Assert.True(kit.Api.NeedsParameterPreflight(ScheduledRoute(type: type)));
+        kit.Api.ValidateParameterPreview(ScheduledRoute(type: type));
+        Assert.Equal("ApiPrefixDenied", ApiKit.BlockedWith(() => kit.Api.ValidateParameterPreview(ScheduledRoute(fleets: "4,5", type: type))));
+        Assert.False(kit.Api.NeedsParameterPreflight(ScheduledRoute(fleets: "4,5", type: "jumpseat")));
+    }
+
+    [Fact]
+    public async Task Every_unapproved_fleet_is_named_at_once_in_the_order_the_route_lists_them()
+    {
+        var kit = Kit(Parameter(1, fleets: "[]"));
+        await kit.Api.ReadParametersAsync(Ct);
+        var route = ScheduledRoute(fleets: "5,4");
+        Assert.Equal([("5", "Fleet 5"), ("4", "Fleet 4")], kit.Api.DeniedFleets(route));
+        var error = Assert.ThrowsAny<Exception>(() => kit.Api.ValidateParameterPreview(route));
+        var message = MessageErrors.Describe(error);
+        Assert.Equal("ApiPrefixDeniedFleets", message.Code);
+        Assert.Contains("Fleet 5 (5), Fleet 4 (4)", message.ToString(), StringComparison.Ordinal);
+    }
+
+    // The two repositioning routes of 2026-11-06 (CAPABILITY-MATRIX): 31 fleets, 6 of them not approved for CCA / CA. The
+    // server refused them in two rounds; the preview now names all six before anything is sent.
+    [Fact]
+    public async Task The_repositioning_route_of_2026_11_06_is_refused_before_sending_with_all_six_fleets_named()
+    {
+        int[] unapproved = [26725, 26718, 27930, 26719, 26724, 26722];
+        var fleets = Enumerable.Range(26800, 25).Concat(unapproved).ToArray();
+        var kit = new ApiKit();
+        kit.LoadStandardAirportsAndFleets();
+        foreach (var id in fleets)
+            kit.Map(ResourceKind.Fleets, $$"""{"id":{{id}},"airline_id":7,"name":"F{{id}}","code":"B738","type":"pax"}""");
+        var approved = string.Join(',', fleets.Except(unapproved));
+        kit.Server.On(HttpMethod.Get, "parameters", List($$"""{"id":1,"airline_id":7,"icao_code":"CCA","iata_code":"CA","approved":true,"restricted":false,"fleet_ids":[{{approved}}]}"""));
+        await kit.Api.ReadParametersAsync(Ct);
+        var route = ScheduledRoute("CCA088", "CA88", string.Join(',', fleets), "repositioning");
+
+        Assert.Equal(unapproved.Select(i => i.ToString(System.Globalization.CultureInfo.InvariantCulture)), kit.Api.DeniedFleets(route).Select(f => f.Token));
+        Assert.Equal("ApiPrefixDeniedFleets", ApiKit.BlockedWith(() => kit.Api.ValidateParameterPreview(route)));
+        kit.Api.ValidateParameterPreview(ScheduledRoute("CCA088", "CA88", approved, "repositioning"));
     }
 
     [Fact]

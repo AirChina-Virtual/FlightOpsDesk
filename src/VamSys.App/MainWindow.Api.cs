@@ -108,12 +108,15 @@ public sealed partial class MainWindow
         {
             var notApplied = canVerifyNotApplied ? owner.L("ApiVerifyNotApplied") : null;
             string Help() => notApplied == null ? "" : "\n" + owner.L("ApiNotAppliedHelp");
+            // E1: records the program found but could not bind by itself are listed, and the first is filled in.
+            var found = item.FoundCreateCandidates is { Count: > 0 } ids ? ids : null;
             var dialog = new TextInputDialogViewModel
             {
                 Title = owner.L("ApiUnknownReview"),
-                Paragraphs = [owner.ApiReview(item), owner.L("ApiRecoverId") + Help()],
+                Paragraphs = found == null ? [owner.ApiReview(item), owner.L("ApiRecoverId") + Help()]
+                    : [owner.ApiReview(item), owner.L("ApiCreateCandidateList", ("ids", string.Join(", ", found))), owner.L("ApiRecoverId") + Help()],
                 InputHeader = "Remote ID",
-                Text = item.EditableRecoveryId ?? "",
+                Text = item.EditableRecoveryId ?? found?[0] ?? "",
                 PrimaryLabel = owner.L(online ? "ApiCheckRemote" : "ApiSaveCandidate"),
                 SecondaryLabel = notApplied
             };
@@ -124,6 +127,30 @@ public sealed partial class MainWindow
                 _ => RecoveryIdAnswer.Cancel
             };
         }
+        // 1.6: one dialog for a whole group: what the situation is, one line per item (with the differences a read showed),
+        // and "confirm all" or "one by one".
+        public async Task<RecoveryGroupAnswer> ConfirmGroupAsync(RecoveryGroup group, IReadOnlyList<RecoveryGroupEntry> entries)
+        {
+            var dialog = new ListDialogViewModel
+            {
+                Title = owner.L("ApiUnknownReview"),
+                Header = [owner.L("RecoveryGroup_" + group, ("count", entries.Count))],
+                Items = entries.Select(e => $"{owner.L(Schemas.All[e.Item.Resource].Name)} · {Schemas.Key(e.Item.Resource, e.Item.After)}"
+                    + (e.Differences.Count == 0 ? "" : "\n" + Differences(e.Differences))).ToList(),
+                PrimaryLabel = owner.L(group == RecoveryGroup.VerifyNotApplied ? "RecoveryGroupVerifyAll" : "RecoveryGroupConfirmAll", ("count", entries.Count)),
+                SecondaryLabel = owner.L("RecoveryGroupOneByOne"),
+                Height = DialogHeight.ReviewDetail,
+                Selectable = false
+            };
+            return await owner.Dialogs.ShowAsync(dialog) switch
+            {
+                DialogResult.Primary => RecoveryGroupAnswer.All,
+                DialogResult.Secondary => RecoveryGroupAnswer.OneByOne,
+                _ => RecoveryGroupAnswer.Cancel
+            };
+        }
+        public void ReportGroup(RecoveryGroup group, int done, int total)
+            => owner.Status(() => owner.L(group == RecoveryGroup.VerifyNotApplied ? "RecoveryGroupVerified" : "RecoveryGroupDone", ("done", done), ("total", total)));
         public Task<bool> ConfirmManualDeleteAsync(ChangeItem item)
             => owner.ConfirmMessage(owner.L("ApiUnknownReview"), owner.L("ApiManualDelete", ("id", item.RemoteId ?? item.After.Identity?.RemoteId)), owner.L("ApiManualConfirm"));
         static string Differences(IReadOnlyList<ApiFieldDifference> differences) => string.Join("\n", differences.Select(d => $"{d.Field}: {d.Expected ?? "∅"} → {d.Actual ?? "∅"}"));

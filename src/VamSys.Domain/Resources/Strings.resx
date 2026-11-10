@@ -898,6 +898,9 @@
   <data name="ApiDuplicate" xml:space="preserve"><value>远端存在疑似重复记录。请刷新并审阅，不能重复创建。</value></data>
   <data name="ApiCredentials" xml:space="preserve"><value>更换 Client ID 时必须同时填写对应的 Secret。</value></data>
   <data name="ApiRecoverId" xml:space="preserve"><value>请在 Orwell 找到本次创建的记录，输入候选 ID。核对失败后可更正；确认前不会绑定记录，也不会重新创建。</value></data>
+  <data name="ApiDeletedWithoutReceipt" xml:space="preserve"><value>已删除（无回执）：删除请求没有收到回执，之后读取该记录返回 404。这是程序根据读取得出的结论，不计为已验证的操作。</value></data>
+  <data name="ApiCreateCandidates" xml:space="preserve"><value>找到 {count} 条可能是本次新建的记录，程序无法确定是哪一条；请在“核对”中选择。</value></data>
+  <data name="ApiCreateCandidateList" xml:space="preserve"><value>本次请求之后新出现、内容一致且创建时间在请求时间内的记录：{ids}。已填入第一条，可直接核对或改为其他 ID。</value></data>
   <data name="ApiManualDelete" xml:space="preserve"><value>请先在 Orwell 确认记录 {id} 已按预期停用／删除。确认后归档本地删除草稿；这只是人工确认，不代表 API 自动验证成功，也不会启用批量删除。</value></data>
   <data name="ApiManualConfirm" xml:space="preserve"><value>已在 Orwell 核对</value></data>
   <data name="Enum_ItemState_ManuallyConfirmed" xml:space="preserve"><value>人工确认</value></data>
@@ -944,6 +947,20 @@
   <data name="ReviewDemoSubmit" xml:space="preserve"><value>模拟提交工作区修改</value></data>
   <data name="ReviewExport" xml:space="preserve"><value>导出{resource} CSV</value></data>
   <data name="ReviewChanged" xml:space="preserve"><value>审阅内容或提交条件已变化，已更新清单。请核对后再次提交。</value></data>
+  <data name="RecoveryGroup_ManualDelete" xml:space="preserve"><value>以下 {count} 项删除已收到 204，但记录仍可读取。请先在 Orwell 确认它们都已按预期停用／删除；确认后全部标为人工确认，不计入已验证的操作。</value></data>
+  <data name="RecoveryGroup_DeletedWithoutReceipt" xml:space="preserve"><value>以下 {count} 项删除没有收到回执，只读 GET 都返回 404。请先在 Orwell 确认；确认后全部标为人工确认（无写入回执），并归档本地删除草稿，不会重新发送删除。</value></data>
+  <data name="RecoveryGroup_UnchangedWithoutReceipt" xml:space="preserve"><value>以下 {count} 项删除没有收到回执，只读 GET 读到的记录都与修改前一致，删除看起来没有生效。请先在 Orwell 确认；确认后全部标为未生效：状态为失败，本地删除草稿保留，可重新审阅提交。</value></data>
+  <data name="RecoveryGroup_AcceptServerValue" xml:space="preserve"><value>以下 {count} 项写入已被服务器接受，但读回的值与发送值不同。确认后全部接受服务器当前值：标为人工确认，本地快照改为服务器当前值，草稿中尚未生效的值列为冲突。不会重新发送写入。差异（发送值 → 服务器当前值）见各行。</value></data>
+  <data name="RecoveryGroup_VerifyNotApplied" xml:space="preserve"><value>以下 {count} 项写入结果未知。程序将逐项只读核对：能证明没有生效的标为失败并保留本地草稿，不能证明的保持未知。不会重新发送写入。</value></data>
+  <data name="RecoveryGroupConfirmAll" xml:space="preserve"><value>全部确认（{count} 项）</value></data>
+  <data name="RecoveryGroupVerifyAll" xml:space="preserve"><value>全部只读核对（{count} 项）</value></data>
+  <data name="RecoveryGroupOneByOne" xml:space="preserve"><value>逐条处理</value></data>
+  <data name="RecoveryGroupDone" xml:space="preserve"><value>已批量处理 {done}／{total} 项。</value></data>
+  <data name="RecoveryGroupVerified" xml:space="preserve"><value>批量只读核对完成：{done}／{total} 项证明未生效，其余保持未知。</value></data>
+  <data name="CellFleetsNotApproved" xml:space="preserve"><value>这些机队尚未获准使用本航线呼号和班号的前缀，提交前会被拦下：{fleets}</value></data>
+  <data name="ReviewRemoveFleets" xml:space="preserve"><value>移除未获准的 {count} 个机队</value></data>
+  <data name="ReviewFleetsRemoved" xml:space="preserve"><value>已从航线移除 {count} 个未获准的机队，审阅清单已更新。可以撤销。</value></data>
+  <data name="TaskRemoveFleets" xml:space="preserve"><value>移除未获准的机队（{count} 条航线）并重新审阅</value></data>
   <data name="ReviewPreparing" xml:space="preserve"><value>正在整理审阅清单…</value></data>
   <data name="ReviewState_Ready" xml:space="preserve"><value>本次提交</value></data>
   <data name="ReviewState_Deferred" xml:space="preserve"><value>暂缓 · 保留草稿</value></data>
@@ -977,6 +994,7 @@
   <data name="ApiParameterRequired" xml:space="preserve"><value>请选择一个当前航空公司已批准且未受限的航司参数。</value></data>
   <data name="ApiParameterCreateOnly" xml:space="preserve"><value>仅支持为新建机队关联航司参数；现有机队改绑和解绑尚未开放。</value></data>
   <data name="ApiPrefixDenied" xml:space="preserve"><value>机队“{fleet}”尚未获准使用呼号 {callsign} 和班号 {flight} 的前缀，请先检查航司参数关联。</value></data>
+  <data name="ApiPrefixDeniedFleets" xml:space="preserve"><value>{count} 个机队尚未获准使用呼号 {callsign} 和班号 {flight} 的前缀：{fleets}。请移除这些机队，或先检查航司参数关联。</value></data>
   <data name="ApiKnownWeightRestriction" xml:space="preserve"><value>当前实例存在重量单位和 SimBrief 写入异常；本版仅提交 kg 数值，禁止附带 weight_unit 或 simbrief_overrides。</value></data>
   <data name="ApiJumpseatIdentity" xml:space="preserve"><value>服务端不保留 jumpseat 呼号和班号，现有记录的这两个字段暂不支持在线修改。</value></data>
   <data name="JumpseatNotPreserved" xml:space="preserve"><value>服务端未保留</value></data>

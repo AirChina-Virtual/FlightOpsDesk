@@ -43,27 +43,55 @@ internal sealed class AirlineParameters(ApiContext ctx)
         catch { Invalidate(); throw; }
     }
 
+    // D11 (2026-11-09): every route type that carries fleets is checked like scheduled. Repositioning was proven by real
+    // 422s on 2026-11-06; cargo, charter, training and vfr are checked by decision, before any evidence. A jumpseat need
+    // not name a fleet and is not checked.
+    public static bool ChecksPrefixes(DataRow route) => route.Get("Type") is not ("" or "jumpseat");
+
     public bool NeedsPreflight(ChangeItem item) => item.Kind != ChangeKind.Delete && (
         item.Resource == ResourceKind.Fleets && item.Kind == ChangeKind.Create && (item.RequiresAirlineParameter || item.After.Get("Parameter IDs") != "")
-        || item.Resource == ResourceKind.Routes && item.After.Get("Type") == "scheduled"
+        || item.Resource == ResourceKind.Routes && ChecksPrefixes(item.After)
             && (item.Kind == ChangeKind.Create || item.Fields.Keys.Any(f => f is "Fleet IDs" or "Callsign" or "Flight Number" or "Type")));
 
-    // Offline check against the parameters already read: a new fleet names one approved, unrestricted parameter; a scheduled
-    // route's callsign and flight number start with the prefixes of a parameter that is linked to each of its fleets.
+    // Offline check against the parameters already read: a new fleet names one approved, unrestricted parameter; a route's
+    // callsign and flight number start with the prefixes of a parameter that is linked to each of its fleets. Every fleet
+    // that fails is named at once (2.2), not only the first.
     public void ValidatePreview(ChangeItem item)
     {
         if (!NeedsPreflight(item))
             return;
         if (!HasMetadata)
             throw Block("ApiParametersUnavailable");
-        var allowed = parameters!.Where(p => p.Approved && !p.Restricted).ToArray();
         if (item.Resource == ResourceKind.Fleets)
         {
+            var allowed = parameters!.Where(p => p.Approved && !p.Restricted).ToArray();
             var ids = FleetAssignmentService.Tokens(item.After.Get("Parameter IDs"));
             if (ids.Count != 1 || !allowed.Any(p => p.Id == ids[0]))
                 throw Block("ApiParameterRequired");
             return;
         }
+        var denied = DeniedFleets(item);
+        if (denied.Count == 0)
+            return;
+        var (callsign, flight) = (item.After.Get("Callsign"), item.After.Get("Flight Number"));
+        var message = denied.Count == 1
+            ? Messages.Define("ApiPrefixDenied", ("fleet", denied[0].Name), ("callsign", callsign), ("flight", flight))
+            : Messages.Define("ApiPrefixDeniedFleets", ("count", denied.Count), ("fleets", string.Join(", ", denied.Select(f => $"{f.Name} ({f.Token})"))),
+                ("callsign", callsign), ("flight", flight));
+        throw MessageErrors.Attach(new InvalidOperationException(message), message);
+    }
+
+    // The fleets of a route whose linked, approved and unrestricted parameters do not cover its callsign and flight
+    // number prefixes, in the order the route names them. A fleet that cannot be found or is marked deleted is invalid
+    // input rather than an unapproved fleet, and blocks at once. Needs the parameters (HasMetadata).
+    public IReadOnlyList<(string Token, string Name)> DeniedFleets(ChangeItem item)
+    {
+        if (!HasMetadata)
+            throw Block("ApiParametersUnavailable");
+        var denied = new List<(string Token, string Name)>();
+        if (item.Resource != ResourceKind.Routes || !ChecksPrefixes(item.After))
+            return denied;
+        var allowed = parameters!.Where(p => p.Approved && !p.Restricted).ToArray();
         foreach (var token in FleetAssignmentService.Tokens(item.After.Get("Fleet IDs")))
         {
             var local = LocalReference.IsLocal(token);
@@ -78,9 +106,9 @@ internal sealed class AirlineParameters(ApiContext ctx)
             if (!allowed.Any(p => (local ? linked.Contains(p.Id) : p.FleetIds.Contains(token) && (!explicitRelation || linked.Contains(p.Id))) && p.IcaoCode.Length > 0 && p.IataCode.Length > 0
                 && item.After.Get("Callsign").StartsWith(p.IcaoCode, StringComparison.OrdinalIgnoreCase)
                 && item.After.Get("Flight Number").StartsWith(p.IataCode, StringComparison.OrdinalIgnoreCase)))
-                throw MessageErrors.Attach(new InvalidOperationException(Messages.Define("ApiPrefixDenied", ("fleet", fleet.Get("Name")), ("callsign", item.After.Get("Callsign")), ("flight", item.After.Get("Flight Number")))),
-                    Messages.Define("ApiPrefixDenied", ("fleet", fleet.Get("Name")), ("callsign", item.After.Get("Callsign")), ("flight", item.After.Get("Flight Number"))));
+                denied.Add((token, fleet.Get("Name")));
         }
+        return denied;
     }
 
     // Reads the parameters (and the fleets a route names, once each) and validates the item against them.

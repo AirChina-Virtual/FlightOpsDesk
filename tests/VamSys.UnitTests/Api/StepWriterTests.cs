@@ -221,7 +221,8 @@ public class StepWriterTests
         Assert.Equal(4, saves.Count);
         var step = item.ApiSteps[0];
         Assert.NotNull(step.DeadlineAt);
-        Assert.Equal(TimeSpan.FromSeconds(100), step.DeadlineAt - step.StartedAt);
+        // the write limit (90 s, E3), which is shorter than this test client's 100 s
+        Assert.Equal(TimeSpan.FromSeconds(90), step.DeadlineAt - step.StartedAt);
     }
 
     [Fact]

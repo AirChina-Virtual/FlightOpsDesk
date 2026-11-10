@@ -68,6 +68,8 @@ VamSys.Core.ChangeItem.DiagnosticDetails => VamSys.Core.ApiDiagnostic; get/set; 
 VamSys.Core.ChangeItem.EditableRecoveryId => System.String; ; ignore=Always
 VamSys.Core.ChangeItem.EditableRecoveryId => not serialized (JsonIgnore Always)
 VamSys.Core.ChangeItem.Fields => System.Collections.Generic.Dictionary<System.String,VamSys.Core.FieldChange>; get/set; ignore=Never
+VamSys.Core.ChangeItem.FirstReadbackDetails => VamSys.Core.ApiDiagnostic; get/set; ignore=WhenWritingNull
+VamSys.Core.ChangeItem.FoundCreateCandidates => System.Collections.Generic.List<System.String>; get/set; ignore=WhenWritingNull
 VamSys.Core.ChangeItem.Id => System.Guid; get/set; ignore=Never
 VamSys.Core.ChangeItem.Kind => VamSys.Core.ChangeKind; get/set; ignore=Never
 VamSys.Core.ChangeItem.ManualResolution => VamSys.Core.ApiManualResolution; get/set; ignore=WhenWritingNull
@@ -118,6 +120,7 @@ VamSys.Core.MessageDescriptor.Literal => System.String; get/set; ignore=Never
 VamSys.Core.RecoveryCandidateAttempt => kind Object
 VamSys.Core.RecoveryCandidateAttempt.ProposedAt => System.DateTimeOffset; get/set; ignore=Never
 VamSys.Core.RecoveryCandidateAttempt.RemoteId => System.String; get/set; ignore=Never
+VamSys.Core.RecoveryCandidateAttempt.Source => System.String; get/set; ignore=WhenWritingNull
 VamSys.Core.ResourceData => custom converter VamSys.Core.ResourceDataConverter
 VamSys.Core.ResourceIdentity => kind Object
 VamSys.Core.ResourceIdentity.ConnectionId => System.String; get/set; ignore=Never

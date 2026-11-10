@@ -16,10 +16,9 @@ internal sealed class DuplicateStage(JobRun run)
         { item.State = ItemState.Pending; item.SetMessage(Messages.Define(reason)); await run.Sink.SaveAsync(); return true; }
         if (PerformanceRun.Current is { } duplicateMetrics)
             duplicateMetrics.Phase = "DuplicateCheck";
-        // A created jumpseat comes back without callsign or flight number, so a recovered one is recognised as new
-        // by the ids that existed before the request.
-        if (ApiOperationPolicy.IsJumpseatCreate(item))
-            item.PreCreateCandidateIds = [];
+        // The ids that existed before the request: a record an unanswered create made is recognised as new by them
+        // (E1; a created jumpseat also comes back without callsign or flight number).
+        item.PreCreateCandidateIds = [];
         await foreach (var existing in api.ReadDuplicateCandidatesAsync(item, run.Queries, run.Ct))
         {
             PerformanceRun.Current?.Candidate();

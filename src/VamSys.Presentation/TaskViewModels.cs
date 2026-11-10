@@ -54,6 +54,12 @@ public sealed class TaskJobViewModel : ObservableObject
     public bool ShowsRetry => Job.Mode == RunMode.Demo && counts[(int)ItemState.Failed] > 0;
     public bool ShowsVerifyDeletes => Job.Mode == RunMode.Online && deletionChecks > 0;
     public bool ShowsDiscard => Job.Mode == RunMode.Online && discardable > 0;
+    // 2.4: failed routes the server refused for unapproved fleets, whose drafts still name those fleets.
+    int RejectedRoutes => removableFleets == null || Job.Mode != RunMode.Online ? 0 : Job.Items.Count(i => removableFleets(i).Count > 0);
+    public bool ShowsRemoveFleets => RejectedRoutes > 0;
+    public string RemoveFleetsLabel => language.Get("TaskRemoveFleets", ("count", RejectedRoutes));
+    public IAsyncRelayCommand RemoveFleets { get; }
+    readonly Func<ChangeItem, IReadOnlyList<string>>? removableFleets;
     public string DetailsLabel => language.Get("Text_979A332955");
     public string ReviewLabel => language.Get("ApiUnknownReview");
     public string ResumeLabel => language.Get("Text_9C4801C86B");
@@ -68,8 +74,10 @@ public sealed class TaskJobViewModel : ObservableObject
     public IAsyncRelayCommand Export { get; }
     public IAsyncRelayCommand VerifyDeletes { get; }
     public IAsyncRelayCommand Discard { get; }
-    public TaskJobViewModel(BatchJob job, ILocalizationService l, Func<bool> available, Func<RunMode> mode, Func<Task> details, Func<Task> review, Func<Task> resume, Func<Task> retry, Func<Task>? export = null, Func<Task>? verifyDeletes = null, Func<Task>? discard = null)
+    public TaskJobViewModel(BatchJob job, ILocalizationService l, Func<bool> available, Func<RunMode> mode, Func<Task> details, Func<Task> review, Func<Task> resume, Func<Task> retry, Func<Task>? export = null, Func<Task>? verifyDeletes = null, Func<Task>? discard = null,
+        Func<ChangeItem, IReadOnlyList<string>>? removableFleets = null, Func<Task>? removeFleets = null)
     {
+        this.removableFleets = removableFleets;
         Job = job;
         displayStatus = job.Status;
         displayDescription = job.Description;
@@ -88,6 +96,8 @@ public sealed class TaskJobViewModel : ObservableObject
         VerifyDeletes = new AsyncRelayCommand(verifyDeletes ?? (() => Task.CompletedTask), () => verifyDeletes != null && available() && job.Mode == RunMode.Online && mode() == RunMode.Online && deletionChecks > 0);
         // Local only: needs no connection, so it also unblocks an offline workspace.
         Discard = new AsyncRelayCommand(discard ?? (() => Task.CompletedTask), () => discard != null && available() && job.Mode == RunMode.Online && discardable > 0);
+        // Local only, like Discard: it edits the draft and needs no connection.
+        RemoveFleets = new AsyncRelayCommand(removeFleets ?? (() => Task.CompletedTask), () => removeFleets != null && available() && RejectedRoutes > 0);
     }
     public void Update(Guid? id, bool notify = true)
     {
@@ -133,12 +143,15 @@ public sealed class TaskJobViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowsRetry));
         OnPropertyChanged(nameof(ShowsVerifyDeletes));
         OnPropertyChanged(nameof(ShowsDiscard));
+        OnPropertyChanged(nameof(ShowsRemoveFleets));
+        OnPropertyChanged(nameof(RemoveFleetsLabel));
         Review.NotifyCanExecuteChanged();
         Resume.NotifyCanExecuteChanged();
         Retry.NotifyCanExecuteChanged();
         Export.NotifyCanExecuteChanged();
         VerifyDeletes.NotifyCanExecuteChanged();
         Discard.NotifyCanExecuteChanged();
+        RemoveFleets.NotifyCanExecuteChanged();
     }
     public void RefreshLanguage()
     {

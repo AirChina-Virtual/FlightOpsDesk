@@ -57,9 +57,37 @@ public sealed partial class MainWindow
             if (!reviews.IsCurrent(generation) || !ReferenceEquals(owner, workspace) || !ReferenceEquals(PageHost.Content, page))
                 return;
             reviews.Show(plan, owner.Id, airline, mode);
-            model.Show(plan, CanEditData(), gate.CanResolveConflicts, kind => UserAction(() => ExportCsv(kind)));
+            var session = mode == RunMode.Online ? online.Connected(owner.Id) : null;
+            model.Show(plan, CanEditData(), gate.CanResolveConflicts, kind => UserAction(() => ExportCsv(kind)),
+                session == null ? null : entry => session.DeniedFleets(entry.Change),
+                session == null ? null : (entry, fleets) => UserAction(() => RemoveUnapprovedFleets(entry.Planned.After.LocalId, fleets)));
         });
         return page;
+    }
+
+    // 2.3 / 2.4: removes a route's unapproved fleets from its draft (one undoable edit) and shows the review again.
+    async Task RemoveUnapprovedFleets(Guid localId, IReadOnlyList<string> fleets)
+    {
+        if (!gate.CanInvokeCommand || !CanEditData())
+            return;
+        var removed = await batch.RemoveRouteFleetsAsync(localId, fleets);
+        reviews.Invalidate();
+        if (shell.Page == ShellPage.Review)
+            Render();
+        else
+            SelectPane(ShellPage.Review);
+        Status(() => L("ReviewFleetsRemoved", ("count", removed)));
+    }
+
+    // 2.5: a route's fleets that are not approved for its prefixes, from the airline parameters already read. Empty when
+    // offline, when the parameters are not known, or when a fleet cannot be resolved (the row checks report that).
+    IReadOnlyList<string> UnapprovedFleets(DataRow route)
+    {
+        if (workspace.Mode != RunMode.Online || online.Connected(workspace.Id) is not { } session)
+            return [];
+        try
+        { return session.DeniedFleets(new ChangeItem { Resource = ResourceKind.Routes, Kind = ChangeKind.Update, After = route }); }
+        catch (InvalidOperationException) { return []; }
     }
 
     // The shown plan when the live workspace still yields the same review; otherwise the page is refreshed.

@@ -93,10 +93,15 @@ public class WriteSafetyTableTests
         await s.Run(job);
 
         var item = Assert.Single(job.Items);
+        // A write the server applied is read once more at the end of the round (E2): an update or a delete that reads as
+        // intended is settled there (a soft delete without its 204 as "without receipt", D3). A create has no id to read;
+        // the record it made is searched for (E1), but this fixture's created_at lies outside the request window.
+        var settledByRead = item.Kind != ChangeKind.Create;
         var expected = outcome switch
         {
             Outcome.FieldError => ItemState.Failed,
             Outcome.Throttled or Outcome.AuthRefused => ItemState.Pending,
+            Outcome.TimeoutApplied when settledByRead => ItemState.Succeeded,
             _ => ItemState.Unknown
         };
         Assert.True(item.State == expected, $"{operation} {outcome}: {item.State} {Code(item)}");

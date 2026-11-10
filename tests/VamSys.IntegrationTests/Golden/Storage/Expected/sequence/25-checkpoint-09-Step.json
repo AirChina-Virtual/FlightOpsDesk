@@ -270,7 +270,7 @@
           "ReadbackDetails": null,
           "PreflightComparison": null,
           "VerificationDifferences": [],
-          "PreCreateCandidateIds": null,
+          "PreCreateCandidateIds": [],
           "Message": "已回读核对",
           "Description": {
             "Code": "Text_631F4DBEC2",
@@ -369,7 +369,7 @@
           "ReadbackDetails": null,
           "PreflightComparison": null,
           "VerificationDifferences": [],
-          "PreCreateCandidateIds": null,
+          "PreCreateCandidateIds": [],
           "Message": "提交中",
           "Description": {
             "Code": "Text_DCC1A22D9E",

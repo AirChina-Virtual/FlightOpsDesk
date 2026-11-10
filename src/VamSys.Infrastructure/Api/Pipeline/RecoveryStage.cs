@@ -12,11 +12,24 @@ internal sealed class RecoveryStage(JobRun run, WriteStage write)
     {
         var item = r.Item;
         var api = run.Api;
+        // E1: a create whose answer was lost and that has no id yet: look for the record it made.
+        if (r.Id == null && CreatedRecordFinder.CanSearch(item))
+        {
+            var created = await api.FindCreatedAsync(item, run.Ct);
+            item.FoundCreateCandidates = created;
+            if (created.Count == 1)
+            {
+                item.ProposeRecoveryId(created[0], "Automatic");
+                r.Id = item.EditableRecoveryId;
+            }
+        }
         var found = r.Id == null ? null : await api.FindResult(item, r.Id, run.Ct);
         if (item.Kind != ChangeKind.Delete && found != null && api.Matches(item, found, item.After, false))
             await run.Completion.CompleteAsync(item, found);
         else if (IndependentApiEvidence.IsSoftDelete(item) && api.RecordDeletionVerification(item, found))
             await run.Completion.CompleteAsync(item, null);
+        else if (IndependentApiEvidence.IsSoftDelete(item) && r.Id != null && api.RecordDeletionWithoutReceipt(item, found))
+            await run.Completion.CompleteAsync(item, null, verifiedOperation: false);
         else if (item.Kind == ChangeKind.Delete && found == null && r.Id != null && item.Resource is ResourceKind.Fleets or ResourceKind.Aircraft or ResourceKind.Routings)
             await run.Completion.CompleteAsync(item, null);
         else if (OperationsAdapter.CanResumeCreate(item) && found != null && api.MatchesCreated(item, found))
@@ -30,6 +43,11 @@ internal sealed class RecoveryStage(JobRun run, WriteStage write)
             { item.State = ItemState.Unknown; api.RecordReadback(item, resumed); item.SetMessage(Messages.Define("ApiReadbackMismatch")); }
         }
         else
-        { item.State = ItemState.Unknown; api.RecordReadback(item, found); item.SetMessage(Messages.Define("ApiUnknown")); }
+        {
+            item.State = ItemState.Unknown;
+            api.RecordReadback(item, found);
+            item.SetMessage(r.Id == null && item.FoundCreateCandidates is { Count: > 1 } candidates
+                ? Messages.Define("ApiCreateCandidates", ("count", candidates.Count)) : Messages.Define("ApiUnknown"));
+        }
     }
 }

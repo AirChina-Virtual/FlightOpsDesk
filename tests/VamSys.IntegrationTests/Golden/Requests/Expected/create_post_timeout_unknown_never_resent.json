@@ -1,6 +1,6 @@
 {
   "scenario": "create_post_timeout_unknown_never_resent",
-  "requestCount": 3,
+  "requestCount": 5,
   "outcomes": [
     "job NeedsAttention",
     "Fleets Create Unknown ApiUnknown"
@@ -8,7 +8,7 @@
   "runs": [
     {
       "label": "first run",
-      "requestCount": 3,
+      "requestCount": 4,
       "requests": [
         {
           "order": 0,
@@ -35,13 +35,26 @@
               "1"
             ]
           }
+        },
+        {
+          "order": 3,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet?page%5Bsize%5D=100",
+          "body": null
         }
       ]
     },
     {
       "label": "recovery",
-      "requestCount": 0,
-      "requests": []
+      "requestCount": 1,
+      "requests": [
+        {
+          "order": 4,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet?page%5Bsize%5D=100",
+          "body": null
+        }
+      ]
     }
   ]
 }

@@ -14,7 +14,18 @@ internal sealed class RequestPipeline(HttpClient client, Uri origin, string vaKe
     readonly RequestBudget budget = requests.BudgetFor(vaKey);
     public ApiDiagnostic? LastResponse { get; private set; }
     public TimeProvider Clock => requests.Clock;
-    public TimeSpan RequestTimeout => client.Timeout;
+    // E3: a read that times out is simply read again, a write that times out becomes Unknown, so writes get longer.
+    // The client's own Timeout stays the ceiling for both (CreateHttpClient sets it to the write limit).
+    public static readonly TimeSpan ReadTimeout = TimeSpan.FromSeconds(30), WriteTimeout = TimeSpan.FromSeconds(90);
+    public TimeSpan TimeoutFor(bool write)
+    {
+        var limit = write ? WriteTimeout : ReadTimeout;
+        return client.Timeout == Timeout.InfiniteTimeSpan || client.Timeout > limit ? limit : client.Timeout;
+    }
+    // How long a write may take: the end of a jumpseat create's request window is saved from it.
+    public TimeSpan RequestTimeout => TimeoutFor(true);
+    // A pause on this VA's clock (counted as waiting in the metrics); it sends nothing and takes no budget.
+    public Task DelayAsync(TimeSpan delay, CancellationToken ct) => budget.DelayAsync(delay, ct);
     public IEnumerable<string> SensitiveValues => tokens.SensitiveValues;
 
     static string Resource(Uri uri) => uri.AbsolutePath.Contains("/aircraft") ? "Aircraft" : uri.AbsolutePath.Contains("/airports") ? "Airports" : uri.AbsolutePath.Contains("/routings") ? "Routings" : uri.AbsolutePath.Contains("/routes") ? "Routes" : uri.AbsolutePath.Contains("/fleet") ? "Fleets" : "Other";
@@ -54,7 +65,7 @@ internal sealed class RequestPipeline(HttpClient client, Uri origin, string vaKe
                     await beforeSend(started);
                 sent = true;
                 try
-                { response = await client.SendAsync(request, ct); }
+                { response = await SendWithinAsync(request, write, ct); }
                 catch (Exception e) when (retry?.ShouldRetry(e, attempt, ct) == true) { PerformanceRun.Current?.Retry(); budget.RetryAfterFailure(attempt); continue; }
                 budget.Observe(response);
             }
@@ -72,6 +83,24 @@ internal sealed class RequestPipeline(HttpClient client, Uri origin, string vaKe
                     throw new ApiResponseException(response.StatusCode, LastResponse.ResponseBody ?? "", LastResponse);
                 return JsonDocument.Parse(response.StatusCode == HttpStatusCode.NoContent ? "null" : text);
             }
+        }
+    }
+
+    // Sends with the method's own time limit when it is shorter than the client's. Running out of it fails like the
+    // client's own timeout (a TaskCanceledException over a TimeoutException), never like the caller's cancellation.
+    async Task<HttpResponseMessage> SendWithinAsync(HttpRequestMessage request, bool write, CancellationToken ct)
+    {
+        var limit = TimeoutFor(write);
+        if (limit == client.Timeout)
+            return await client.SendAsync(request, ct);
+        using var within = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        within.CancelAfter(limit);
+        try
+        { return await client.SendAsync(request, within.Token); }
+        catch (OperationCanceledException e) when (within.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            throw new TaskCanceledException($"The request was canceled due to the configured timeout of {limit.TotalSeconds} seconds elapsing.",
+                new TimeoutException(e.Message, e));
         }
     }
 }

@@ -18,7 +18,9 @@ public class UnansweredSoftDeleteTests
 
     /// <summary>
     /// The first run sends the DELETE, the answer is lost (timeout) and the server did or did not apply it. The scripted
-    /// timeout is hit exactly once, which the helper asserts, so the item really is an unanswered delete.
+    /// timeout is hit exactly once, which the helper asserts, so the item really is an unanswered delete. When the server
+    /// applied it, the reads of the rest of the first run fail too: a 404 at the end of the round would otherwise complete
+    /// the delete by itself (D3, see the test below), and these tests are about what is left for the person.
     /// </summary>
     static async Task<(StoredWorld S, BatchJob Job, string Path)> Unanswered(ResourceKind kind, bool serverApplied)
     {
@@ -27,6 +29,8 @@ public class UnansweredSoftDeleteTests
         var timeouts = 0;
         s.Remote.Intercept = r =>
         {
+            if (serverApplied && timeouts > 0 && r.Method == "GET")
+                throw new TimeoutException("simulated read");
             if (r.Method != "DELETE")
                 return null;
             timeouts++;
@@ -67,9 +71,9 @@ public class UnansweredSoftDeleteTests
         using var owner = s;
         var local = job.Items.Single().After.LocalId;
 
-        await ResumeAndCheck(s, job);
+        await new OperationsDeletionVerifier(s.World.Api, s.W).VerifyAsync(job, s.Writer, Ct);
         var item = job.Items.Single();
-        // before: nothing settles it, and the existing manual confirmation (which needs a receipt) refuses it
+        // before: the read-only deletion check (which needs a receipt) does not settle it, nor does the manual confirmation
         Assert.Equal(ItemState.Unknown, item.State);
         Assert.False(OperationsUnknownResolver.CanCheck(item));
         Assert.True(ApiOperationPolicy.HasOpenOnlineItems(s.W));
@@ -112,6 +116,46 @@ public class UnansweredSoftDeleteTests
         Assert.False(later.ManualResolution!.WriteReceipt);
         Assert.Equal("ApiManualDeleteNoReceipt", later.Description?.Code);
         Assert.Empty(s.W.VerifiedOperations);
+        Assert.Equal([$"DELETE {path}"], s.Writes());
+    }
+
+    // ---- D3: the record is gone and was read as 404 by the program itself ------------------------------------------
+
+    [Theory]
+    [InlineData(ResourceKind.Routes)]
+    [InlineData(ResourceKind.Airports)]
+    public async Task An_unanswered_soft_delete_that_reads_404_completes_in_the_same_round_marked_without_receipt_and_not_verified(ResourceKind kind)
+    {
+        using var s = new StoredWorld();
+        var path = PathOf(kind);
+        s.Remote.Intercept = r =>
+        {
+            if (r.Method != "DELETE")
+                return null;
+            s.Remote.Respond(r);
+            throw new TimeoutException("simulated");
+        };
+        s.World.MarkDelete(kind, kind == ResourceKind.Airports ? "103" : "10");
+        var job = s.Submit();
+        var local = job.Items.Single().After.LocalId;
+
+        await s.Run(job);
+
+        var item = job.Items.Single();
+        Assert.Equal(ItemState.Succeeded, item.State);
+        Assert.Equal("ApiDeletedWithoutReceipt", item.Description?.Code);
+        Assert.False(item.WriteAccepted);
+        Assert.Equal("AutomaticWithoutWriteReceipt", item.DeletionVerification!.Outcome);
+        Assert.False(item.DeletionVerification.WasManuallyConfirmed);
+        Assert.Null(item.DeletionVerification.WriteStatus);
+        Assert.Equal(404, item.DeletionVerification.ReadStatus);
+        Assert.Null(item.ManualResolution);
+        // the deletion draft leaves the workspace, nothing blocks it any more, and the operation is not verified by it
+        Assert.Null(s.W.Resources[kind].FindDraftRow(local));
+        Assert.False(ApiOperationPolicy.HasOpenOnlineItems(s.W));
+        Assert.Empty(s.W.VerifiedOperations);
+        Assert.Empty(s.Disk.VerifiedOperations);
+        Assert.Equal(Json(job.Items), Json(s.Disk.Jobs.Single().Items));
         Assert.Equal([$"DELETE {path}"], s.Writes());
     }
 

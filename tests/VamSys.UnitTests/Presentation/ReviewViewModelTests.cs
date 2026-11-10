@@ -144,6 +144,6 @@ public class ReviewViewModelTests
         Assert.NotEqual(chinese, (model.Title, model.Rows[0].Heading, model.Rows[1].State));
         Assert.Contains(nameof(ReviewViewModel.SubmitLabel), page);
         Assert.Contains(nameof(ReviewViewModel.ShownBlockers), page);
-        Assert.Equal([nameof(ReviewRowViewModel.Heading), nameof(ReviewRowViewModel.ExportLabel), nameof(ReviewRowViewModel.State), nameof(ReviewRowViewModel.Body), nameof(ReviewRowViewModel.Reason)], rows);
+        Assert.Equal([nameof(ReviewRowViewModel.Heading), nameof(ReviewRowViewModel.ExportLabel), nameof(ReviewRowViewModel.State), nameof(ReviewRowViewModel.Body), nameof(ReviewRowViewModel.Reason), nameof(ReviewRowViewModel.RemoveFleetsLabel)], rows);
     }
 }

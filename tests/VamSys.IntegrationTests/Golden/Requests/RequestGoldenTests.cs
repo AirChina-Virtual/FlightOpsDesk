@@ -378,7 +378,8 @@ public class RequestGoldenTests
         };
         w.Edit(ResourceKind.Fleets, "4", ("Name", "Fleet 4 renamed"));
         await w.RunAsync("first run");
-        Assert.Equal(ItemState.Unknown, w.Job!.Items.Single().State);
+        // settled by the read at the end of the same round (E2); resuming afterwards sends nothing
+        Assert.Equal(ItemState.Succeeded, w.Job!.Items.Single().State);
         await w.ResumeAsync("recovery");
         Assert.Equal(ItemState.Succeeded, w.Job.Items.Single().State);
         Assert.Equal(1, w.Remote.Server.Requests.Count(r => r.Method == "PUT"));

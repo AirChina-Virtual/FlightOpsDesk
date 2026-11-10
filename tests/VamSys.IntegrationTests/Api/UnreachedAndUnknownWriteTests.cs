@@ -79,6 +79,8 @@ public class UnreachedAndUnknownWriteTests
         var method = kind == "update" ? "PUT" : "POST";
         s.Remote.Intercept = r =>
         {
+            // reads fail for the rest of the first run, so the read at the end of the round cannot settle the write
+            if (attempts > 0 && r.Method == "GET") throw new TimeoutException("simulated read");
             if (r.Method != method) return null;
             attempts++;
             if (applied) s.Remote.Respond(r);

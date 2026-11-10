@@ -49,6 +49,8 @@ public sealed class PackageChecksTests : IDisposable
         }
         var infrastructure = new Assembly("VamSys.Infrastructure") { Friends = qa };
         infrastructure.Resources.Add("Operations.OpenApi.json");
+        if (qa)
+            infrastructure.Strings.Add("VAMSYS_QA_OPERATIONS_ORIGIN");
         var all = new[] { app, storage, infrastructure, new Assembly("VamSys.Domain"), new Assembly("VamSys.Application"), new Assembly("VamSys.Presentation") };
         return all.ToDictionary(a => a.Name);
     }
@@ -90,6 +92,17 @@ public sealed class PackageChecksTests : IDisposable
     [Fact]
     public void A_product_package_with_a_QA_switch_string_is_refused()
         => Assert.Equal("Unexpected QA switch in FlightOpsDesk (QA=False)", Refusal(Package(false, a => a["FlightOpsDesk"].Strings.Add("VAMSYS_QA_DATAGRID")), false));
+
+    // 4.1: only the QA build can be pointed at a mock server.
+    [Fact]
+    public void A_product_package_with_the_mock_server_switch_is_refused_and_a_QA_package_without_it_too()
+    {
+        Assert.Equal("Unexpected mock-server switch in VamSys.Infrastructure (QA=False)",
+            Refusal(Package(false, a => a["VamSys.Infrastructure"].Strings.Add("VAMSYS_QA_OPERATIONS_ORIGIN")), false));
+        Dispose();
+        Assert.Equal("Unexpected mock-server switch in VamSys.Infrastructure (QA=True)",
+            Refusal(Package(true, a => a["VamSys.Infrastructure"].Strings.Remove("VAMSYS_QA_OPERATIONS_ORIGIN")), true));
+    }
 
     [Fact]
     public void A_product_package_with_the_window_hook_implementation_is_refused()

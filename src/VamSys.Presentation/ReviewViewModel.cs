@@ -16,7 +16,8 @@ public static class ReviewTexts
 }
 
 // A line of the workspace review: either a resource heading with its CSV export, or one reviewed change.
-public sealed class ReviewRowViewModel(ResourceKind resource, ReviewEntry? entry, ILocalizationService language, IAsyncRelayCommand? export) : ObservableObject
+public sealed class ReviewRowViewModel(ResourceKind resource, ReviewEntry? entry, ILocalizationService language, IAsyncRelayCommand? export,
+    IReadOnlyList<string>? deniedFleets = null, IAsyncRelayCommand? removeFleets = null) : ObservableObject
 {
     public ResourceKind Resource { get; } = resource;
     public ReviewEntry? Entry { get; } = entry;
@@ -27,10 +28,15 @@ public sealed class ReviewRowViewModel(ResourceKind resource, ReviewEntry? entry
     public string Body => Entry is null ? "" : ReviewTexts.ChangeText(Entry.Planned, language);
     public string Reason => Entry?.Reason is null ? "" : language.Format(Entry.Reason);
     public IAsyncRelayCommand? ExportCommand { get; } = export;
+    // 2.3: a route blocked only by fleets that are not approved for its prefixes offers to remove them (one undoable edit).
+    public IReadOnlyList<string> DeniedFleets { get; } = deniedFleets ?? [];
+    public bool ShowsRemoveFleets => RemoveFleetsCommand is not null && DeniedFleets.Count > 0;
+    public string RemoveFleetsLabel => language.Get("ReviewRemoveFleets", ("count", DeniedFleets.Count));
+    public IAsyncRelayCommand? RemoveFleetsCommand { get; } = removeFleets;
 
     public void RefreshLanguage()
     {
-        foreach (var name in new[] { nameof(Heading), nameof(ExportLabel), nameof(State), nameof(Body), nameof(Reason) })
+        foreach (var name in new[] { nameof(Heading), nameof(ExportLabel), nameof(State), nameof(Body), nameof(Reason), nameof(RemoveFleetsLabel) })
             OnPropertyChanged(name);
     }
 }
@@ -70,7 +76,9 @@ public sealed class ReviewViewModel(Workspace workspace, ILocalizationService la
     public string NothingToReview => language.Get("Text_90484F47B3");
 
     // Fills the page: a heading per resource with changes, in resource order, followed by its changes.
-    public void Show(WorkspaceReviewPlan shown, bool canEdit, bool canResolveConflicts, Func<ResourceKind, Task> export)
+    // deniedFleets / removeFleets (2.3): the unapproved fleets of a blocked route, and the action that removes them.
+    public void Show(WorkspaceReviewPlan shown, bool canEdit, bool canResolveConflicts, Func<ResourceKind, Task> export,
+        Func<ReviewEntry, IReadOnlyList<string>>? deniedFleets = null, Func<ReviewEntry, IReadOnlyList<string>, Task>? removeFleets = null)
     {
         plan = shown;
         conflicts = workspace.Resources.Sum(p => p.Value.Conflicts.Count);
@@ -84,11 +92,19 @@ public sealed class ReviewViewModel(Workspace workspace, ILocalizationService la
                 continue;
             var resource = kind;
             rows.Add(new(kind, null, language, new AsyncRelayCommand(() => export(resource))));
-            rows.AddRange(entries.Select(e => new ReviewRowViewModel(kind, e, language, null)));
+            foreach (var entry in entries)
+            {
+                var denied = canEdit && removeFleets != null && deniedFleets != null && IsPrefixBlock(entry) ? deniedFleets(entry) : [];
+                rows.Add(new ReviewRowViewModel(kind, entry, language, null, denied,
+                    denied.Count > 0 ? new AsyncRelayCommand(() => removeFleets!(entry, denied)) : null));
+            }
         }
         Rows = rows;
         OnPropertyChanged(string.Empty);
     }
+
+    static bool IsPrefixBlock(ReviewEntry entry) => entry.Disposition == ReviewDisposition.Blocked && entry.Planned.Resource == ResourceKind.Routes
+        && entry.Reason?.Code is "ApiPrefixDenied" or "ApiPrefixDeniedFleets";
 
     static readonly string[] Texts = [nameof(PreparingText), nameof(Title), nameof(Target), nameof(Counts), nameof(Mode), nameof(ConnectHint),
         nameof(ShownBlockers), nameof(IssuesLabel), nameof(SubmitLabel), nameof(ConflictsLabel), nameof(NothingToReview)];

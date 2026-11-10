@@ -47,6 +47,7 @@ public sealed class OnlineGateway(WorkspaceStoreAdapter storage) : IOnlineGatewa
         public async Task<IReadOnlyList<AirlineParameter>> ReadParametersAsync(CancellationToken ct, bool force) => await api.ReadParametersAsync(ct, force);
         public void InvalidateParameters() => api.InvalidateParameters();
         public void PreviewPlan(ChangeItem change) => api.PreviewPlan(change);
+        public IReadOnlyList<string> DeniedFleets(ChangeItem change) => api.HasParameterMetadata ? api.DeniedFleets(change).Select(f => f.Token).ToList() : [];
         public IReadOnlyList<string> DescribePlan(ChangeItem change) => api.Plan(change).Select(s => $"{s.Method} {s.Path}").ToList();
 
         public async Task ExecuteAsync(BatchJob job, IBatchCheckpointWriter writer, CancellationToken ct, Action<BatchProgress> progress)

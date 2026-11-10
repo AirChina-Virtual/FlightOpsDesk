@@ -17,6 +17,8 @@ public interface IOnlineSession
     void InvalidateParameters();
     // Builds the requests of a change without sending anything; throws when the change cannot be sent.
     void PreviewPlan(ChangeItem change);
+    // The fleets of a route that are not approved for its prefixes, from the parameters already read (no request).
+    IReadOnlyList<string> DeniedFleets(ChangeItem change) => [];
     // The method and path of each request a change would send.
     IReadOnlyList<string> DescribePlan(ChangeItem change);
     Task ExecuteAsync(BatchJob job, IBatchCheckpointWriter writer, CancellationToken ct, Action<BatchProgress> progress);

@@ -63,8 +63,11 @@ public class IndexReservationStageTests
         w.New(ResourceKind.Fleets, NewFleet("Fleet 4"));
         w.New(ResourceKind.Fleets, NewFleet("Renamed"));
         w.New(ResourceKind.Fleets, NewFleet("Independent"));
+        // The record cannot be read in the first run either, so its reads (also the one at the end of the round) cannot settle it.
         w.Remote.Intercept = r =>
         {
+            if (r.Method == "GET" && r.Path.EndsWith("/fleet/4", StringComparison.Ordinal) && Count(w, "PUT") > 0)
+                throw new TimeoutException("simulated read");
             if (r.Method != "PUT")
                 return null;
             if (appliedOnServer)

@@ -1,6 +1,6 @@
 {
   "scenario": "write_timeout_not_applied_recovery_is_read_only",
-  "requestCount": 4,
+  "requestCount": 5,
   "outcomes": [
     "job NeedsAttention",
     "Fleets Update Unknown ApiUnknown"
@@ -8,7 +8,7 @@
   "runs": [
     {
       "label": "first run",
-      "requestCount": 2,
+      "requestCount": 3,
       "requests": [
         {
           "order": 0,
@@ -24,6 +24,12 @@
           "bodyJson": {
             "name": "Fleet 4 renamed"
           }
+        },
+        {
+          "order": 2,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": null
         }
       ]
     },
@@ -32,7 +38,7 @@
       "requestCount": 1,
       "requests": [
         {
-          "order": 2,
+          "order": 3,
           "method": "GET",
           "pathAndQuery": "/api/v3/operations/fleet/4",
           "body": null
@@ -44,7 +50,7 @@
       "requestCount": 1,
       "requests": [
         {
-          "order": 3,
+          "order": 4,
           "method": "GET",
           "pathAndQuery": "/api/v3/operations/fleet/4",
           "body": null

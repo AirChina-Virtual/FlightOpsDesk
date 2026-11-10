@@ -125,11 +125,15 @@ public class CredentialSaveTests
         w.Edit(ResourceKind.Fleets, "4", ("Name", "renamed"));
         if (unknown)
         {
-            // the server applies the write, the answer is lost
+            // the server applies the write, the answer is lost, and the reads that would settle it in this round fail too
+            var sent = false;
             w.Remote.Intercept = r =>
             {
+                if (sent && r.Method == "GET")
+                    throw new TimeoutException("simulated read");
                 if (r.Method != "PUT")
                     return null;
+                sent = true;
                 w.Remote.Respond(r);
                 throw new TimeoutException("simulated");
             };

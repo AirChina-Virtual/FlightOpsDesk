@@ -75,7 +75,9 @@ public class AircraftMoveTests
 
         await s.Run(job);
         Assert.Equal(1, failures);
-        Assert.Equal(ItemState.Unknown, job.Items.Single().State);
+        // the read at the end of the round (E2) already settles a committed move; one that was not committed stays unknown
+        Assert.Equal(committed ? ItemState.Succeeded : ItemState.Unknown, job.Items.Single().State);
+        Assert.Equal(1, Count(s.World, "PATCH"));
 
         var recovered = await Recover(s);
 

@@ -21,6 +21,7 @@
             <TextBlock Text="{x:Bind State, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" FontWeight="SemiBold"/>
             <TextBlock Text="{x:Bind Body, Mode=OneWay}" TextWrapping="Wrap"/>
             <TextBlock Text="{x:Bind Reason, Mode=OneWay}" TextWrapping="Wrap"/>
+            <Button Content="{x:Bind RemoveFleetsLabel, Mode=OneWay}" Command="{x:Bind RemoveFleetsCommand}" Visibility="{x:Bind ShowsRemoveFleets}"/>
           </StackPanel>
         </DataTemplate>
       </local:ReviewRowTemplateSelector.Change>

@@ -40,8 +40,23 @@ public sealed partial class MainWindow
                 foreach (var i in await demo.ResetFailedAsync(job))
                     vm!.Update(i.Id);
                 await ExecuteDemo(job);
-            }), () => UserAction(() => ExportTaskDiagnostics(job.Id)), () => UserAction(() => VerifyTaskDeletions(job)), () => UserAction(() => DiscardUnsent(job)));
+            }), () => UserAction(() => ExportTaskDiagnostics(job.Id)), () => UserAction(() => VerifyTaskDeletions(job)), () => UserAction(() => DiscardUnsent(job)),
+            batch.RejectedFleetsToRemove, () => UserAction(() => RemoveRejectedFleets(job, vm!)));
         return vm;
+    }
+    // 2.4: removes from each failed route the fleets the server refused it for, then shows the review again.
+    async Task RemoveRejectedFleets(BatchJob job, TaskJobViewModel vm)
+    {
+        if (!gate.CanInvokeCommand || !CanEditData())
+            return;
+        var removed = 0;
+        foreach (var item in job.Items.ToArray())
+            if (batch.RejectedFleetsToRemove(item) is { Count: > 0 } fleets)
+                removed += await batch.RemoveRouteFleetsAsync(item.After.LocalId, fleets);
+        vm.RefreshHeader();
+        reviews.Invalidate();
+        SelectPane(ShellPage.Review);
+        Status(() => L("ReviewFleetsRemoved", ("count", removed)));
     }
     void EnsureTasks()
     {

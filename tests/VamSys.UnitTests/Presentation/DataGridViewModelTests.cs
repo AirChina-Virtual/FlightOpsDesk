@@ -25,6 +25,8 @@ public class DataGridViewModelTests
         public Task PasteCells(RowViewModel row, string field, string text) => Task.CompletedTask;
         public Task FillDown(RowViewModel row, string field) => Task.CompletedTask;
         public void OpenDetails(Guid rowId) { }
+        public Func<DataRow, IReadOnlyList<string>> Unapproved { get; set; } = _ => [];
+        public IReadOnlyList<string> UnapprovedFleets(DataRow route) => Unapproved(route);
     }
 
     static readonly List<string> Columns = ["_delete", "Name", "Fleet IDs"];
@@ -48,6 +50,31 @@ public class DataGridViewModelTests
     }
 
     static CellViewModel Cell(RowViewModel row, string field) => row.Cells.Single(c => c.Field == field);
+
+    // 2.5: the Fleet IDs cell of a route names the fleets that are not approved for its prefixes.
+    [Fact]
+    public void A_route_cell_naming_unapproved_fleets_shows_them_as_its_problem()
+    {
+        var (host, grid, rows, _) = Shown(2);
+        foreach (var id in new[] { "4", "5" })
+            host.Workspace.Resources[ResourceKind.Fleets].Draft.Add(new() { Fields = new Dictionary<string, string> { ["ID"] = id, ["Name"] = "Fleet " + id, ["_delete"] = "FALSE" } });
+        host.FleetLabels = new Dictionary<string, FleetOption> { ["5"] = new("5", "Fleet 5", "B738", "5", true, null) };
+        for (var n = 0; n < 2; n++)
+        {
+            var edited = rows[n].With("Fleet IDs", "4,5").With("Type", "charter");
+            host.Data.Draft[n] = edited;
+            rows[n] = edited;
+        }
+        host.Unapproved = route => route.LocalId == rows[0].LocalId ? ["5"] : [];
+
+        var shown = grid.Fill(rows.Select(r => r.LocalId), host.Data, 2);
+
+        var refused = Cell(shown[0], "Fleet IDs");
+        Assert.True(refused.HasIssue);
+        Assert.Contains("Fleet 5 (5)", refused.Hint, StringComparison.Ordinal);
+        Assert.False(Cell(shown[1], "Fleet IDs").HasIssue);
+        Assert.False(Cell(shown[0], "Name").HasIssue);
+    }
 
     [Fact]
     public void Rows_are_built_once_and_rebound_in_place_for_another_page_or_another_resource_with_the_same_columns()
