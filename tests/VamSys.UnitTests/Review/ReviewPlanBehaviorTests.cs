@@ -16,10 +16,10 @@ public class ReviewPlanBehaviorTests
             Airports Update #1 Ready - deps[] airlineParam=False fields[Name=Set:Beijing Capital]
             Airports Delete #2 Ready - deps[] airlineParam=False fields[]
             Airports Create #4 Ready - deps[] airlineParam=False fields[ICAO/IATA=Set:ZUUU,Name=Set:Chengdu]
-            Fleets Create #11 Ready - deps[] airlineParam=True fields[Name=Set:Beta 1,Type (pax/cargo/...)=Set:pax]
-            Fleets Create #12 Ready - deps[] airlineParam=True fields[Name=Set:Beta 2,Type (pax/cargo/...)=Set:pax]
-            Fleets Create #13 Ready - deps[] airlineParam=True fields[Name=Set:Beta 3,Type (pax/cargo/...)=Set:pax]
-            Fleets Create #14 Deferred ReviewSample deps[] airlineParam=True fields[Name=Set:Beta 4,Type (pax/cargo/...)=Set:pax]
+            Fleets Create #11 Ready - deps[] airlineParam=True fields[Name=Set:Beta 1,Type Code=Set:B738,Type (pax/cargo/...)=Set:pax,Max Passengers=Set:180]
+            Fleets Create #12 Ready - deps[] airlineParam=True fields[Name=Set:Beta 2,Type Code=Set:B738,Type (pax/cargo/...)=Set:pax,Max Passengers=Set:180]
+            Fleets Create #13 Ready - deps[] airlineParam=True fields[Name=Set:Beta 3,Type Code=Set:B738,Type (pax/cargo/...)=Set:pax,Max Passengers=Set:180]
+            Fleets Create #14 Deferred ReviewSample deps[] airlineParam=True fields[Name=Set:Beta 4,Type Code=Set:B738,Type (pax/cargo/...)=Set:pax,Max Passengers=Set:180]
             Aircraft Update #20 Ready - deps[] airlineParam=False fields[Fleet ID=Set:2]
             Aircraft Update #21 Ready - deps[] airlineParam=False fields[Name=Set:renamed]
             Routes Update #30 Ready - deps[] airlineParam=False fields[Remarks=Set:edited 30]
@@ -28,9 +28,9 @@ public class ReviewPlanBehaviorTests
             Routes Update #33 Deferred ReviewSample deps[] airlineParam=False fields[Remarks=Set:edited 33]
             Routes Update #34 Ready - deps[] airlineParam=False fields[Fleet IDs=Set:1,2]
             Routes Delete #35 Ready - deps[] airlineParam=False fields[]
-            Routes Create #36 Ready - deps[11] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0036,Flight Number=Set:0036,Type=Set:scheduled,Remarks=Set:r36,Altitude=Set:33000,Fleet IDs=Set:local:0000000b-0000-0000-0000-000000000000,1]
-            Routes Create #37 Ready - deps[] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0037,Flight Number=Set:0037,Type=Set:jumpseat,Remarks=Set:r37,Altitude=Set:33000,Fleet IDs=Set:1]
-            Routes Create #38 Deferred ReviewDependency deps[14] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0038,Flight Number=Set:0038,Type=Set:scheduled,Remarks=Set:r38,Altitude=Set:33000,Fleet IDs=Set:local:0000000e-0000-0000-0000-000000000000]
+            Routes Create #36 Ready - deps[11] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0036,Flight Number=Set:0036,Type=Set:scheduled,Departure Airport (ICAO/IATA)=Set:ZBAA,Arrival Airport (ICAO/IATA)=Set:ZGGG,Remarks=Set:r36,Altitude=Set:33000,Fleet IDs=Set:local:0000000b-0000-0000-0000-000000000000,1]
+            Routes Create #37 Ready - deps[] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0037,Flight Number=Set:0037,Type=Set:jumpseat,Departure Airport (ICAO/IATA)=Set:ZBAA,Arrival Airport (ICAO/IATA)=Set:ZGGG,Remarks=Set:r37,Altitude=Set:33000,Fleet IDs=Set:1]
+            Routes Create #38 Deferred ReviewDependency deps[14] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0038,Flight Number=Set:0038,Type=Set:scheduled,Departure Airport (ICAO/IATA)=Set:ZBAA,Arrival Airport (ICAO/IATA)=Set:ZGGG,Remarks=Set:r38,Altitude=Set:33000,Fleet IDs=Set:local:0000000e-0000-0000-0000-000000000000]
             blockers[]
             """.ReplaceLineEndings("\n"), Describe(plan).ReplaceLineEndings("\n"));
     }
@@ -58,16 +58,35 @@ public class ReviewPlanBehaviorTests
         Assert.Equal(demo.Entries.Count, demo.SubmitItems.Count);
     }
 
-    [Fact]
-    public void Demo_validation_issues_block_every_entry_and_the_submission()
+    // 3.1 (D6): a validation problem blocks only the change of its row, in Demo and Online alike; the page lists it.
+    [Theory]
+    [InlineData(RunMode.Demo)]
+    [InlineData(RunMode.Online)]
+    public void A_validation_issue_blocks_only_its_own_entry_and_what_depends_on_it(RunMode mode)
     {
-        var w = Mixed(RunMode.Demo);
-        var plan = ReviewPlanBuilder.BuildForWorkspace(Planner, w, RunMode.Demo, false, new HashSet<string>(), null);
-        Assert.NotEmpty(plan.Blockers);
-        Assert.All(plan.Blockers, b => Assert.Equal("ReviewValidationIssue", b.Code));
-        Assert.All(plan.Entries, e => { Assert.Equal(ReviewDisposition.Blocked, e.Disposition); Assert.Same(plan.Blockers[0], e.Reason); });
-        Assert.Empty(plan.SubmitItems);
-        Assert.Equal(Planner.PlanWorkspace(w).Count, plan.Entries.Count);
+        var w = Mixed(mode);
+        Edit(w, ResourceKind.Fleets, 11, false, ("Type Code", ""));
+        var plan = mode == RunMode.Demo ? ReviewPlanBuilder.BuildForWorkspace(Planner, w, mode, false, new HashSet<string>(), null) : Build(w);
+        Assert.Empty(plan.Blockers);
+        var blocked = Assert.Single(plan.Entries, e => e.Disposition == ReviewDisposition.Blocked);
+        Assert.Equal((11, "ReviewValidationIssue"), (Number(blocked.Change.After.LocalId), blocked.Reason!.Code));
+        Assert.Equal("ReviewValidationIssue", Assert.Single(plan.Issues).Code);
+        // route 36 names the new fleet 11, so it waits for it
+        var dependent = plan.Entries.Single(e => Number(e.Change.After.LocalId) == 36);
+        Assert.Equal((ReviewDisposition.Deferred, "ReviewDependency"), (dependent.Disposition, dependent.Reason!.Code));
+        Assert.NotEmpty(plan.SubmitItems);
+        Assert.DoesNotContain(plan.SubmitItems, i => Number(i.After.LocalId) is 11 or 36);
+    }
+
+    [Fact]
+    public void A_validation_issue_on_a_row_that_did_not_change_blocks_nothing()
+    {
+        var w = Mixed();
+        Edit(w, ResourceKind.Fleets, 15, false, ("Max Passengers", "-1"));
+        Edit(w, ResourceKind.Fleets, 15, true, ("Max Passengers", "-1"));
+        var plan = Build(w);
+        Assert.Empty(plan.Issues);
+        Assert.DoesNotContain(plan.Entries, e => e.Disposition == ReviewDisposition.Blocked);
     }
 
     [Fact]
@@ -106,15 +125,50 @@ public class ReviewPlanBehaviorTests
     }
 
     [Fact]
-    public void Blockers_block_every_ready_entry_with_the_first_blocker_and_empty_the_submission()
+    public void Global_blockers_still_block_every_ready_entry_with_the_first_blocker_and_empty_the_submission()
     {
-        var w = Mixed();
-        w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [new ChangeItem { State = ItemState.Pending }] });
-        var plan = Build(w);
+        var plan = ReviewPlanBuilder.BuildPlanned(Planner.ScanWorkspace(Mixed()), RunMode.Online, true, new HashSet<string>(), _ => { }, [Messages.Define("ApiPendingJob")]);
         Assert.Equal(["ApiPendingJob"], plan.Blockers.Select(b => b.Code));
         Assert.Equal(["Blocked", "Deferred"], plan.Entries.Select(e => e.Disposition.ToString()).Distinct().Order());
         Assert.All(plan.Entries.Where(e => e.Disposition == ReviewDisposition.Blocked), e => Assert.Same(plan.Blockers[0], e.Reason));
         Assert.Empty(plan.SubmitItems);
+    }
+
+    // 3.1 (D7): an unfinished online task holds back only changes of the same record (row, remote id or key).
+    [Theory]
+    [InlineData(ItemState.Pending, true)]
+    [InlineData(ItemState.Unknown, true)]
+    [InlineData(ItemState.Succeeded, false)]
+    public void An_unfinished_task_item_blocks_only_changes_of_its_own_record(ItemState state, bool blocks)
+    {
+        var w = Mixed();
+        var route = w.Resources[ResourceKind.Routes].Draft.Single(r => r.LocalId == Id(30));
+        var elsewhere = new DataRow { Fields = new Dictionary<string, string> { ["ICAO/IATA"] = "ZZZZ", ["Name"] = "Elsewhere" } };
+        w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items =
+        [
+            new ChangeItem { State = state, Resource = ResourceKind.Routes, Kind = ChangeKind.Update, Before = route, After = route },
+            new ChangeItem { State = ItemState.Unknown, Resource = ResourceKind.Airports, Kind = ChangeKind.Create, After = elsewhere }
+        ] });
+        var plan = Build(w);
+        Assert.Empty(plan.Blockers);
+        var blocked = plan.Entries.Where(e => e.Disposition == ReviewDisposition.Blocked).Select(e => (Number(e.Change.After.LocalId), e.Reason!.Code)).ToArray();
+        Assert.Equal(blocks ? [(30, "ReviewOpenTaskItem")] : [], blocked);
+        Assert.Equal(blocks ? ["ReviewOpenTaskItems"] : [], plan.Issues.Select(i => i.Code));
+        Assert.NotEmpty(plan.SubmitItems);
+    }
+
+    // 3.1 (D7): a conflict blocks only its own row's change.
+    [Fact]
+    public void A_conflict_blocks_only_the_change_of_its_row()
+    {
+        var w = Mixed();
+        w.Resources[ResourceKind.Routes].Conflicts.Add(new(Id(31), "Remarks", "r31", "edited 31", "server 31"));
+        var plan = Build(w);
+        Assert.Empty(plan.Blockers);
+        var blocked = Assert.Single(plan.Entries, e => e.Disposition == ReviewDisposition.Blocked);
+        Assert.Equal((31, "ApiConflict"), (Number(blocked.Change.After.LocalId), blocked.Reason!.Code));
+        Assert.Equal(["ApiConflict"], plan.Issues.Select(i => i.Code));
+        Assert.NotEmpty(plan.SubmitItems);
     }
 
     [Fact]

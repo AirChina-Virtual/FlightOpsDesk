@@ -29,8 +29,10 @@ internal sealed class CandidateReservations(ApiContext ctx, DuplicateFinder find
     public void Seed(BatchJob job, CandidateQuerySession session)
     {
         session.Bind(ctx.Workspace.Id, ctx.Workspace.AirlineId);
-        // Only uncertain writes survive a session. Confirmed candidates are read fresh on resume.
-        foreach (var item in job.Items.Where(i => i.State is not (ItemState.Succeeded or ItemState.ManuallyConfirmed)
+        // Only uncertain writes survive a session. Confirmed candidates are read fresh on resume. Since 3.1 a new task may
+        // run while an older one still has unknown items, so their identities are reserved too.
+        foreach (var item in ctx.Workspace.Jobs.Where(j => j.Mode == RunMode.Online && !ReferenceEquals(j, job)).Prepend(job).SelectMany(j => j.Items)
+            .Where(i => i.State is not (ItemState.Succeeded or ItemState.ManuallyConfirmed)
             && (i.State is ItemState.Unknown or ItemState.Running || i.CreateCompleted || i.WriteAccepted)))
             Reserve(item, session);
     }

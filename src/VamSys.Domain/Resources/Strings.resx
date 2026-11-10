@@ -947,6 +947,15 @@
   <data name="ReviewDemoSubmit" xml:space="preserve"><value>模拟提交工作区修改</value></data>
   <data name="ReviewExport" xml:space="preserve"><value>导出{resource} CSV</value></data>
   <data name="ReviewChanged" xml:space="preserve"><value>审阅内容或提交条件已变化，已更新清单。请核对后再次提交。</value></data>
+  <data name="ReviewInclude" xml:space="preserve"><value>本次提交{resource}</value></data>
+  <data name="ReviewLeftOut" xml:space="preserve"><value>另有 {count} 项依赖未勾选资源中的新建，本次不提交。</value></data>
+  <data name="TaskContinueRemaining" xml:space="preserve"><value>继续提交剩余 {count} 项</value></data>
+  <data name="TaskContinueReady" xml:space="preserve"><value>样本已核对通过，同类修改还有 {count} 项，可在审阅页继续提交。</value></data>
+  <data name="ReviewSummaryLine" xml:space="preserve"><value>{resource} · {kind}：{count} 项</value></data>
+  <data name="ReviewEstimate" xml:space="preserve"><value>预计约 {requests} 次请求，约 {minutes} 分钟（每秒最多 1 次请求；限流等待和重试另计）。</value></data>
+  <data name="ReviewShowAll" xml:space="preserve"><value>查看全部 {count} 项</value></data>
+  <data name="ReviewOpenTaskItem" xml:space="preserve"><value>这条记录在未完成的在线任务中（待执行或结果未知）。请先在任务中心处理那项，再提交新的修改。</value></data>
+  <data name="ReviewOpenTaskItems" xml:space="preserve"><value>{count} 项修改涉及未完成在线任务中的记录，暂不能提交；其余修改不受影响。</value></data>
   <data name="RecoveryGroup_ManualDelete" xml:space="preserve"><value>以下 {count} 项删除已收到 204，但记录仍可读取。请先在 Orwell 确认它们都已按预期停用／删除；确认后全部标为人工确认，不计入已验证的操作。</value></data>
   <data name="RecoveryGroup_DeletedWithoutReceipt" xml:space="preserve"><value>以下 {count} 项删除没有收到回执，只读 GET 都返回 404。请先在 Orwell 确认；确认后全部标为人工确认（无写入回执），并归档本地删除草稿，不会重新发送删除。</value></data>
   <data name="RecoveryGroup_UnchangedWithoutReceipt" xml:space="preserve"><value>以下 {count} 项删除没有收到回执，只读 GET 读到的记录都与修改前一致，删除看起来没有生效。请先在 Orwell 确认；确认后全部标为未生效：状态为失败，本地删除草稿保留，可重新审阅提交。</value></data>

@@ -79,6 +79,14 @@ public sealed partial class MainWindow
                 Render();
                 await recovery.ExecuteAsync(job, NotifyTask, running.Token);
                 Status(() => JobText(job));
+                // 3.2: the sample limit held changes of the operations this task just proved; offer to continue with them.
+                // Planned on a worker: the window is still locked by this work, so nothing edits the workspace meanwhile.
+                var remaining = await Task.Run(() => reviews.RemainingAfter(job));
+                if (remaining > 0 && Tasks.TryGet(job.Id, out var card))
+                {
+                    card.Remaining = remaining;
+                    Status(() => L("TaskContinueReady", ("count", remaining)));
+                }
             }
             finally
             {

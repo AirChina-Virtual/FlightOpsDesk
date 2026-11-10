@@ -13,10 +13,13 @@ public sealed record ReviewEntry(PlannedChange Planned, ReviewDisposition Dispos
     public ChangeItem Change => Planned.ToItem();
 }
 
-public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IReadOnlyList<MessageDescriptor> blockers)
+// Blockers stop the whole submission; Issues are what the page lists for the person (3.1: conflicts, open task items and
+// validation problems now block only their own entries, so they are issues, not blockers).
+public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IReadOnlyList<MessageDescriptor> blockers, IReadOnlyList<MessageDescriptor>? issues = null)
 {
     public IReadOnlyList<ReviewEntry> Entries { get; } = entries;
     public IReadOnlyList<MessageDescriptor> Blockers { get; } = blockers;
+    public IReadOnlyList<MessageDescriptor> Issues { get; } = issues ?? blockers;
     public int SubmitCount
     {
         get
@@ -50,6 +53,26 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
         }
     }
 
+    // 3.5 (F9, D8): the submission of only some resources. A ready change of a chosen resource that depends on a change
+    // left out (another resource's create) is left out too, transitively, so nothing is sent ahead of what it needs.
+    public List<ChangeItem> SubmitItemsFor(IReadOnlySet<ResourceKind> resources)
+    {
+        var all = SubmitItems;
+        if (all.All(i => resources.Contains(i.Resource)))
+            return all;
+        var included = all.Where(i => resources.Contains(i.Resource)).ToList();
+        var ids = included.Select(i => i.Id).ToHashSet();
+        bool dropped;
+        do
+        {
+            dropped = false;
+            foreach (var item in included.ToArray())
+                if (item.Dependencies.Any(d => !ids.Contains(d)))
+                { included.Remove(item); ids.Remove(item.Id); dropped = true; }
+        } while (dropped);
+        return included;
+    }
+
     // Planner IDs are deliberately excluded: dependencies are compared by row identity.
     // A SHA-256 over the content that affects the submission (the full rows and the changed fields), computed once: the reviewed
     // rows are not edited after planning. Every value is length-prefixed, so no two contents collide by layout.
@@ -61,6 +84,7 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
         Dictionary<Guid, PlannedChange>? byId = null;
         var hash = new KeyHash();
         hash.Json(Blockers);
+        hash.Json(Issues);
         hash.Int(Entries.Count);
         foreach (var e in Entries)
         {
@@ -175,25 +199,79 @@ public static class ReviewPlanBuilder
     public static WorkspaceReviewPlan BuildForWorkspace(ChangePlanner planner, Workspace w, RunMode mode, bool connected,
         ISet<string> verified, Action<ChangeItem>? preview)
     {
-        var blockers = new List<MessageDescriptor>();
+        // 3.1 (D6, D7): nothing blocks the whole workspace any more. A conflict, an item of an unfinished online task and a
+        // validation problem each block only the change of their own row; what depends on it is deferred. Online and demo
+        // reviews validate the same way. The executor checks conflicts per item too (PreflightStage).
+        var changes = planner.ScanWorkspace(w);
+        var changed = new HashSet<Guid>();
+        foreach (var change in changes)
+            changed.Add(change.After.LocalId);
+        var rowBlocks = new Dictionary<Guid, MessageDescriptor>();
+        var issues = new List<MessageDescriptor>();
+
+        MessageDescriptor? conflict = null;
+        foreach (var data in w.Resources.Values)
+            foreach (var c in data.Conflicts)
+                if (changed.Contains(c.RowId))
+                    rowBlocks.TryAdd(c.RowId, conflict ??= Messages.Define("ApiConflict"));
         if (w.Resources.Values.Any(d => d.Conflicts.Count > 0))
-            blockers.Add(Messages.Define("ApiConflict"));
-        if (mode == RunMode.Online && ApiOperationPolicy.HasOpenOnlineItems(w))
-            blockers.Add(Messages.Define("ApiPendingJob"));
-        if (mode == RunMode.Demo)
+            issues.Add(Messages.Define("ApiConflict"));
+
+        if (mode == RunMode.Online)
+        {
+            var open = OpenTaskKeys(w);
+            var held = 0;
+            MessageDescriptor? reason = null;
+            foreach (var change in changes)
+                if (open.Count > 0 && TaskKeys(change.Resource, change.Before, change.After).Any(open.Contains) && rowBlocks.TryAdd(change.After.LocalId, reason ??= Messages.Define("ReviewOpenTaskItem")))
+                    held++;
+            if (held > 0)
+                issues.Add(Messages.Define("ReviewOpenTaskItems", ("count", held)));
+        }
+
+        if (changed.Count > 0)
         {
             var pass = new ValidationPass(w);
-            foreach (var (kind, data) in w.Resources.Where(p => p.Value.Draft.Count > 0))
+            var kinds = changes.Select(c => c.Resource).ToHashSet();
+            foreach (var (kind, data) in w.Resources.Where(p => kinds.Contains(p.Key)))
                 foreach (var issue in Schemas.Validate(w, kind, pass))
                 {
+                    if (!changed.Contains(issue.RowId))
+                        continue;
                     var row = data.FindDraftRow(issue.RowId);
-                    blockers.Add(Messages.Define("ReviewValidationIssue", ("resource", Schemas.All[kind].Name),
-                        ("key", row is null ? issue.RowId.ToString()[..8] : Schemas.Key(kind, row)), ("field", issue.Field), ("reason", issue.Description)));
+                    var message = Messages.Define("ReviewValidationIssue", ("resource", Schemas.All[kind].Name),
+                        ("key", row is null ? issue.RowId.ToString()[..8] : Schemas.Key(kind, row)), ("field", issue.Field), ("reason", issue.Description));
+                    rowBlocks.TryAdd(issue.RowId, message);
+                    issues.Add(message);
                 }
         }
-        var plan = BuildPlanned(planner.ScanWorkspace(w), mode, connected, verified, preview, blockers, w.ContractHash);
+        var plan = BuildPlanned(changes, mode, connected, verified, preview, null, w.ContractHash, rowBlocks, issues);
         _ = plan.ContentKey();
         return plan;
+    }
+
+    // Who an unfinished online task's items are: their rows, their remote records and their keys (codes, names).
+    static HashSet<string> OpenTaskKeys(Workspace w)
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var job in w.Jobs)
+            if (job.Mode == RunMode.Online)
+                foreach (var item in job.Items)
+                    if (item.State is ItemState.Pending or ItemState.Running or ItemState.Unknown)
+                        keys.UnionWith(TaskKeys(item.Resource, item.Before, item.After));
+        return keys;
+    }
+
+    static IEnumerable<string> TaskKeys(ResourceKind kind, DataRow? before, DataRow after)
+    {
+        yield return $"{kind}|row|{after.LocalId}";
+        foreach (var row in before is null ? [after] : new[] { before, after })
+        {
+            if ((row.Identity?.RemoteId ?? (row.Get("ID") is { Length: > 0 } id ? id : null)) is string remote)
+                yield return $"{kind}|id|{remote}";
+            if (Schemas.Key(kind, row) is { Length: > 0 } key)
+                yield return $"{kind}|key|{key}";
+        }
     }
 
     public static WorkspaceReviewPlan Build(IReadOnlyList<ChangeItem> changes, RunMode mode, bool connected,
@@ -206,7 +284,8 @@ public static class ReviewPlanBuilder
     }
 
     public static WorkspaceReviewPlan BuildPlanned(IReadOnlyList<PlannedChange> changes, RunMode mode, bool connected,
-        ISet<string> verified, Action<ChangeItem>? preview = null, IReadOnlyList<MessageDescriptor>? blockers = null, string? externalEvidenceContractHash = null)
+        ISet<string> verified, Action<ChangeItem>? preview = null, IReadOnlyList<MessageDescriptor>? blockers = null, string? externalEvidenceContractHash = null,
+        IReadOnlyDictionary<Guid, MessageDescriptor>? rowBlocks = null, IReadOnlyList<MessageDescriptor>? issues = null)
     {
         var entries = new List<ReviewEntry>(changes.Count);
         var samples = new Dictionary<string, int>(StringComparer.Ordinal);
@@ -234,6 +313,8 @@ public static class ReviewPlanBuilder
                 entries.Add(new(change, ReviewDisposition.AwaitingConnection, connect ??= Messages.Define("ReviewConnect")));
                 continue;
             }
+            if (rowBlocks != null && rowBlocks.TryGetValue(change.After.LocalId, out var rowBlock))
+            { entries.Add(new(change, ReviewDisposition.Blocked, rowBlock)); continue; }
             var item = mode == RunMode.Online ? ItemOf(change) : null;
             try
             { if (mode == RunMode.Online) preview!(item!); }
@@ -259,7 +340,7 @@ public static class ReviewPlanBuilder
             for (var n = 0; n < entries.Count; n++)
                 if (entries[n].Disposition == ReviewDisposition.Ready)
                     entries[n] = entries[n] with { Disposition = ReviewDisposition.Blocked, Reason = blockers[0] };
-        return new(entries, blockers ?? []);
+        return new(entries, blockers ?? [], issues);
     }
 
     // A ready entry whose dependency is not ready is deferred, until nothing changes. Most reviews have no dependencies at all.

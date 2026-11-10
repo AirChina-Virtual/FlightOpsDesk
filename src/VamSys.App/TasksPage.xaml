@@ -27,6 +27,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMedium}">
                   <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ReviewLabel, Mode=OneWay}" Command="{x:Bind Review}" Visibility="{x:Bind ShowsReview, Mode=OneWay}"/>
                   <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ResumeLabel, Mode=OneWay}" Command="{x:Bind Resume}" Visibility="{x:Bind ShowsResume, Mode=OneWay}"/>
+                  <Button Style="{StaticResource AccentButtonStyle}" Content="{x:Bind ContinueLabel, Mode=OneWay}" Command="{x:Bind Continue}" Visibility="{x:Bind ShowsContinue, Mode=OneWay}"/>
                   <Button Content="{x:Bind RetryLabel, Mode=OneWay}" Command="{x:Bind Retry}" Visibility="{x:Bind ShowsRetry, Mode=OneWay}"/>
                   <Button Content="{x:Bind VerifyDeletesLabel, Mode=OneWay}" Command="{x:Bind VerifyDeletes}" Visibility="{x:Bind ShowsVerifyDeletes, Mode=OneWay}"/>
                   <Button Content="{x:Bind DiscardLabel, Mode=OneWay}" Command="{x:Bind Discard}" Visibility="{x:Bind ShowsDiscard, Mode=OneWay}"/>

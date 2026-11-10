@@ -54,6 +54,12 @@ public sealed class TaskJobViewModel : ObservableObject
     public bool ShowsRetry => Job.Mode == RunMode.Demo && counts[(int)ItemState.Failed] > 0;
     public bool ShowsVerifyDeletes => Job.Mode == RunMode.Online && deletionChecks > 0;
     public bool ShowsDiscard => Job.Mode == RunMode.Online && discardable > 0;
+    // 3.2: changes of the operations this task proved that are still to submit (set once the task completed, in memory).
+    int remaining;
+    public int Remaining { get => remaining; set { remaining = value; RefreshHeader(); } }
+    public bool ShowsContinue => remaining > 0;
+    public string ContinueLabel => language.Get("TaskContinueRemaining", ("count", remaining));
+    public IAsyncRelayCommand Continue { get; private set; } = null!;
     // 2.4: failed routes the server refused for unapproved fleets, whose drafts still name those fleets.
     int RejectedRoutes => removableFleets == null || Job.Mode != RunMode.Online ? 0 : Job.Items.Count(i => removableFleets(i).Count > 0);
     public bool ShowsRemoveFleets => RejectedRoutes > 0;
@@ -75,8 +81,9 @@ public sealed class TaskJobViewModel : ObservableObject
     public IAsyncRelayCommand VerifyDeletes { get; }
     public IAsyncRelayCommand Discard { get; }
     public TaskJobViewModel(BatchJob job, ILocalizationService l, Func<bool> available, Func<RunMode> mode, Func<Task> details, Func<Task> review, Func<Task> resume, Func<Task> retry, Func<Task>? export = null, Func<Task>? verifyDeletes = null, Func<Task>? discard = null,
-        Func<ChangeItem, IReadOnlyList<string>>? removableFleets = null, Func<Task>? removeFleets = null)
+        Func<ChangeItem, IReadOnlyList<string>>? removableFleets = null, Func<Task>? removeFleets = null, Func<Task>? continueRemaining = null)
     {
+        Continue = new AsyncRelayCommand(continueRemaining ?? (() => Task.CompletedTask), () => continueRemaining != null && available() && remaining > 0);
         this.removableFleets = removableFleets;
         Job = job;
         displayStatus = job.Status;
@@ -145,6 +152,9 @@ public sealed class TaskJobViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowsDiscard));
         OnPropertyChanged(nameof(ShowsRemoveFleets));
         OnPropertyChanged(nameof(RemoveFleetsLabel));
+        OnPropertyChanged(nameof(ShowsContinue));
+        OnPropertyChanged(nameof(ContinueLabel));
+        Continue?.NotifyCanExecuteChanged();
         Review.NotifyCanExecuteChanged();
         Resume.NotifyCanExecuteChanged();
         Retry.NotifyCanExecuteChanged();

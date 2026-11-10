@@ -17,8 +17,13 @@ public static class ReviewTexts
 
 // A line of the workspace review: either a resource heading with its CSV export, or one reviewed change.
 public sealed class ReviewRowViewModel(ResourceKind resource, ReviewEntry? entry, ILocalizationService language, IAsyncRelayCommand? export,
-    IReadOnlyList<string>? deniedFleets = null, IAsyncRelayCommand? removeFleets = null) : ObservableObject
+    IReadOnlyList<string>? deniedFleets = null, IAsyncRelayCommand? removeFleets = null, Action? included = null) : ObservableObject
 {
+    // 3.5: a heading's resource is part of this submission (all are by default).
+    bool isIncluded = true;
+    public bool IsIncluded { get => isIncluded; set { if (SetProperty(ref isIncluded, value)) included?.Invoke(); } }
+    public bool ShowsInclude => included != null;
+    public string IncludeLabel => language.Get("ReviewInclude", ("resource", Heading));
     public ResourceKind Resource { get; } = resource;
     public ReviewEntry? Entry { get; } = entry;
     public bool IsHeading => Entry is null;
@@ -36,7 +41,7 @@ public sealed class ReviewRowViewModel(ResourceKind resource, ReviewEntry? entry
 
     public void RefreshLanguage()
     {
-        foreach (var name in new[] { nameof(Heading), nameof(ExportLabel), nameof(State), nameof(Body), nameof(Reason), nameof(RemoveFleetsLabel) })
+        foreach (var name in new[] { nameof(Heading), nameof(ExportLabel), nameof(State), nameof(Body), nameof(Reason), nameof(RemoveFleetsLabel), nameof(IncludeLabel) })
             OnPropertyChanged(name);
     }
 }
@@ -54,6 +59,14 @@ public sealed class ReviewViewModel(Workspace workspace, ILocalizationService la
 
     public IReadOnlyList<ReviewRowViewModel> Rows { get; private set; } = [];
     public bool CanSubmit { get; private set; }
+    bool canEditShown;
+    // 3.5: the resources ticked for this submission.
+    public IReadOnlySet<ResourceKind> Chosen => Rows.Where(r => r.IsHeading && r.IsIncluded).Select(r => r.Resource).ToHashSet();
+    void ChosenChanged()
+    {
+        CanSubmit = plan is not null && canEditShown && workspace.Mode != RunMode.Offline && plan.SubmitItemsFor(Chosen).Count > 0;
+        OnPropertyChanged(nameof(CanSubmit));
+    }
     public bool CanResolveConflicts { get; private set; }
 
     public string Title => language.Get("ReviewWorkspace");
@@ -65,11 +78,12 @@ public sealed class ReviewViewModel(Workspace workspace, ILocalizationService la
     public bool ShowsConnectHint => workspace.Mode == RunMode.Offline;
     public string ConnectHint => language.Get("ReviewConnect");
     // The first three blockers are shown on the page; all of them are listed behind the issues button.
-    public IReadOnlyList<string> ShownBlockers => plan is null ? [] : plan.Blockers.Take(3).Select(language.Format).ToList();
-    public bool ShowsBlockers => plan?.Blockers.Count > 0;
-    public IReadOnlyList<string> AllBlockers => plan is null ? [] : plan.Blockers.Select(language.Format).ToList();
-    public bool ShowsIssues => plan?.Blockers.Count > 3;
-    public string IssuesLabel => language.Get("ReviewIssues", ("count", plan?.Blockers.Count ?? 0));
+    // 3.1: the issues (conflicts, open task items, validation) block only their own entries; they are still listed here.
+    public IReadOnlyList<string> ShownBlockers => plan is null ? [] : plan.Issues.Take(3).Select(language.Format).ToList();
+    public bool ShowsBlockers => plan?.Issues.Count > 0;
+    public IReadOnlyList<string> AllBlockers => plan is null ? [] : plan.Issues.Select(language.Format).ToList();
+    public bool ShowsIssues => plan?.Issues.Count > 3;
+    public string IssuesLabel => language.Get("ReviewIssues", ("count", plan?.Issues.Count ?? 0));
     public string SubmitLabel => language.Get(workspace.Mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit");
     public string ConflictsLabel => language.Get("ApiConflicts", ("count", conflicts));
     public bool ShowsNothingToReview => plan is not null && Rows.Count == 0;
@@ -82,6 +96,7 @@ public sealed class ReviewViewModel(Workspace workspace, ILocalizationService la
     {
         plan = shown;
         conflicts = workspace.Resources.Sum(p => p.Value.Conflicts.Count);
+        canEditShown = canEdit;
         CanSubmit = canEdit && shown.SubmitCount > 0 && workspace.Mode != RunMode.Offline;
         CanResolveConflicts = canResolveConflicts && conflicts > 0;
         var rows = new List<ReviewRowViewModel>();
@@ -91,7 +106,9 @@ public sealed class ReviewViewModel(Workspace workspace, ILocalizationService la
             if (entries.Length == 0)
                 continue;
             var resource = kind;
-            rows.Add(new(kind, null, language, new AsyncRelayCommand(() => export(resource))));
+            // Only a resource with something ready to send can be left out of the submission.
+            var ready = entries.Any(e => e.Disposition == ReviewDisposition.Ready);
+            rows.Add(new(kind, null, language, new AsyncRelayCommand(() => export(resource)), included: ready && canEdit ? ChosenChanged : null));
             foreach (var entry in entries)
             {
                 var denied = canEdit && removeFleets != null && deniedFleets != null && IsPrefixBlock(entry) ? deniedFleets(entry) : [];

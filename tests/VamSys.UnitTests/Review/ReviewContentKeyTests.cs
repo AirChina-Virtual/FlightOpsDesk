@@ -58,7 +58,11 @@ public class ReviewContentKeyTests
         ["dependency dropped"] = w => Edit(w, ResourceKind.Routes, 36, false, ("Fleet IDs", Token(10))),
         ["unknown local reference"] = w => Edit(w, ResourceKind.Routes, 36, false, ("Fleet IDs", Token(11) + "," + Token(77))),
         ["resolved reference text"] = w => { Edit(w, ResourceKind.Fleets, 10, false, ("ID", "5")); Edit(w, ResourceKind.Fleets, 10, true, ("ID", "5")); },
-        ["pending job blocker"] = w => w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [new ChangeItem { State = ItemState.Pending }] }),
+        ["pending job item on a changed record"] = w =>
+        {
+            var route = w.Resources[ResourceKind.Routes].Draft.Single(r => r.LocalId == Id(30));
+            w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items = [new ChangeItem { State = ItemState.Pending, Resource = ResourceKind.Routes, Kind = ChangeKind.Update, Before = route, After = route }] });
+        },
         ["contract hash with independent evidence"] = w => w.ContractHash = IndependentApiEvidence.ContractHash,
     };
 

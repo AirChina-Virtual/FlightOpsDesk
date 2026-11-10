@@ -10,7 +10,10 @@
         <DataTemplate x:DataType="vm:ReviewRowViewModel">
           <Grid Margin="{StaticResource ReviewGroupMargin}" ColumnSpacing="{StaticResource SpacingLarge}">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <TextBlock Text="{x:Bind Heading, Mode=OneWay}" Style="{StaticResource CardTitleStyle}" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMedium}">
+              <CheckBox IsChecked="{x:Bind IsIncluded, Mode=TwoWay}" Visibility="{x:Bind ShowsInclude}" AutomationProperties.Name="{x:Bind IncludeLabel, Mode=OneWay}" MinWidth="0" VerticalAlignment="Center"/>
+              <TextBlock Text="{x:Bind Heading, Mode=OneWay}" Style="{StaticResource CardTitleStyle}" VerticalAlignment="Center"/>
+            </StackPanel>
             <Button Grid.Column="1" Content="{x:Bind ExportLabel, Mode=OneWay}" Command="{x:Bind ExportCommand}"/>
           </Grid>
         </DataTemplate>

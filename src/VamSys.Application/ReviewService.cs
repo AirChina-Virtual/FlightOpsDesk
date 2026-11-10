@@ -48,6 +48,18 @@ public sealed class ReviewService(WorkspaceSession session, IOnlineGateway onlin
             Shown = null;
     }
 
+    // 3.2 (F4): after an online task completed, the workspace changes of an operation the task just proved (and so may now
+    // go beyond the sample limit): what the person can continue with on the review page. Zero for any other task.
+    public int RemainingAfter(BatchJob job)
+    {
+        var w = session.Workspace;
+        if (job.Mode != RunMode.Online || job.StatusCode != JobStatus.Completed || w.Mode != RunMode.Online)
+            return 0;
+        var proved = job.Items.Where(i => i.State == ItemState.Succeeded).Select(ApiOperationPolicy.Key).ToHashSet(StringComparer.Ordinal);
+        proved.IntersectWith(w.VerifiedOperations);
+        return proved.Count == 0 ? 0 : planner.PlanWorkspace(w).Count(i => proved.Contains(ApiOperationPolicy.Key(i)));
+    }
+
     // The shown plan when the live workspace still yields the same review. The live plan is rebuilt on a worker; the
     // shown plan's key was computed when it was built.
     public async Task<ReviewCheck> CheckCurrentAsync(RunMode mode, IWorkerLock locker)

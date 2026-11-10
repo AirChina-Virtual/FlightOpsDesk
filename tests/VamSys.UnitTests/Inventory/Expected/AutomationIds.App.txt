@@ -53,3 +53,4 @@ name:{x:Bind Footer.NextLabel, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
 name:{x:Bind Footer.PageSizeLabel, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
 name:{x:Bind Footer.PageSummary, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
 name:{x:Bind Footer.PreviousLabel, Mode=OneWay} => xaml src/VamSys.App/DataGrid.xaml
+name:{x:Bind IncludeLabel, Mode=OneWay} => xaml src/VamSys.App/ReviewPage.xaml

@@ -947,6 +947,15 @@ Remote: {remote}</value>
   <data name="ReviewDemoSubmit" xml:space="preserve"><value>Simulate workspace submission</value></data>
   <data name="ReviewExport" xml:space="preserve"><value>Export {resource} CSV</value></data>
   <data name="ReviewChanged" xml:space="preserve"><value>Changes or submission conditions have changed. Review the updated list and submit again.</value></data>
+  <data name="ReviewInclude" xml:space="preserve"><value>Submit {resource} this time</value></data>
+  <data name="ReviewLeftOut" xml:space="preserve"><value>{count} more changes depend on creates of a resource that is not ticked and are not submitted this time.</value></data>
+  <data name="TaskContinueRemaining" xml:space="preserve"><value>Continue with the remaining {count}</value></data>
+  <data name="TaskContinueReady" xml:space="preserve"><value>The samples were verified; {count} changes of the same kind remain and can be submitted from the review.</value></data>
+  <data name="ReviewSummaryLine" xml:space="preserve"><value>{resource} · {kind}: {count}</value></data>
+  <data name="ReviewEstimate" xml:space="preserve"><value>About {requests} requests, about {minutes} min (at most one request per second; rate-limit waits and retries come on top).</value></data>
+  <data name="ReviewShowAll" xml:space="preserve"><value>Show all {count} items</value></data>
+  <data name="ReviewOpenTaskItem" xml:space="preserve"><value>This record is in an unfinished online task (pending or unknown). Settle that item in the task center before submitting a new change.</value></data>
+  <data name="ReviewOpenTaskItems" xml:space="preserve"><value>{count} changes touch records of unfinished online tasks and cannot be submitted yet; the other changes are not affected.</value></data>
   <data name="RecoveryGroup_ManualDelete" xml:space="preserve"><value>These {count} deletes were answered 204, but their records are still readable. First verify in Orwell that all of them are deleted or disabled as intended. Confirming marks them all as manually confirmed; this is not a verified operation.</value></data>
   <data name="RecoveryGroup_DeletedWithoutReceipt" xml:space="preserve"><value>These {count} deletes were not answered, and each record now reads 404. First verify in Orwell. Confirming marks them all as manually confirmed (no write receipt) and archives the local delete drafts. Nothing is sent again.</value></data>
   <data name="RecoveryGroup_UnchangedWithoutReceipt" xml:space="preserve"><value>These {count} deletes were not answered, and each record still reads exactly as before, so the delete seems not to have taken effect. First verify in Orwell. Confirming marks them all as not applied: they become Failed and keep their local delete drafts for a new review.</value></data>

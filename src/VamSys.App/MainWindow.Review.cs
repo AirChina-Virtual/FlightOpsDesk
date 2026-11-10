@@ -108,12 +108,46 @@ public sealed partial class MainWindow
     {
         if (await CurrentReviewPlan(mode) is not { } shown)
             return null;
-        // Use the exact objects shown on the page, including their dependency IDs.
-        var items = shown.SubmitItems;
-        var submit = L(mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit");
-        if (!await ConfirmList(submit, items.Select(i => $"{L(Schemas.All[i.Resource].Name)} · {ReviewChangeText(i)}").ToArray(), submit,
-            [L("ApiSubmitScope", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"), ("count", items.Count))], DialogHeight.ReviewDetail, selectable: false))
+        // Use the exact objects shown on the page, including their dependency IDs; only the ticked resources (3.5).
+        var all = shown.SubmitItems;
+        var chosen = shownReviewPage?.Model.Chosen;
+        var items = chosen is null ? all : shown.SubmitItemsFor(chosen);
+        // ready changes of ticked resources that wait for a create of an unticked one
+        var leftOut = chosen is null ? 0 : all.Count(i => chosen.Contains(i.Resource)) - items.Count;
+        if (items.Count == 0)
             return null;
+        var submit = L(mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit");
+        // 3.3 (F3): one line per resource and operation, the requests and time it will take, and every item on request.
+        var summary = items.GroupBy(i => (i.Resource, i.Kind)).OrderBy(g => g.Key.Resource).ThenBy(g => g.Key.Kind)
+            .Select(g => L("ReviewSummaryLine", ("resource", L(Schemas.All[g.Key.Resource].Name)), ("kind", L("Enum_ChangeKind_" + g.Key.Kind)), ("count", g.Count()))).ToArray();
+        var header = new List<string> { L("ApiSubmitScope", ("va", workspace.Name), ("id", workspace.AirlineId ?? "?"), ("count", items.Count)) };
+        if (leftOut > 0)
+            header.Add(L("ReviewLeftOut", ("count", leftOut)));
+        if (mode == RunMode.Online)
+        {
+            var requests = SubmissionEstimate.Requests(items, workspace);
+            header.Add(L("ReviewEstimate", ("requests", requests), ("minutes", Math.Max(1, (int)Math.Ceiling(SubmissionEstimate.Duration(requests).TotalMinutes)))));
+        }
+        while (true)
+        {
+            var dialog = new ListDialogViewModel
+            {
+                Title = submit,
+                Header = header,
+                Items = summary,
+                PrimaryLabel = submit,
+                SecondaryLabel = L("ReviewShowAll", ("count", items.Count)),
+                Height = DialogHeight.ReviewDetail,
+                Selectable = false
+            };
+            var answer = await Dialogs.ShowAsync(dialog);
+            if (answer == DialogResult.Primary)
+                break;
+            if (answer != DialogResult.Secondary)
+                return null;
+            await ConfirmList(L("ReviewShowAll", ("count", items.Count)), items.Select(i => $"{L(Schemas.All[i.Resource].Name)} · {ReviewChangeText(i)}").ToArray(),
+                L("Text_3FD47EDCE4"), null, DialogHeight.ReviewDetail, selectable: false);
+        }
         var deletes = items.Where(i => i.Kind == ChangeKind.Delete).ToArray();
         if (deletes.Length > 0 && !await ConfirmList(L("Text_5D6042B30E"), deletes.Select(i => $"{L(Schemas.All[i.Resource].Name)}: {Schemas.Key(i.Resource, i.After)}").ToArray(), L("Confirm"),
             [L("ApiDeleteConfirm", ("count", deletes.Length))]))

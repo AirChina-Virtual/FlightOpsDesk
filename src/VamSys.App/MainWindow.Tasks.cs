@@ -41,7 +41,8 @@ public sealed partial class MainWindow
                     vm!.Update(i.Id);
                 await ExecuteDemo(job);
             }), () => UserAction(() => ExportTaskDiagnostics(job.Id)), () => UserAction(() => VerifyTaskDeletions(job)), () => UserAction(() => DiscardUnsent(job)),
-            batch.RejectedFleetsToRemove, () => UserAction(() => RemoveRejectedFleets(job, vm!)));
+            batch.RejectedFleetsToRemove, () => UserAction(() => RemoveRejectedFleets(job, vm!)),
+            () => UserAction(() => { reviews.Invalidate(); SelectPane(ShellPage.Review); return Task.CompletedTask; }));
         return vm;
     }
     // 2.4: removes from each failed route the fleets the server refused it for, then shows the review again.

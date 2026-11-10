@@ -43,21 +43,26 @@ static class ReviewPlanFixture
         Put(w, ResourceKind.Airports, [zbaa, zspd, zggg],
             [With(zbaa, ("Name", "Beijing Capital")), With(zspd, ("_delete", "TRUE")), zggg.Dup(), Row(4, ("ICAO/IATA", "ZUUU"), ("Name", "Chengdu"), ("_delete", "FALSE"))]);
 
-        var alpha = Row(10, ("ID", "1"), ("Name", "Alpha"), ("Type (pax/cargo/...)", "pax"), ("_delete", "FALSE"));
-        Put(w, ResourceKind.Fleets, [alpha],
+        // Every row passes the row checks: the review validates online too (3.1), and these tests are about the rest.
+        DataRow Fleet(int n, params (string, string)[] fields) => Row(n, [.. fields, ("Type Code", "B738"), ("Type (pax/cargo/...)", "pax"), ("Max Passengers", "180"), ("_delete", "FALSE")]);
+        var alpha = Fleet(10, ("ID", "1"), ("Name", "Alpha"));
+        var gamma = Fleet(15, ("ID", "2"), ("Name", "Gamma"));
+        Put(w, ResourceKind.Fleets, [alpha, gamma],
         [
             alpha.Dup(),
-            Row(11, ("Name", "Beta 1"), ("Type (pax/cargo/...)", "pax"), ("_delete", "FALSE")),
-            Row(12, ("Name", "Beta 2"), ("Type (pax/cargo/...)", "pax"), ("_delete", "FALSE")),
-            Row(13, ("Name", "Beta 3"), ("Type (pax/cargo/...)", "pax"), ("_delete", "FALSE")),
-            Row(14, ("Name", "Beta 4"), ("Type (pax/cargo/...)", "pax"), ("_delete", "FALSE"))
+            gamma.Dup(),
+            Fleet(11, ("Name", "Beta 1")),
+            Fleet(12, ("Name", "Beta 2")),
+            Fleet(13, ("Name", "Beta 3")),
+            Fleet(14, ("Name", "Beta 4"))
         ]);
 
-        var ac1 = Row(20, ("Registration", "B-0001"), ("Fleet ID", "1"), ("ID", "501"), ("_delete", "FALSE"));
+        var ac1 = Row(20, ("Registration", "B-0001"), ("Name", "one"), ("Fleet ID", "1"), ("ID", "501"), ("_delete", "FALSE"));
         var ac2 = Row(21, ("Registration", "B-0002"), ("Fleet ID", "1"), ("ID", "502"), ("_delete", "FALSE"));
         Put(w, ResourceKind.Aircraft, [ac1, ac2], [With(ac1, ("Fleet ID", "2")), With(ac2, ("Name", "renamed"))]);
 
         DataRow Route(int n, string fleets) => Row(n, ("ID", (900 + n).ToString()), ("Callsign", "QA" + n.ToString("D4")), ("Flight Number", n.ToString("D4")), ("Type", "scheduled"),
+            ("Departure Airport (ICAO/IATA)", "ZBAA"), ("Arrival Airport (ICAO/IATA)", "ZGGG"),
             ("Remarks", "r" + n), ("Altitude", "33000"), ("Fleet IDs", fleets), ("_delete", "FALSE"));
         var routes = Enumerable.Range(30, 6).Select(n => Route(n, "1")).ToArray();
         Put(w, ResourceKind.Routes, routes,
