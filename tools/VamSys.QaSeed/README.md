@@ -9,6 +9,7 @@ net10.0 控制台程序，只提供命令行入口，供 `scripts/open-datagrid-
 | `--seed-data-ui <目录> <行数>` | 人工查看数据页用的合成航线 |
 | `--verify-package <目录>`、`--verify-qa-package <目录>` | 打包检查（`PackageChecks`），`scripts/build.ps1 -Publish` 每次发布都会运行 |
 | `--export-diagnostic-replay <JSON路径>` | 通过模拟 422/500 生成脱敏诊断与 SHA-256 |
+| `--check-contract <仓库目录>` | 契约漂移检查（综合优化计划 4.3），见下 |
 
 所有 `--seed-*` 入口在写入前都会拒绝已有文件的目录。
 
@@ -22,3 +23,13 @@ dotnet run --no-build --project tools/VamSys.QaSeed -c Release -- --verify-qa-pa
 `PackageChecks.Verify` 要求正式包和 QA 包都含有运行所需文件、不含开发目录与源文件、不含测试或工具程序集、文档链接有效；正式包不含调试符号、QA 入口（`CreateVerification` 等）、QA 钩子实现、`VAMSYS_QA_` 开关字符串、存储测试钩子和友元授权，QA 包则必须含有这些。检查本身的测试见 `IntegrationTests.Packaging.PackageChecksTests`。
 
 编译服务不可用时，可先 `dotnet build tools/VamSys.QaSeed/VamSys.QaSeed.csproj -c Release -p:RestoreLockedMode=true -p:UseSharedCompilation=false -m:1 -nr:false`，再直接运行 `dotnet tools/VamSys.QaSeed/bin/Release/net10.0/VamSys.QaSeed.dll`。
+
+## 契约漂移检查
+
+`ContractDrift` 读取 `docs/contracts/manifest.json`，对每个来源（只接受 `https://vamsys.io`）发一次 GET，与固定副本比较。固定副本与清单中的 SHA-256 不一致时直接停止，不发请求。哈希不同时，排除 `description`、`summary`、`example(s)`、`default`、`title`（`properties` 下同名字段照常比较）并忽略键顺序后，列出版本变化、增删改的操作（逐项说明哪部分变了）和组件，以及自身未变但经 `$ref` 引用到变化组件的操作。抓到的副本保存在 `artifacts/contract-drift/<名称>-<UTC时间>.json` 供人工查看；固定副本和适配器嵌入的契约不会被替换。退出码 0 全部未变、1 有变化、2 无法检查（网络、哈希不符等）。不带任何账户信息，不需要登录。
+
+~~~powershell
+dotnet run --no-build --project tools/VamSys.QaSeed -c Release -- --check-contract .
+~~~
+
+检查本身的测试见 `IntegrationTests.Packaging.ContractDriftTests`（用模拟来源，不连网）。

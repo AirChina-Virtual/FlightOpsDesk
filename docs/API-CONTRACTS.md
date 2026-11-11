@@ -2,7 +2,7 @@
 
 规范来源：[Operations](https://vamsys.io/api-docs/operations.json)、[Pilot](https://vamsys.io/api-docs/pilot.json)。原始 JSON 已固定在 `contracts/`，抓取时间、OpenAPI 3.1.0、API 3.0.0 与 SHA-256 见 `contracts/manifest.json`。适配器嵌入同一 Operations 规范，并校验所生成请求的属性、类型、必填项、枚举及已声明边界。
 
-Operations 固定为本轮 10 月 20 日证据中的快照，SHA-256 为 `1EC1A869FC3C6F4D70A7A6ECD50170D5D915551794E796F9F34D5AFB944D78C2`。与 9 月版本同为 API 3.0.0、173 个操作；排除说明、示例、默认值和标题后，35 个组件 schema 存在结构差异（含请求、查询和响应）。运行时不自动替换契约，新增字段仍受客户端白名单与独立兼容性策略限制。Pilot 保留原有归档。
+Operations 固定为本轮 10 月 20 日证据中的快照，SHA-256 为 `1EC1A869FC3C6F4D70A7A6ECD50170D5D915551794E796F9F34D5AFB944D78C2`。与 9 月版本同为 API 3.0.0、173 个操作；排除说明、示例、默认值和标题后，35 个组件 schema 存在结构差异（含请求、查询和响应）。运行时不自动替换契约，新增字段仍受客户端白名单与独立兼容性策略限制。Pilot 保留原有归档。官方文档是否变化用 `VamSys.QaSeed --check-contract` 只读检查（见 [QaSeed 说明](../tools/VamSys.QaSeed/README.md#契约漂移检查)）；2026-11-10 检查时 Operations 仅 `DELETE /bookings/{booking_id}` 的两处说明文字不同，结构与固定副本一致。
 
 已有独立真实 API 脚本测试；下表的本地测试指软件实际代码的模拟回归，不能推导软件真实写入或窗口验收。证据分级见 [能力验证矩阵](CAPABILITY-MATRIX.md)。已按用户确认开放固定契约下的独立实测范围，见 [字段与证据清单](VERIFIED-API-SCOPE.md)；这些请求不再受首次三条限制。未覆盖变体保留原有样本／兼容限制。外部基线不写工作区验证标记，只有软件实际成功回读才登记。
 
