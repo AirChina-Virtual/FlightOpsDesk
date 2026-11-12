@@ -10,7 +10,8 @@ namespace VamSys.IntegrationTests.Api;
 /// The write-safety state table (R7 step 3): every resource and operation against every way its write can end, and every
 /// point a run can stop at, instead of one test per historical problem. The rule under test (I01, F15): a write is sent at
 /// most once unless the server provably did not process it (it was throttled or refused authentication), and anything
-/// that may have reached the server is only ever read afterwards.
+/// that may have reached the server is only ever read afterwards. A throttled write is sent once more in the same round
+/// (E7, D5); a refused login pauses the job until the user resumes it.
 /// </summary>
 [Collection(StoredWorldCollection.Name)]
 public class WriteSafetyTableTests
@@ -100,12 +101,13 @@ public class WriteSafetyTableTests
         var expected = outcome switch
         {
             Outcome.FieldError => ItemState.Failed,
-            Outcome.Throttled or Outcome.AuthRefused => ItemState.Pending,
+            Outcome.Throttled => ItemState.Succeeded,
+            Outcome.AuthRefused => ItemState.Pending,
             Outcome.TimeoutApplied when settledByRead => ItemState.Succeeded,
             _ => ItemState.Unknown
         };
         Assert.True(item.State == expected, $"{operation} {outcome}: {item.State} {Code(item)}");
-        Assert.Equal(1, Writes(s, method));
+        Assert.Equal(outcome == Outcome.Throttled ? 2 : 1, Writes(s, method));
         Assert.Equal(item.State, s.Disk.Jobs.Single().Items.Single().State);
         if (outcome == Outcome.FieldError)
             Assert.Equal(["The name is invalid."], item.DiagnosticDetails!.FieldErrors["name"]);

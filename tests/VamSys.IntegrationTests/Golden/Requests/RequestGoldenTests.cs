@@ -333,12 +333,12 @@ public class RequestGoldenTests
     public async Task Write_429_returns_to_pending_and_is_sent_once_on_resume()
     {
         var w = new GoldenWorld();
-        var limited = false;
+        // twice: the first 429 is followed by one more PUT in the same round (E7), which is rate-limited as well
+        var limited = 0;
         w.Remote.Intercept = r =>
         {
-            if (r.Method != "PUT" || limited)
+            if (r.Method != "PUT" || limited++ >= 2)
                 return null;
-            limited = true;
             return new FakeResponse((HttpStatusCode)429, "{}", new Dictionary<string, string> { ["Retry-After"] = "30" });
         };
         w.Edit(ResourceKind.Fleets, "4", ("Name", "Fleet 4 renamed"));
@@ -346,7 +346,7 @@ public class RequestGoldenTests
         Assert.Equal(ItemState.Pending, w.Job!.Items.Single().State);
         await w.ResumeAsync("resume after 429");
         Assert.Equal(ItemState.Succeeded, w.Job.Items.Single().State);
-        Assert.Equal(2, w.Remote.Server.Requests.Count(r => r.Method == "PUT"));
+        Assert.Equal(3, w.Remote.Server.Requests.Count(r => r.Method == "PUT"));
         w.Verify("write_429_then_resume");
     }
 

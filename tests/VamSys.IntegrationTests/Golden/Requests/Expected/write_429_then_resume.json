@@ -1,6 +1,6 @@
 {
   "scenario": "write_429_then_resume",
-  "requestCount": 5,
+  "requestCount": 7,
   "outcomes": [
     "job Completed",
     "Fleets Update Succeeded"
@@ -8,7 +8,7 @@
   "runs": [
     {
       "label": "first run",
-      "requestCount": 2,
+      "requestCount": 4,
       "requests": [
         {
           "order": 0,
@@ -24,13 +24,7 @@
           "bodyJson": {
             "name": "Fleet 4 renamed"
           }
-        }
-      ]
-    },
-    {
-      "label": "resume after 429",
-      "requestCount": 3,
-      "requests": [
+        },
         {
           "order": 2,
           "method": "GET",
@@ -45,9 +39,30 @@
           "bodyJson": {
             "name": "Fleet 4 renamed"
           }
-        },
+        }
+      ]
+    },
+    {
+      "label": "resume after 429",
+      "requestCount": 3,
+      "requests": [
         {
           "order": 4,
+          "method": "GET",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": null
+        },
+        {
+          "order": 5,
+          "method": "PUT",
+          "pathAndQuery": "/api/v3/operations/fleet/4",
+          "body": "{\"name\":\"Fleet 4 renamed\"}",
+          "bodyJson": {
+            "name": "Fleet 4 renamed"
+          }
+        },
+        {
+          "order": 6,
           "method": "GET",
           "pathAndQuery": "/api/v3/operations/fleet/4",
           "body": null

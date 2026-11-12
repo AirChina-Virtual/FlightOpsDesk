@@ -8,6 +8,8 @@ namespace VamSys.Infrastructure;
 //   interrupted item   recovery   read what became of the write, settle from the answer, never repeat it
 //   fresh item         preflight (local) -> plan -> duplicate check (creates) -> preflight (server)
 //                      -> write -> read back -> complete        (each item ends with a checkpoint)
+//   second pass        E7 (D5): an item whose write was rejected with 429 or never sent goes through once more, with
+//                      the items that were skipped only because of it (each item at most twice per round)
 //   end of the round   items this round left Unknown are looked up once more, read-only (see RecheckAsync)
 //
 // The order of the requests, of the saves and of the metrics phases is the write-safety contract and is locked by the
@@ -36,61 +38,85 @@ internal sealed class ExecutionPipeline(OperationsAdapter api, Workspace workspa
         api.SeedCandidates(job, run.Queries);
         job.SetStatus(JobStatus.Running, Messages.Define("Text_5026A63B58"));
         var fresh = new List<ChangeItem>();
-        foreach (var item in job.Items.OrderBy(i => i.Kind == ChangeKind.Delete ? 10 - (int)i.Resource : (int)i.Resource))
+        var unprocessed = new HashSet<ChangeItem>();
+        var order = job.Items.OrderBy(i => i.Kind == ChangeKind.Delete ? 10 - (int)i.Resource : (int)i.Resource).ToList();
+        if (!await PassAsync(order, collect: true) && unprocessed.Count > 0 && job.StatusCode == JobStatus.Running && !ct.IsCancellationRequested)
         {
-            sink.Active = item;
-            // Recovery is read-only even when dependency checks or the recovery GET fail.
-            var recovering = item.State is ItemState.Running or ItemState.Unknown || item.CreateCompleted || item.WriteAccepted;
-            if (recovering && item.State is not (ItemState.Succeeded or ItemState.ManuallyConfirmed))
-                item.State = ItemState.Unknown;
-            if (ct.IsCancellationRequested)
-            { job.SetStatus(JobStatus.Canceled, Messages.Define("Text_6F312AE253")); break; }
-            if (item.State is ItemState.Succeeded or ItemState.Conflict or ItemState.Failed or ItemState.ManuallyConfirmed)
-                continue;
-            if (!recovering && item.Dependencies.Any(id => run.Items.ById(id).State != ItemState.Succeeded))
-            { item.State = ItemState.Skipped; item.SetMessage(Messages.Define("Text_3E85DDB213")); await sink.SaveAsync(); continue; }
-            var r = new ItemRun(item, recovering ? Phase.Recovering : Phase.Preflight);
-            if (PerformanceRun.Current is { } metrics)
-                metrics.Phase = r.Phase.ToString();
-            try
-            {
-                preflight.CheckLocal(item);
-                r.Id = item.CanProposeRecoveryId ? item.EditableRecoveryId : item.RemoteId ?? item.Before?.Identity?.RemoteId;
-                if (recovering)
-                {
-                    // An interrupted request is never automatically repeated.
-                    await recovery.RunAsync(r);
-                    await sink.SaveAsync();
-                    continue;
-                }
-                var steps = api.ExecutionPlan(item);
-                if (item.Kind == ChangeKind.Create && await duplicates.RunAsync(r))
-                    continue;
-                if (await preflight.CheckRemoteAsync(r))
-                    continue;
-                fresh.Add(item);
-                await write.RunAsync(r, steps);
-                await readback.RunAsync(r);
-            }
-            catch (PersistenceException) { throw; }
-            catch (Exception e)
-            {
-                if (await failures.HandleAsync(e, r))
-                    break;
-            }
-            if (item.State is ItemState.Failed or ItemState.Pending && !item.CreateCompleted && !item.WriteAccepted)
-                run.Queries.Release(item);
-            await sink.SaveAsync();
-            if (ct.IsCancellationRequested)
-            { job.SetStatus(JobStatus.Canceled, Messages.Define("Text_6F312AE253")); break; }
+            // E7 (D5): the server did not process these writes (429, or the request never left), so they are sent once
+            // more in this round, after the budget's Retry-After wait; items skipped only because of them follow them.
+            var again = order.Where(i => unprocessed.Contains(i)
+                || i.State == ItemState.Skipped && i.Dependencies.Any(id => unprocessed.Contains(run.Items.ById(id)))).ToList();
+            await PassAsync(again, collect: false);
         }
         if (job.StatusCode == JobStatus.Running)
-            await RecheckAsync(fresh.Where(i => i.State == ItemState.Unknown).ToList(), run, recovery);
+            await RecheckAsync(fresh.Distinct().Where(i => i.State == ItemState.Unknown).ToList(), run, recovery);
         sink.Active = null;
         if (job.StatusCode == JobStatus.Running)
             job.SetStatus(job.Items.All(i => i.State == ItemState.Succeeded) ? JobStatus.Completed : JobStatus.NeedsAttention, Messages.Define(job.Items.All(i => i.State == ItemState.Succeeded) ? "Text_140197D868" : "Text_E9008C53CF"));
         await sink.SaveAsync();
+
+        // Returns true when the job stopped (cancelled, or paused on authentication).
+        async Task<bool> PassAsync(List<ChangeItem> items, bool collect)
+        {
+            foreach (var item in items)
+            {
+                sink.Active = item;
+                // Recovery is read-only even when dependency checks or the recovery GET fail.
+                var recovering = item.State is ItemState.Running or ItemState.Unknown || item.CreateCompleted || item.WriteAccepted;
+                if (recovering && item.State is not (ItemState.Succeeded or ItemState.ManuallyConfirmed))
+                    item.State = ItemState.Unknown;
+                if (ct.IsCancellationRequested)
+                { job.SetStatus(JobStatus.Canceled, Messages.Define("Text_6F312AE253")); return true; }
+                if (item.State is ItemState.Succeeded or ItemState.Conflict or ItemState.Failed or ItemState.ManuallyConfirmed)
+                    continue;
+                if (!recovering && item.Dependencies.Any(id => run.Items.ById(id).State != ItemState.Succeeded))
+                { item.State = ItemState.Skipped; item.SetMessage(Messages.Define("Text_3E85DDB213")); await sink.SaveAsync(); continue; }
+                var r = new ItemRun(item, recovering ? Phase.Recovering : Phase.Preflight);
+                if (PerformanceRun.Current is { } metrics)
+                    metrics.Phase = r.Phase.ToString();
+                try
+                {
+                    preflight.CheckLocal(item);
+                    r.Id = item.CanProposeRecoveryId ? item.EditableRecoveryId : item.RemoteId ?? item.Before?.Identity?.RemoteId;
+                    if (recovering)
+                    {
+                        // An interrupted request is never automatically repeated.
+                        await recovery.RunAsync(r);
+                        await sink.SaveAsync();
+                        continue;
+                    }
+                    var steps = api.ExecutionPlan(item);
+                    if (item.Kind == ChangeKind.Create && await duplicates.RunAsync(r))
+                        continue;
+                    if (await preflight.CheckRemoteAsync(r))
+                        continue;
+                    fresh.Add(item);
+                    await write.RunAsync(r, steps);
+                    await readback.RunAsync(r);
+                }
+                catch (PersistenceException) { throw; }
+                catch (Exception e)
+                {
+                    if (await failures.HandleAsync(e, r))
+                        return true;
+                    if (collect && item.State == ItemState.Pending && NotProcessed(e, r.Phase) && !ct.IsCancellationRequested)
+                        unprocessed.Add(item);
+                }
+                if (item.State is ItemState.Failed or ItemState.Pending && !item.CreateCompleted && !item.WriteAccepted)
+                    run.Queries.Release(item);
+                await sink.SaveAsync();
+                if (ct.IsCancellationRequested)
+                { job.SetStatus(JobStatus.Canceled, Messages.Define("Text_6F312AE253")); return true; }
+            }
+            return false;
+        }
     }
+
+    // E7 (D5): the only two failures the server certainly did not process: a 429 (rejected before processing) and a
+    // request that never left (rate-limit wait, token refresh). An authentication failure pauses the job instead.
+    static bool NotProcessed(Exception e, Phase phase)
+        => e is ApiResponseException { Status: System.Net.HttpStatusCode.TooManyRequests } && phase is Phase.Preflight or Phase.Writing
+           || e is RequestNotSentException { InnerException: not ApiAccessException and not OperationCanceledException };
 
     // E2: a write that ended Unknown in this round (timeout, 5xx, a read-back that did not match) is looked up once more
     // after every other item, through the same read-only recovery path the "Continue" button uses, so what the server

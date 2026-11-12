@@ -38,8 +38,9 @@ public class WriteReadbackAndRecoveryStageTests
         Assert.Equal(JobStatus.NeedsAttention, w.Job.StatusCode);
     }
 
+    // E7 (D5): a 429 was rejected before processing, so the write is sent once more later in the same round.
     [Fact]
-    public async Task A_rate_limited_write_goes_back_to_pending_with_its_step_prepared_and_is_sent_once_on_the_next_run()
+    public async Task A_rate_limited_write_is_sent_once_more_in_the_same_round()
     {
         var w = new GoldenWorld();
         var limited = false;
@@ -47,12 +48,72 @@ public class WriteReadbackAndRecoveryStageTests
         w.Edit(ResourceKind.Fleets, "4", ("Name", "renamed"));
         await w.RunAsync("first run");
         var item = w.Job!.Items.Single();
+        Assert.Equal(ItemState.Succeeded, item.State);
+        Assert.Equal(2, Count(w, "PUT"));
+        Assert.Equal(JobStatus.Completed, w.Job.StatusCode);
+    }
+
+    // ... but only once: rate-limited again, it goes back to pending with its step prepared and waits for the next run.
+    [Fact]
+    public async Task A_write_rate_limited_twice_goes_back_to_pending_and_is_sent_once_on_the_next_run()
+    {
+        var w = new GoldenWorld();
+        var limited = 0;
+        w.Remote.Intercept = r => r.Method != "PUT" || limited++ >= 2 ? null : RateLimited();
+        w.Edit(ResourceKind.Fleets, "4", ("Name", "renamed"));
+        await w.RunAsync("first run");
+        var item = w.Job!.Items.Single();
         Assert.Equal(ItemState.Pending, item.State);
         Assert.Equal("ApiRateLimited", Code(item));
         Assert.Equal(BatchStepState.Prepared, item.ApiSteps[0].State);
+        Assert.Equal(2, Count(w, "PUT"));
         await w.ResumeAsync("second run");
         Assert.Equal(ItemState.Succeeded, item.State);
-        Assert.Equal(2, Count(w, "PUT"));
+        Assert.Equal(3, Count(w, "PUT"));
+    }
+
+    // E7 (D5): a write that never left the machine (here the token could not be fetched) is sent once more in the round.
+    [Fact]
+    public async Task A_write_that_could_not_be_sent_is_tried_once_more_in_the_same_round()
+    {
+        var w = new GoldenWorld();
+        w.Edit(ResourceKind.Fleets, "4", ("Name", "renamed"));
+        var job = NewJob(w);
+        var item = job.Items.Single();
+        var requests = InstantTime.Requests();
+        var failures = 0;
+        // a token that is always about to expire is fetched for every request; the one for the PUT fails once
+        var tokens = new TokenProvider(_ =>
+        {
+            if (item.State == ItemState.Running && failures == 0)
+            {
+                failures++;
+                throw new HttpRequestException("token endpoint unreachable");
+            }
+            return Task.FromResult(new AccessToken("golden-token", requests.Clock.GetUtcNow()));
+        }, requests.Clock);
+        var api = new OperationsAdapter(new OperationsTransport(w.Remote.Server.CreateClient(), OperationsAdapter.BaseUri, "golden-va", tokens, requests), w.Workspace);
+
+        await new OperationsBatchExecutor(api, w.Workspace).ExecuteAsync(job, () => Task.CompletedTask, Ct);
+
+        Assert.Equal(1, failures);
+        Assert.Equal(ItemState.Succeeded, item.State);
+        Assert.Equal(1, Count(w, "PUT"));
+    }
+
+    // E7: an item skipped only because the create it depends on was rate-limited follows it in the second pass.
+    [Fact]
+    public async Task An_item_waiting_for_a_rate_limited_create_follows_it_in_the_same_round()
+    {
+        var w = new GoldenWorld();
+        var limited = false;
+        w.Remote.Intercept = r => { if (r.Method != "POST" || limited) return null; limited = true; return RateLimited(); };
+        var fleet = w.New(ResourceKind.Fleets, ("Name", "New"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "pax"), ("Parameter IDs", "1"));
+        w.New(ResourceKind.Aircraft, ("Name", "Plane Three"), ("Registration", "QA-NEW"), ("Fleet ID", LocalReference.Format(fleet.LocalId)));
+        await w.RunAsync("first run");
+        Assert.Equal([ItemState.Succeeded, ItemState.Succeeded], w.Job!.Items.Select(i => i.State));
+        Assert.Equal(3, Count(w, "POST"));
+        Assert.Equal(JobStatus.Completed, w.Job.StatusCode);
     }
 
     [Fact]
@@ -589,8 +650,9 @@ public class WriteReadbackAndRecoveryStageTests
     public async Task A_rate_limited_create_goes_back_to_pending_with_nothing_created_and_is_posted_again_on_the_next_run()
     {
         var w = new GoldenWorld();
-        var limited = false;
-        w.Remote.Intercept = r => { if (r.Method != "POST" || limited) return null; limited = true; return RateLimited(); };
+        // rate-limited twice: the second try in the round (E7) is refused as well
+        var limited = 0;
+        w.Remote.Intercept = r => r.Method != "POST" || limited++ >= 2 ? null : RateLimited();
         w.New(ResourceKind.Fleets, ("Name", "New"), ("Type Code", "B738"), ("Type (pax/cargo/...)", "pax"), ("Parameter IDs", "1"));
         await w.RunAsync("first run");
         var item = w.Job!.Items.Single();
@@ -602,7 +664,7 @@ public class WriteReadbackAndRecoveryStageTests
         await w.ResumeAsync("second run");
         Assert.Equal(ItemState.Succeeded, item.State);
         Assert.Equal("90", item.RemoteId);
-        Assert.Equal(2, Count(w, "POST"));
+        Assert.Equal(3, Count(w, "POST"));
     }
 
     [Fact]
