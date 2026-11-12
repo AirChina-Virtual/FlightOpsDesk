@@ -126,6 +126,18 @@ public static class DataUiFixture
     /// <summary>A demo workspace with one fleet, two airports and two scheduled routes between them, so deleting an airport is refused.</summary>
     public static void SeedBatch(string directory) => SeedRoutes(directory, "2099-01-01 00:00:00");
 
+    /// <summary>The batch workspace with a second fleet, for choosing a route's fleets in a single dialog.</summary>
+    public static void SeedFleetChoice(string directory)
+    {
+        SeedBatch(directory);
+        var store = new WorkspaceStore(directory);
+        var workspace = store.Load(store.List().Single().Id);
+        CsvAdapter.Import(ResourceKind.Fleets, workspace.Resources[ResourceKind.Fleets], [
+            new DataRow { Fields = new Dictionary<string, string> { ["ID"] = "1", ["Name"] = "Boeing 737-800", ["Type Code"] = "B738", ["Type (pax/cargo/...)"] = "pax" } },
+            new DataRow { Fields = new Dictionary<string, string> { ["ID"] = "2", ["Name"] = "Airbus A320", ["Type Code"] = "A320", ["Type (pax/cargo/...)"] = "pax" } }], true);
+        store.Save(workspace);
+    }
+
     /// <summary>The batch workspace, except that the second route has no end date.</summary>
     public static void SeedUndatedRoute(string directory) => SeedRoutes(directory, "");
 
@@ -198,7 +210,7 @@ public static class DataUiFixture
         for(var n=0;n<count;n++)
         {
             var row=new DataRow.Builder(); foreach(var field in Schemas.All[ResourceKind.Routes].Columns)row[field]="";
-            foreach(var (field,value) in new (string,string)[]{("ID",n.ToString()),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Type","jumpseat"),("Callsign","QA"+n.ToString("D5")),("Flight Number",n.ToString("D5")),("Fleet IDs","1"),("Start Date","2026-10-01 00:00:00"),("End Date","2027-10-01 00:00:00"),("Departure Time (HH:MM)","10:00"),("Arrival Time (HH:MM)","12:00"),("Remarks","row "+n),("Tags","performance"),("Is Hidden","FALSE"),("Altitude","33000"),("Cost Index","AUTO"),("_delete","FALSE")})row[field]=value;
+            foreach(var (field,value) in new (string,string)[]{("ID",n.ToString()),("Departure Airport (ICAO/IATA)","ZBAA"),("Arrival Airport (ICAO/IATA)","ZSPD"),("Type","jumpseat"),("Callsign","QA"+n.ToString("D5")),("Flight Number",n.ToString("D5")),("Fleet IDs",""),("Start Date","2026-10-01 00:00:00"),("End Date","2027-10-01 00:00:00"),("Departure Time (HH:MM)","10:00"),("Arrival Time (HH:MM)","12:00"),("Remarks","row "+n),("Tags","performance"),("Is Hidden","FALSE"),("Altitude","33000"),("Cost Index","AUTO"),("_delete","FALSE")})row[field]=value;
             rows.Add(row.ToRow());
         }
         var data=workspace.Resources[ResourceKind.Routes]; CsvAdapter.Import(ResourceKind.Routes,data,rows,true);

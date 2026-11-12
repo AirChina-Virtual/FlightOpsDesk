@@ -65,6 +65,8 @@ public sealed class FleetAssignmentService
                 issues.Add(new(row.LocalId, field, Messages.Define("Text_0CEB89655F")));
             if (kind == ResourceKind.Routes && row.Get("Type") != "jumpseat" && target.Count == 0)
                 issues.Add(new(row.LocalId, field, Messages.Define("Text_2335DBC57B")));
+            if (kind == ResourceKind.Routes && row.Get("Type") == "jumpseat" && target.Count > 0)
+                issues.Add(new(row.LocalId, field, Messages.Define("RouteJumpseatNoFleets")));
             foreach (var token in target.Where(t => !old.Contains(t, StringComparer.OrdinalIgnoreCase)))
                 if (!catalog[token].Available)
                     issues.Add(new(row.LocalId, field, Messages.Define("Text_F7B2F3BC0C", ("arg0", token), ("arg1", catalog[token].Problem))));

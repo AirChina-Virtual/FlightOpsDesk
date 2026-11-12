@@ -192,9 +192,10 @@ public sealed class FakeRemote
                 ? new JsonArray(ids.Select(v => (JsonNode?)JsonValue.Create(int.Parse(v!.ToString()))).ToArray())
                 : value?.DeepClone();
         }
-        // Live behaviour recorded in docs/API-CONTRACTS.md: a created jumpseat does not keep callsign / flight number.
+        // Live behaviour recorded in docs/API-CONTRACTS.md: a created jumpseat does not keep callsign / flight number or
+        // fleets (fleets: 2026-11-12, route 14217362).
         if (collection == "routes" && body["type"]?.ToString() == "jumpseat")
-        { row["callsign"] = null; row["flight_number"] = null; }
+        { row["callsign"] = null; row["flight_number"] = null; row["fleet_ids"] = null; }
         row["created_at"] = Stamp;
         row["updated_at"] = Stamp;
         Rows[path] = row;

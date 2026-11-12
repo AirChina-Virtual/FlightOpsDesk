@@ -23,6 +23,17 @@ public class FleetAssignmentServiceTests
 
     static string[] Selected(string csv) => csv.Split(',', StringSplitOptions.RemoveEmptyEntries);
 
+    // The server drops a jumpseat's fleets (2026-11-12): the picker refuses to give a jumpseat fleets, and clearing is fine.
+    [Fact]
+    public void A_jumpseat_route_cannot_be_given_fleets()
+    {
+        var w = WithFleets("1", "2");
+        var jumpseat = Row(("ID", "j"), ("Type", "jumpseat"), ("Fleet IDs", ""));
+        var refused = Service.Preview(w, ResourceKind.Routes, [jumpseat], ["1"], FleetAssignmentMode.Replace);
+        Assert.Equal("RouteJumpseatNoFleets", Assert.Single(refused.Issues).Description.Code);
+        Assert.Empty(Service.Preview(w, ResourceKind.Routes, [jumpseat.With("Fleet IDs", "1")], ["1"], FleetAssignmentMode.Remove).Issues);
+    }
+
     // current Fleet IDs, selection, mode -> new Fleet IDs; "=" means the row stays exactly as it was.
     [Theory]
     [InlineData("1,2", "3", FleetAssignmentMode.Add, "1,2,3")]

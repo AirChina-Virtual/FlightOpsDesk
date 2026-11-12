@@ -150,6 +150,9 @@ internal sealed class RoutePlanner(ApiContext ctx, RequestPlanners siblings) : E
             throw Block("ApiInvalid", "Fleet IDs");
         if (body.ContainsKey("fleet_ids") && c.After.Get("Type") == "scheduled" && ((long[])body["fleet_ids"]!).Length == 0)
             throw Block("ApiInvalid", "Fleet IDs");
+        // A jumpseat has no fleets: the server drops them (2026-11-12), so they are never sent.
+        if (c.After.Get("Type") == "jumpseat" && body.TryGetValue("fleet_ids", out var jumpseatFleets) && ((long[])jumpseatFleets!).Length > 0)
+            throw Block("ApiInvalid", "Fleet IDs");
         if (!Schemas.RouteTypes.Contains(c.After.Get("Type")))
             throw Block("ApiInvalid", "Type");
         foreach (var (field, min, max) in new[] { ("Callsign", 4, 7), ("Flight Number", 3, 6) })

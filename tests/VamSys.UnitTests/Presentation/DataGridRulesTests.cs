@@ -35,6 +35,23 @@ public class DataGridRulesTests
         Assert.Equal(readOnly, DataGridRules.CellReadOnly(row, field, mode));
     }
 
+    // The server drops a jumpseat's fleets: an empty fleet cell of a jumpseat cannot be filled, in every mode and whether
+    // or not the server knows the row; fleets that are there anyway can still be cleared.
+    [Theory]
+    [InlineData("jumpseat", "", true)]
+    [InlineData("jumpseat", "4", false)]
+    [InlineData("scheduled", "", false)]
+    [InlineData("cargo", "", false)]
+    public void A_jumpseats_empty_fleet_cell_is_read_only(string type, string fleets, bool readOnly)
+    {
+        var row = Row(("Type", type), ("Fleet IDs", fleets));
+        foreach (var mode in Enum.GetValues<RunMode>())
+        {
+            Assert.Equal(readOnly, DataGridRules.CellReadOnly(row, "Fleet IDs", mode));
+            Assert.Equal(readOnly, DataGridRules.CellReadOnly(row.WithIdentity(new("101", "7")), "Fleet IDs", mode));
+        }
+    }
+
     [Fact]
     public void The_status_column_names_deletion_conflict_new_draft_and_unchanged_rows_in_that_order()
     {

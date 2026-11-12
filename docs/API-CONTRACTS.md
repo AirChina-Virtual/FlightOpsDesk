@@ -62,6 +62,19 @@ Pilot API 是个人授权的 Authorization Code + PKCE，涉及 profile、bookin
 - 新在线机队选择一个 approved、unrestricted 参数，以字符串数组 `parameter_ids` 提交。参数查询只有只读模型，不新增资源 CRUD；旧 `Allowed Prefix IDs` 不自动映射，既有机队改绑／解绑禁用。旧任务缺少新选择要求标志时保留保存时的语义。
 - scheduled 机队集合使用 `Routes:Update:FleetIds:Scheduled`，不继承旧 `Routes:Update` 标记；整数请求与 string/number 响应按规范化集合完整核对，拒绝重复、缺少或新增成员。参数与机队批准信息只在当前连接、当前执行会话缓存；机队变化、读取失败或相关 422 失效。
 - 已有 jumpseat 允许呼号／班号为空并显示“服务端未保留”，这两个字段在线只读。创建仍提交合法必填值，只有这两个字段的显式 JSON null 可作为回读例外。机场、类型、远端 ID 与其他持久字段仍严格比较；缺字段或非空差异不豁免。
+- **各航线类型的服务器处理（2026-11-12 核查）**，来源：固定契约、vCCA 快照（3,580 条航线的原始 JSON，只读分析）、14217362 的写入与回读、独立脚本的已验证范围：
+
+  | 类型 | 证据 | 机队 | 呼号／班号 | 其他字段 | 客户端规则 |
+  |---|---|---|---|---|---|
+  | scheduled | 快照 3,181 条；自建样本 CRUD | 保存，必填 | 保存，需前缀批准 | 时刻、Routing、备注、Service Days、日期按值保存 | 机队必填；前缀预检 |
+  | cargo | 快照 394 条；无软件写入 | 保存 | 保存 | 同上 | 同 scheduled |
+  | repositioning | 快照 3 条；2026-11-06 软件新建 2 条 | 保存 | 保存，需前缀批准（422 证据） | 同上 | 同 scheduled |
+  | training | 快照 2 条；无写入 | 保存 | 保存 | 同上 | 同 scheduled |
+  | charter、vfr | 无（vCCA 没有这类航线） | 契约：必填 | 契约：必填 | 未知 | 同 scheduled |
+  | jumpseat | 独立脚本 CRUD；2026-11-12 软件新建 14217362 | **不保存**（发送的 `fleet_ids` 回读为 null） | 契约必填，但**不保存**（回读为 null） | 时刻、Routing、备注、内部备注、Cost Index、Service Days、隐藏、日期按值保存（独立脚本）；`container_ids` 契约写明忽略；未填开始日期时服务器填当天 | 机队必须为空（校验、规划、机队选择三处拦截）；呼号／班号照填，回读 null 视为一致；已有 jumpseat 的呼号／班号只读；不能改入或改出 jumpseat（契约：会清空机队和集装箱） |
+
+  只有 jumpseat 有“发送了但不保存”的字段。所有类型的 `flight_length`、`flight_distance` 由服务器计算，客户端不发送。
+- jumpseat 不保存机队：2026-11-12 真实验收中带 `fleet_ids: [32227]` 新建的 jumpseat（航线 14217362）回读为 `fleet_ids: null`。此后 jumpseat 填了机队会在校验中标出、规划时拒绝、机队选择中拒绝；已经带机队发出的旧任务，回读到 null 视为一致。
 - jumpseat 候选按机场对、类型、起降时刻与有效日期比较。无 ID 的人工候选须不在提交前候选 ID 中，持久字段一致且创建时间在持久化请求窗口内（±60 秒）；缺证据保持 Unknown，不能重发。
 - `updated_at` 不作为业务版本号。预检诊断分别保存时间戳和业务字段差异；仅元数据变化不制造冲突。不自动扫描 booking／PIREP，不将既有时间相关性写成确定因果。
 - 诊断保留 HTTP、阶段、本地时间、服务器 Date、完整字段错误、error_id 和可用追踪头。先脱敏再按 1 MiB 限制正文，并保存截断标志和完整脱敏正文哈希；UI 摘要可缩短。OAuth 正文、凭据和 Cookie 不导出。原 Diagnostic 与新可选 JSON 字段兼容，数据库仍为 v4。

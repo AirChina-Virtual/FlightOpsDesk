@@ -20,7 +20,8 @@ public sealed partial class MainWindow
         var form = new FleetChoiceDialogViewModel(BatchTargetsText(selection, single != null), options, initial, singleFleet: resource == ResourceKind.Aircraft, canChooseMode: resource == ResourceKind.Routes, localization)
         {
             Title = resource == ResourceKind.Aircraft ? L("Text_F1439C5A73") : L("Text_F042305012"),
-            PrimaryLabel = L("Text_5C250CFB41"),
+            // One row: the choice is the change, applied without a second preview dialog (undo reverts it).
+            PrimaryLabel = single != null ? L("FleetChoiceApply") : L("Text_5C250CFB41"),
             AvailableHeight = Math.Max(160, RootGrid.ActualHeight - 220)
         };
         if (!await Confirm(form))
@@ -33,7 +34,7 @@ public sealed partial class MainWindow
         var labels = options.ToDictionary(o => o.Token, o => o.Describe(localization), StringComparer.OrdinalIgnoreCase);
         string Label(string value) => string.Join("；", FleetAssignmentService.Tokens(value).Select(t => labels.GetValueOrDefault(t, t)));
         var before = rows.ToDictionary(r => r.LocalId);
-        if (!await ConfirmList(L("Text_D1482F496E"), preview.Rows.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n{Label(before[r.LocalId].Get(field))} → {Label(r.Get(field))}").ToList(),
+        if (single == null && !await ConfirmList(L("Text_D1482F496E"), preview.Rows.Select(r => $"{Schemas.Key(resource, r)} {r.Get("Flight Number")}{r.Get("Registration")}\n{Label(before[r.LocalId].Get(field))} → {Label(r.Get(field))}").ToList(),
             L("Text_2354C137CE"), [BatchScope(selection, preview.Rows.Count)], DialogHeight.FleetPreview))
             return;
         await batch.ApplyFleetsAsync(resource, preview);

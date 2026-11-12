@@ -239,8 +239,12 @@ public sealed class DataGridViewModel(IDataGridHost host, CellEditCommitter edit
             var kind = rowLink.Kind;
             var id = view!.Row.LocalId;
             var (replacement, changedDelta) = edits.Commit(data, view.Row, field, value, host.Baseline);
-            // Rows are replaced, never edited in place: the view follows the replacement.
-            view.ReplaceRow(replacement);
+            // Rows are replaced, never edited in place: the view follows the replacement. A type change can clear the
+            // fleets and change which cells are read-only, so the whole row is shown again.
+            if (field == "Type")
+                view.Rebind(replacement);
+            else
+                view.ReplaceRow(replacement);
             view.Cells.FirstOrDefault(c => c.Field == "_delete")?.RefreshLanguage();
             host.CellEdited(owner, kind, data, id, changedDelta);
         })
@@ -253,7 +257,8 @@ public sealed class DataGridViewModel(IDataGridHost host, CellEditCommitter edit
             DayName = day => Enum.TryParse<DayOfWeek>(day, true, out var weekday) ? language.DisplayCulture.DateTimeFormat.GetDayName(weekday) : day,
             Label = key => language.Get(key),
             OriginalLabel = value => language.Get("CellServerValue", ("value", value.Length == 0 ? language.Get("CellEmptyValue") : value)),
-            ReadOnlyReason = () => view is null ? "" : Schemas.Deleted(view.Row) ? language.Get("CellReadOnlyDeleted") : language.Get("CellReadOnlyServer"),
+            ReadOnlyReason = () => view is null ? "" : Schemas.Deleted(view.Row) ? language.Get("CellReadOnlyDeleted")
+                : DataGridRules.JumpseatFleets(view.Row, field) ? language.Get("RouteJumpseatNoFleetsReadOnly") : language.Get("CellReadOnlyServer"),
             EditEnded = reverted =>
             {
                 edits.ResetContinuation();

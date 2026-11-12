@@ -20,6 +20,9 @@ public sealed class CellEditCommitter
         var before = ChangePlanner.GetChangeKind(current, baseline.GetValueOrDefault(id));
         var key = id + ":" + field;
         var replacement = current.With(field, value);
+        // A route that becomes a jumpseat loses its fleets in the same step (the server drops a jumpseat's fleets).
+        if (field == "Type" && value == "jumpseat" && current.Get("Fleet IDs") != "")
+            replacement = replacement.With("Fleet IDs", "");
         data.Edit([id], () => data.ReplaceDraftRows([replacement]), newStep: continuing != key);
         continuing = key;
         var after = ChangePlanner.GetChangeKind(replacement, baseline.GetValueOrDefault(id));

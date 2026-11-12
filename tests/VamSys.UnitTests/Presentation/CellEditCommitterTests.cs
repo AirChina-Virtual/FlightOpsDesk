@@ -16,6 +16,20 @@ public class CellEditCommitterTests
         return (data, row, new() { [row.LocalId] = row });
     }
 
+    // A route that becomes a jumpseat loses its fleets in the same undo step; other type changes keep them.
+    [Fact]
+    public void Changing_a_route_to_jumpseat_clears_its_fleets_in_the_same_step()
+    {
+        var row = Row(("Type", "scheduled"), ("Fleet IDs", "4,5"));
+        var data = new ResourceData();
+        data.Draft.Add(row);
+        var edits = new CellEditCommitter();
+        var jumpseat = edits.Commit(data, row, "Type", "jumpseat", new Dictionary<Guid, DataRow>()).Replacement;
+        Assert.Equal("", jumpseat.Get("Fleet IDs"));
+        Assert.Single(data.Undo);
+        Assert.Equal("4,5", edits.Commit(data, row, "Type", "cargo", new Dictionary<Guid, DataRow>()).Replacement.Get("Fleet IDs"));
+    }
+
     [Fact]
     public void A_commit_replaces_the_draft_row_and_leaves_the_original_untouched()
     {

@@ -70,7 +70,7 @@ static class ReviewPlanFixture
             With(routes[0], ("Remarks", "edited 30")), With(routes[1], ("Remarks", "edited 31")), With(routes[2], ("Remarks", "edited 32")), With(routes[3], ("Remarks", "edited 33")),
             With(routes[4], ("Fleet IDs", "1,2")), With(routes[5], ("_delete", "TRUE")),
             With(Route(36, Token(11) + "," + Token(10)), ("ID", "")),
-            With(Route(37, "1"), ("ID", ""), ("Type", "jumpseat")),
+            With(Route(37, ""), ("ID", ""), ("Type", "jumpseat")),
             With(Route(38, Token(14)), ("ID", ""))
         ]);
         return w;

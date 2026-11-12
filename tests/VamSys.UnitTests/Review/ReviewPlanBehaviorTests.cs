@@ -29,7 +29,7 @@ public class ReviewPlanBehaviorTests
             Routes Update #34 Ready - deps[] airlineParam=False fields[Fleet IDs=Set:1,2]
             Routes Delete #35 Ready - deps[] airlineParam=False fields[]
             Routes Create #36 Ready - deps[11] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0036,Flight Number=Set:0036,Type=Set:scheduled,Departure Airport (ICAO/IATA)=Set:ZBAA,Arrival Airport (ICAO/IATA)=Set:ZGGG,Remarks=Set:r36,Altitude=Set:33000,Fleet IDs=Set:local:0000000b-0000-0000-0000-000000000000,1]
-            Routes Create #37 Ready - deps[] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0037,Flight Number=Set:0037,Type=Set:jumpseat,Departure Airport (ICAO/IATA)=Set:ZBAA,Arrival Airport (ICAO/IATA)=Set:ZGGG,Remarks=Set:r37,Altitude=Set:33000,Fleet IDs=Set:1]
+            Routes Create #37 Ready - deps[] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0037,Flight Number=Set:0037,Type=Set:jumpseat,Departure Airport (ICAO/IATA)=Set:ZBAA,Arrival Airport (ICAO/IATA)=Set:ZGGG,Remarks=Set:r37,Altitude=Set:33000,Fleet IDs=Clear:]
             Routes Create #38 Deferred ReviewDependency deps[14] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0038,Flight Number=Set:0038,Type=Set:scheduled,Departure Airport (ICAO/IATA)=Set:ZBAA,Arrival Airport (ICAO/IATA)=Set:ZGGG,Remarks=Set:r38,Altitude=Set:33000,Fleet IDs=Set:local:0000000e-0000-0000-0000-000000000000]
             blockers[]
             """.ReplaceLineEndings("\n"), Describe(plan).ReplaceLineEndings("\n"));

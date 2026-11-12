@@ -161,6 +161,9 @@ public static class Schemas
                         Add(r, f, Messages.Define("Text_B283E8E5F2"));
                 if (r.Get("Type") != "jumpseat" && r.Get("Fleet IDs") == "")
                     Add(r, "Fleet IDs", Messages.Define("Text_134FD96D33"));
+                // The server drops a jumpseat's fleets (2026-11-12, route 14217362): sending them could never be read back.
+                if (r.Get("Type") == "jumpseat" && r.Get("Fleet IDs") != "")
+                    Add(r, "Fleet IDs", Messages.Define("RouteJumpseatNoFleets"));
                 if (r.Get("Callsign") != "" && r.Get("Callsign").Length is < 4 or > 7)
                     Add(r, "Callsign", Messages.Define("Text_39CD1EC048"));
                 if (r.Get("Flight Number") != "" && r.Get("Flight Number").Length is < 3 or > 6)

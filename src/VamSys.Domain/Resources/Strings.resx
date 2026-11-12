@@ -32,6 +32,7 @@
   <data name="Text_182B2BEF88" xml:space="preserve">
     <value>作用于所选 {arg0:N0} 条记录，仅使用当前工作区机型。未解析关联会保留并提示。</value>
   </data>
+  <data name="FleetChoiceApply" xml:space="preserve"><value>应用</value></data>
   <data name="Text_5C250CFB41" xml:space="preserve">
     <value>预览变更</value>
   </data>
@@ -675,6 +676,8 @@
   <data name="Text_EFB86BD704" xml:space="preserve">
     <value>航线类型无效</value>
   </data>
+  <data name="RouteJumpseatNoFleetsReadOnly" xml:space="preserve"><value>jumpseat 航线不带机型，服务器不会保存</value></data>
+  <data name="RouteJumpseatNoFleets" xml:space="preserve"><value>jumpseat 航线不带机型，请清空</value></data>
   <data name="Text_134FD96D33" xml:space="preserve">
     <value>非 jumpseat 航线必填</value>
   </data>

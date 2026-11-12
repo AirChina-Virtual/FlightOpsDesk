@@ -151,6 +151,23 @@ public class ReadbackVerifierTests
         Assert.False(Verify(kit, update, kit.Map(ResourceKind.Routes, ApiKit.Jumpseat11)).Passed);
     }
 
+    // 2026-11-12, route 14217362: a jumpseat sent with fleets came back with "fleet_ids": null. A task saved with that
+    // request settles on the read; new jumpseats are no longer sent with fleets (planner and validation block them).
+    [Fact]
+    public void A_created_jumpseat_sent_with_fleets_may_come_back_without_them()
+    {
+        var kit = Kit();
+        var item = ApiKit.Create(ResourceKind.Routes, ("Type", "jumpseat"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", "CAO1234"), ("Flight Number", "CA1234"));
+        var expected = ApiExpectedFor(kit, item).ToDictionary();
+        expected["fleet_ids"] = ApiKit.Json("[4]");
+        var current = kit.Map(ResourceKind.Routes, """{"id":90,"departure_id":101,"arrival_id":102,"type":"jumpseat","callsign":null,"flight_number":null,"fleet_ids":null}""");
+        Assert.True(kit.Api.VerifyReadback(item, current, item.After, expected).Passed);
+        // a scheduled route that loses its fleets is still a mismatch
+        var scheduled = ApiKit.Create(ResourceKind.Routes, ("Type", "scheduled"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", "CAO1234"), ("Flight Number", "CA1234"), ("Fleet IDs", "4"));
+        var lost = kit.Map(ResourceKind.Routes, """{"id":91,"departure_id":101,"arrival_id":102,"type":"scheduled","callsign":"CAO1234","flight_number":"CA1234","fleet_ids":null}""");
+        Assert.False(Verify(kit, scheduled, lost).Passed);
+    }
+
     [Fact]
     public void A_recovered_jumpseat_must_be_new_and_created_inside_the_request_window()
     {

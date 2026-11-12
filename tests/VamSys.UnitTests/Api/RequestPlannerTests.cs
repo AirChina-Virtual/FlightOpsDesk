@@ -338,6 +338,8 @@ public class RequestPlannerTests
         // The contract asks for a callsign and flight number on every route type, jumpseats included.
         var steps = kit.Api.Plan(ApiKit.Create(ResourceKind.Routes, ("Type", "jumpseat"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", "CAO1234"), ("Flight Number", "CA1234"), ("Remarks", "seat")));
         Is(Only(steps), HttpMethod.Post, "routes", """{"type":"jumpseat","departure_id":101,"arrival_id":102,"callsign":"CAO1234","flight_number":"CA1234","remarks":"seat"}""");
+        // the server drops a jumpseat's fleets (2026-11-12): they are refused instead of sent
+        Assert.Equal("ApiInvalid", ApiKit.BlockedWith(() => kit.Api.Plan(ApiKit.Create(ResourceKind.Routes, ("Type", "jumpseat"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", "CAO1234"), ("Flight Number", "CA1234"), ("Fleet IDs", "4")))));
     }
 
     [Fact]

@@ -44,6 +44,7 @@ public sealed partial class EditableCell : ContentControl
         HorizontalContentAlignment = HorizontalAlignment.Stretch;
         VerticalContentAlignment = VerticalAlignment.Stretch;
         CharacterReceived += TypedOnCell;
+        Unloaded += (_, _) => { pointerOver = false; CloseOwnHint(); };
     }
     // Recycled for another row: an open editor belongs to the previous cell.
     void CellChanged(CellViewModel? old, CellViewModel? next) => EndEdit(false, normalize: false);
@@ -99,6 +100,21 @@ public sealed partial class EditableCell : ContentControl
     // thousands of tooltips. The tooltip reads the hint when it opens, so a recycled cell shows its current row's hint.
     ToolTip? hintTip;
     bool pointerOver;
+    // A tooltip opened from code stays open until code closes it (the service only closes the ones it opened): at most one
+    // hint is open, and it closes when the pointer leaves, editing starts, the cell unloads or another hint opens.
+    static ToolTip? openHint;
+    internal static void CloseHint()
+    {
+        if (openHint is { } open)
+        { openHint = null; open.IsOpen = false; }
+    }
+    void CloseOwnHint()
+    {
+        if (hintTip is { } tip && ReferenceEquals(openHint, tip))
+            CloseHint();
+        else if (hintTip is { IsOpen: true } own)
+            own.IsOpen = false;
+    }
     protected override void OnPointerEntered(PointerRoutedEventArgs e)
     {
         base.OnPointerEntered(e);
@@ -118,14 +134,22 @@ public sealed partial class EditableCell : ContentControl
         var timer = DispatcherQueue.CreateTimer();
         timer.Interval = TimeSpan.FromMilliseconds(UiTokens.HintDelayMilliseconds);
         timer.IsRepeating = false;
-        timer.Tick += (_, _) => { if (pointerOver && editorRoot is null && Cell?.Hint != null) tip.IsOpen = true; };
+        timer.Tick += (_, _) =>
+        {
+            if (!pointerOver || editorRoot is not null || Cell?.Hint is null || !IsLoaded)
+                return;
+            CloseHint();
+            openHint = tip;
+            tip.IsOpen = true;
+        };
         timer.Start();
     }
-    protected override void OnPointerExited(PointerRoutedEventArgs e) { base.OnPointerExited(e); pointerOver = false; }
+    protected override void OnPointerExited(PointerRoutedEventArgs e) { base.OnPointerExited(e); pointerOver = false; CloseOwnHint(); }
     protected override void OnTapped(TappedRoutedEventArgs e) { base.OnTapped(e); if (editorRoot != null) e.Handled = true; }
 
     internal void BeginEdit(FocusState focus = FocusState.Programmatic, string? replaceWith = null)
     {
+        CloseOwnHint();
         if (editorRoot != null || Cell is not { IsReadOnly: false } cell)
             return;
         if (cell.Type == FieldType.Bool)

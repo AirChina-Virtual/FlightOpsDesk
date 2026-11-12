@@ -32,6 +32,7 @@
   <data name="Text_182B2BEF88" xml:space="preserve">
     <value>Applies to {arg0:N0} selected records using this workspace's fleets. Unresolved references are retained and flagged.</value>
   </data>
+  <data name="FleetChoiceApply" xml:space="preserve"><value>Apply</value></data>
   <data name="Text_5C250CFB41" xml:space="preserve">
     <value>Preview changes</value>
   </data>
@@ -675,6 +676,8 @@
   <data name="Text_EFB86BD704" xml:space="preserve">
     <value>Invalid route type</value>
   </data>
+  <data name="RouteJumpseatNoFleetsReadOnly" xml:space="preserve"><value>A jumpseat route has no fleets; the server does not keep them</value></data>
+  <data name="RouteJumpseatNoFleets" xml:space="preserve"><value>A jumpseat route has no fleets; clear this field</value></data>
   <data name="Text_134FD96D33" xml:space="preserve">
     <value>Required for non-jumpseat routes</value>
   </data>

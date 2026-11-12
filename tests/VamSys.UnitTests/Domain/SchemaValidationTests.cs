@@ -40,7 +40,6 @@ public class SchemaValidationTests
 
     [Theory]
     [InlineData("Type", "weird", true)]
-    [InlineData("Type", "jumpseat", false)]
     [InlineData("Callsign", "AB", true)]
     [InlineData("Callsign", "ABCDEFGH", true)]
     [InlineData("Callsign", "ABCD", false)]
@@ -86,6 +85,11 @@ public class SchemaValidationTests
         Assert.Empty(Check(Base(), ResourceKind.Routes, ValidRoute(("Type", "jumpseat"), ("Fleet IDs", ""))));
         Assert.Equal(["Fleet IDs"], Fields(Check(Base(), ResourceKind.Routes, ValidRoute(("Fleet IDs", "")))));
     }
+
+    // The server drops a jumpseat's fleets (2026-11-12): a jumpseat with fleets is flagged on that field.
+    [Fact]
+    public void A_jumpseat_route_with_fleets_is_flagged_on_the_fleets()
+        => Assert.Equal(["Fleet IDs"], Fields(Check(Base(), ResourceKind.Routes, ValidRoute(("Type", "jumpseat")))));
 
     [Theory]
     [InlineData("pax", "Max Passengers", "100", "")]

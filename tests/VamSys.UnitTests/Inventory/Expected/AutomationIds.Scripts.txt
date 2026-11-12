@@ -31,6 +31,7 @@ script-name:Airline name => found in source or resx
 script-name:Airline parameter => found in source or resx
 script-name:An airport creation is still unverified. => found in source or resx
 script-name:Another application instance is using this data directory. => found in source or resx
+script-name:Apply => found in source or resx
 script-name:Apply to drafts => found in source or resx
 script-name:Assign fleets => found in source or resx
 script-name:B738 => found in source or resx

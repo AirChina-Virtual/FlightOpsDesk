@@ -83,6 +83,28 @@ public class DialogTests
         Assert.Empty(Stored(app.DataDirectory).Jobs);
     }
 
+    // 4.2 feedback: one row's fleets are chosen in one dialog and applied on "Apply", without a second preview dialog.
+    [WindowFact]
+    public void A_single_rows_fleets_are_chosen_in_one_dialog()
+    {
+        using var app = Start("dialog-fleet-single", DataUiFixture.SeedFleetChoice, Package.Product);
+        app.Context = () => app.Name("StatusLabel");
+
+        PickResource(app, "Routes");
+        app.Wait(() => app.FindNamed("Choose fleet", ControlType.Button).FirstOrDefault(), "a fleet button").Invoke();
+        app.WaitText("Select available fleets (multiple)");
+        app.Wait(() => app.FindNamed("Airbus A320 · A320 · 2", ControlType.CheckBox).FirstOrDefault(), "the second fleet").Toggle();
+        app.DialogPrimary("Apply").Invoke();
+        app.DialogClosed();
+        Thread.Sleep(1500);
+        Assert.Empty(app.Find("CloseButton"));
+        app.Close();
+
+        var routes = Stored(app.DataDirectory).Resources[ResourceKind.Routes].Draft;
+        Assert.Equal(["1", "2"], routes.Single(r => r.Get("ID") == "1").Get("Fleet IDs").Split(',').Order());
+        Assert.Equal("1", routes.Single(r => r.Get("ID") == "2").Get("Fleet IDs"));
+    }
+
     [WindowFact]
     public void Deleting_an_airport_that_routes_use_is_refused_with_the_dependencies()
     {

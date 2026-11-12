@@ -230,6 +230,7 @@ public sealed partial class MainWindow : Window
         if (!ready || !gate.CanNavigate)
             return;
         CancelDataQuery();
+        EditableCell.CloseHint();
         shell.TryNavigate(ShellPages.FromTag((args.SelectedItem as NavigationViewItem)?.Tag?.ToString()));
         Render();
     }
