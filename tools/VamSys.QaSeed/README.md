@@ -10,6 +10,7 @@ net10.0 控制台程序，只提供命令行入口，供 `scripts/open-datagrid-
 | `--verify-package <目录>`、`--verify-qa-package <目录>` | 打包检查（`PackageChecks`），`scripts/build.ps1 -Publish` 每次发布都会运行 |
 | `--export-diagnostic-replay <JSON路径>` | 通过模拟 422/500 生成脱敏诊断与 SHA-256 |
 | `--check-contract <仓库目录>` | 契约漂移检查（综合优化计划 4.3），见下 |
+| `--verify-read-only <报告JSON路径>` | 对真实 vAMSYS 的只读验证（综合优化计划 5.1），见下 |
 
 所有 `--seed-*` 入口在写入前都会拒绝已有文件的目录。
 
@@ -33,3 +34,22 @@ dotnet run --no-build --project tools/VamSys.QaSeed -c Release -- --check-contra
 ~~~
 
 检查本身的测试见 `IntegrationTests.Packaging.ContractDriftTests`（用模拟来源，不连网）。
+
+## 只读验证（5.1）
+
+`ReadOnlyVerification` 一次完成 E4、E8、G7、E10 需要的真实请求，只发 GET 和取令牌的 POST；另有一层处理器在请求发出前拒绝其他任何方法。GET 走产品传输层（每秒 1 次的限流预算、只读重试）。
+
+| 项 | 做法 |
+|---|---|
+| E10 | 分别以 scope `*`、不带 scope、空 scope 取令牌，各用 1 次 GET 看能否读取；只记录状态码和 OAuth 错误码 |
+| E4 | 机场、机队、航路按每页 100 和 500 读全，航线另读 1000；比较 ID 集合是否一致、有无重复，记录每页实际条数和游标是否保留页大小。飞机读出各机队后，最大的机队再按 100 和 500 各读一遍 |
+| E8 | 取一个机场的 ICAO、IATA 和一个机队名，分别用原值、改变大小写、部分值筛选，与完整列表对照 |
+| G7 | 在飞机所属机队用注册号原值、改变大小写、部分值筛选，再在另一个机队用原值筛选 |
+
+凭据从环境变量 `VAMSYS_CLIENT_ID`、`VAMSYS_CLIENT_SECRET` 读取，没有时在控制台提示输入（密钥不回显）。凭据和令牌不写入报告。报告含 ID、条数、所用的样本值和状态码。真实 vCCA 数据约 180 次请求，约 3 分半（2026-11-11）。每页记录 `meta` 的字段名和种类（不保存游标值）；游标认 `next_cursor_url`，没有时用 `next_page_url`。
+
+~~~powershell
+dotnet run --no-build --project tools/VamSys.QaSeed -c Release -- --verify-read-only artifacts/readonly-check/report.json
+~~~
+
+检查本身的测试见 `IntegrationTests.Packaging.ReadOnlyVerificationTests`（模拟服务器）。

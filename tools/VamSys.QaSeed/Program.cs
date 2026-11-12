@@ -8,6 +8,13 @@ if(args.Length==2 && args[0] is "--verify-package" or "--verify-qa-package")
 {PackageChecks.Verify(args[1],args[0]=="--verify-qa-package");return;}
 if(args.Length==3 && args[0]=="--seed-data-ui"){DataUiFixture.Seed(args[1],int.Parse(args[2]));return;}
 
+if(args.Length==2 && args[0]=="--verify-read-only")
+{
+    try { Environment.ExitCode = await ReadOnlyVerification.RunAsync(args[1]); }
+    catch (Exception e) when (e is HttpRequestException or TaskCanceledException or InvalidOperationException or IOException)
+    { Console.Error.WriteLine("Read-only check stopped: " + e.Message); Environment.ExitCode = 2; }
+    return;
+}
 if(args.Length==2 && args[0]=="--check-contract")
 {
     try { Environment.ExitCode = await ContractDrift.RunAsync(args[1]); }

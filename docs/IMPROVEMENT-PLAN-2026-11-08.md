@@ -82,8 +82,9 @@
 
 | 项 | 内容 |
 |---|---|
-| 5.1 | 一个只读脚本完成 E4（每页 500 条）、E8（机场／机队筛选匹配方式）、G7（`filter[registration]`）、E10（OAuth scope）验证 |
-| 5.2 | 按结果实现 E4 → E5 按资源刷新 → E6（D9）；E8；G7；E10 |
+| 5.1 | 一个只读脚本完成 E4（每页 500 条）、E8（机场／机队筛选匹配方式）、G7（`filter[registration]`）、E10（OAuth scope）验证。**完成（2026-11-11）**：`VamSys.QaSeed --verify-read-only`，只发 GET 和取令牌请求，由用户输入凭据在真实 vCCA 上运行两次（第一次工具只认 `next_cursor_url`，未翻页，修正后重跑；E8、G7、E10 两次结果一致），报告在 `artifacts/readonly-check/`。结果见下方“5.1 结果” |
+| 5.1 结果 | **E4 不采用**：每页 100、500、1000 条服务器都只返回 100 条（`meta.per_page=100`，静默封顶），三种页大小读到的 ID 集合相同、无重复（机场 242、航线 3,578）。**分页字段**：真实响应用 `meta.next_page_url`／`next_cursor`，没有契约所写的 `next_cursor_url`；产品的 Pager 已兼容 `next_page_url`，此前真实刷新正常。**E8 可采用**：机场 `filter[icao]`、`filter[iata]` 精确匹配、不分大小写（`LEMD`／`lemd` 命中，`LEM` 不命中）；机队 `filter[name]` 包含匹配、不分大小写（返回超集，客户端仍用 `IsDuplicate` 判定，不会漏）。**G7**：飞机 `filter[registration]` 精确匹配、**区分大小写**，只在所给机队内（`b-5495`、`-549` 不命中，其他机队不命中），所以按注册号确认仍要逐机队查询，并使用服务器上原样的注册号。**E10 不实施**：`scope=*`、不带 scope、空 scope 都能取得令牌并读取，契约也未声明任何 scope，没有更细的权限可申请；不带 scope 的令牌未验证写入，继续用 `*` |
+| 5.2 | 按结果实现 ~~E4~~ → E5 按资源刷新 → E6（D9）；E8；G7；~~E10~~ |
 | 5.3 | E7（D5）、E9（D10） |
 
 ## 阶段 6：真实写入取证

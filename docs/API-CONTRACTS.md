@@ -16,7 +16,7 @@ Operations 固定为本轮 10 月 20 日证据中的快照，SHA-256 为 `1EC1A8
 | 航路 | GET/POST `/routings`；GET/PUT/DELETE `/routings/{routing_id}` | 起降为机场 ID，更新不能改变；单条 GET/POST/PUT 裸对象；tag 可随 POST；永久删除 | 是 | 通过 | 按矩阵区分 |
 | 航线 | GET/POST `/routes`；GET/PUT/DELETE `/routes/{route_id}` | RouteData 没有 `airline_id`，归属取当前连接的 VA；fleet_ids 为整数数组；UTC HH:MM:SS，日期按 `2025-01-01T00:00:00+00:00` 格式提交；callsign／flight_number 对所有类型必填；cost_index 为空、AUTO 或 0–999；起降不可更新；软删除 | 是，实验接口 | 通过 | 自建 scheduled/jumpseat 样本通过 |
 
-集合读取处理 `data` 数组与 `meta.next_cursor_url`。每页请求 `page[size]=100`（文档默认 15 条，未写上限）；首页如果因此返回 400／422，改用服务器默认页长继续读取。分页限制 HTTPS、同源及 Operations 路径，拒绝循环页。
+集合读取处理 `data` 数组与 `meta.next_cursor_url`，没有时用 `meta.next_page_url`。2026-11-11 只读验证（综合优化计划 5.1）：真实响应只有 `next_page_url`／`next_cursor`，没有契约所写的 `next_cursor_url`；`page[size]` 超过 100 时服务器静默按 100 返回（`meta.per_page=100`）。每页请求 `page[size]=100`（文档默认 15 条，未写上限，实际上限 100）；首页如果因此返回 400／422，改用服务器默认页长继续读取。分页限制 HTTPS、同源及 Operations 路径，拒绝循环页。
 
 除航线外，其余四类数据缺少 `airline_id` 时仍会拒绝，继续用于识别错误的 VA。航线数据本身不能证明连接到了哪个 VA，因此连接验证仍要读取机型或机场。
 
