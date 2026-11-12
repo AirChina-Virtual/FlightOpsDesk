@@ -26,9 +26,9 @@ public sealed class FakeOnlineSession : IOnlineSession
         if (Identifies) AirlineId = "7";
         return Task.FromResult(Identifies);
     }
-    public async Task RefreshSnapshotsAsync(Func<Workspace, Task> persist, CancellationToken ct, Action<ResourceKind, int>? progress)
+    public async Task RefreshSnapshotsAsync(Func<Workspace, Task> persist, CancellationToken ct, Action<ResourceKind, int>? progress, IEnumerable<ResourceKind>? resources)
     {
-        Calls.Add("refresh");
+        Calls.Add(resources is null ? "refresh" : "refresh:" + string.Join(",", resources));
         if (RefreshError != null) throw RefreshError;
         progress?.Invoke(ResourceKind.Airports, 3);
         if (Stage != null) await persist(new Workspace());

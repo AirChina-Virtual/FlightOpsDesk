@@ -131,6 +131,20 @@ public class ConnectionServiceTests
         Assert.Equal(["refresh", "parameters:True"], f.Api.Calls);
     }
 
+    // E5: the airline parameters belong to fleets and routes; a refresh of only another resource leaves them alone.
+    [Theory]
+    [InlineData(ResourceKind.Routes, true)]
+    [InlineData(ResourceKind.Fleets, true)]
+    [InlineData(ResourceKind.Airports, false)]
+    [InlineData(ResourceKind.Aircraft, false)]
+    [InlineData(ResourceKind.Routings, false)]
+    public async Task A_refresh_of_one_resource_reads_the_parameters_only_for_fleets_and_routes(ResourceKind kind, bool parameters)
+    {
+        var f = new Fixture(RunMode.Online);
+        Assert.True(await f.Service.RefreshAsync((_, _) => { }, CancellationToken.None, kind));
+        Assert.Equal(parameters ? ["refresh:" + kind, "parameters:True"] : ["refresh:" + kind], f.Api.Calls);
+    }
+
     [Fact]
     public async Task A_failed_refresh_leaves_the_workspace_as_it_was()
     {

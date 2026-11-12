@@ -32,12 +32,15 @@ public sealed class ConnectionService(WorkspaceSession session, IOnlineGateway o
         return true;
     }
 
-    // Reads every resource from the server and stages it; each staged snapshot is saved before the next is read.
-    // Returns whether the airline parameters could be read.
-    public async Task<bool> RefreshAsync(Action<ResourceKind, int> progress, CancellationToken ct)
+    // Reads every resource from the server (or one and what it refers to, E5) and stages it, saved once all was read.
+    // Returns whether the airline parameters could be read; they belong to fleets and routes, so a refresh of only
+    // airports, aircraft or routings leaves them as they were.
+    public async Task<bool> RefreshAsync(Action<ResourceKind, int> progress, CancellationToken ct, ResourceKind? only = null)
     {
         var api = online.Session(session.Workspace);
-        await api.RefreshSnapshotsAsync(session.SaveStagedAsync, ct, progress);
+        await api.RefreshSnapshotsAsync(session.SaveStagedAsync, ct, progress, only is { } kind ? [kind] : null);
+        if (only is ResourceKind.Airports or ResourceKind.Aircraft or ResourceKind.Routings)
+            return true;
         return await ReadOptionalParametersAsync(ct);
     }
 

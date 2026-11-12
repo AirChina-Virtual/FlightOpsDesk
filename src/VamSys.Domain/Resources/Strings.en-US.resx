@@ -786,6 +786,7 @@
   <data name="ApiFleetSet" xml:space="preserve">
     <value>Route fleet replacement and clearing semantics have not been verified against an instance.</value>
   </data>
+  <data name="ApiRefreshResource" xml:space="preserve"><value>Refresh {resource} only</value></data>
   <data name="ApiRefresh" xml:space="preserve">
     <value>Refresh from API</value>
   </data>
@@ -854,6 +855,7 @@ Remote: {remote}</value>
   <data name="ApiRefreshFirst" xml:space="preserve">
     <value>Refresh from the API to establish remote identities first.</value>
   </data>
+  <data name="ApiAircraftElsewhere" xml:space="preserve"><value>Aircraft {registration} no longer reads under its old fleet but still exists in fleet {fleet}; it may have been moved rather than deleted. Check it before going on.</value></data>
   <data name="ApiUnknown" xml:space="preserve">
     <value>The result is unconfirmed. Resume checks the remote state without repeating writes. Inspect the original record in Orwell.</value>
   </data>

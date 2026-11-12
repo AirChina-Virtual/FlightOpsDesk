@@ -18,8 +18,22 @@ internal sealed class IdentityIndex(ApiContext ctx)
             knownAirportsVersion++;
     }
     public void Forget(ResourceKind kind, string id) { if (known.Remove((kind, id)) && kind == ResourceKind.Airports) knownAirportsVersion++; }
-    // A completed refresh read everything into a scratch session; its rows become this session's.
-    public void Adopt(IdentityIndex scratch) { known = scratch.known; knownAirportsVersion++; }
+    // A completed refresh read everything into a scratch session; its rows become this session's. A partial refresh (E5)
+    // replaces only the entries of the resources it read; the others keep resolving as before.
+    public void Adopt(IdentityIndex scratch, IReadOnlySet<ResourceKind>? resources = null)
+    {
+        if (resources is null)
+            known = scratch.known;
+        else
+        {
+            var merged = known.Where(p => !resources.Contains(p.Key.Item1)).ToDictionary(p => p.Key, p => p.Value);
+            foreach (var (key, row) in scratch.known)
+                if (resources.Contains(key.Item1))
+                    merged[key] = row;
+            known = merged;
+        }
+        knownAirportsVersion++;
+    }
 
     public DataRow? Known(ResourceKind kind, string id)
         => known.GetValueOrDefault((kind, id)) ?? ctx.Workspace.Resources[kind].Snapshot.FirstOrDefault(r => r.Identity?.RemoteId == id && r.Identity.ConnectionId == ctx.Workspace.AirlineId);

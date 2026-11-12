@@ -42,8 +42,8 @@ public sealed class OnlineGateway(WorkspaceStoreAdapter storage) : IOnlineGatewa
     {
         public string? AirlineId => api.SessionAirlineId;
         public Task<bool> IdentifyAirlineAsync(CancellationToken ct) => api.IdentifyAirlineAsync(ct);
-        public Task RefreshSnapshotsAsync(Func<Workspace, Task> persist, CancellationToken ct, Action<ResourceKind, int>? progress)
-            => api.RefreshSnapshotsAsync(persist, ct, progress);
+        public Task RefreshSnapshotsAsync(Func<Workspace, Task> persist, CancellationToken ct, Action<ResourceKind, int>? progress, IEnumerable<ResourceKind>? resources)
+            => api.RefreshSnapshotsAsync(persist, ct, progress, resources);
         public async Task<IReadOnlyList<AirlineParameter>> ReadParametersAsync(CancellationToken ct, bool force) => await api.ReadParametersAsync(ct, force);
         public void InvalidateParameters() => api.InvalidateParameters();
         public void PreviewPlan(ChangeItem change) => api.PreviewPlan(change);

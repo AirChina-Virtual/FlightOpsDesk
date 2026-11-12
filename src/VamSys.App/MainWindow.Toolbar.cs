@@ -19,7 +19,7 @@ public sealed partial class MainWindow
     DropDownButton? batchMenu, dataMenu, viewMenu;
     SplitButton? addButton;
     Button? undoButton, redoButton, reviewButton;
-    MenuFlyoutItem? conflictItem, refreshItem;
+    MenuFlyoutItem? conflictItem, refreshItem, refreshResourceItem;
 
     // --- Resource tabs ---
     void InitializeResourceTabs()
@@ -202,8 +202,10 @@ public sealed partial class MainWindow
         // Loading from the server, conflicts and checks.
         var data = new MenuFlyout();
         refreshItem = Item(() => L("ApiRefresh"), Symbol.Refresh, RefreshApi);
+        refreshResourceItem = Item(() => L("ApiRefreshResource", ("resource", L(Schemas.All[resource].Name))), Symbol.Sync, RefreshResourceApi);
         conflictItem = Item(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts);
         data.Items.Add(refreshItem);
+        data.Items.Add(refreshResourceItem);
         data.Items.Add(conflictItem);
         data.Items.Add(new MenuFlyoutSeparator());
         data.Items.Add(Item(() => L("Text_41B0AF8C5C"), Symbol.Accept, Validate));
@@ -275,8 +277,11 @@ public sealed partial class MainWindow
             var shown = applies();
             item.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
             item.IsEnabled = shown && DataGridAvailability.Command(enabled, tag, ReferenceEquals(item, conflictItem), counts, Data.Conflicts.Count)
-                && (!ReferenceEquals(item, refreshItem) && !ReferenceEquals(item, conflictItem) || gate.CanRequestOnline);
+                && (!ReferenceEquals(item, refreshItem) && !ReferenceEquals(item, refreshResourceItem) && !ReferenceEquals(item, conflictItem) || gate.CanRequestOnline);
         }
+        // The label names the page's resource, which changes without a language change.
+        if (refreshResourceItem != null)
+            refreshResourceItem.Text = L("ApiRefreshResource", ("resource", L(Schemas.All[resource].Name)));
         if (batchMenu != null)
             batchMenu.IsEnabled = enabled && (shownState?.Model.Selected.Count ?? 0) > 0;
         foreach (var control in new Control?[] { addButton, dataMenu, undoButton, redoButton, viewMenu })

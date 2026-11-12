@@ -64,6 +64,8 @@ internal sealed class DuplicateFinder(ApiContext ctx)
 
     // The remote records that could be duplicates of the item, in the cheapest complete way available:
     //   routes and routings   a filtered read per remote airport pair, cached once fully read (an early duplicate stops paging)
+    //   airports and fleets   with few creates against a long list (E8, chosen when the run is seeded): filtered reads per
+    //                         new code or name, narrowed by the same signature index
     //   everything else       one complete read of the resource into a signature index
     // Rows confirmed earlier in this run come first, so a record created by this very task is found without a request.
     public async IAsyncEnumerable<DataRow> ReadCandidatesAsync(ChangeItem item, CandidateQuerySession session, [EnumeratorCancellation] CancellationToken ct)
@@ -96,6 +98,23 @@ internal sealed class DuplicateFinder(ApiContext ctx)
             ct.ThrowIfCancellationRequested();
             session.Bind(ctx.Workspace.Id, ctx.Workspace.AirlineId);
             session.Pairs[pair] = complete;
+            yield break;
+        }
+        if (session.FilteredLookup.Contains(item.Resource) && !session.Indexes.ContainsKey(item.Resource) && signature.Text.Length > 0)
+        {
+            if (!session.Lookups.TryGetValue(signature, out var lookup))
+            {
+                // Published only once every filtered page was read, like the full index.
+                var complete = new CandidateIndex();
+                foreach (var filter in item.Resource == ResourceKind.Airports ? new[] { "icao", "iata" } : ["name"])
+                    await foreach (var row in ctx.Reader.ReadFilteredAsync(item.Resource, ResourcePaths.Collection(item.Resource), new() { [filter] = signature.Text }, ct))
+                        complete.Put(row, RemoteSignatures(item.Resource, row));
+                ct.ThrowIfCancellationRequested();
+                session.Bind(ctx.Workspace.Id, ctx.Workspace.AirlineId);
+                session.Lookups[signature] = lookup = complete;
+            }
+            foreach (var row in lookup.Find(signature))
+            { ct.ThrowIfCancellationRequested(); if (seen.Add(row.Identity!.RemoteId)) yield return row; }
             yield break;
         }
         if (!session.Indexes.TryGetValue(item.Resource, out var rows))

@@ -315,6 +315,45 @@ public class WriteReadbackAndRecoveryStageTests
         Assert.DoesNotContain(w.Workspace.Resources[ResourceKind.Fleets].Snapshot, r => r.Identity!.RemoteId == "6");
     }
 
+    // G7: an aircraft reads only under its fleet. An unanswered delete whose aircraft was moved meanwhile reads 404 under the
+    // old fleet; every fleet is then asked for the registration, and the aircraft found elsewhere is not taken as deleted.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task An_unanswered_aircraft_delete_is_completed_only_when_no_fleet_still_holds_the_registration(bool moved)
+    {
+        var w = new GoldenWorld();
+        w.Remote.Intercept = r => r.Method == "DELETE" ? throw new TimeoutException("simulated") : null;
+        w.MarkDelete(ResourceKind.Aircraft, "8");
+        await w.RunAsync("first run");
+        var item = w.Job!.Items.Single();
+        Assert.Equal(ItemState.Unknown, item.State);
+        var plane = w.Remote.Rows["fleet/4/aircraft/8"];
+        w.Remote.Rows.Remove("fleet/4/aircraft/8");
+        if (moved)
+        {
+            plane["fleet_id"] = 5;
+            w.Remote.AddRow("fleet/5/aircraft/8", plane.ToJsonString());
+        }
+        w.Remote.Intercept = null;
+        await w.ResumeAsync("recovery");
+        Assert.Equal(1, Count(w, "DELETE"));
+        var lookups = w.Remote.Server.Requests.Where(r => r.Method == "GET" && r.PathAndQuery.Contains("filter%5Bregistration%5D=B-TEST", StringComparison.Ordinal)).ToList();
+        Assert.NotEmpty(lookups);
+        if (moved)
+        {
+            Assert.Equal(ItemState.Unknown, item.State);
+            Assert.Equal("ApiAircraftElsewhere", Code(item));
+            Assert.Contains(w.Workspace.Resources[ResourceKind.Aircraft].Snapshot, r => r.Identity!.RemoteId == "8");
+        }
+        else
+        {
+            Assert.Equal(ItemState.Succeeded, item.State);
+            Assert.Equal(3, lookups.Count);
+            Assert.DoesNotContain(w.Workspace.Resources[ResourceKind.Aircraft].Snapshot, r => r.Identity!.RemoteId == "8");
+        }
+    }
+
     [Fact]
     public async Task A_proposed_recovery_id_is_read_and_when_it_matches_the_create_is_completed_without_a_post()
     {

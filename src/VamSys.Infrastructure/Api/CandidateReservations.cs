@@ -35,6 +35,23 @@ internal sealed class CandidateReservations(ApiContext ctx, DuplicateFinder find
             .Where(i => i.State is not (ItemState.Succeeded or ItemState.ManuallyConfirmed)
             && (i.State is ItemState.Unknown or ItemState.Running || i.CreateCompleted || i.WriteAccepted)))
             Reserve(item, session);
+        ChooseLookups(job, session);
+    }
+
+    // E8: a filtered lookup costs one GET per distinct new fleet name and two per new airport code (filter[icao] and
+    // filter[iata]); the whole list costs one GET per 100 rows (the server's page cap, 5.1). Filtered only when cheaper.
+    // 5.1 showed both filters miss nothing the duplicate rule would find: ICAO/IATA match exactly without case, the
+    // fleet name by substring without case (a superset the index below narrows to the rule's own matches).
+    void ChooseLookups(BatchJob job, CandidateQuerySession session)
+    {
+        foreach (var kind in new[] { ResourceKind.Airports, ResourceKind.Fleets })
+        {
+            var names = job.Items.Where(i => i.Resource == kind && i.Kind == ChangeKind.Create && i.State is not (ItemState.Succeeded or ItemState.ManuallyConfirmed))
+                .Select(i => i.After.Get(kind == ResourceKind.Airports ? "ICAO/IATA" : "Name")).Where(n => n.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+            var pages = Math.Max(1, (ctx.Workspace.Resources[kind].Snapshot.Count + 99) / 100);
+            if (names > 0 && names * (kind == ResourceKind.Airports ? 2 : 1) < pages)
+                session.FilteredLookup.Add(kind);
+        }
     }
 
     // The reason a create must wait (another item's outcome is unknown and could be the same record), or null.
@@ -54,6 +71,10 @@ internal sealed class CandidateReservations(ApiContext ctx, DuplicateFinder find
             throw Block("ApiRefreshFirst");
         if (session.Indexes.TryGetValue(item.Resource, out var index))
         { if (row == null) index.Remove(id); else index.Put(row, keys); }
+        // E8 lookups too: each finds only its own signature, so the confirmed row may go into all of them.
+        foreach (var (signature, lookup) in session.Lookups)
+            if (signature.Kind == item.Resource)
+            { if (row == null) lookup.Remove(id); else lookup.Put(row, keys); }
         if (!session.Confirmed.TryGetValue(item.Resource, out var confirmed))
             session.Confirmed[item.Resource] = confirmed = new();
         if (row == null)

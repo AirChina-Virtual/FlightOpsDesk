@@ -10,6 +10,8 @@ public sealed class InstantTime : TimeProvider
 {
     long ticks = DateTimeOffset.UtcNow.UtcTicks;
     public static RequestCoordinator Requests() => new(new InstantTime());
+    // Jumps ahead without firing anything (for expiries measured against the clock).
+    public void Advance(TimeSpan amount) => Interlocked.Add(ref ticks, amount.Ticks);
     public override long TimestampFrequency => TimeSpan.TicksPerSecond;
     public override long GetTimestamp() => Interlocked.Read(ref ticks);
     public override DateTimeOffset GetUtcNow() => new(GetTimestamp(), TimeSpan.Zero);

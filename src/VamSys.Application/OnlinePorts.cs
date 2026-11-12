@@ -12,7 +12,8 @@ public interface IOnlineSession
 {
     string? AirlineId { get; }
     Task<bool> IdentifyAirlineAsync(CancellationToken ct);
-    Task RefreshSnapshotsAsync(Func<Workspace, Task> persist, CancellationToken ct, Action<ResourceKind, int>? progress);
+    // resources: only these and what they refer to (E5); null reads everything.
+    Task RefreshSnapshotsAsync(Func<Workspace, Task> persist, CancellationToken ct, Action<ResourceKind, int>? progress, IEnumerable<ResourceKind>? resources = null);
     Task<IReadOnlyList<AirlineParameter>> ReadParametersAsync(CancellationToken ct, bool force);
     void InvalidateParameters();
     // Builds the requests of a change without sending anything; throws when the change cannot be sent.

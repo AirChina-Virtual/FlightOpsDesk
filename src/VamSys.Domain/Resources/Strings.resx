@@ -786,6 +786,7 @@
   <data name="ApiFleetSet" xml:space="preserve">
     <value>航线机型集合更新与清空语义尚未完成实例核实。</value>
   </data>
+  <data name="ApiRefreshResource" xml:space="preserve"><value>只刷新{resource}</value></data>
   <data name="ApiRefresh" xml:space="preserve">
     <value>从 API 刷新</value>
   </data>
@@ -854,6 +855,7 @@
   <data name="ApiRefreshFirst" xml:space="preserve">
     <value>请先从 API 刷新数据并确认远端标识。</value>
   </data>
+  <data name="ApiAircraftElsewhere" xml:space="preserve"><value>飞机 {registration} 在原机队下已读不到，但在机队 {fleet} 中仍然存在，可能是被移动而不是被删除。请核对后再处理。</value></data>
   <data name="ApiUnknown" xml:space="preserve">
     <value>结果尚未确认。恢复时仅核对远端，不自动重复写入；请在 Orwell 检查原记录。</value>
   </data>

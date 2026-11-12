@@ -214,6 +214,50 @@ public class ResourceReaderTests
         Assert.NotNull(await kit.Api.FindAsync(ResourceKind.Aircraft, "8", Ct));
     }
 
+    // E5: a refresh of the routes reads the routes and what they refer to (airports, fleets), nothing else. The aircraft
+    // and routings keep their snapshot, draft, conflicts, read mark, snapshot time and session index entries.
+    [Fact]
+    public async Task A_refresh_of_one_resource_reads_it_and_its_references_and_leaves_the_others_as_they_were()
+    {
+        var kit = Remote();
+        await kit.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, Ct);
+        var aircraft = kit.Workspace.Resources[ResourceKind.Aircraft];
+        var routings = kit.Workspace.Resources[ResourceKind.Routings];
+        var (aircraftSnapshot, aircraftDraft, routingsSnapshot) = (aircraft.Snapshot.ToList(), aircraft.Draft.ToList(), routings.Snapshot.ToList());
+        var (aircraftTime, routesTime) = (aircraft.SnapshotAt, kit.Workspace.Resources[ResourceKind.Routes].SnapshotAt);
+        aircraft.Conflicts.Add(new(aircraft.Draft[0].LocalId, "Name", "a", "b", "c"));
+        kit.Server.Reset();
+        kit.Server.On(HttpMethod.Get, "airports", FakeResponse.Ok(Page("", ApiKit.Egll, ApiKit.Egkk)));
+        kit.Server.On(HttpMethod.Get, "fleet", FakeResponse.Ok(Page("", ApiKit.Fleet4)));
+        kit.Server.On(HttpMethod.Get, "routes", FakeResponse.Ok(Page("", ApiKit.Scheduled10)));
+
+        await kit.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, Ct, resources: [ResourceKind.Routes]);
+
+        Assert.Equal(["airports", "fleet", "routes"], Paths(kit));
+        // staging copies the lists; the rows themselves are the ones that were there
+        Assert.Equal(aircraftSnapshot, kit.Workspace.Resources[ResourceKind.Aircraft].Snapshot, ReferenceEqualityComparer.Instance);
+        Assert.Equal(aircraftDraft, kit.Workspace.Resources[ResourceKind.Aircraft].Draft, ReferenceEqualityComparer.Instance);
+        Assert.Equal(routingsSnapshot, kit.Workspace.Resources[ResourceKind.Routings].Snapshot, ReferenceEqualityComparer.Instance);
+        Assert.Single(kit.Workspace.Resources[ResourceKind.Aircraft].Conflicts);
+        Assert.Equal(aircraftTime, kit.Workspace.Resources[ResourceKind.Aircraft].SnapshotAt);
+        Assert.Contains("Aircraft:Read", kit.Workspace.VerifiedOperations);
+        Assert.Single(kit.Workspace.Resources[ResourceKind.Routes].Snapshot);
+        Assert.Equal("EGLL", kit.Workspace.Resources[ResourceKind.Routes].Snapshot[0].Get("Departure Airport (ICAO/IATA)"));
+        Assert.True(kit.Workspace.Resources[ResourceKind.Routes].SnapshotAt >= routesTime);
+        // the aircraft read by the earlier full refresh are still known to the session
+        kit.Server.On(HttpMethod.Get, "fleet/4/aircraft/8", ApiKit.Data(ApiKit.Aircraft8));
+        Assert.NotNull(await kit.Api.FindAsync(ResourceKind.Aircraft, "8", Ct));
+    }
+
+    [Theory]
+    [InlineData(ResourceKind.Airports, "Airports")]
+    [InlineData(ResourceKind.Fleets, "Fleets")]
+    [InlineData(ResourceKind.Aircraft, "Fleets,Aircraft")]
+    [InlineData(ResourceKind.Routings, "Airports,Routings")]
+    [InlineData(ResourceKind.Routes, "Airports,Fleets,Routes")]
+    public void A_resource_is_read_with_what_it_refers_to(ResourceKind kind, string read)
+        => Assert.Equal(read, string.Join(",", SnapshotRefresher.WithReferences([kind]).Order()));
+
     [Fact]
     public async Task A_refresh_that_fails_to_read_leaves_the_workspace_and_the_session_as_they_were()
     {
@@ -224,6 +268,81 @@ public class ResourceReaderTests
         Assert.Empty(kit.Workspace.VerifiedOperations);
         var error = await Assert.ThrowsAnyAsync<Exception>(() => kit.Api.FindAsync(ResourceKind.Aircraft, "8", Ct));
         Assert.Equal("ApiRefreshFirst", MessageErrors.Describe(error).Code);
+    }
+
+    // E6 (D9): what a failed refresh read in full is kept for five minutes in this session; the retry reads only the rest.
+    [Fact]
+    public async Task A_retry_soon_after_a_failed_refresh_reads_only_what_failed()
+    {
+        var kit = Remote();
+        kit.Server.Enqueue(HttpMethod.Get, "routes", FakeResponse.WithStatus(422), FakeResponse.WithStatus(422));
+        await Assert.ThrowsAsync<ApiResponseException>(() => kit.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, Ct));
+        var before = Paths(kit).Length;
+        kit.Clock.Advance(TimeSpan.FromMinutes(4));
+
+        await kit.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, Ct);
+
+        Assert.Equal(["routes"], Paths(kit)[before..]);
+        Assert.All(Enum.GetValues<ResourceKind>(), kind => Assert.NotEmpty(kit.Workspace.Resources[kind].Snapshot));
+        Assert.Equal(5, kit.Workspace.VerifiedOperations.Count);
+        // the kept rows are known to the session as if read now
+        kit.Server.On(HttpMethod.Get, "fleet/4/aircraft/8", ApiKit.Data(ApiKit.Aircraft8));
+        Assert.NotNull(await kit.Api.FindAsync(ResourceKind.Aircraft, "8", Ct));
+    }
+
+    [Theory]
+    [InlineData("expired")]
+    [InlineData("write")]
+    [InlineData("succeeded")]
+    public async Task Kept_rows_are_dropped_after_five_minutes_after_a_write_and_after_a_refresh_that_succeeded(string what)
+    {
+        var kit = Remote();
+        kit.Server.Enqueue(HttpMethod.Get, "routes", FakeResponse.WithStatus(422), FakeResponse.WithStatus(422));
+        await Assert.ThrowsAsync<ApiResponseException>(() => kit.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, Ct));
+        if (what == "expired")
+            kit.Clock.Advance(TimeSpan.FromMinutes(5) + TimeSpan.FromSeconds(1));
+        else if (what == "write")
+        {
+            kit.Server.On(HttpMethod.Post, "airports", FakeResponse.Ok("""{"data":{"id":103}}"""));
+            using var _ = await kit.Transport.SendAsync(HttpMethod.Post, new Uri(OperationsAdapter.BaseUri, "airports"), new { icao = "EGSS" }, Ct);
+        }
+        else
+            await kit.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, Ct);
+        var before = Paths(kit).Length;
+
+        await kit.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, Ct);
+
+        Assert.Equal(["airports", "fleet", "fleet/4/aircraft", "routings", "routes"], Paths(kit)[before..]);
+    }
+
+    [Fact]
+    public async Task A_retry_after_a_failed_save_reads_nothing_and_saves()
+    {
+        var kit = Remote();
+        await Assert.ThrowsAsync<IOException>(() => kit.Api.RefreshSnapshotsAsync(_ => throw new IOException("disk full"), Ct));
+        var before = Paths(kit).Length;
+        var saved = false;
+
+        await kit.Api.RefreshSnapshotsAsync(_ => { saved = true; return Task.CompletedTask; }, Ct);
+
+        Assert.True(saved);
+        Assert.Empty(Paths(kit)[before..]);
+        Assert.All(Enum.GetValues<ResourceKind>(), kind => Assert.NotEmpty(kit.Workspace.Resources[kind].Snapshot));
+    }
+
+    [Fact]
+    public async Task A_resource_refresh_after_a_failed_full_refresh_uses_what_was_kept()
+    {
+        var kit = Remote();
+        kit.Server.Enqueue(HttpMethod.Get, "routes", FakeResponse.WithStatus(422), FakeResponse.WithStatus(422));
+        await Assert.ThrowsAsync<ApiResponseException>(() => kit.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, Ct));
+        var before = Paths(kit).Length;
+
+        await kit.Api.RefreshSnapshotsAsync(_ => Task.CompletedTask, Ct, resources: [ResourceKind.Aircraft]);
+
+        Assert.Empty(Paths(kit)[before..]);
+        Assert.Single(kit.Workspace.Resources[ResourceKind.Aircraft].Snapshot);
+        Assert.Empty(kit.Workspace.Resources[ResourceKind.Routings].Snapshot);
     }
 
     [Fact]

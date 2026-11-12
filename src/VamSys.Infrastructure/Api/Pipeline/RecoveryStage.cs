@@ -30,6 +30,16 @@ internal sealed class RecoveryStage(JobRun run, WriteStage write)
             await run.Completion.CompleteAsync(item, null);
         else if (IndependentApiEvidence.IsSoftDelete(item) && r.Id != null && api.RecordDeletionWithoutReceipt(item, found))
             await run.Completion.CompleteAsync(item, null, verifiedOperation: false);
+        else if (item.Kind == ChangeKind.Delete && found == null && r.Id != null && item.Resource == ResourceKind.Aircraft && !item.WriteAccepted
+            && await api.FindAircraftElsewhereAsync(item, r.Id, run.Ct) is var elsewhere && (!elsewhere.Checked || elsewhere.Fleet != null))
+        {
+            // G7: not gone, only not under its old fleet (or no registration to look for): it stays for the user.
+            item.State = ItemState.Unknown;
+            api.RecordReadback(item, null);
+            item.SetMessage(elsewhere.Fleet is { } fleet
+                ? Messages.Define("ApiAircraftElsewhere", ("registration", item.Before!.Get("Registration")), ("fleet", fleet))
+                : Messages.Define("ApiUnknown"));
+        }
         else if (item.Kind == ChangeKind.Delete && found == null && r.Id != null && item.Resource is ResourceKind.Fleets or ResourceKind.Aircraft or ResourceKind.Routings)
             await run.Completion.CompleteAsync(item, null);
         else if (OperationsAdapter.CanResumeCreate(item) && found != null && api.MatchesCreated(item, found))

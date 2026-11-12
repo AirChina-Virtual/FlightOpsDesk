@@ -16,12 +16,13 @@ internal sealed class ApiKit
     public readonly Workspace Workspace;
     public readonly OperationsAdapter Api;
     public readonly OperationsTransport Transport;
+    public readonly InstantTime Clock = new();
 
     public ApiKit(string? airline = "7")
     {
         Workspace = new Workspace { AirlineId = airline, Mode = RunMode.Online };
         // Virtual time: the one-request-per-second spacing and the read retry back-off cost no real time.
-        var requests = InstantTime.Requests();
+        var requests = new RequestCoordinator(Clock);
         Transport = new OperationsTransport(Server.CreateClient(), OperationsAdapter.BaseUri, Guid.NewGuid().ToString(),
             new TokenProvider(_ => Task.FromResult(new AccessToken("test", requests.Clock.GetUtcNow().AddHours(1))), requests.Clock), requests);
         Api = new OperationsAdapter(Transport, Workspace);

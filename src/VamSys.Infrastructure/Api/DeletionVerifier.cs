@@ -35,6 +35,26 @@ internal sealed class DeletionVerifier(ApiContext ctx, ReadbackVerifier readback
 
     public const string WithoutReceipt = "AutomaticWithoutWriteReceipt";
 
+    // G7: an aircraft is read only under its fleet, so a 404 there does not show it is gone: someone may have moved it.
+    // Before an unanswered aircraft delete is completed, every fleet is asked for the registration (5.1: filter[registration]
+    // matches exactly and case-sensitively, within one fleet, so the value is the one the server holds). Answers whether the
+    // check could run and the fleet still holding the aircraft, if any.
+    public async Task<(bool Checked, string? Fleet)> FindAircraftElsewhereAsync(ChangeItem item, string id, CancellationToken ct)
+    {
+        var registration = item.Before?.Get("Registration") ?? "";
+        if (registration.Length == 0)
+            return (false, null);
+        var filters = new Dictionary<string, string> { ["registration"] = registration };
+        await foreach (var fleet in ctx.Reader.ReadAllAsync(ResourceKind.Fleets, ct))
+        {
+            var fleetId = fleet.Identity!.RemoteId;
+            await foreach (var row in ctx.Reader.ReadFilteredAsync(ResourceKind.Aircraft, $"fleet/{fleetId}/aircraft", filters, ct))
+                if (row.Identity?.RemoteId == id)
+                    return (true, fleetId);
+        }
+        return (true, null);
+    }
+
     // D3: a soft delete whose DELETE was sent but never answered (timeout or 5xx, so no 204), and that the recovery GET
     // just read as 404. The program completes it, but it is not the 204 + 404 proof: the evidence says "without write
     // receipt" and the operation is not counted as verified. Everything else about the record must still agree (same VA,

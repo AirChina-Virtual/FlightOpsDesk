@@ -21,7 +21,10 @@ public sealed partial class MainWindow
             finally { running.Dispose(); running = null; }
         });
     }
-    async Task RefreshApi()
+    Task RefreshApi() => RefreshApi(null);
+    // E5: only the page's resource and what it refers to.
+    Task RefreshResourceApi() => RefreshApi(resource);
+    async Task RefreshApi(ResourceKind? only)
     {
         if (!gate.CanRequestOnline)
             return;
@@ -32,7 +35,7 @@ public sealed partial class MainWindow
             running = new();
             try
             {
-                var parameters = await connection.RefreshAsync((kind, count) => Status(() => L("ApiLoading", ("resource", L(Schemas.All[kind].Name)), ("count", count))), running.Token);
+                var parameters = await connection.RefreshAsync((kind, count) => Status(() => L("ApiLoading", ("resource", L(Schemas.All[kind].Name)), ("count", count))), running.Token, only);
                 Status(() => L("ApiRefreshed", ("count", workspace.Resources.Sum(p => p.Value.Conflicts.Count))) + (parameters ? "" : "\n" + L("ApiParametersUnavailable")));
             }
             finally { running.Dispose(); running = null; }

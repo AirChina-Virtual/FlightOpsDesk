@@ -63,7 +63,8 @@ public sealed class OperationsAdapter : IResourceReader, IResourceWriter, IApiRe
     public DataRow FromJson(ResourceKind kind, JsonElement value) => ctx.Mappers.For(kind).FromJson(value);
     public Task<bool> IdentifyAirlineAsync(CancellationToken ct) => ctx.Reader.IdentifyAirlineAsync(ct);
     public IAsyncEnumerable<DataRow> ReadAllAsync(ResourceKind kind, CancellationToken ct) => ctx.Reader.ReadAllAsync(kind, ct);
-    public Task RefreshSnapshotsAsync(Func<Workspace, Task> persist, CancellationToken ct, Action<ResourceKind, int>? progress = null) => refresher.RefreshAsync(persist, ct, progress);
+    public Task RefreshSnapshotsAsync(Func<Workspace, Task> persist, CancellationToken ct, Action<ResourceKind, int>? progress = null, IEnumerable<ResourceKind>? resources = null)
+        => refresher.RefreshAsync(persist, ct, progress, resources);
     public void Forget(ResourceKind kind, string id) => ctx.Identity.Forget(kind, id);
     public Task<DataRow?> FindAsync(ResourceKind kind, string id, CancellationToken ct) => ctx.Reader.FindAsync(kind, id, ct);
     public Task<DataRow?> FindRow(ResourceKind kind, DataRow row, string? id, CancellationToken ct) => ctx.Reader.FindRowAsync(kind, row, id, ct);
@@ -106,6 +107,7 @@ public sealed class OperationsAdapter : IResourceReader, IResourceWriter, IApiRe
     internal static bool Equivalent(string field, string a, string b) => ReadbackVerifier.Equivalent(field, a, b);
     internal bool RecordDeletionVerification(ChangeItem item, DataRow? current) => deletion.Record(item, current);
     internal bool RecordDeletionWithoutReceipt(ChangeItem item, DataRow? current) => deletion.RecordWithoutReceipt(item, current);
+    internal Task<(bool Checked, string? Fleet)> FindAircraftElsewhereAsync(ChangeItem item, string id, CancellationToken ct) => deletion.FindAircraftElsewhereAsync(item, id, ct);
     internal Task PreflightMoveAsync(ChangeItem item, CancellationToken ct) => movement.PreflightAsync(item, ct);
     internal static bool CanResumeCreate(ChangeItem item) => UnknownResolver.CanResumeCreate(item);
     internal Task<bool> ProveNotAppliedAsync(ChangeItem item, CancellationToken ct) => unknown.ProveNotAppliedAsync(item, ct);

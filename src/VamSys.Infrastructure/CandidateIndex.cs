@@ -52,6 +52,10 @@ public sealed class CandidateQuerySession
     internal readonly Dictionary<ResourceKind, CandidateIndex> Confirmed = [];
     // Complete filtered route/routing reads per remote airport pair, kept current by confirmed writes in this run.
     internal readonly Dictionary<(ResourceKind Kind, long Departure, long Arrival), List<DataRow>> Pairs = [];
+    // E8: airports and fleets whose few creates are looked up by filter instead of reading the whole list (decided when
+    // the run is seeded), and the complete filtered result per looked-up signature.
+    internal readonly HashSet<ResourceKind> FilteredLookup = [];
+    internal readonly Dictionary<CandidateSignature, CandidateIndex> Lookups = new(CandidateSignature.Equality);
     readonly Dictionary<Guid, HashSet<CandidateSignature>> reservations = [];
     readonly Dictionary<CandidateSignature, HashSet<Guid>> uncertain = new(CandidateSignature.Equality);
     readonly Dictionary<ResourceKind, HashSet<Guid>> unresolved = [];
