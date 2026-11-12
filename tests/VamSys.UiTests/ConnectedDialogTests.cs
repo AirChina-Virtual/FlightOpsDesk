@@ -73,6 +73,30 @@ public class ConnectedDialogTests
         Assert.Single(routes.Undo);
     }
 
+    // 5.2 E5: the data menu refreshes only the page's resource and what it refers to.
+    [WindowFact]
+    public void The_data_menu_refreshes_only_the_routes_with_their_airports_and_fleets()
+    {
+        using var app = Connected("connected-refresh-resource", Scenario.UnapprovedFleet, out var server, out var remote);
+        using var owner = server;
+        app.SelectItem("数据管理");
+        app.SelectResource("航线");
+        var before = remote.Server.Requests.Count;
+        app.One("DataMenu").Expand();
+        var only = "只刷新航线"; // composed from the resource name at run time
+        app.First(only, ControlType.MenuItem).Invoke();
+        app.StatusStarting("API 数据已刷新");
+        var requests = remote.Server.Requests.Skip(before).ToList();
+        app.Close();
+
+        Assert.All(requests, r => Assert.Equal("GET", r.Method));
+        var paths = requests.Select(r => r.Path).ToList();
+        Assert.Contains(paths, p => p.EndsWith("/airports", StringComparison.Ordinal));
+        Assert.Contains(paths, p => p.EndsWith("/fleet", StringComparison.Ordinal));
+        Assert.Contains(paths, p => p.EndsWith("/routes", StringComparison.Ordinal));
+        Assert.DoesNotContain(paths, p => p.Contains("/aircraft", StringComparison.Ordinal) || p.Contains("/routings", StringComparison.Ordinal));
+    }
+
     [WindowFact]
     public void A_delete_answered_204_but_still_readable_is_confirmed_by_hand()
     {
