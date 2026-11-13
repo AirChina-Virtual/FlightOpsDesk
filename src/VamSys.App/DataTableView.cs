@@ -68,6 +68,21 @@ sealed class DataTableView
 
     // A click on a column header asks to sort by it (the status column has no value to sort by).
     public event Action<string>? HeaderClicked;
+    // The status column's header holds the page's check box: true selects the shown page, false clears the selection.
+    public event Action<bool>? PageSelectionClicked;
+    CheckBox? pageCheck;
+    bool? pageState = false;
+    bool showingPageState;
+    public void ShowPageSelection(bool? state, bool enabled)
+    {
+        pageState = state;
+        if (pageCheck is null)
+            return;
+        showingPageState = true;
+        try { pageCheck.IsChecked = state; }
+        finally { showingPageState = false; }
+        pageCheck.IsEnabled = enabled;
+    }
     (string? Field, bool Descending) sortShown;
     readonly Dictionary<string, TextBlock> headerLabels = [];
 
@@ -77,7 +92,21 @@ sealed class DataTableView
             return;
         headerColumns = columns;
         headerLabels.Clear();
-        var headers = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0, Margin = UiTokens.DataHeaderInset };
+        // The page's check box stands in the inset over the rows' own check boxes; the column headers follow it.
+        var headers = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0 };
+        var check = pageCheck = new CheckBox
+        {
+            MinWidth = 0, Width = UiTokens.DataHeaderInset.Left - UiTokens.HeaderCheckMargin.Left, Padding = new Thickness(0), Margin = UiTokens.HeaderCheckMargin,
+            IsChecked = pageState, VerticalAlignment = VerticalAlignment.Center
+        };
+        AutomationProperties.SetAutomationId(check, "DataSelectPage");
+        AutomationProperties.SetName(check, language.Get("TableSelectPage"));
+        ToolTipService.SetToolTip(check, new ToolTip().Localize(language, "Content", () => language.Get("TableSelectPage")));
+        // Pointer, keyboard and automation all toggle it: checked selects the page; unchecked (also from a partly selected
+        // page) clears the selection. The state the table then shows replaces it.
+        check.Checked += (_, _) => { if (!showingPageState) PageSelectionClicked?.Invoke(true); };
+        check.Unchecked += (_, _) => { if (!showingPageState) PageSelectionClicked?.Invoke(false); };
+        headers.Children.Add(check);
         foreach (var field in columns)
         {
             string Name() => field == "_delete" ? language.Get("ColumnStatus") : ApiOperationPolicy.FieldLabel(field, language);
@@ -88,15 +117,15 @@ sealed class DataTableView
                 Margin = UiTokens.ColumnHeaderMargin,
                 Style = UiTokens.ColumnHeaderTextStyle
             }.Localize(language, "Text", Label);
-            if (field != "_delete")
+            if (field == "_delete")
+                ToolTipService.SetToolTip(label, new ToolTip().Localize(language, "Content", Name));
+            else
             {
                 label.Tapped += (_, _) => HeaderClicked?.Invoke(field);
                 // A second click soon after the first is a double tap, not another tap: it turns the order round too.
                 label.DoubleTapped += (_, _) => HeaderClicked?.Invoke(field);
                 ToolTipService.SetToolTip(label, new ToolTip().Localize(language, "Content", () => Name() + " · " + language.Get("TableSortHint")));
             }
-            else
-                ToolTipService.SetToolTip(label, new ToolTip().Localize(language, "Content", Name));
             headerLabels[field] = label;
             headers.Children.Add(label);
         }

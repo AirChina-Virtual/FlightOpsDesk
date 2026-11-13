@@ -790,6 +790,9 @@
     <value>Route fleet replacement and clearing semantics have not been verified against an instance.</value>
   </data>
   <data name="ApiRefreshResource" xml:space="preserve"><value>Refresh {resource} only</value></data>
+  <data name="DataSelectedCount" xml:space="preserve"><value>{count} selected</value></data>
+  <data name="DataSelectAllResults" xml:space="preserve"><value>Select all {count}</value></data>
+  <data name="DataMoreActions" xml:space="preserve"><value>More actions</value></data>
   <data name="ApiRefresh" xml:space="preserve">
     <value>Refresh from API</value>
   </data>

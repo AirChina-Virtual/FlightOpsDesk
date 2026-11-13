@@ -16,6 +16,9 @@ public sealed partial class MainWindow
 
     void AddShortcuts()
     {
+        // The shortcuts live on the root: WinUI would otherwise show their key text ("Ctrl+Z") as a tooltip wherever the
+        // pointer rests in the window. The toolbar buttons name their shortcuts in their own tooltips.
+        RootGrid.KeyboardAcceleratorPlacementMode = KeyboardAcceleratorPlacementMode.Hidden;
         void Add(VirtualKey key, VirtualKeyModifiers modifiers, Func<bool> run)
         {
             var accelerator = new KeyboardAccelerator { Key = key, Modifiers = modifiers };

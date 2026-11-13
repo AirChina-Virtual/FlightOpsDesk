@@ -22,16 +22,7 @@
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
         <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingLarge}">
           <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingMedium}">
-            <Button Content="{x:Bind Footer.SelectionLabel, Mode=OneWay}" IsEnabled="{x:Bind Footer.CanEdit, Mode=OneWay}">
-              <Button.Flyout>
-                <MenuFlyout>
-                  <MenuFlyoutItem Text="{x:Bind Footer.SelectPageLabel, Mode=OneWay}" IsEnabled="{x:Bind Footer.CanSelectPage, Mode=OneWay}" AutomationProperties.AutomationId="DataSelectPage" Click="SelectPage"/>
-                  <MenuFlyoutItem Text="{x:Bind Footer.SelectAllLabel, Mode=OneWay}" IsEnabled="{x:Bind Footer.CanSelectAll, Mode=OneWay}" AutomationProperties.AutomationId="DataSelectAll" Click="SelectAll"/>
-                  <MenuFlyoutItem Text="{x:Bind Footer.ClearSelectionLabel, Mode=OneWay}" IsEnabled="{x:Bind Footer.CanClearSelection, Mode=OneWay}" AutomationProperties.AutomationId="DataClearSelection" Click="ClearSelection"/>
-                </MenuFlyout>
-              </Button.Flyout>
-            </Button>
-            <TextBlock Text="{x:Bind Footer.SelectionSummary, Mode=OneWay}" ToolTipService.ToolTip="{x:Bind Footer.SelectionHint, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+            <!-- Selecting moved to the status column header (the page) and the command bar (all results, clearing). -->
             <Button Content="{x:Bind Footer.CancelQueryLabel, Mode=OneWay}" Visibility="{x:Bind Footer.QueryInProgress, Mode=OneWay}" AutomationProperties.AutomationId="DataQueryCancel" Click="CancelQuery"/>
           </StackPanel>
         </StackPanel>

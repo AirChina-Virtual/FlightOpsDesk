@@ -23,16 +23,6 @@ public class DataFooterTests
         JsonNode State() => app.Query("data-state");
         JsonNode Page(int page, string what) => app.Wait(() => State() is var s && s.Int("page") == page ? s : null, $"{what} (page {page})");
         JsonNode Where(Func<JsonNode, bool> holds, string what) => app.Wait(() => State() is var s && holds(s) ? s : null, what);
-        AutomationElement SelectionMenu(string button, string item)
-        {
-            // The selection menu button has no AutomationId; it is the one button named by TableSelection.
-            // A popup closing a moment ago (the page size list) can take a menu opening now with it, so the click repeats.
-            return app.Wait(() =>
-            {
-                app.Named(button, ControlType.Button).Invoke();
-                return Poll(() => app.Find(item) is [var e] ? e : null, TimeSpan.FromSeconds(2));
-            }, $"the menu with {item}");
-        }
         void PickPageSize(int size)
         {
             var box = app.One("DataPageSize");
@@ -92,16 +82,16 @@ public class DataFooterTests
         s = Where(x => x.Int("pageSize") == 200, "page size 200");
         Assert.Equal((3, 200), (s.Int("page"), s.Int("rows")));
 
-        // Selection menu: this page, all results, clear; clearing is offered only when something is selected.
-        SelectionMenu("Select", "DataSelectPage").Invoke();
+        // Selecting: the header box selects the page, then "select all" offers every result; clearing is offered only
+        // while something is selected.
+        Assert.Empty(app.Find("DataSelectAll"));
+        app.One("DataSelectPage").Toggle();
         Where(x => x.Int("selected") == 200, "select page");
-        SelectionMenu("Select", "DataSelectAll").Invoke();
+        app.Wait(() => app.Find("DataSelectAll").FirstOrDefault(), "select all is offered").Invoke();
         Where(x => x.Int("selected") == 20000, "select all");
-        SelectionMenu("Select", "DataClearSelection").Invoke();
+        app.One("DataClearSelection").Invoke();
         Where(x => x.Int("selected") == 0, "clear selection");
-        Assert.False(SelectionMenu("Select", "DataClearSelection").Current.IsEnabled, "Clear selection offered with nothing selected");
-        Press(Keys.Escape);
-        app.Until(() => app.Find("DataClearSelection").Length == 0, "menu closed");
+        app.Until(() => app.Find("DataClearSelection").Length == 0, "clearing is gone with nothing selected");
 
         // Automation names follow the language.
         var pageSize = app.Name("DataPageSize");
@@ -109,9 +99,9 @@ public class DataFooterTests
         app.Query("language:zh-CN");
         app.Until(() => app.Name("DataNextPage") == "下一页" && app.Name("DataGoPage") == "跳转" && app.Name("DataPageJump") == "跳转" && app.Name("DataPageSize") != pageSize,
             "Chinese automation names");
-        var all = SelectionMenu("选择", "DataSelectAll");
-        Assert.Equal("选择全部筛选结果", all.Current.Name);
-        Press(Keys.Escape);
+        app.One("DataSelectPage").Toggle();
+        app.Until(() => app.Find("DataSelectAll").FirstOrDefault()?.Current.Name.StartsWith("选择全部", StringComparison.Ordinal) == true, "Chinese select-all label");
+        app.One("DataClearSelection").Invoke();
 
         app.Close();
     }

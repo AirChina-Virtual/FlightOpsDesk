@@ -59,9 +59,11 @@ public class LocalizationTests
         app.Click("Choose fleet");
         app.First("Select available fleets (multiple)", ControlType.Text);
         app.First("Airbus A320 · A320 · 2", ControlType.CheckBox).Toggle();
-        app.Click("Preview changes");
-        app.Click("Apply to drafts");
-        app.Until(() => app.Name("DataBatchMenu").StartsWith("Selected records", StringComparison.Ordinal), "the selection menu follows the language");
+        // One row's fleets apply from the choice itself.
+        app.DialogPrimary("Apply").Invoke();
+        app.DialogClosed();
+        app.Until(() => app.Name("DataSelectionCount").EndsWith("selected", StringComparison.Ordinal), "the selection count follows the language");
+        app.Until(() => app.Find("DataDelete").FirstOrDefault()?.Current.IsEnabled == true, "deleting the selection is offered");
         app.Click("Delete selected");
         app.Click("Confirm deletion");
         app.First("Pending deletion", ControlType.Text);

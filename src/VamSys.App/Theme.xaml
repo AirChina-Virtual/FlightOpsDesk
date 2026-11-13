@@ -178,6 +178,8 @@
   <x:Double x:Key="HintDelayMilliseconds">500</x:Double>
   <Thickness x:Key="ColumnHeaderMargin">0,0,6,0</Thickness>
   <Thickness x:Key="DataHeaderInset">36,0,0,0</Thickness>
+  <!-- The page's check box in that inset, over the rows' check boxes. -->
+  <Thickness x:Key="HeaderCheckMargin">16,0,0,0</Thickness>
   <x:Double x:Key="LockedTableOpacity">0.6</x:Double>
 
   <!-- Control widths -->

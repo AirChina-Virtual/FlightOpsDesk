@@ -21,21 +21,25 @@ public class RedesignTests
         app.SelectItem("数据管理");
         app.Until(() => app.Rows().Length > 1, "rows are shown");
         var all = app.Rows().Length;
-        // The commands for selected records stay in one place and wait for a selection.
-        Assert.False(app.Enabled("DataBatchMenu"));
+        // Without a selection the bar shows the everyday commands; a selection swaps in its count and its commands.
+        Assert.Empty(app.Find("DataDelete"));
+        app.One("DataRefresh");
         app.Rows()[0].Select();
-        app.Until(() => app.Enabled("DataBatchMenu") && app.Name("DataBatchMenu").Contains('1', StringComparison.Ordinal), "a selection enables the menu and shows its count");
-        app.One("DataBatchMenu").Expand();
-        app.First("删除所选", ControlType.MenuItem);
+        app.Until(() => app.Find("DataDelete").Length > 0 && app.Name("DataSelectionCount").Contains('1', StringComparison.Ordinal), "a selection shows its commands and count");
+        app.First("删除所选", ControlType.Button);
+        Assert.Empty(app.Find("DataRefresh"));
         app.Screenshot("data-selected.png");
-        app.One("DataBatchMenu").Collapse();
         app.Rows()[0].Unselect();
-        app.Until(() => !app.Enabled("DataBatchMenu"), "the menu waits for a selection again");
+        app.Until(() => app.Find("DataDelete").Length == 0 && app.Find("DataRefresh").Length > 0, "the everyday commands come back");
 
         // Undo and redo from the keyboard change the data, and F5 queries again.
         var original = app.Value("Callsign");
         app.Edit("Callsign", "DEM999");
+        app.Context = () => { var f = AutomationElement.FocusedElement; return $"focused id '{f?.Current.AutomationId}' name '{f?.Current.Name}' type {f?.Current.ControlType.ProgrammaticName} class {f?.Current.ClassName}"; };
         app.Foreground();
+        // The keys go to the table, not to a cell editor that is still open (its own Ctrl+Z undoes its typing).
+        app.Rows()[0].SetFocus();
+        app.Until(() => AutomationElement.FocusedElement?.Current.ClassName != "TextBox", "the focus is on the table");
         PressWithControl((byte)'Z');
         app.Until(() => app.Value("Callsign") == original, "Ctrl+Z undoes the edit");
         PressWithControl((byte)'Y');

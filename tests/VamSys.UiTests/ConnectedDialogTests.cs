@@ -82,7 +82,7 @@ public class ConnectedDialogTests
         app.SelectItem("数据管理");
         app.SelectResource("航线");
         var before = remote.Server.Requests.Count;
-        app.One("DataMenu").Expand();
+        app.One("DataRefresh").Expand();
         var only = "只刷新航线"; // composed from the resource name at run time
         app.First(only, ControlType.MenuItem).Invoke();
         app.StatusStarting("API 数据已刷新");

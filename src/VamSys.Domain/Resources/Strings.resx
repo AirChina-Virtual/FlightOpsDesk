@@ -790,6 +790,9 @@
     <value>航线机型集合更新与清空语义尚未完成实例核实。</value>
   </data>
   <data name="ApiRefreshResource" xml:space="preserve"><value>只刷新{resource}</value></data>
+  <data name="DataSelectedCount" xml:space="preserve"><value>已选 {count} 条</value></data>
+  <data name="DataSelectAllResults" xml:space="preserve"><value>选择全部 {count} 条</value></data>
+  <data name="DataMoreActions" xml:space="preserve"><value>更多操作</value></data>
   <data name="ApiRefresh" xml:space="preserve">
     <value>从 API 刷新</value>
   </data>

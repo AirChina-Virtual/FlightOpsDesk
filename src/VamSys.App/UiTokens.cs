@@ -54,6 +54,7 @@ public static class UiTokens
     public static Style CellBoxStyle(int look) => Get<Style>(look switch { 2 => "CellIssueBoxStyle", 1 => "CellChangedBoxStyle", _ => "CellBoxStyle" });
     public static Thickness ColumnHeaderMargin => Get<Thickness>("ColumnHeaderMargin");
     public static Thickness DataHeaderInset => Get<Thickness>("DataHeaderInset");
+    public static Thickness HeaderCheckMargin => Get<Thickness>("HeaderCheckMargin");
     public static double LockedTableOpacity => Get<double>("LockedTableOpacity");
 
     public static double SearchBoxWidth => Get<double>("SearchBoxWidth");

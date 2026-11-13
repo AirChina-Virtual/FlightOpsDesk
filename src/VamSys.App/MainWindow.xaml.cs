@@ -315,6 +315,11 @@ public sealed partial class MainWindow : Window
         var control = dataGrid = new DataGrid(dataFooter = new(localization), DataGridControlActions(), tableTemplates!.Template("RowTemplate"), DataRowHeight, localization);
         control.View.UserSelectionChanged += DataSelectionChanged;
         control.View.HeaderClicked += SortByHeader;
+        control.View.PageSelectionClicked += async selectPage =>
+        {
+            if (CanEditData())
+                await UserAction(() => { if (selectPage) SelectShownPage(); else ClearDataSelection(); return Task.CompletedTask; });
+        };
         control.View.RowMenuRequested += ShowRowMenu;
         control.View.ShowHeaders(DisplayColumns());
         control.View.ShowSort(sortBox!.Current);

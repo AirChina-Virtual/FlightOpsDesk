@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
 using VamSys.Core;
 
 namespace VamSys.App;
@@ -13,13 +14,18 @@ public sealed partial class MainWindow
 {
     // Columns hidden from the view menu, per resource, for this run of the program.
     readonly Dictionary<ResourceKind, HashSet<string>> hiddenColumns = [];
-    // The menu commands and the selection they need ("active", "deleted", "delete"), and whether they apply here.
-    readonly List<(MenuFlyoutItem Item, string? Tag, Func<bool> Applies)> menuCommands = [];
+    // The commands and the selection they need ("active", "deleted", "delete"), and whether they apply here.
+    readonly List<(Control Item, string? Tag, Func<bool> Applies)> menuCommands = [];
     Grid? dataActions;
-    DropDownButton? batchMenu, dataMenu, viewMenu;
-    SplitButton? addButton;
-    Button? undoButton, redoButton, reviewButton;
-    MenuFlyoutItem? conflictItem, refreshItem, refreshResourceItem;
+    DropDownButton? viewMenu, moreMenu;
+    SplitButton? addButton, refreshButton;
+    Button? undoButton, redoButton, reviewButton, conflictButton, validateButton, selectAllButton, clearSelectionButton;
+    MenuFlyoutItem? refreshResourceItem;
+    // The bar shows the everyday commands, or (with records selected) the commands for the selection.
+    StackPanel? idleCommands, selectionCommands;
+    TextBlock? selectionCount;
+    // Buttons whose content is an icon and a label: their automation name follows the label.
+    readonly List<(Button Button, Func<string> Label)> namedCommands = [];
 
     // --- Resource tabs ---
     void InitializeResourceTabs()
@@ -167,13 +173,28 @@ public sealed partial class MainWindow
     Grid BuildActionBar()
     {
         menuCommands.Clear();
+        namedCommands.Clear();
+        T Track<T>(T item, string? tag, Func<bool>? applies = null) where T : Control
+        {
+            menuCommands.Add((item, tag, applies ?? (() => true)));
+            return item;
+        }
         MenuFlyoutItem Item(Func<string> label, Symbol icon, Func<Task> action, string? tag = null, Func<bool>? applies = null)
         {
             var item = new MenuFlyoutItem { Icon = new SymbolIcon(icon) }.Localize(localization, "Text", label);
             item.Click += async (_, _) => { if (gate.CanInvokeCommand) await UserAction(action); };
-            menuCommands.Add((item, tag, applies ?? (() => true)));
-            return item;
+            return Track(item, tag, applies);
         }
+        Button Command(Func<string> label, Symbol icon, Func<Task> action, string automationId, string? tag = null, Func<bool>? applies = null)
+        {
+            var button = new Button { Content = IconText(icon, label) };
+            AutomationProperties.SetAutomationId(button, automationId);
+            namedCommands.Add((button, label));
+            button.Click += async (_, _) => { if (gate.CanInvokeCommand) await UserAction(action); };
+            return Track(button, tag, applies);
+        }
+        bool Fleets() => resource is ResourceKind.Aircraft or ResourceKind.Routes;
+        bool Routes() => resource == ResourceKind.Routes;
 
         // Add: a new record, or records from a CSV file.
         var addMenu = new MenuFlyout();
@@ -184,33 +205,43 @@ public sealed partial class MainWindow
         AutomationProperties.SetAutomationId(addButton, "DataAdd");
         addButton.Click += async (_, _) => { if (gate.CanInvokeCommand) await UserAction(async () => { if (!gate.CanAct) return; await batch.AddRowAsync(resource); Render(); }); };
 
-        // The selected records.
-        var selection = new MenuFlyout();
-        selection.Items.Add(Item(() => L("Text_E306752B35"), Symbol.Edit, EditRules, "active"));
-        selection.Items.Add(Item(() => L("Text_95DD1FDDFE"), Symbol.People, () => resource is ResourceKind.Aircraft or ResourceKind.Routes ? ChooseFleets(null) : Task.CompletedTask, "active",
-            () => resource is ResourceKind.Aircraft or ResourceKind.Routes));
-        selection.Items.Add(Item(() => L("Text_7AA882D2FE"), Symbol.Clock, () => resource == ResourceKind.Routes ? RetireSelected() : Task.CompletedTask, "active", () => resource == ResourceKind.Routes));
-        selection.Items.Add(Item(() => L("RowDuplicate"), Symbol.Copy, DuplicateSelected, "active"));
-        selection.Items.Add(Item(() => L("RowDetails"), Symbol.OpenPane, () => { OpenSelectedDetails(); return Task.CompletedTask; }, "active"));
-        selection.Items.Add(new MenuFlyoutSeparator());
-        selection.Items.Add(Item(() => L("Text_435BF8A234"), Symbol.Delete, DeleteSelected, "delete"));
-        selection.Items.Add(Item(() => L("Text_A6926595CE"), Symbol.Undo, RestoreSelected, "deleted"));
-        batchMenu = new DropDownButton { Flyout = selection };
-        AutomationProperties.SetAutomationId(batchMenu, "DataBatchMenu");
-        ToolTipService.SetToolTip(batchMenu, new ToolTip().Localize(localization, "Content", () => L("BatchOnlySelected")));
-
-        // Loading from the server, conflicts and checks.
-        var data = new MenuFlyout();
-        refreshItem = Item(() => L("ApiRefresh"), Symbol.Refresh, RefreshApi);
+        // Loading from the server (everything, or only this resource and what it refers to), checks and conflicts.
+        var refreshMenu = new MenuFlyout();
         refreshResourceItem = Item(() => L("ApiRefreshResource", ("resource", L(Schemas.All[resource].Name))), Symbol.Sync, RefreshResourceApi);
-        conflictItem = Item(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts);
-        data.Items.Add(refreshItem);
-        data.Items.Add(refreshResourceItem);
-        data.Items.Add(conflictItem);
-        data.Items.Add(new MenuFlyoutSeparator());
-        data.Items.Add(Item(() => L("Text_41B0AF8C5C"), Symbol.Accept, Validate));
-        dataMenu = new DropDownButton { Flyout = data };
-        AutomationProperties.SetAutomationId(dataMenu, "DataMenu");
+        refreshMenu.Items.Add(refreshResourceItem);
+        refreshButton = Track(new SplitButton { Flyout = refreshMenu, Content = IconText(Symbol.Refresh, () => L("ApiRefresh")) }, null);
+        AutomationProperties.SetAutomationId(refreshButton, "DataRefresh");
+        refreshButton.Click += async (_, _) => { if (gate.CanInvokeCommand) await UserAction(RefreshApi); };
+        validateButton = Command(() => L("Text_41B0AF8C5C"), Symbol.Accept, Validate, "DataValidate");
+        conflictButton = Command(() => L("ApiConflicts", ("count", Data.Conflicts.Count)), Symbol.Important, ResolveApiConflicts, "DataConflicts");
+        idleCommands = Row(addButton, refreshButton, validateButton, conflictButton);
+        idleCommands.Spacing = UiTokens.SpacingMedium;
+
+        // The selected records: the count, the commands for them, more of them in a menu, and leaving the selection.
+        selectionCount = new TextBlock { VerticalAlignment = VerticalAlignment.Center, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
+        AutomationProperties.SetAutomationId(selectionCount, "DataSelectionCount");
+        var edit = Command(() => L("Text_E306752B35"), Symbol.Edit, EditRules, "DataBatchRule", "active");
+        var fleets = Command(() => L("Text_95DD1FDDFE"), Symbol.People, () => Fleets() ? ChooseFleets(null) : Task.CompletedTask, "DataChooseFleets", "active", Fleets);
+        var duplicate = Command(() => L("RowDuplicate"), Symbol.Copy, DuplicateSelected, "DataDuplicate", "active");
+        var delete = Command(() => L("Text_435BF8A234"), Symbol.Delete, DeleteSelected, "DataDelete", "delete");
+        var more = new MenuFlyout();
+        more.Items.Add(Item(() => L("Text_7AA882D2FE"), Symbol.Clock, () => Routes() ? RetireSelected() : Task.CompletedTask, "active", Routes));
+        more.Items.Add(Item(() => L("RowDetails"), Symbol.OpenPane, () => { OpenSelectedDetails(); return Task.CompletedTask; }, "active"));
+        more.Items.Add(Item(() => L("Text_A6926595CE"), Symbol.Undo, RestoreSelected, "deleted"));
+        moreMenu = new DropDownButton { Content = new SymbolIcon(Symbol.More), Flyout = more, Padding = UiTokens.IconButtonPadding };
+        AutomationProperties.SetAutomationId(moreMenu, "DataMoreMenu");
+        AutomationProperties.SetName(moreMenu, L("DataMoreActions"));
+        ToolTipService.SetToolTip(moreMenu, new ToolTip().Localize(localization, "Content", () => L("DataMoreActions")));
+        selectAllButton = new Button();
+        AutomationProperties.SetAutomationId(selectAllButton, "DataSelectAll");
+        selectAllButton.Click += async (_, _) => { if (gate.CanInvokeCommand) await UserAction(() => { SelectAllResults(); return Task.CompletedTask; }); };
+        clearSelectionButton = new Button { Content = IconText(Symbol.Cancel, () => L("TableClearSelection")) };
+        namedCommands.Add((clearSelectionButton, () => L("TableClearSelection")));
+        AutomationProperties.SetAutomationId(clearSelectionButton, "DataClearSelection");
+        clearSelectionButton.Click += async (_, _) => { if (gate.CanInvokeCommand) await UserAction(() => { ClearDataSelection(); return Task.CompletedTask; }); };
+        selectionCommands = Row(selectionCount, edit, fleets, duplicate, delete, moreMenu, selectAllButton, clearSelectionButton);
+        selectionCommands.Spacing = UiTokens.SpacingMedium;
+        selectionCommands.Visibility = Visibility.Collapsed;
 
         Button IconButton(Symbol icon, string labelKey, string tipKey, Func<Task> action)
         {
@@ -226,7 +257,7 @@ public sealed partial class MainWindow
         reviewButton = new Button { Style = (Style)Application.Current.Resources["AccentButtonStyle"] };
         reviewButton.Click += (_, _) => { if (gate.CanInvokeCommand) SelectPane(ShellPage.Review); };
 
-        var left = Row(addButton, batchMenu, dataMenu, undoButton, redoButton);
+        var left = Row(idleCommands, selectionCommands, undoButton, redoButton);
         left.Spacing = UiTokens.SpacingMedium;
         var bar = new Grid { ColumnSpacing = UiTokens.SpacingMedium };
         bar.ColumnDefinitions.Add(new() { Width = new GridLength(1, GridUnitType.Star) });
@@ -248,43 +279,74 @@ public sealed partial class MainWindow
     // The labels that carry numbers: the selection count, the conflicts and the pending changes.
     void RefreshCommandLabels()
     {
-        if (batchMenu is null || dataMenu is null || reviewButton is null)
+        if (reviewButton is null || selectionCount is null || selectAllButton is null)
             return;
-        var selected = shownState?.Model.Selected.Count ?? 0;
-        var batch = selected > 0 ? L("BatchMenuSelected", ("count", selected)) : L("BatchMenu");
-        batchMenu.Content = batch;
-        AutomationProperties.SetName(batchMenu, batch);
-        var conflicts = Data.Conflicts.Count;
-        var data = conflicts > 0 ? L("DataMenuConflicts", ("count", conflicts)) : L("DataMenu");
-        dataMenu.Content = data;
-        AutomationProperties.SetName(dataMenu, data);
+        var model = shownState?.Model;
+        var selected = model?.Selected.Count ?? 0;
+        selectionCount.Text = L("DataSelectedCount", ("count", selected));
+        var total = model?.Total ?? 0;
+        var all = L("DataSelectAllResults", ("count", total));
+        selectAllButton.Content = all;
+        AutomationProperties.SetName(selectAllButton, all);
         var pending = workspace.Resources.Values.All(changeCounts.ContainsKey) ? workspace.Resources.Values.Sum(d => changeCounts[d]) : 0;
         var review = L("Text_48A195CA7E");
         reviewButton.Content = pending > 0 ? $"{review} · {pending}" : review;
         AutomationProperties.SetName(reviewButton, review);
         if (addButton != null)
             AutomationProperties.SetName(addButton, L("Text_0006D696D8"));
+        if (refreshButton != null)
+            AutomationProperties.SetName(refreshButton, L("ApiRefresh"));
         if (undoButton != null)
             AutomationProperties.SetName(undoButton, L("Text_926A50B98E"));
         if (redoButton != null)
             AutomationProperties.SetName(redoButton, L("Text_03717B6F10"));
+        if (moreMenu != null)
+            AutomationProperties.SetName(moreMenu, L("DataMoreActions"));
+        foreach (var (button, label) in namedCommands)
+            AutomationProperties.SetName(button, label());
     }
-    // What the commands can do now: editing allowed, the selection, the resource, online and conflicts.
+    // What the commands can do now: editing allowed, the selection, the resource, online and conflicts. With records
+    // selected the bar shows the commands for them; "select all results" appears once the whole page is selected.
     void RefreshCommands(bool enabled, (int Active, int Deleted, int Deletable) counts)
     {
+        var model = shownState?.Model;
+        var selected = model?.Selected.Count ?? 0;
         foreach (var (item, tag, applies) in menuCommands)
         {
             var shown = applies();
             item.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
-            item.IsEnabled = shown && DataGridAvailability.Command(enabled, tag, ReferenceEquals(item, conflictItem), counts, Data.Conflicts.Count)
-                && (!ReferenceEquals(item, refreshItem) && !ReferenceEquals(item, refreshResourceItem) && !ReferenceEquals(item, conflictItem) || gate.CanRequestOnline);
+            var online = !ReferenceEquals(item, refreshButton) && !ReferenceEquals(item, refreshResourceItem) && !ReferenceEquals(item, conflictButton) || gate.CanRequestOnline;
+            item.IsEnabled = shown && online && (tag is null && !ReferenceEquals(item, conflictButton) ? enabled
+                : DataGridAvailability.Command(enabled, tag, ReferenceEquals(item, conflictButton), counts, Data.Conflicts.Count));
         }
+        if (conflictButton != null)
+            conflictButton.Visibility = Data.Conflicts.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         // The label names the page's resource, which changes without a language change.
         if (refreshResourceItem != null)
             refreshResourceItem.Text = L("ApiRefreshResource", ("resource", L(Schemas.All[resource].Name)));
-        if (batchMenu != null)
-            batchMenu.IsEnabled = enabled && (shownState?.Model.Selected.Count ?? 0) > 0;
-        foreach (var control in new Control?[] { addButton, dataMenu, undoButton, redoButton, viewMenu })
+        if (idleCommands != null && selectionCommands != null)
+        {
+            var hiding = selected > 0 ? idleCommands : selectionCommands;
+            // Hiding the focused button would send the focus on to the search box, which then takes Ctrl+Z and typing:
+            // the focus goes to the table (or, while it is locked, to undo) first.
+            if (hiding.Visibility == Visibility.Visible && FocusManager.GetFocusedElement(RootGrid.XamlRoot) is DependencyObject focused && Within(focused, hiding)
+                && tableView?.Table.Focus(FocusState.Programmatic) != true)
+                undoButton?.Focus(FocusState.Programmatic);
+            idleCommands.Visibility = selected > 0 ? Visibility.Collapsed : Visibility.Visible;
+            selectionCommands.Visibility = selected > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        var pageSelected = model != null && visible.Count > 0 && visible.All(r => model.Selected.Contains(r.Row.LocalId));
+        if (selectAllButton != null && model != null)
+        {
+            selectAllButton.Visibility = pageSelected && selected < model.Total ? Visibility.Visible : Visibility.Collapsed;
+            selectAllButton.IsEnabled = enabled;
+        }
+        if (clearSelectionButton != null)
+            clearSelectionButton.IsEnabled = enabled;
+        if (moreMenu != null)
+            moreMenu.IsEnabled = enabled && selected > 0;
+        tableView?.ShowPageSelection(model is null || visible.Count == 0 ? false : pageSelected ? true : visible.Any(r => model.Selected.Contains(r.Row.LocalId)) ? null : false, enabled && visible.Count > 0);
+        foreach (var control in new Control?[] { addButton, undoButton, redoButton, viewMenu })
             if (control != null)
                 control.IsEnabled = enabled;
         if (filterBox != null)
@@ -293,6 +355,13 @@ public sealed partial class MainWindow
             sortBox.Button.IsEnabled = enabled;
         RefreshCommandLabels();
         RefreshFilterLabels();
+    }
+    static bool Within(DependencyObject element, DependencyObject ancestor)
+    {
+        for (var node = element; node != null; node = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(node))
+            if (ReferenceEquals(node, ancestor))
+                return true;
+        return false;
     }
     // For the window scripts: each selection command and whether it can run now.
     object[] BatchCommandStates() => [.. menuCommands.Where(c => c.Tag != null).Select(c => new { target = c.Tag, enabled = c.Item.IsEnabled })];

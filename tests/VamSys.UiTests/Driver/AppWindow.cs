@@ -368,8 +368,9 @@ public sealed partial class AppWindow : IDisposable
         return Wait(() => ButtonOrNull(name) ?? FromMenus(name), $"button '{name}'");
     }
 
-    // The data page keeps its commands in drop-down menus; another page may still have a command bar's overflow.
-    static readonly string[] CommandMenus = ["DataBatchMenu", "DataMenu", "MoreButton"];
+    // The data page keeps a few commands in menus (more actions, refreshing one resource); another page may still have a
+    // command bar's overflow.
+    static readonly string[] CommandMenus = ["DataMoreMenu", "DataRefresh", "MoreButton"];
 
     /// <summary>Opens each command menu that is on screen and enabled in turn and returns the item with this name.</summary>
     AutomationElement? FromMenus(string name)

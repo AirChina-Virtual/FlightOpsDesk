@@ -39,8 +39,11 @@ public class ToolbarTests
         app.One("DataFilterAll").Toggle();
         app.Until(() => Total() == all, "all records again");
 
-        // A header sorts by its column, and a second click reverses it.
+        // A header sorts by its column, and a second click reverses it. A cell editor still open from the edit above
+        // would take the first click to close; the focus moves to the table first.
         app.Foreground();
+        app.Rows()[0].SetFocus();
+        app.Until(() => AutomationElement.FocusedElement?.Current.ClassName != "TextBox", "the focus is on the table");
         var header = app.Wait(() => app.FindNamed("ID", ControlType.Text).FirstOrDefault(), "the ID header");
         ClickAt(header.Current.BoundingRectangle);
         app.Until(() => app.Name("DataSort").Contains("ID", StringComparison.Ordinal) && First("ID") == "100", "ascending by ID");

@@ -3,7 +3,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch">
-    <Border Style="{StaticResource CardStyle}" MaxWidth="{StaticResource PageContentMaxWidth}" VerticalAlignment="Top">
+    <!-- A column that stretches up to the page width and stays at the left edge, under the page title. -->
+    <Grid VerticalAlignment="Top"><Grid.ColumnDefinitions><ColumnDefinition Width="*" MaxWidth="{StaticResource PageContentMaxWidth}"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions>
+    <Border Style="{StaticResource CardStyle}" VerticalAlignment="Top">
       <StackPanel Spacing="{StaticResource SpacingLarge}">
         <TextBlock Text="{x:Bind Model.Title, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
         <TextBlock Text="{x:Bind Model.Help, Mode=OneWay}" FontSize="{StaticResource BodyFontSize}" TextWrapping="Wrap"/>
@@ -14,5 +16,6 @@
         </StackPanel>
       </StackPanel>
     </Border>
+    </Grid>
   </ScrollViewer>
 </UserControl>

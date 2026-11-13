@@ -4,7 +4,9 @@
     xmlns:vm="using:VamSys.Presentation">
   <!-- No x:Name here: WinUI would expose each one as an AutomationId, which the window scripts and the inventory lock. -->
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalContentAlignment="Stretch">
-    <StackPanel Spacing="{StaticResource SpacingPage}" MaxWidth="{StaticResource PageContentMaxWidth}">
+    <!-- A column that stretches up to the page width and stays at the left edge, under the page title. -->
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" MaxWidth="{StaticResource PageContentMaxWidth}"/><ColumnDefinition Width="0"/></Grid.ColumnDefinitions>
+    <StackPanel Spacing="{StaticResource SpacingPage}">
       <Border Style="{StaticResource CardStyle}">
         <StackPanel Spacing="{StaticResource SpacingLarge}">
           <TextBlock Text="{x:Bind Model.ApiSettingsTitle, Mode=OneWay}" Style="{StaticResource CardTitleStyle}"/>
@@ -68,5 +70,6 @@
         </StackPanel>
       </Border>
     </StackPanel>
+    </Grid>
   </ScrollViewer>
 </UserControl>
