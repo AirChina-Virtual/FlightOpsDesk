@@ -53,6 +53,7 @@ public static class UiTokens
     // The cell box for its look (CellViewModel.Look): plain, changed from the server's value, or with a problem.
     public static Style CellBoxStyle(int look) => Get<Style>(look switch { 2 => "CellIssueBoxStyle", 1 => "CellChangedBoxStyle", _ => "CellBoxStyle" });
     public static Thickness ColumnHeaderMargin => Get<Thickness>("ColumnHeaderMargin");
+    public static Thickness DataRowPadding => Get<Thickness>("DataRowPadding");
     public static Thickness DataHeaderInset => Get<Thickness>("DataHeaderInset");
     public static Thickness HeaderCheckMargin => Get<Thickness>("HeaderCheckMargin");
     public static double LockedTableOpacity => Get<double>("LockedTableOpacity");

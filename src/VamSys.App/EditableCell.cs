@@ -76,11 +76,13 @@ public sealed partial class EditableCell : ContentControl
     bool returningFocus;
     // A click edits the cell, as clicking the former TextBox did, and does not toggle row selection.
     // The editor opens on release: the list item takes focus while handling the press.
+    // Only the primary button (a touch or pen contact counts as one) edits: a right click is left to the list, so it opens
+    // the row menu. Taking it here opened the editor instead, which replaced the text the click was on, and no menu came.
     bool pressed;
     protected override void OnPointerPressed(PointerRoutedEventArgs e)
     {
         base.OnPointerPressed(e);
-        if (editorRoot != null || Cell is null || Cell.IsReadOnly)
+        if (editorRoot != null || Cell is null || Cell.IsReadOnly || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
         e.Handled = true;
         pressed = CapturePointer(e.Pointer);

@@ -10,7 +10,7 @@
       <Grid>
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <!-- Outside the list, so the column names stay in view while the rows scroll and move with them sideways. -->
-        <Border BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerBrush}" Padding="0,6"/>
+        <Border BorderThickness="0,0,0,1" BorderBrush="{ThemeResource DividerBrush}" Background="{ThemeResource TableHeaderBackgroundBrush}" Padding="0,6"/>
         <ListView Grid.Row="1" SelectionMode="Multiple" HorizontalContentAlignment="Stretch"/>
       </Grid>
     </ScrollViewer>

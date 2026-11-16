@@ -266,12 +266,16 @@ public sealed partial class AppWindow : IDisposable
     public void Until(Func<bool> until, string what, TimeSpan? limit = null) =>
         Wait(() => until() ? this : null, what, limit);
 
+    /// <summary>What the last <see cref="ClickOn"/> or <see cref="RightClickOn"/> aimed at: the rectangle, the point and the element under it just before the press.</summary>
+    public string? LastClick { get; private set; }
+
     string Describe()
     {
+        var click = LastClick is null ? "" : " | last click: " + LastClick;
         if (Context is null)
-            return "";
-        try { return " | state: " + Context(); }
-        catch (Exception e) { return " | state unavailable: " + e.Message; }
+            return click;
+        try { return click + " | state: " + Context(); }
+        catch (Exception e) { return click + " | state unavailable: " + e.Message; }
     }
 
     // ---- UI Automation ----------------------------------------------------------------------------------------------
@@ -632,11 +636,14 @@ public sealed partial class AppWindow : IDisposable
                 observed = $"the point {point.X},{point.Y} of rectangle {rect} belongs to another program: {hit.ControlType.ProgrammaticName} '{hit.Name}' class {hit.ClassName} pid {hit.ProcessId}";
                 return null;
             }
-            observed = $"rectangle {rect}, point {point.X},{point.Y} on {hit.ControlType.ProgrammaticName} '{hit.Name}' class {hit.ClassName}";
+            observed = $"rectangle {rect}, point {point.X},{point.Y} on {hit.ControlType.ProgrammaticName} '{hit.Name}' class {hit.ClassName} id '{hit.AutomationId}'";
             return point;
         }, DefaultWait);
         if (found is ValueTuple<int, int> target)
+        {
+            LastClick = $"{what}: {observed}";
             return target;
+        }
         var foreground = GetForegroundWindow();
         throw new TimeoutException($"Timeout: a usable click target for {what}; last seen: {observed}; foreground window {(foreground == Handle ? "is this window" : $"0x{foreground:X} is not this window")}{Describe()}");
     }

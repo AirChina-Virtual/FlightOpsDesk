@@ -11,6 +11,8 @@ namespace VamSys.UiTests;
 /// </summary>
 public class ToolbarTests
 {
+    const string Departure = "Departure Airport (ICAO/IATA)";
+
     [WindowFact]
     public void The_toolbar_groups_the_commands_and_the_table_sorts_filters_and_hides_columns()
     {
@@ -29,6 +31,9 @@ public class ToolbarTests
         app.Context = () => $"sort '{app.Name("DataSort")}' | first callsign {First("Callsign")} | horizontal {app.Query("data-state").Str("horizontal")}"
             + $" | headers {string.Join(", ", app.FindAll(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text)).Where(e => e.Current.Name.StartsWith("ID", StringComparison.Ordinal)).Select(Header))}"
             + $" | page check {string.Join(", ", app.Find("DataSelectPage").Select(Header))}"
+            + $" | row 1 editors {app.Query("data-row:1").Str("editors")} focused {app.Query("data-row:1").Str("focused")}"
+            + $" | UIA focus {AutomationElement.FocusedElement?.Current.ControlType.ProgrammaticName} '{AutomationElement.FocusedElement?.Current.Name}' class {AutomationElement.FocusedElement?.Current.ClassName}"
+            + $" | menu items [{string.Join(", ", app.FindAll(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.MenuItem)).Select(e => e.Current.Name))}]"
             + $" | input {string.Join("; ", app.Query("input-log")["input"]!.AsArray().Select(i => i!.GetValue<string>()).TakeLast(12))}";
 
         // An edit shows on its resource's tab as a pending change.
@@ -82,9 +87,18 @@ public class ToolbarTests
         app.Click("校验");
         if (Poll(() => app.Find("PrimaryButton").FirstOrDefault(), TimeSpan.FromSeconds(2)) != null)
             app.DialogCancel();
-        var row = app.Rows()[1];
+        app.DialogClosed();
+        // A user right-clicks a cell of the record. The centre of the whole row was wherever the table's sideways scroll put
+        // it, and a right click on an editable cell used to open its editor instead of the menu (EditableCell). The table is
+        // shown from its left edge and the second row's Departure cell, an editable one, is right-clicked: the row menu
+        // opens and no editor does.
+        ShowLeftEdge();
         app.Foreground();
-        app.RightClickOn(row, "the second row");
+        var cell = app.Wait(() => Below(app.Rows()[1], new AndCondition(new PropertyCondition(AutomationElement.NameProperty, Departure),
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit))).FirstOrDefault(), "the second row's Departure cell");
+        app.RightClickOn(cell, "the second row's Departure cell");
+        app.First("记录详情", ControlType.MenuItem);
+        Assert.Equal(0, app.Query("data-row:1").Int("editors"));
         app.First("记录详情", ControlType.MenuItem).Invoke();
         app.One("RowDetails");
         Assert.Single(app.Query("data-state")["selectedRows"]!.AsArray());

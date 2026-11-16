@@ -49,7 +49,8 @@ sealed class DataTableView
         var style = new Style(typeof(ListViewItem)) { BasedOn = (Style)Application.Current.Resources["DefaultListViewItemStyle"] };
         style.Setters.Add(new Setter(FrameworkElement.HeightProperty, rowHeight));
         style.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, rowHeight));
-        style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+        // The cells start after the selection check box WinUI draws at the row's left; the header uses the same inset.
+        style.Setters.Add(new Setter(Control.PaddingProperty, UiTokens.DataRowPadding));
         style.Setters.Add(new Setter(Control.FontSizeProperty, UiTokens.BodyFontSize));
         style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
         table.ItemContainerStyle = style;
@@ -92,7 +93,8 @@ sealed class DataTableView
             return;
         headerColumns = columns;
         headerLabels.Clear();
-        // The page's check box stands in the inset over the rows' own check boxes; the column headers follow it.
+        // The page's check box stands in the inset exactly over the rows' own check boxes, centred on the labels' line (its
+        // 20 px square is centred in the check box's 32 px height, and the labels are centred too); the column headers follow.
         var headers = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0 };
         var check = pageCheck = new CheckBox
         {

@@ -9,6 +9,7 @@
     <ResourceDictionary x:Key="Default">
       <StaticResource x:Key="CardStrokeBrush" ResourceKey="CardStrokeColorDefaultBrush"/>
       <StaticResource x:Key="DividerBrush" ResourceKey="DividerStrokeColorDefaultBrush"/>
+      <StaticResource x:Key="TableHeaderBackgroundBrush" ResourceKey="SubtleFillColorTertiaryBrush"/>
       <StaticResource x:Key="StatusErrorBrush" ResourceKey="SystemFillColorCriticalBrush"/>
       <StaticResource x:Key="ModeOnlineBrush" ResourceKey="SystemFillColorCautionBackgroundBrush"/>
       <StaticResource x:Key="ModeDemoBrush" ResourceKey="SystemFillColorAttentionBackgroundBrush"/>
@@ -24,6 +25,7 @@
     <ResourceDictionary x:Key="Light">
       <StaticResource x:Key="CardStrokeBrush" ResourceKey="CardStrokeColorDefaultBrush"/>
       <StaticResource x:Key="DividerBrush" ResourceKey="DividerStrokeColorDefaultBrush"/>
+      <StaticResource x:Key="TableHeaderBackgroundBrush" ResourceKey="SubtleFillColorTertiaryBrush"/>
       <StaticResource x:Key="StatusErrorBrush" ResourceKey="SystemFillColorCriticalBrush"/>
       <StaticResource x:Key="ModeOnlineBrush" ResourceKey="SystemFillColorCautionBackgroundBrush"/>
       <StaticResource x:Key="ModeDemoBrush" ResourceKey="SystemFillColorAttentionBackgroundBrush"/>
@@ -39,6 +41,7 @@
     <ResourceDictionary x:Key="HighContrast">
       <StaticResource x:Key="CardStrokeBrush" ResourceKey="CardStrokeColorDefaultBrush"/>
       <StaticResource x:Key="DividerBrush" ResourceKey="DividerStrokeColorDefaultBrush"/>
+      <StaticResource x:Key="TableHeaderBackgroundBrush" ResourceKey="SubtleFillColorTertiaryBrush"/>
       <StaticResource x:Key="StatusErrorBrush" ResourceKey="SystemFillColorCriticalBrush"/>
       <StaticResource x:Key="ModeOnlineBrush" ResourceKey="SystemFillColorCautionBackgroundBrush"/>
       <StaticResource x:Key="ModeDemoBrush" ResourceKey="SystemFillColorAttentionBackgroundBrush"/>
@@ -78,6 +81,9 @@
     <Setter Property="FontWeight" Value="SemiBold"/>
     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
     <Setter Property="Foreground" Value="{ThemeResource SecondaryTextBrush}"/>
+    <!-- The same inner padding as the cells below, and centred on the header check box's line. -->
+    <Setter Property="Padding" Value="{StaticResource CellBoxPadding}"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
   </Style>
   <Style x:Key="StatusTextStyle" TargetType="TextBlock">
     <Setter Property="TextWrapping" Value="Wrap"/>
@@ -170,16 +176,22 @@
   <Thickness x:Key="CellBorderThickness">0,0,0,1</Thickness>
   <Thickness x:Key="CellMarkedBorderThickness">0,0,0,2</Thickness>
   <Thickness x:Key="CellIssueBorderThickness">1</Thickness>
-  <Thickness x:Key="CellTextPadding">8,0</Thickness>
+  <!-- Text starts 9 in from its column's left edge in every cell (box padding, button and editor padding plus their 1 border). -->
+  <Thickness x:Key="CellTextPadding">9,0</Thickness>
   <Thickness x:Key="CellBoxPadding">9,0</Thickness>
   <Thickness x:Key="CellButtonPadding">8,2</Thickness>
   <Thickness x:Key="CellEditorPadding">8,2,8,2</Thickness>
   <Thickness x:Key="CellPickerPadding">6,0</Thickness>
   <x:Double x:Key="HintDelayMilliseconds">500</x:Double>
+  <!-- A header label is as wide as its column and keeps the cells' right margin, so labels and cells share every x. -->
   <Thickness x:Key="ColumnHeaderMargin">0,0,6,0</Thickness>
+  <!-- In Multiple selection mode WinUI draws a row's 20 px check box 14 from the row's left edge and starts the row's
+       content at 28 plus the item's padding: 8 more puts the cells at 36, clear of the check box (it ends at 34). -->
+  <Thickness x:Key="DataRowPadding">8,0,0,0</Thickness>
+  <!-- Where the first column starts in the header: the same 28 + DataRowPadding. -->
   <Thickness x:Key="DataHeaderInset">36,0,0,0</Thickness>
-  <!-- The page's check box in that inset, over the rows' check boxes. -->
-  <Thickness x:Key="HeaderCheckMargin">16,0,0,0</Thickness>
+  <!-- The page's check box in that inset, exactly over the rows' check boxes. -->
+  <Thickness x:Key="HeaderCheckMargin">14,0,0,0</Thickness>
   <x:Double x:Key="LockedTableOpacity">0.6</x:Double>
 
   <!-- Control widths -->
