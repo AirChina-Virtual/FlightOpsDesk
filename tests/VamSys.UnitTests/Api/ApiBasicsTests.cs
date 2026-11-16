@@ -58,11 +58,17 @@ public class ApiBasicsTests
     {
         var w = new Workspace();
         w.Resources[ResourceKind.Routes].Draft.Add(Row(("Type", "jumpseat"), ("Departure Airport (ICAO/IATA)", "EGLL"), ("Arrival Airport (ICAO/IATA)", "EGKK"), ("Cost Index", "1000")));
-        var issues = Schemas.Validate(w, ResourceKind.Routes).Select(i => i.Field).ToHashSet();
-        Assert.Contains("Callsign", issues);
-        Assert.Contains("Flight Number", issues);
-        Assert.Contains("Cost Index", issues);
-        Assert.DoesNotContain("Fleet IDs", issues);
+        w.Resources[ResourceKind.Routes].Draft.Add(Row(("Type", "scheduled"), ("Departure Airport (ICAO/IATA)", "EGLL"), ("Arrival Airport (ICAO/IATA)", "EGCC"), ("Fleet IDs", "4")));
+        var issues = Schemas.Validate(w, ResourceKind.Routes);
+        // A jumpseat's callsign and flight number stay empty (the server keeps neither); other types need both.
+        var jumpseat = issues.Where(i => i.RowId == w.Resources[ResourceKind.Routes].Draft[0].LocalId).Select(i => i.Field).ToHashSet();
+        Assert.DoesNotContain("Callsign", jumpseat);
+        Assert.DoesNotContain("Flight Number", jumpseat);
+        Assert.Contains("Cost Index", jumpseat);
+        Assert.DoesNotContain("Fleet IDs", jumpseat);
+        var scheduled = issues.Where(i => i.RowId == w.Resources[ResourceKind.Routes].Draft[1].LocalId).Select(i => i.Field).ToHashSet();
+        Assert.Contains("Callsign", scheduled);
+        Assert.Contains("Flight Number", scheduled);
     }
 
     [Theory]

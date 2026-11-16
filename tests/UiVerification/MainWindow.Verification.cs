@@ -25,6 +25,14 @@ public sealed partial class MainWindow
         public void Start() => window.InitializeVerification();
         public void ObserveDialog(ContentDialog dialog, bool showing) => window.ObserveVerificationDialog(dialog, showing);
     }
+    readonly List<string> verificationInput=[];
+    void LogVerificationInput(string kind,object? source)
+    {
+        var focus=RootGrid.XamlRoot is null?null:Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(RootGrid.XamlRoot);
+        var hit=source is null?"":" on "+source.GetType().Name+(source is TextBlock text?" '"+text.Text+"'":"");
+        verificationInput.Add($"{DateTime.Now:HH:mm:ss.fff} {kind}{hit} canEdit={gate.CanEdit} querying={gate.QueryInProgress} actions={gate.RunningUserActions} focus={focus?.GetType().Name}");
+        if(verificationInput.Count>40)verificationInput.RemoveAt(0);
+    }
     void ObserveVerificationDialog(ContentDialog dialog, bool showing) { if (showing) verificationDialog=dialog; else if(verificationDialog==dialog) verificationDialog=null; }
     void ConfigureVerificationTheme()
         => RootGrid.RequestedTheme = Environment.GetEnvironmentVariable("VAMSYS_QA_THEME") == "light" ? ElementTheme.Light : ElementTheme.Dark;
@@ -36,6 +44,13 @@ public sealed partial class MainWindow
         EventHandler<object>? firstFrame=null;
         firstFrame=(_,_)=>{Microsoft.UI.Xaml.Media.CompositionTarget.Rendering-=firstFrame;verificationFirstFrameMs=(DateTime.Now-processStarted).TotalMilliseconds;};
         Microsoft.UI.Xaml.Media.CompositionTarget.Rendering+=firstFrame;
+        // What the window received of real pointer input, for a test whose click did nothing: presses and taps anywhere
+        // under the root (popups are not under it), with what they hit and whether the window took edits at that moment.
+        RootGrid.AddHandler(UIElement.PointerPressedEvent,new Microsoft.UI.Xaml.Input.PointerEventHandler((_,e)=>LogVerificationInput("pressed",e.OriginalSource)),true);
+        RootGrid.AddHandler(UIElement.PointerReleasedEvent,new Microsoft.UI.Xaml.Input.PointerEventHandler((_,e)=>LogVerificationInput("released",e.OriginalSource)),true);
+        RootGrid.AddHandler(UIElement.TappedEvent,new Microsoft.UI.Xaml.Input.TappedEventHandler((_,e)=>LogVerificationInput("tapped",e.OriginalSource)),true);
+        RootGrid.AddHandler(UIElement.DoubleTappedEvent,new Microsoft.UI.Xaml.Input.DoubleTappedEventHandler((_,e)=>LogVerificationInput("double-tapped",e.OriginalSource)),true);
+        Activated+=(_,e)=>LogVerificationInput("window "+e.WindowActivationState,null);
         VamSys.Infrastructure.StorageTestHooks.SetBarrier(storage.Inner,p=>{
             if(p=="Draft:AfterCommit")Interlocked.Increment(ref verificationDraftCommits);
             if(p=="Full:AfterCommit")Interlocked.Increment(ref verificationFullCommits);
@@ -74,6 +89,7 @@ public sealed partial class MainWindow
                 return new{milliseconds=timer.Elapsed.TotalMilliseconds,state=DataVerificationState()};
             }
             case "data-state":RootGrid.UpdateLayout();return DataVerificationState();
+            case "input-log":return new{input=verificationInput.ToArray()};
             case "review-fixture":
                 { var fleets = workspace.Resources[ResourceKind.Fleets].Draft; fleets[0] = fleets[0].With("Name", "QA reviewed fleet"); }
                 { var airports = workspace.Resources[ResourceKind.Airports].Draft; airports[0] = airports[0].With("Name", "QA reviewed airport"); }

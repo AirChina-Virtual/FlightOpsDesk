@@ -35,7 +35,7 @@ public sealed partial class MainWindow
         }
     }
 
-    string ReviewChangeText(ChangeItem item) => ReviewTexts.ChangeText(PlannedChange.Wrap(item), localization);
+    string ReviewChangeText(ChangeItem item, ReviewSummaries summaries) => ReviewTexts.ChangeText(PlannedChange.Wrap(item), localization, summaries);
 
     Task reviewLoad = Task.CompletedTask;
     // The page appears at once; the plan is built on a worker and the page filled when it is ready.
@@ -104,6 +104,13 @@ public sealed partial class MainWindow
             Render();
         return check.Plan;
     }
+    // The delete confirmation names each record by its key and what it is.
+    string DeleteLine(ChangeItem item, ReviewSummaries summaries)
+    {
+        var key = Schemas.Key(item.Resource, item.After);
+        var summary = summaries.Summary(item, localization);
+        return summary.Length == 0 ? key : key.Length == 0 ? summary : $"{key} · {summary}";
+    }
     async Task<List<ChangeItem>?> ConfirmWorkspaceSubmission(RunMode mode)
     {
         if (await CurrentReviewPlan(mode) is not { } shown)
@@ -116,6 +123,7 @@ public sealed partial class MainWindow
         var leftOut = chosen is null ? 0 : all.Count(i => chosen.Contains(i.Resource)) - items.Count;
         if (items.Count == 0)
             return null;
+        var summaries = new ReviewSummaries(workspace);
         var submit = L(mode == RunMode.Demo ? "ReviewDemoSubmit" : "ReviewSubmit");
         // 3.3 (F3): one line per resource and operation, the requests and time it will take, and every item on request.
         var summary = items.GroupBy(i => (i.Resource, i.Kind)).OrderBy(g => g.Key.Resource).ThenBy(g => g.Key.Kind)
@@ -145,11 +153,11 @@ public sealed partial class MainWindow
                 break;
             if (answer != DialogResult.Secondary)
                 return null;
-            await ConfirmList(L("ReviewShowAll", ("count", items.Count)), items.Select(i => $"{L(Schemas.All[i.Resource].Name)} · {ReviewChangeText(i)}").ToArray(),
+            await ConfirmList(L("ReviewShowAll", ("count", items.Count)), items.Select(i => $"{L(Schemas.All[i.Resource].Name)} · {ReviewChangeText(i, summaries)}").ToArray(),
                 L("Text_3FD47EDCE4"), null, DialogHeight.ReviewDetail, selectable: false);
         }
         var deletes = items.Where(i => i.Kind == ChangeKind.Delete).ToArray();
-        if (deletes.Length > 0 && !await ConfirmList(L("Text_5D6042B30E"), deletes.Select(i => $"{L(Schemas.All[i.Resource].Name)}: {Schemas.Key(i.Resource, i.After)}").ToArray(), L("Confirm"),
+        if (deletes.Length > 0 && !await ConfirmList(L("Text_5D6042B30E"), deletes.Select(i => $"{L(Schemas.All[i.Resource].Name)}: {DeleteLine(i, summaries)}").ToArray(), L("Confirm"),
             [L("ApiDeleteConfirm", ("count", deletes.Length))]))
             return null;
         return items;

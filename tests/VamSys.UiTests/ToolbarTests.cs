@@ -23,7 +23,7 @@ public class ToolbarTests
         int Total() => app.Query("data-state").Int("total");
         string First(string field) => app.Query("data-row:0")["fields"]!.Str(field) ?? "";
         var all = Total();
-        app.Context = () => $"sort '{app.Name("DataSort")}' | first callsign {First("Callsign")} | headers {string.Join(", ", app.FindAll(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text)).Select(e => e.Current.Name).Where(n => n.StartsWith("ID", StringComparison.Ordinal)))}";
+        app.Context = () => $"sort '{app.Name("DataSort")}' | first callsign {First("Callsign")} | headers {string.Join(", ", app.FindAll(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text)).Select(e => e.Current.Name).Where(n => n.StartsWith("ID", StringComparison.Ordinal)))} | input {string.Join("; ", app.Query("input-log")["input"]!.AsArray().Select(i => i!.GetValue<string>()).TakeLast(12))}";
 
         // An edit shows on its resource's tab as a pending change.
         app.Edit("Callsign", "DEM900");

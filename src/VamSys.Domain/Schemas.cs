@@ -155,9 +155,10 @@ public static class Schemas
             {
                 if (!RouteTypes.Contains(r.Get("Type")))
                     Add(r, "Type", Messages.Define("Text_EFB86BD704"));
-                // StoreRouteRequest requires callsign and flight_number for every type, jumpseat included.
+                // StoreRouteRequest requires callsign and flight_number for every type. The server keeps neither for a
+                // jumpseat, so a jumpseat's are left empty and the request carries placeholders (RoutePlanner).
                 foreach (var f in RouteIdentityFields)
-                    if (r.Get(f) == "" && !(r.Get("Type") == "jumpseat" && before?.Identity != null))
+                    if (r.Get(f) == "" && r.Get("Type") != "jumpseat")
                         Add(r, f, Messages.Define("Text_B283E8E5F2"));
                 if (r.Get("Type") != "jumpseat" && r.Get("Fleet IDs") == "")
                     Add(r, "Fleet IDs", Messages.Define("Text_134FD96D33"));

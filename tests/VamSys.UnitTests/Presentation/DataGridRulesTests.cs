@@ -37,6 +37,28 @@ public class DataGridRulesTests
 
     // The server drops a jumpseat's fleets: an empty fleet cell of a jumpseat cannot be filled, in every mode and whether
     // or not the server knows the row; fleets that are there anyway can still be cleared.
+    // What the server does not keep for a jumpseat stays empty: callsign and flight number always, remarks on a new one
+    // (they are dropped from the create). A cell that holds something anyway can still be cleared.
+    [Theory]
+    [InlineData("jumpseat", "Callsign", "", false, true)]
+    [InlineData("jumpseat", "Flight Number", "", false, true)]
+    [InlineData("jumpseat", "Remarks", "", false, true)]
+    [InlineData("jumpseat", "Remarks", "", true, false)]
+    [InlineData("jumpseat", "Callsign", "CAO1", false, false)]
+    [InlineData("jumpseat", "Remarks", "kept", false, false)]
+    [InlineData("jumpseat", "Internal Remarks", "", false, false)]
+    [InlineData("scheduled", "Callsign", "", false, false)]
+    [InlineData("scheduled", "Remarks", "", false, false)]
+    public void A_jumpseats_cells_the_server_does_not_keep_stay_empty(string type, string field, string value, bool known, bool readOnly)
+    {
+        var row = Row(("Type", type), (field, value));
+        if (known)
+            row = row.WithIdentity(new("101", "7"));
+        foreach (var mode in new[] { RunMode.Offline, RunMode.Demo })
+            Assert.Equal(readOnly, DataGridRules.CellReadOnly(row, field, mode));
+        Assert.Equal(readOnly, DataGridRules.JumpseatBlank(row, field));
+    }
+
     [Theory]
     [InlineData("jumpseat", "", true)]
     [InlineData("jumpseat", "4", false)]

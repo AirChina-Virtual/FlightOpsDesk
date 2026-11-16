@@ -168,6 +168,23 @@ public class ReadbackVerifierTests
         Assert.False(Verify(kit, scheduled, lost).Passed);
     }
 
+    // 2026-11-16, route 14327585: a jumpseat created with remarks came back with "remarks": null, in the POST answer and
+    // in the read after it.
+    [Fact]
+    public void A_created_jumpseat_may_come_back_without_its_remarks()
+    {
+        var kit = Kit();
+        var item = ApiKit.Create(ResourceKind.Routes, ("Type", "jumpseat"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", "CAO1234"), ("Flight Number", "CA1234"), ("Remarks", "QA42 jumpseat"));
+        string With(string type, string remarks) => $$"""{"id":90,"departure_id":101,"arrival_id":102,"type":"{{type}}","callsign":null,"flight_number":null,"remarks":{{remarks}}}""";
+        Assert.True(Verify(kit, item, kit.Map(ResourceKind.Routes, With("jumpseat", "null"))).Passed);
+        // other remarks than the ones sent are still a mismatch
+        Assert.False(Verify(kit, item, kit.Map(ResourceKind.Routes, With("jumpseat", "\"other\""))).Passed);
+        // a scheduled route that loses its remarks is still a mismatch
+        var scheduled = ApiKit.Create(ResourceKind.Routes, ("Type", "scheduled"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", "CAO1234"), ("Flight Number", "CA1234"), ("Fleet IDs", "4"), ("Remarks", "kept"));
+        var lost = kit.Map(ResourceKind.Routes, """{"id":91,"departure_id":101,"arrival_id":102,"type":"scheduled","callsign":"CAO1234","flight_number":"CA1234","fleet_ids":[4],"remarks":null}""");
+        Assert.False(Verify(kit, scheduled, lost).Passed);
+    }
+
     [Fact]
     public void A_recovered_jumpseat_must_be_new_and_created_inside_the_request_window()
     {

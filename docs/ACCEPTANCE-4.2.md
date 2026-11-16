@@ -6,7 +6,7 @@
 
 1. 用正式包（`artifacts/flightops-app`）打开 vCCA 工作区，在“连接与设置”中由你本人输入凭据并测试连接。
 2. 数据页“数据”菜单 →“从 API 刷新”，确认没有待审阅冲突、没有其他待提交改动（审阅页为空）。如有其他改动，先处理掉或换一个新工作区，避免混进本次提交。
-3. 选一个 vCCA **还没有**的机场 ICAO（在机场页搜索确认不存在），下文记为 `XXXX`。
+3. 选一个**真实存在**、但 vCCA **还没有**的机场 ICAO（在机场页搜索确认不存在），下文用 `XXXX` 代指它；不要照填 `XXXX`，服务器只接受真实机场代码。
 4. 选一个能用 CCA／CA 前缀的已批准参数 ID（新建机队时在“Parameter IDs”的选择框里选），下文记为 `P`。
 5. 选两个已有机场作为航路和航线的起降，下文用 ZSPD、ZSSS 举例。
 
@@ -22,7 +22,7 @@
 | 飞机 | Name `QA42 Plane`，Registration `B-QA42`，Fleet ID 选 `QA42 Fleet A`（本地新建的机型） |
 | 航路 | ZSPD → ZSSS，Route String `DCT`，Remarks `QA42 routing` |
 | 航线 | Type `scheduled`，Callsign `CCA9042`，Flight Number `CA9042`，ZSPD → ZSSS，Fleet IDs 选 `QA42 Fleet A`，Start Date 今天，End Date 今天起一个月内，起降时间任填（如 `10:00`／`11:30`），Remarks `QA42 scheduled` |
-| 航线 | Type `jumpseat`，ZSPD → ZSSS，Callsign `CCA9043`，Flight Number `CA9043`（服务器要求填写，但不会保存），Remarks `QA42 jumpseat`；**Fleet IDs 留空**（服务器不保存 jumpseat 的机型，填了会被标出） |
+| 航线 | Type `jumpseat`，ZSPD → ZSSS；呼号、班号、机型、Remarks 留空（服务器不保存，格子不可填，请求里由程序带占位值） |
 
 预期：7 项全部成功；飞机和 scheduled 航线在机型之后执行，自动用上新机型的远端 ID；每项都有回读核对。
 

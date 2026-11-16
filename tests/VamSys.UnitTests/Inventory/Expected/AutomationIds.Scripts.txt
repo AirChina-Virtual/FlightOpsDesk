@@ -187,6 +187,7 @@ verification-command:data-state => tests/UiVerification
 verification-command:data-undo-save => tests/UiVerification
 verification-command:dialog-cancel => tests/UiVerification
 verification-command:fail => tests/UiVerification
+verification-command:input-log => tests/UiVerification
 verification-command:memory => tests/UiVerification
 verification-command:parameter-dialog => tests/UiVerification
 verification-command:prepare => tests/UiVerification

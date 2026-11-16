@@ -30,6 +30,25 @@ public class CellEditCommitterTests
         Assert.Equal("4,5", edits.Commit(data, row, "Type", "cargo", new Dictionary<Guid, DataRow>()).Replacement.Get("Fleet IDs"));
     }
 
+    // A new route that becomes a jumpseat also loses callsign, flight number and remarks (the server keeps none of them
+    // from a jumpseat's create); one the server already holds keeps them.
+    [Fact]
+    public void Changing_a_new_route_to_jumpseat_clears_what_the_server_would_not_keep()
+    {
+        var row = Row(("Type", "scheduled"), ("Callsign", "CAO100"), ("Flight Number", "CA100"), ("Remarks", "r"), ("Internal Remarks", "i"));
+        var data = new ResourceData();
+        data.Draft.Add(row);
+        var jumpseat = new CellEditCommitter().Commit(data, row, "Type", "jumpseat", new Dictionary<Guid, DataRow>()).Replacement;
+        Assert.Equal(("", "", "", "i"), (jumpseat.Get("Callsign"), jumpseat.Get("Flight Number"), jumpseat.Get("Remarks"), jumpseat.Get("Internal Remarks")));
+        Assert.Single(data.Undo);
+
+        var known = row.WithIdentity(new("10", "7"));
+        var stored = new ResourceData();
+        stored.Draft.Add(known);
+        var kept = new CellEditCommitter().Commit(stored, known, "Type", "jumpseat", new Dictionary<Guid, DataRow> { [known.LocalId] = known }).Replacement;
+        Assert.Equal(("CAO100", "CA100", "r"), (kept.Get("Callsign"), kept.Get("Flight Number"), kept.Get("Remarks")));
+    }
+
     [Fact]
     public void A_commit_replaces_the_draft_row_and_leaves_the_original_untouched()
     {

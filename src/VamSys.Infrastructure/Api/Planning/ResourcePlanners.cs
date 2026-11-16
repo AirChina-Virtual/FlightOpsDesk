@@ -143,6 +143,18 @@ internal sealed class RoutePlanner(ApiContext ctx, RequestPlanners siblings) : E
         return new DateTimeOffset(DateTime.SpecifyKind(date, DateTimeKind.Unspecified), TimeSpan.Zero).ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture);
     }
 
+    // What stands in for a jumpseat's empty callsign or flight number: the letters most of the airline's routes start
+    // that field with, then "000" (CCA000, CA000). The only values a live jumpseat create was sent with had that shape
+    // (CCA9043 / CA9043, 2026-11-16); the server answered with null for both.
+    string JumpseatPlaceholder(string field)
+    {
+        var prefix = Ctx.Workspace.Resources[ResourceKind.Routes].Snapshot
+            .Select(r => new string([.. r.Get(field).TakeWhile(char.IsAsciiLetter).Take(3)]).ToUpperInvariant())
+            .Where(p => p.Length > 0).GroupBy(p => p)
+            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).FirstOrDefault()?.Key;
+        return (prefix ?? "JMP") + "000";
+    }
+
     protected override void CheckBody(ChangeItem c, bool create, Dictionary<string, object?> body)
     {
         // A scheduled route needs a non-empty fleet set; a jumpseat has none.
@@ -155,8 +167,13 @@ internal sealed class RoutePlanner(ApiContext ctx, RequestPlanners siblings) : E
             throw Block("ApiInvalid", "Fleet IDs");
         if (!Schemas.RouteTypes.Contains(c.After.Get("Type")))
             throw Block("ApiInvalid", "Type");
-        foreach (var (field, min, max) in new[] { ("Callsign", 4, 7), ("Flight Number", 3, 6) })
-            if ((create || c.Fields.ContainsKey(field)) && c.After.Get(field).Length is var length && (length < min || length > max))
+        // The create schema requires callsign and flight number, and the server keeps neither for a jumpseat: left
+        // empty, they are sent as placeholders.
+        var placeholders = create && c.After.Get("Type") == "jumpseat";
+        foreach (var (field, wire, min, max) in new[] { ("Callsign", "callsign", 4, 7), ("Flight Number", "flight_number", 3, 6) })
+            if (placeholders && c.After.Get(field) == "")
+                body[wire] = JumpseatPlaceholder(field);
+            else if ((create || c.Fields.ContainsKey(field)) && c.After.Get(field).Length is var length && (length < min || length > max))
                 throw Block("ApiInvalid", field);
         if (body.TryGetValue("cost_index", out var costIndex) && !Schemas.ValidCostIndex((string)costIndex!))
             throw Block("ApiInvalid", "Cost Index");

@@ -677,6 +677,7 @@
     <value>Invalid route type</value>
   </data>
   <data name="RouteJumpseatNoFleetsReadOnly" xml:space="preserve"><value>A jumpseat route has no fleets; the server does not keep them</value></data>
+  <data name="RouteJumpseatNotKept" xml:space="preserve"><value>A jumpseat route does not keep this; leave it empty</value></data>
   <data name="RouteJumpseatNoFleets" xml:space="preserve"><value>A jumpseat route has no fleets; clear this field</value></data>
   <data name="Text_134FD96D33" xml:space="preserve">
     <value>Required for non-jumpseat routes</value>
@@ -961,6 +962,7 @@ Remote: {remote}</value>
   <data name="TaskContinueReady" xml:space="preserve"><value>The samples were verified; {count} changes of the same kind remain and can be submitted from the review.</value></data>
   <data name="ReviewSummaryLine" xml:space="preserve"><value>{resource} · {kind}: {count}</value></data>
   <data name="ReviewEstimate" xml:space="preserve"><value>About {requests} requests, about {minutes} min (at most one request per second; rate-limit waits and retries come on top).</value></data>
+  <data name="ReviewSummaryFleet" xml:space="preserve"><value>Fleet: {fleet}</value></data>
   <data name="ReviewShowAll" xml:space="preserve"><value>Show all {count} items</value></data>
   <data name="ReviewOpenTaskItem" xml:space="preserve"><value>This record is in an unfinished online task (pending or unknown). Settle that item in the task center before submitting a new change.</value></data>
   <data name="ReviewOpenTaskItems" xml:space="preserve"><value>{count} changes touch records of unfinished online tasks and cannot be submitted yet; the other changes are not affected.</value></data>

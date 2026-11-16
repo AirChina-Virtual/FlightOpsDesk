@@ -258,7 +258,8 @@ public sealed class DataGridViewModel(IDataGridHost host, CellEditCommitter edit
             Label = key => language.Get(key),
             OriginalLabel = value => language.Get("CellServerValue", ("value", value.Length == 0 ? language.Get("CellEmptyValue") : value)),
             ReadOnlyReason = () => view is null ? "" : Schemas.Deleted(view.Row) ? language.Get("CellReadOnlyDeleted")
-                : DataGridRules.JumpseatFleets(view.Row, field) ? language.Get("RouteJumpseatNoFleetsReadOnly") : language.Get("CellReadOnlyServer"),
+                : DataGridRules.JumpseatFleets(view.Row, field) ? language.Get("RouteJumpseatNoFleetsReadOnly")
+                : DataGridRules.JumpseatBlank(view.Row, field) ? language.Get("RouteJumpseatNotKept") : language.Get("CellReadOnlyServer"),
             EditEnded = reverted =>
             {
                 edits.ResetContinuation();

@@ -342,6 +342,24 @@ public class RequestPlannerTests
         Assert.Equal("ApiInvalid", ApiKit.BlockedWith(() => kit.Api.Plan(ApiKit.Create(ResourceKind.Routes, ("Type", "jumpseat"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", "CAO1234"), ("Flight Number", "CA1234"), ("Fleet IDs", "4")))));
     }
 
+    // The create schema requires callsign and flight number; the server keeps neither for a jumpseat. Left empty, they go
+    // out as placeholders: the letters most of the airline's routes start that field with, then "000".
+    [Fact]
+    public void A_jumpseat_created_without_callsign_and_flight_number_sends_placeholders()
+    {
+        var kit = Kit();
+        var item = ApiKit.Create(ResourceKind.Routes, ("Type", "jumpseat"), (Dep, "EGLL"), (Arr, "EGKK"));
+        Is(Only(kit.Api.Plan(item)), HttpMethod.Post, "routes", """{"type":"jumpseat","departure_id":101,"arrival_id":102,"callsign":"JMP000","flight_number":"JMP000"}""");
+        foreach (var json in new[] { ApiKit.Scheduled10, ApiKit.Scheduled12, ApiKit.Jumpseat11,
+            """{"id":13,"departure_id":101,"arrival_id":102,"type":"cargo","callsign":"CKK200","flight_number":"KK200","fleet_ids":[4]}""" })
+            kit.Workspace.Resources[ResourceKind.Routes].Snapshot.Add(kit.Map(ResourceKind.Routes, json));
+        Is(Only(kit.Api.Plan(item)), HttpMethod.Post, "routes", """{"type":"jumpseat","departure_id":101,"arrival_id":102,"callsign":"CAO000","flight_number":"CA000"}""");
+        // one that is filled in is sent as it is; other types still need both
+        Is(Only(kit.Api.Plan(ApiKit.Create(ResourceKind.Routes, ("Type", "jumpseat"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", "CAO1234")))),
+            HttpMethod.Post, "routes", """{"type":"jumpseat","departure_id":101,"arrival_id":102,"callsign":"CAO1234","flight_number":"CA000"}""");
+        Assert.Equal("ApiInvalid", ApiKit.BlockedWith(() => kit.Api.Plan(ApiKit.Create(ResourceKind.Routes, ("Type", "scheduled"), (Dep, "EGLL"), (Arr, "EGKK"), ("Fleet IDs", "4")))));
+    }
+
     [Fact]
     public void A_scheduled_create_without_fleets_is_refused()
     {

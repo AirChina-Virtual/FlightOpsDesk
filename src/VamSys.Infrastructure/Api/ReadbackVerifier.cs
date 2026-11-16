@@ -39,8 +39,9 @@ internal sealed class ReadbackVerifier(ApiContext ctx, RequestPlanners planners)
             if (!raw.RootElement.TryGetProperty(wire, out var actual))
             { reasons.Add(new(wire, wanted.GetRawText(), null)); continue; }
             // A created jumpseat does not keep callsign / flight number, nor fleets (recorded live behaviour; fleets 2026-11-12,
-            // route 14217362). New jumpseats are no longer sent with fleets; this settles one that was.
-            if (ApiOperationPolicy.IsJumpseatCreate(item) && (wire is "callsign" or "flight_number" or "fleet_ids") && actual.ValueKind == JsonValueKind.Null)
+            // route 14217362). New jumpseats are no longer sent with fleets; this settles one that was. Nor does it keep the
+            // remarks sent with the create (2026-11-16, route 14327585: "remarks" null in the POST answer and the read).
+            if (ApiOperationPolicy.IsJumpseatCreate(item) && (wire is "callsign" or "flight_number" or "fleet_ids" or "remarks") && actual.ValueKind == JsonValueKind.Null)
                 continue;
             if (!WireEquivalent(item.Resource, wire, actual, wanted))
                 reasons.Add(new(wire, wanted.GetRawText(), actual.GetRawText()));

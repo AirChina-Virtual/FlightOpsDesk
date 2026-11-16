@@ -193,9 +193,9 @@ public sealed class FakeRemote
                 : value?.DeepClone();
         }
         // Live behaviour recorded in docs/API-CONTRACTS.md: a created jumpseat does not keep callsign / flight number or
-        // fleets (fleets: 2026-11-12, route 14217362).
+        // fleets (fleets: 2026-11-12, route 14217362), nor the remarks sent with it (2026-11-16, route 14327585).
         if (collection == "routes" && body["type"]?.ToString() == "jumpseat")
-        { row["callsign"] = null; row["flight_number"] = null; row["fleet_ids"] = null; }
+        { row["callsign"] = null; row["flight_number"] = null; row["fleet_ids"] = null; if (row.ContainsKey("remarks")) row["remarks"] = null; }
         row["created_at"] = Stamp;
         row["updated_at"] = Stamp;
         Rows[path] = row;

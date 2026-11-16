@@ -677,6 +677,7 @@
     <value>航线类型无效</value>
   </data>
   <data name="RouteJumpseatNoFleetsReadOnly" xml:space="preserve"><value>jumpseat 航线不带机型，服务器不会保存</value></data>
+  <data name="RouteJumpseatNotKept" xml:space="preserve"><value>jumpseat 航线不保存这一项，无需填写</value></data>
   <data name="RouteJumpseatNoFleets" xml:space="preserve"><value>jumpseat 航线不带机型，请清空</value></data>
   <data name="Text_134FD96D33" xml:space="preserve">
     <value>非 jumpseat 航线必填</value>
@@ -961,6 +962,7 @@
   <data name="TaskContinueReady" xml:space="preserve"><value>样本已核对通过，同类修改还有 {count} 项，可在审阅页继续提交。</value></data>
   <data name="ReviewSummaryLine" xml:space="preserve"><value>{resource} · {kind}：{count} 项</value></data>
   <data name="ReviewEstimate" xml:space="preserve"><value>预计约 {requests} 次请求，约 {minutes} 分钟（每秒最多 1 次请求；限流等待和重试另计）。</value></data>
+  <data name="ReviewSummaryFleet" xml:space="preserve"><value>机型：{fleet}</value></data>
   <data name="ReviewShowAll" xml:space="preserve"><value>查看全部 {count} 项</value></data>
   <data name="ReviewOpenTaskItem" xml:space="preserve"><value>这条记录在未完成的在线任务中（待执行或结果未知）。请先在任务中心处理那项，再提交新的修改。</value></data>
   <data name="ReviewOpenTaskItems" xml:space="preserve"><value>{count} 项修改涉及未完成在线任务中的记录，暂不能提交；其余修改不受影响。</value></data>

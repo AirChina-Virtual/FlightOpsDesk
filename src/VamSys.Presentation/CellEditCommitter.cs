@@ -23,6 +23,11 @@ public sealed class CellEditCommitter
         // A route that becomes a jumpseat loses its fleets in the same step (the server drops a jumpseat's fleets).
         if (field == "Type" && value == "jumpseat" && current.Get("Fleet IDs") != "")
             replacement = replacement.With("Fleet IDs", "");
+        // A new route that becomes a jumpseat also loses what the server would not keep from its create.
+        if (field == "Type" && value == "jumpseat" && current.Identity == null)
+            foreach (var dropped in new[] { "Callsign", "Flight Number", "Remarks" })
+                if (replacement.Get(dropped) != "")
+                    replacement = replacement.With(dropped, "");
         data.Edit([id], () => data.ReplaceDraftRows([replacement]), newStep: continuing != key);
         continuing = key;
         var after = ChangePlanner.GetChangeKind(replacement, baseline.GetValueOrDefault(id));
