@@ -21,7 +21,8 @@ public sealed class ConnectionService(WorkspaceSession session, IOnlineGateway o
     }
 
     // False when the workspace is not connected (the person has to connect first); throws while online tasks are
-    // pending, running or unknown, because a refresh would compare against records those tasks may change.
+    // pending, running or unknown or have skipped items "Continue" can still send (ApiOperationPolicy.OpenItems), because
+    // a refresh would compare against records those tasks may change.
     public bool CanRefresh()
     {
         var workspace = session.Workspace;

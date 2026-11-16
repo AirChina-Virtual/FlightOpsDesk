@@ -97,7 +97,7 @@
     <value>Demo · No live connection</value>
   </data>
   <data name="Text_C4C1F8C6F4" xml:space="preserve">
-    <value>Online · Adapter pending</value>
+    <value>Online</value>
   </data>
   <data name="Text_6C352EE0B0" xml:space="preserve">
     <value>Offline mode</value>
@@ -336,9 +336,6 @@
   <data name="Text_5A2BBDEA04" xml:space="preserve">
     <value>Choose CSV and map columns</value>
   </data>
-  <data name="Text_130FDB3E71" xml:space="preserve">
-    <value>Read from API (adapter pending)</value>
-  </data>
   <data name="Text_B91DE02936" xml:space="preserve">
     <value>Use as original snapshot (replace this resource's snapshot and drafts)</value>
   </data>
@@ -450,9 +447,6 @@
   </data>
   <data name="Text_92BD49D337" xml:space="preserve">
     <value>Use airport local times (preserve offline values; do not infer time zones)</value>
-  </data>
-  <data name="Text_A741E95F8D" xml:space="preserve">
-    <value>Operations API · Adapter pending</value>
   </data>
   <data name="Text_7E95E384B5" xml:space="preserve">
     <value>Instance OpenAPI, authentication URL and resource contracts are missing. Live reads and writes remain disabled. Saving settings sends no requests.</value>
@@ -711,9 +705,6 @@
   </data>
   <data name="Text_61CA285291" xml:space="preserve">
     <value>Pagination response does not match the known contract</value>
-  </data>
-  <data name="Text_9F2DE78FA0" xml:space="preserve">
-    <value>Adapter pending: instance OpenAPI, authentication URL and resource contracts are missing; no live verification performed</value>
   </data>
   <data name="OfflineReady" xml:space="preserve">
     <value>Connect to the Operations API or open a cached workspace.</value>

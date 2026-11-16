@@ -50,7 +50,13 @@ public sealed class TaskJobViewModel : ObservableObject
     public double Progress => Job.Items.Count == 0 ? 1 : 1 - (double)(counts[(int)ItemState.Pending] + counts[(int)ItemState.Running]) / Job.Items.Count;
     // Which actions the task's own state calls for. Whether one can run right now (connection, other work) stays with its command.
     public bool ShowsReview => Job.Mode == RunMode.Online && counts[(int)ItemState.Unknown] > 0;
-    public bool ShowsResume => Job.Mode != RunMode.Offline && counts[(int)ItemState.Pending] + counts[(int)ItemState.Running] + counts[(int)ItemState.Unknown] + unreBased > 0;
+    public bool ShowsResume => Job.Mode != RunMode.Offline && Resumable > 0;
+    // Items "Continue" may still send (ApiOperationPolicy.OpenItems: skipped ones count while what they wait on can still
+    // succeed) and succeeded ones not yet rebased into the snapshot.
+    int Resumable => counts[(int)ItemState.Pending] + counts[(int)ItemState.Running] + counts[(int)ItemState.Unknown] + continuableSkipped + unreBased;
+    int continuableSkipped;
+    // Whether a skipped item can still run depends on the items it waits on, so it is counted again after any change.
+    void CountContinuableSkipped() => continuableSkipped = counts[(int)ItemState.Skipped] == 0 ? 0 : ApiOperationPolicy.OpenItems(Job).Count(i => i.State == ItemState.Skipped);
     public bool ShowsRetry => Job.Mode == RunMode.Demo && counts[(int)ItemState.Failed] > 0;
     public bool ShowsVerifyDeletes => Job.Mode == RunMode.Online && deletionChecks > 0;
     public bool ShowsDiscard => Job.Mode == RunMode.Online && discardable > 0;
@@ -95,9 +101,10 @@ public sealed class TaskJobViewModel : ObservableObject
         previous = job.Items.ToDictionary(i => i.Id, TaskItemDisplay.Capture);
         foreach (var i in previous.Values)
         { counts[(int)i.State]++; if (i.State == ItemState.Succeeded && !i.Rebased) unreBased++; if (i.CanVerifyDeletion) deletionChecks++; if (i.CanDiscard) discardable++; if (i.Discarded) discarded++; }
+        CountContinuableSkipped();
         Details = new AsyncRelayCommand(details);
         Review = new AsyncRelayCommand(review, () => available() && job.Mode == RunMode.Online && mode() != RunMode.Demo && counts[(int)ItemState.Unknown] > 0);
-        Resume = new AsyncRelayCommand(resume, () => available() && job.Mode == mode() && job.Mode != RunMode.Offline && (counts[(int)ItemState.Pending] + counts[(int)ItemState.Running] + counts[(int)ItemState.Unknown] + unreBased) > 0);
+        Resume = new AsyncRelayCommand(resume, () => available() && job.Mode == mode() && job.Mode != RunMode.Offline && Resumable > 0);
         Retry = new AsyncRelayCommand(retry, () => available() && job.Mode == RunMode.Demo && counts[(int)ItemState.Failed] > 0);
         Export = new AsyncRelayCommand(export ?? (() => Task.CompletedTask), () => available());
         VerifyDeletes = new AsyncRelayCommand(verifyDeletes ?? (() => Task.CompletedTask), () => verifyDeletes != null && available() && job.Mode == RunMode.Online && mode() == RunMode.Online && deletionChecks > 0);
@@ -135,6 +142,7 @@ public sealed class TaskJobViewModel : ObservableObject
                 discarded++;
             if (itemModels?.TryGetValue(key, out var vm) == true)
             { vm.Item = previous[key]; if (notify) vm.Refresh(); }
+            CountContinuableSkipped();
         }
         if (notify)
             RefreshHeader();

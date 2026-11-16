@@ -43,6 +43,24 @@ public class DiscardUnsentTests
     }
 
     [Fact]
+    public void A_skipped_item_continue_can_still_send_holds_the_connection_settings_until_what_it_waits_on_fails()
+    {
+        using var s = new StoredWorld();
+        s.World.MarkDelete(ResourceKind.Routes, "10");
+        s.World.MarkDelete(ResourceKind.Airports, "103");
+        var job = s.Submit();
+        var (waited, skipped) = (job.Items[0], job.Items[1]);
+        waited.State = ItemState.Succeeded;
+        skipped.State = ItemState.Skipped;
+        skipped.Dependencies = [waited.Id];
+        var blocked = Assert.Throws<InvalidOperationException>(() => s.Store.SaveConnectionSettings(s.W, "123", "secret", "", false));
+        Assert.Equal("ApiPendingJob", MessageErrors.Describe(blocked).Code);
+
+        waited.State = ItemState.Failed;
+        s.Store.SaveConnectionSettings(s.W, "123", "secret", "", false);
+    }
+
+    [Fact]
     public async Task Only_items_that_never_reached_the_server_can_be_discarded_and_a_failed_save_changes_nothing()
     {
         using var s = new StoredWorld();

@@ -42,7 +42,36 @@ public static class ApiOperationPolicy
 {
     public static bool IsJumpseatCreate(ChangeItem item) => item.Resource == ResourceKind.Routes && item.Kind == ChangeKind.Create && item.After.Get("Type") == "jumpseat";
     // Any open online item blocks refresh, new submissions and connection settings, so nothing is submitted twice.
-    public static bool HasOpenOnlineItems(Workspace workspace) => workspace.Jobs.Any(j => j.Mode == RunMode.Online && j.Items.Any(i => i.State is ItemState.Pending or ItemState.Running or ItemState.Unknown));
+    public static bool HasOpenOnlineItems(Workspace workspace) => workspace.Jobs.Any(j => j.Mode == RunMode.Online && OpenItems(j).Any());
+    // The items of a task that may still be sent: pending, running or unknown ones, and skipped ones while "Continue" can
+    // still send them, that is while everything they wait on has succeeded or is itself open. A skipped item that waits on
+    // a failed, conflicting or manually confirmed item can never run in its task and is not open.
+    public static IEnumerable<ChangeItem> OpenItems(BatchJob job)
+    {
+        var byId = new Dictionary<Guid, ChangeItem>();
+        foreach (var item in job.Items)
+            byId.TryAdd(item.Id, item);
+        var open = new Dictionary<ChangeItem, bool>();
+        foreach (var item in job.Items)
+            if (IsOpen(item, []))
+                yield return item;
+
+        bool IsOpen(ChangeItem item, HashSet<ChangeItem> visiting)
+        {
+            if (item.State is ItemState.Pending or ItemState.Running or ItemState.Unknown)
+                return true;
+            if (item.State != ItemState.Skipped)
+                return false;
+            if (open.TryGetValue(item, out var known))
+                return known;
+            if (!visiting.Add(item))
+                return false;
+            var result = item.Dependencies.All(id => !byId.TryGetValue(id, out var dependency)
+                || dependency.State == ItemState.Succeeded || IsOpen(dependency, visiting));
+            open[item] = result;
+            return result;
+        }
+    }
     // Every step is saved as in flight before it is sent, so a Pending item whose steps are all still prepared,
     // and that has no answered create or accepted write, never reached the server.
     public static bool CanDiscardUnsent(ChangeItem item) => item.State == ItemState.Pending && !item.CreateCompleted && !item.WriteAccepted

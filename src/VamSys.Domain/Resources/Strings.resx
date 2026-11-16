@@ -97,7 +97,7 @@
     <value>演示 · 不连接真实数据</value>
   </data>
   <data name="Text_C4C1F8C6F4" xml:space="preserve">
-    <value>在线 · 待适配</value>
+    <value>在线</value>
   </data>
   <data name="Text_6C352EE0B0" xml:space="preserve">
     <value>离线模式</value>
@@ -336,9 +336,6 @@
   <data name="Text_5A2BBDEA04" xml:space="preserve">
     <value>选择 CSV 并映射</value>
   </data>
-  <data name="Text_130FDB3E71" xml:space="preserve">
-    <value>从 API 读取（待适配）</value>
-  </data>
   <data name="Text_B91DE02936" xml:space="preserve">
     <value>作为原始快照（替换此资源的快照和草稿）</value>
   </data>
@@ -450,9 +447,6 @@
   </data>
   <data name="Text_92BD49D337" xml:space="preserve">
     <value>航线使用机场本地时间（离线保持原值，不推测机场时区）</value>
-  </data>
-  <data name="Text_A741E95F8D" xml:space="preserve">
-    <value>Operations API · 待适配</value>
   </data>
   <data name="Text_7E95E384B5" xml:space="preserve">
     <value>缺少实例 OpenAPI、认证地址和资源字段契约，真实读取与写入保持禁用。保存连接配置不会发送请求。</value>
@@ -711,9 +705,6 @@
   </data>
   <data name="Text_61CA285291" xml:space="preserve">
     <value>分页响应不符合已知契约</value>
-  </data>
-  <data name="Text_9F2DE78FA0" xml:space="preserve">
-    <value>待适配：缺少实例 OpenAPI、认证地址及资源字段契约；尚未真实联调</value>
   </data>
   <data name="OfflineReady" xml:space="preserve">
     <value>请连接 Operations API，或打开已缓存的工作区。</value>

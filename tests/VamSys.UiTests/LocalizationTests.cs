@@ -11,6 +11,9 @@ namespace VamSys.UiTests;
 /// </summary>
 public class LocalizationTests
 {
+    // The sort button's text when the table is sorted by ID ascending: the resource's prefix, the column and the arrow.
+    static string SortedById(string prefix) => prefix + "ID ↑";
+
     [WindowFact]
     public void Language_switches_in_place_and_keeps_settings_draft_filter_selection_and_review()
     {
@@ -79,6 +82,21 @@ public class LocalizationTests
         app.First("Export Routes CSV", ControlType.Button);
         Assert.True(app.Shown("Simulate workspace submission", ControlType.Button), "Demo submission missing from the review");
         Assert.False(app.Shown("Submit workspace changes", ControlType.Button), "Live API submission offered for a demo workspace");
+
+        // The sort button follows a language switch, with no sort chosen and with one (it used to keep the old language).
+        app.SelectItem("Data management");
+        app.Until(() => app.Name("DataSort") == "Sort field", "no sort, in English");
+        app.SelectItem("Connection & settings");
+        app.Language("简体中文");
+        app.SelectItem("数据管理");
+        app.Until(() => app.Name("DataSort") == "排序字段", "no sort, in Chinese");
+        app.Foreground();
+        app.ClickOn(app.Wait(() => app.FindNamed("ID", ControlType.Text).FirstOrDefault(), "the ID header"), "the ID header");
+        app.Until(() => app.Name("DataSort") == SortedById("排序："), "sorted by ID, in Chinese");
+        app.SelectItem("连接与设置");
+        app.Language("English");
+        app.SelectItem("Data management");
+        app.Until(() => app.Name("DataSort") == SortedById("Sort: "), "sorted by ID, in English");
 
         app.Close();
     }

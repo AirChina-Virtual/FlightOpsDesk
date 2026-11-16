@@ -100,6 +100,7 @@ script-name:Select one approved, unrestricted airline parameter for the new flee
 script-name:Set end date => found in source or resx
 script-name:Shift date (days) => found in source or resx
 script-name:Simulate workspace submission => found in source or resx
+script-name:Sort field => found in source or resx
 script-name:Submit workspace changes => found in source or resx
 script-name:Tags => found in source or resx
 script-name:Task center => found in source or resx
@@ -140,6 +141,7 @@ script-name:已在 Orwell 核对 => found in source or resx
 script-name:恢复默认位置 => found in source or resx
 script-name:打开数据管理 => found in source or resx
 script-name:找不到数据位置 => found in source or resx
+script-name:排序字段 => found in source or resx
 script-name:接受服务器当前值 => found in source or resx
 script-name:搜索全部字段 => found in source or resx
 script-name:数据存放位置 => found in source or resx

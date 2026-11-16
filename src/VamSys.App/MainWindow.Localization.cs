@@ -60,6 +60,8 @@ public sealed partial class MainWindow
             if (ReferenceEquals(PageHost.Content, shownReviewPage))
                 shownReviewPage?.Model.RefreshLanguage();
             RefreshDataAvailability();
+            // The sort button's text is made from resources only when the sort changes; its menu is rebuilt on opening.
+            sortBox?.Refresh();
         }
         finally { ready = previous; }
     }

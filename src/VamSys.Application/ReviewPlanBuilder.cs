@@ -259,36 +259,9 @@ public static class ReviewPlanBuilder
         var keys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var job in w.Jobs)
             if (job.Mode == RunMode.Online)
-                foreach (var item in OpenItems(job))
+                foreach (var item in ApiOperationPolicy.OpenItems(job))
                     keys.UnionWith(TaskKeys(item.Resource, item.Before, item.After));
         return keys;
-    }
-
-    internal static IEnumerable<ChangeItem> OpenItems(BatchJob job)
-    {
-        var byId = new Dictionary<Guid, ChangeItem>();
-        foreach (var item in job.Items)
-            byId.TryAdd(item.Id, item);
-        var open = new Dictionary<ChangeItem, bool>();
-        foreach (var item in job.Items)
-            if (IsOpen(item, []))
-                yield return item;
-
-        bool IsOpen(ChangeItem item, HashSet<ChangeItem> visiting)
-        {
-            if (item.State is ItemState.Pending or ItemState.Running or ItemState.Unknown)
-                return true;
-            if (item.State != ItemState.Skipped)
-                return false;
-            if (open.TryGetValue(item, out var known))
-                return known;
-            if (!visiting.Add(item))
-                return false;
-            var result = item.Dependencies.All(id => !byId.TryGetValue(id, out var dependency)
-                || dependency.State == ItemState.Succeeded || IsOpen(dependency, visiting));
-            open[item] = result;
-            return result;
-        }
     }
 
     static IEnumerable<string> TaskKeys(ResourceKind kind, DataRow? before, DataRow after)
