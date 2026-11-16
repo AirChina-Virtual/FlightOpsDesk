@@ -23,7 +23,13 @@ public class ToolbarTests
         int Total() => app.Query("data-state").Int("total");
         string First(string field) => app.Query("data-row:0")["fields"]!.Str(field) ?? "";
         var all = Total();
-        app.Context = () => $"sort '{app.Name("DataSort")}' | first callsign {First("Callsign")} | headers {string.Join(", ", app.FindAll(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text)).Select(e => e.Current.Name).Where(n => n.StartsWith("ID", StringComparison.Ordinal)))} | input {string.Join("; ", app.Query("input-log")["input"]!.AsArray().Select(i => i!.GetValue<string>()).TakeLast(12))}";
+        // Where the ID header is: its rectangle and IsOffscreen, the page check box at the left end of the same header row,
+        // and the table's horizontal offset (headers and rows scroll sideways together in one ScrollViewer).
+        string Header(AutomationElement e) => $"'{e.Current.Name}' offscreen={e.Current.IsOffscreen} rect {e.Current.BoundingRectangle}";
+        app.Context = () => $"sort '{app.Name("DataSort")}' | first callsign {First("Callsign")} | horizontal {app.Query("data-state").Str("horizontal")}"
+            + $" | headers {string.Join(", ", app.FindAll(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Text)).Where(e => e.Current.Name.StartsWith("ID", StringComparison.Ordinal)).Select(Header))}"
+            + $" | page check {string.Join(", ", app.Find("DataSelectPage").Select(Header))}"
+            + $" | input {string.Join("; ", app.Query("input-log")["input"]!.AsArray().Select(i => i!.GetValue<string>()).TakeLast(12))}";
 
         // An edit shows on its resource's tab as a pending change.
         app.Edit("Callsign", "DEM900");
@@ -44,10 +50,16 @@ public class ToolbarTests
         app.Foreground();
         app.Rows()[0].SetFocus();
         app.Until(() => AutomationElement.FocusedElement?.Current.ClassName != "TextBox", "the focus is on the table");
-        // A click waits for the header to be laid out inside the window: a click at an empty rectangle went to another window.
+        // The ID column is at the table's left edge; window runs found its header with an empty rectangle, out of view. As a
+        // user drags the scroll bar back, the table is scrolled to its left edge (the QA command sets the same horizontal
+        // offset) before the header is clicked. ClickOn then waits for a rectangle inside the window, and on timeout the
+        // context above says where the header and the table's offset were.
+        void ShowLeftEdge() => app.Query("data-scroll:0,0");
+        ShowLeftEdge();
         var header = app.Wait(() => app.FindNamed("ID", ControlType.Text).FirstOrDefault(), "the ID header");
         app.ClickOn(header, "the ID header");
         app.Until(() => app.Name("DataSort").Contains("ID", StringComparison.Ordinal) && First("ID") == "100", "ascending by ID");
+        ShowLeftEdge();
         header = app.Wait(() => app.FindNamed("ID \u2191", ControlType.Text).FirstOrDefault(), "the header shows the order");
         app.ClickOn(header, "the ID \u2191 header");
         app.Until(() => First("ID") == "111", "descending by ID");
