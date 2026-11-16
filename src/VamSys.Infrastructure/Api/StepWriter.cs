@@ -43,8 +43,12 @@ internal sealed class StepWriter(ApiContext ctx)
             using var response = result;
             if (step.Method == HttpMethod.Post)
             {
+                // The server answers a create with the bare record (routings) or with the record wrapped in "data"
+                // (airports, fleets, aircraft and routes, seen live 2026-11-16); both are read the same way. An answer
+                // with neither shape is parsed as it is and fails, so the outcome stays unknown and is settled by reading.
+                var answer = CreatedRecord(response.RootElement);
                 // Keep the created ID durable before a full parse can fail on an unexpected response shape.
-                if (response.RootElement.ValueKind == JsonValueKind.Object && response.RootElement.TryGetProperty("id", out var createdId) && long.TryParse(createdId.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var parsedId) && parsedId > 0)
+                if (answer.ValueKind == JsonValueKind.Object && answer.TryGetProperty("id", out var createdId) && long.TryParse(createdId.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var parsedId) && parsedId > 0)
                 {
                     change.RemoteId = parsedId.ToString(CultureInfo.InvariantCulture);
                     change.CreateCompleted = true;
@@ -52,7 +56,7 @@ internal sealed class StepWriter(ApiContext ctx)
                     record.State = BatchStepState.ResponseReceived;
                     await persist();
                 }
-                var created = ctx.Mappers.For(change.Resource).FromJson(response.RootElement);
+                var created = ctx.Mappers.For(change.Resource).FromJson(answer);
                 change.RemoteId = created.Identity!.RemoteId;
                 change.After = change.After.WithIdentity(created.Identity);
                 change.CreateCompleted = true;
@@ -63,5 +67,14 @@ internal sealed class StepWriter(ApiContext ctx)
             await persist();
         }
         return change.RemoteId ?? change.After.Identity?.RemoteId;
+    }
+
+    // The record in a create answer: the root when it carries an "id", else a "data" object that carries one, else
+    // the root unchanged, so an answer of neither shape keeps failing the way it did before.
+    internal static JsonElement CreatedRecord(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object || root.TryGetProperty("id", out _))
+            return root;
+        return root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object && data.TryGetProperty("id", out _) ? data : root;
     }
 }

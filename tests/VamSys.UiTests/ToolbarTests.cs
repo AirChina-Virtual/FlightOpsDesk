@@ -44,11 +44,12 @@ public class ToolbarTests
         app.Foreground();
         app.Rows()[0].SetFocus();
         app.Until(() => AutomationElement.FocusedElement?.Current.ClassName != "TextBox", "the focus is on the table");
+        // A click waits for the header to be laid out inside the window: a click at an empty rectangle went to another window.
         var header = app.Wait(() => app.FindNamed("ID", ControlType.Text).FirstOrDefault(), "the ID header");
-        ClickAt(header.Current.BoundingRectangle);
+        app.ClickOn(header, "the ID header");
         app.Until(() => app.Name("DataSort").Contains("ID", StringComparison.Ordinal) && First("ID") == "100", "ascending by ID");
         header = app.Wait(() => app.FindNamed("ID \u2191", ControlType.Text).FirstOrDefault(), "the header shows the order");
-        ClickAt(header.Current.BoundingRectangle);
+        app.ClickOn(header, "the ID \u2191 header");
         app.Until(() => First("ID") == "111", "descending by ID");
         // The view menu hides a column and shows it again.
         var columns = app.Query("data-state").Int("columns");
@@ -71,7 +72,7 @@ public class ToolbarTests
             app.DialogCancel();
         var row = app.Rows()[1];
         app.Foreground();
-        RightClickAt(row.Current.BoundingRectangle);
+        app.RightClickOn(row, "the second row");
         app.First("记录详情", ControlType.MenuItem).Invoke();
         app.One("RowDetails");
         Assert.Single(app.Query("data-state")["selectedRows"]!.AsArray());

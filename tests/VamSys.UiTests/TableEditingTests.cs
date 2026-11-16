@@ -45,7 +45,7 @@ public partial class TableEditingTests
             var cells = app.Wait(() => app.FindNamed(Departure, ControlType.Edit) is { Length: > 0 } c && !c[0].Current.BoundingRectangle.IsEmpty ? c : null, "Departure cells on screen");
             app.Wait(() =>
             {
-                ClickAt(cells[0].Current.BoundingRectangle);
+                app.ClickOn(cells[0], "the first row's Departure cell");
                 return Poll(() => app.Query("data-row:0").Str("focused") == "TextBox" ? "editing" : null, TimeSpan.FromSeconds(2));
             }, "a click opens the editor");
             Press(Keys.Escape);

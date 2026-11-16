@@ -36,11 +36,14 @@ public class CellEditingTests
         // TextBox. Departure is a column inside the window; Remarks is scrolled out of view horizontally.
         app.Foreground();
         var departures = app.Wait(() => Cells(Departure) is { Length: > 1 } c && !c[1].Current.BoundingRectangle.IsEmpty ? c : null, "second row's Departure cell on screen");
-        // Once in about six full runs the first click did nothing (focus stayed on the title bar); the cause is not known, so
-        // the click repeats and docs/TEST-REPORT.md keeps the question open.
+        // Once in about six full runs the first click did nothing (focus stayed on the title bar). The likely cause, seen the
+        // same way in ToolbarTests (the window got no pointer press and was deactivated), is a click at a rectangle that was
+        // not laid out yet, which the driver turned into a point on another window. ClickOn now waits for a rectangle inside
+        // this window whose point belongs to this program, and fails with what it found otherwise. Not yet confirmed by a
+        // run, so the click still repeats and docs/TEST-REPORT.md keeps the question open.
         var editing = app.Wait(() =>
         {
-            ClickAt(departures[1].Current.BoundingRectangle);
+            app.ClickOn(departures[1], "the second row's Departure cell");
             return Poll(() => Row(1) is var s && s.Str("focused") == "TextBox" ? s : null, TimeSpan.FromSeconds(2));
         }, "click focuses the editor");
         Assert.Equal(1, editing.Int("editors"));

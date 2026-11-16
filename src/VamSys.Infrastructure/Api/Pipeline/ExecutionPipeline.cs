@@ -10,7 +10,8 @@ namespace VamSys.Infrastructure;
 //                      -> write -> read back -> complete        (each item ends with a checkpoint)
 //   second pass        E7 (D5): an item whose write was rejected with 429 or never sent goes through once more, with
 //                      the items that were skipped only because of it (each item at most twice per round)
-//   end of the round   items this round left Unknown are looked up once more, read-only (see RecheckAsync)
+//   end of the round   items this round left Unknown are looked up once more, read-only (see RecheckAsync); the items
+//                      skipped only because of an item this lookup settled then run once (and are looked up likewise)
 //
 // The order of the requests, of the saves and of the metrics phases is the write-safety contract and is locked by the
 // request goldens and the process-kill recovery tests. This class only sequences the stages and applies the job-level
@@ -49,7 +50,20 @@ internal sealed class ExecutionPipeline(OperationsAdapter api, Workspace workspa
             await PassAsync(again, collect: false);
         }
         if (job.StatusCode == JobStatus.Running)
-            await RecheckAsync(fresh.Distinct().Where(i => i.State == ItemState.Unknown).ToList(), run, recovery);
+        {
+            var rechecked = fresh.Distinct().Where(i => i.State == ItemState.Unknown).ToList();
+            await RecheckAsync(rechecked, run, recovery);
+            // An item the end-of-round lookup settled no longer holds back the items skipped because of it: they run now,
+            // once, in order, instead of waiting for "Continue". A skipped item never reached the server, and an item
+            // whose other dependency is still not Succeeded (unknown, failed) is skipped again by the pass itself.
+            var dependents = SkippedDependents(order, rechecked.Where(i => i.State == ItemState.Succeeded), run.Items);
+            if (dependents.Count > 0 && job.StatusCode == JobStatus.Running && !ct.IsCancellationRequested)
+            {
+                var before = fresh.Count;
+                if (!await PassAsync(dependents, collect: false) && job.StatusCode == JobStatus.Running)
+                    await RecheckAsync(fresh.Skip(before).Distinct().Where(i => i.State == ItemState.Unknown).ToList(), run, recovery);
+            }
+        }
         sink.Active = null;
         if (job.StatusCode == JobStatus.Running)
             job.SetStatus(job.Items.All(i => i.State == ItemState.Succeeded) ? JobStatus.Completed : JobStatus.NeedsAttention, Messages.Define(job.Items.All(i => i.State == ItemState.Succeeded) ? "Text_140197D868" : "Text_E9008C53CF"));
@@ -110,6 +124,26 @@ internal sealed class ExecutionPipeline(OperationsAdapter api, Workspace workspa
             }
             return false;
         }
+    }
+
+    // The skipped items that wait, directly or through other skipped items, on one of the settled items, in job order.
+    // Only items that never reached the server qualify: a skip happens before any stage, and an item with an answered
+    // or interrupted write is recovered, never skipped.
+    internal static List<ChangeItem> SkippedDependents(List<ChangeItem> order, IEnumerable<ChangeItem> settled, ItemIndex items)
+    {
+        var released = new HashSet<ChangeItem>(settled);
+        if (released.Count == 0)
+            return [];
+        var result = new HashSet<ChangeItem>();
+        for (var grew = true; grew;)
+        {
+            grew = false;
+            foreach (var item in order)
+                if (item.State == ItemState.Skipped && !item.CreateCompleted && !item.WriteAccepted && !result.Contains(item)
+                    && item.Dependencies.Any(id => released.Contains(items.ById(id))))
+                { result.Add(item); released.Add(item); grew = true; }
+        }
+        return order.Where(result.Contains).ToList();
     }
 
     // E7 (D5): the only two failures the server certainly did not process: a 429 (rejected before processing) and a

@@ -572,20 +572,73 @@ public sealed partial class AppWindow : IDisposable
             throw new InvalidOperationException("Window is not foreground; keep it active before retrying real input.");
     }
 
-    /// <summary>Clicks the left mouse button at the centre of a rectangle given in physical pixels.</summary>
-    public static void ClickAt(System.Windows.Rect target)
+    /// <summary>
+    /// Clicks the left mouse button at the centre of a rectangle given in physical pixels. A rectangle that is empty,
+    /// not finite or whose centre is outside this window is refused: the click would land on another window. Prefer
+    /// <see cref="ClickOn"/>, which waits until the element is laid out.
+    /// </summary>
+    public void ClickAt(System.Windows.Rect target) => MouseClick(Centre(target), MouseLeftDown, MouseLeftUp);
+
+    /// <summary>As <see cref="ClickAt"/>, with the right mouse button.</summary>
+    public void RightClickAt(System.Windows.Rect target) => MouseClick(Centre(target), MouseRightDown, MouseRightUp);
+
+    /// <summary>
+    /// Waits until the element has a usable rectangle on screen (laid out, inside this window, and the point at its centre
+    /// belongs to this program), then clicks its centre. On timeout the failure says what was found instead.
+    /// </summary>
+    public void ClickOn(AutomationElement element, string what) => MouseClick(Target(element, what), MouseLeftDown, MouseLeftUp);
+
+    /// <summary>As <see cref="ClickOn"/>, with the right mouse button.</summary>
+    public void RightClickOn(AutomationElement element, string what) => MouseClick(Target(element, what), MouseRightDown, MouseRightUp);
+
+    static void MouseClick((int X, int Y) point, uint down, uint up)
     {
-        SetCursorPos((int)(target.X + target.Width / 2), (int)(target.Y + target.Height / 2));
-        mouse_event(MouseLeftDown, 0, 0, 0, 0);
-        mouse_event(MouseLeftUp, 0, 0, 0, 0);
+        SetCursorPos(point.X, point.Y);
+        mouse_event(down, 0, 0, 0, 0);
+        mouse_event(up, 0, 0, 0, 0);
     }
 
-    /// <summary>Clicks the right mouse button at the centre of a rectangle given in physical pixels.</summary>
-    public static void RightClickAt(System.Windows.Rect target)
+    (int X, int Y) Centre(System.Windows.Rect target) =>
+        Problem(target, out var point) is { } problem ? throw new InvalidOperationException($"Refusing to click: {problem}{Describe()}") : point;
+
+    // Why a click at the rectangle's centre would not reach this window, or null with the point to click.
+    string? Problem(System.Windows.Rect target, out (int X, int Y) point)
     {
-        SetCursorPos((int)(target.X + target.Width / 2), (int)(target.Y + target.Height / 2));
-        mouse_event(MouseRightDown, 0, 0, 0, 0);
-        mouse_event(MouseRightUp, 0, 0, 0, 0);
+        point = default;
+        if (target.IsEmpty || !double.IsFinite(target.X) || !double.IsFinite(target.Y) || !double.IsFinite(target.Width) || !double.IsFinite(target.Height)
+            || target.Width <= 0 || target.Height <= 0)
+            return $"the rectangle {target} is empty or not finite (element not laid out)";
+        if (!GetWindowRect(Handle, out var bounds))
+            return $"the window's bounds cannot be read (rectangle {target})";
+        var x = target.X + target.Width / 2;
+        var y = target.Y + target.Height / 2;
+        if (x < bounds.Left || x >= bounds.Right || y < bounds.Top || y >= bounds.Bottom)
+            return $"the rectangle {target} has its centre outside the window [{bounds.Left},{bounds.Top} - {bounds.Right},{bounds.Bottom}]";
+        point = ((int)x, (int)y);
+        return null;
+    }
+
+    (int X, int Y) Target(AutomationElement element, string what)
+    {
+        var observed = "nothing read yet";
+        var found = Poll<object>(() =>
+        {
+            var rect = element.Current.BoundingRectangle;
+            if (Problem(rect, out var point) is { } problem)
+            { observed = problem; return null; }
+            var hit = AutomationElement.FromPoint(new System.Windows.Point(point.X, point.Y)).Current;
+            if (hit.ProcessId != process.Id)
+            {
+                observed = $"the point {point.X},{point.Y} of rectangle {rect} belongs to another program: {hit.ControlType.ProgrammaticName} '{hit.Name}' class {hit.ClassName} pid {hit.ProcessId}";
+                return null;
+            }
+            observed = $"rectangle {rect}, point {point.X},{point.Y} on {hit.ControlType.ProgrammaticName} '{hit.Name}' class {hit.ClassName}";
+            return point;
+        }, DefaultWait);
+        if (found is ValueTuple<int, int> target)
+            return target;
+        var foreground = GetForegroundWindow();
+        throw new TimeoutException($"Timeout: a usable click target for {what}; last seen: {observed}; foreground window {(foreground == Handle ? "is this window" : $"0x{foreground:X} is not this window")}{Describe()}");
     }
 
     /// <summary>Presses and releases a key (a virtual-key code such as <see cref="Keys.Enter"/>).</summary>

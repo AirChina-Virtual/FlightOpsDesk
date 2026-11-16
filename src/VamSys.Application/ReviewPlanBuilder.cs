@@ -251,15 +251,44 @@ public static class ReviewPlanBuilder
     }
 
     // Who an unfinished online task's items are: their rows, their remote records and their keys (codes, names).
+    // A skipped item counts while "Continue" can still send it, that is while everything it waits on has succeeded or is
+    // itself still open; one that waits on a failed, conflicting or manually confirmed item can never run in its task
+    // and does not hold its row (otherwise the row could never be submitted again).
     static HashSet<string> OpenTaskKeys(Workspace w)
     {
         var keys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var job in w.Jobs)
             if (job.Mode == RunMode.Online)
-                foreach (var item in job.Items)
-                    if (item.State is ItemState.Pending or ItemState.Running or ItemState.Unknown)
-                        keys.UnionWith(TaskKeys(item.Resource, item.Before, item.After));
+                foreach (var item in OpenItems(job))
+                    keys.UnionWith(TaskKeys(item.Resource, item.Before, item.After));
         return keys;
+    }
+
+    internal static IEnumerable<ChangeItem> OpenItems(BatchJob job)
+    {
+        var byId = new Dictionary<Guid, ChangeItem>();
+        foreach (var item in job.Items)
+            byId.TryAdd(item.Id, item);
+        var open = new Dictionary<ChangeItem, bool>();
+        foreach (var item in job.Items)
+            if (IsOpen(item, []))
+                yield return item;
+
+        bool IsOpen(ChangeItem item, HashSet<ChangeItem> visiting)
+        {
+            if (item.State is ItemState.Pending or ItemState.Running or ItemState.Unknown)
+                return true;
+            if (item.State != ItemState.Skipped)
+                return false;
+            if (open.TryGetValue(item, out var known))
+                return known;
+            if (!visiting.Add(item))
+                return false;
+            var result = item.Dependencies.All(id => !byId.TryGetValue(id, out var dependency)
+                || dependency.State == ItemState.Succeeded || IsOpen(dependency, visiting));
+            open[item] = result;
+            return result;
+        }
     }
 
     static IEnumerable<string> TaskKeys(ResourceKind kind, DataRow? before, DataRow after)

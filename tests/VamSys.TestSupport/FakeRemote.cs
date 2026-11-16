@@ -6,7 +6,8 @@ namespace VamSys.TestSupport;
 /// <summary>
 /// A small stateful Operations API behind <see cref="FakeOperationsServer"/> (which records every request).
 /// Shapes follow docs/API-CONTRACTS.md: collections answer data + meta.next_cursor_url, single GET/PUT answer a data
-/// wrapper (routings answer a bare object), POST answers a bare object with 201, DELETE answers 204 and the row is gone.
+/// wrapper (routings answer a bare object), POST answers 201 with the record in a data wrapper (routings: a bare
+/// object; live since 2026-11-16, see <see cref="SwapCreateShapes"/>), DELETE answers 204 and the row is gone.
 /// Ids, timestamps and the airline are fixed so that recorded bodies never vary between runs.
 /// </summary>
 public sealed class FakeRemote
@@ -19,6 +20,11 @@ public sealed class FakeRemote
     public readonly Dictionary<string, int> PageSizes = new(StringComparer.Ordinal);
     /// <summary>Called before normal handling; return a response to override it, or throw to simulate a transport failure.</summary>
     public Func<RecordedRequest, FakeResponse?>? Intercept;
+    /// <summary>
+    /// Answer every create in the other shape: a bare object for airports, fleets, aircraft and routes (as the server did
+    /// before 2026-11-16) and a data wrapper for routings. Both shapes must keep being understood.
+    /// </summary>
+    public bool SwapCreateShapes;
     int nextId = 90;
     readonly HashSet<string> registered = [];
 
@@ -200,7 +206,9 @@ public sealed class FakeRemote
         row["updated_at"] = Stamp;
         Rows[path] = row;
         RegisterRow(path);
-        return FakeResponse.WithStatus(201, row.ToJsonString());
+        // Live 2026-11-16 (docs/API-CONTRACTS.md): routings answer the bare record, every other create wraps it in "data".
+        var wrapped = (collection != "routings") != SwapCreateShapes;
+        return FakeResponse.WithStatus(201, (wrapped ? new JsonObject { ["data"] = row.DeepClone() } : row).ToJsonString());
     }
 
     FakeResponse Move(string path, JsonObject body)

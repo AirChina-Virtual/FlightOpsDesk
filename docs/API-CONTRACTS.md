@@ -10,11 +10,13 @@ Operations 固定为本轮 10 月 20 日证据中的快照，SHA-256 为 `1EC1A8
 
 | 资源 | 方法与路径 | 响应与重要语义 | 文档确认 | 本地测试 | 独立真实 API |
 |---|---|---|---|---|---|
-| 机场 | GET/POST `/airports`；GET/PUT/DELETE `/airports/{airport_id}` | 创建用 `icao_iata`，后续按远端 ID；POST 裸对象，GET/PUT `data` 包装；DELETE 204 软删除 | 是 | 通过 | 外部脚本部分通过 |
-| 机型 | GET/POST `/fleet`；GET/PUT/DELETE `/fleet/{fleet_id}` | 容量、parameter_ids 等已支持字段可随首次 POST；POST 裸对象，单条 GET/PUT 包装；永久删除 | 是 | 通过 | 外部脚本部分通过 |
-| 飞机 | GET/POST `/fleet/{fleet_id}/aircraft`；GET/PUT/DELETE `/fleet/{fleet_id}/aircraft/{aircraft_id}` | 遍历机型读取；容量等已支持字段可随 POST；单条 GET/PUT 包装；永久删除 | 是 | 通过 | 外部脚本部分通过 |
-| 航路 | GET/POST `/routings`；GET/PUT/DELETE `/routings/{routing_id}` | 起降为机场 ID，更新不能改变；单条 GET/POST/PUT 裸对象；tag 可随 POST；永久删除 | 是 | 通过 | 按矩阵区分 |
-| 航线 | GET/POST `/routes`；GET/PUT/DELETE `/routes/{route_id}` | RouteData 没有 `airline_id`，归属取当前连接的 VA；fleet_ids 为整数数组；UTC HH:MM:SS，日期按 `2025-01-01T00:00:00+00:00` 格式提交；callsign／flight_number 对所有类型必填；cost_index 为空、AUTO 或 0–999；起降不可更新；软删除 | 是，实验接口 | 通过 | 自建 scheduled/jumpseat 样本通过 |
+| 机场 | GET/POST `/airports`；GET/PUT/DELETE `/airports/{airport_id}` | 创建用 `icao_iata`，后续按远端 ID；POST 201 `data` 包装（2026-11-16 实测，此前文档记为裸对象），GET/PUT `data` 包装；DELETE 204 软删除 | 是 | 通过 | 外部脚本部分通过 |
+| 机型 | GET/POST `/fleet`；GET/PUT/DELETE `/fleet/{fleet_id}` | 容量、parameter_ids 等已支持字段可随首次 POST；POST 201 `data` 包装（2026-11-16 实测，此前文档记为裸对象），单条 GET/PUT 包装；永久删除 | 是 | 通过 | 外部脚本部分通过 |
+| 飞机 | GET/POST `/fleet/{fleet_id}/aircraft`；GET/PUT/DELETE `/fleet/{fleet_id}/aircraft/{aircraft_id}` | 遍历机型读取；容量等已支持字段可随 POST；POST 201 `data` 包装（2026-11-16 实测）；单条 GET/PUT 包装；永久删除 | 是 | 通过 | 外部脚本部分通过 |
+| 航路 | GET/POST `/routings`；GET/PUT/DELETE `/routings/{routing_id}` | 起降为机场 ID，更新不能改变；单条 GET/POST/PUT 裸对象（POST 2026-11-16 实测仍为裸对象）；tag 可随 POST；永久删除 | 是 | 通过 | 按矩阵区分 |
+| 航线 | GET/POST `/routes`；GET/PUT/DELETE `/routes/{route_id}` | RouteData 没有 `airline_id`，归属取当前连接的 VA；fleet_ids 为整数数组；UTC HH:MM:SS，日期按 `2025-01-01T00:00:00+00:00` 格式提交；callsign／flight_number 对所有类型必填；POST 201 `data` 包装（2026-11-16 实测）；cost_index 为空、AUTO 或 0–999；起降不可更新；软删除 | 是，实验接口 | 通过 | 自建 scheduled/jumpseat 样本通过 |
+
+**POST 应答形状（2026-11-16 软件真实验收，从保存的任务记录读出）**：`POST /airports`、`POST /fleet`、`POST /fleet/{id}/aircraft`、`POST /routes` 回 `201 {"data":{"id":32329,...}}`，`POST /routings` 仍回裸对象 `{"id":56386,...}`。当时的客户端只在顶层找 `id`，包装应答中的 ID 没有读到：这几项的 POST 步骤停在“已发出”、没有记下 ID，结果未知，直到本轮结束的自动核对按候选找回 ID（来源 Automatic）；依赖同一任务中新机队的飞机和 scheduled 航线因此被跳过，等用户点继续。2026-11-15 起两种形状都能读出 ID，模拟服务器（`FakeRemote`）也按上面的实测形状应答。
 
 集合读取处理 `data` 数组与 `meta.next_cursor_url`，没有时用 `meta.next_page_url`。2026-11-11 只读验证（综合优化计划 5.1）：真实响应只有 `next_page_url`／`next_cursor`，没有契约所写的 `next_cursor_url`；`page[size]` 超过 100 时服务器静默按 100 返回（`meta.per_page=100`）。每页请求 `page[size]=100`（文档默认 15 条，未写上限，实际上限 100）；首页如果因此返回 400／422，改用服务器默认页长继续读取。分页限制 HTTPS、同源及 Operations 路径，拒绝循环页。
 
@@ -26,7 +28,7 @@ POST `https://vamsys.io/oauth/token`，form-urlencoded：grant_type=client_crede
 
 所有请求使用 Bearer 和 Accept: application/json。预算为进程全局共享的 60 次／分钟，保守覆盖未知 VA 及同一 VA 的多个工作区；429 遵守 Retry-After，剩余额度为零至少等待 60 秒，不假设 Reset 头单位。
 
-读取临时错误退避重试；写入不自动重试，唯一例外见下（E7，D5）。401/403 暂停任务。写入收到 429，或请求根本没有发出（等待限流额度或获取令牌时失败，认证失败和取消除外）时，服务器没有处理该请求：本轮其余条目处理完后，按 Retry-After 等待，重新做写前检查后再发一次，每条每轮最多一次；仍不成功则放回待执行，继续任务即可重试；已返回 ID 或已接受的写入仍按未知处理。422／其他错误保留脱敏诊断；500、超时和中断写入保留未知结果。POST 返回后先保存 `id`，再解析完整响应；分步创建在 PUT 前保存 ID。新建前检查重复，修改前检查字段冲突，删除前读取相关资源进行引用保护。
+读取临时错误退避重试；写入不自动重试，唯一例外见下（E7，D5）。401/403 暂停任务。写入收到 429，或请求根本没有发出（等待限流额度或获取令牌时失败，认证失败和取消除外）时，服务器没有处理该请求：本轮其余条目处理完后，按 Retry-After 等待，重新做写前检查后再发一次，每条每轮最多一次；仍不成功则放回待执行，继续任务即可重试；已返回 ID 或已接受的写入仍按未知处理。422／其他错误保留脱敏诊断；500、超时和中断写入保留未知结果。POST 返回后先保存 `id`，再解析完整响应；`id` 从裸对象或 `data` 包装中读取，两种都认，都没有可用 `id` 时按结果未知处理、只靠读取找回；分步创建在 PUT 前保存 ID。新建前检查重复，修改前检查字段冲突，删除前读取相关资源进行引用保护。
 
 ## 明确禁用与未适配
 

@@ -157,6 +157,31 @@ public class ReviewPlanBehaviorTests
         Assert.NotEmpty(plan.SubmitItems);
     }
 
+    // 3.1 (D7): a skipped item still holds its record while "Continue" in its task can send it (what it waits on has
+    // succeeded or is still open), and lets it go once that can no longer happen (what it waits on failed).
+    [Theory]
+    [InlineData(ItemState.Succeeded, true)]
+    [InlineData(ItemState.Unknown, true)]
+    [InlineData(ItemState.Pending, true)]
+    [InlineData(ItemState.Failed, false)]
+    [InlineData(ItemState.Conflict, false)]
+    public void A_skipped_task_item_blocks_its_record_while_its_task_can_still_send_it(ItemState dependencyState, bool blocks)
+    {
+        var w = Mixed();
+        var route = w.Resources[ResourceKind.Routes].Draft.Single(r => r.LocalId == Id(30));
+        var dependency = new ChangeItem { State = dependencyState, Resource = ResourceKind.Fleets, Kind = ChangeKind.Create, After = new DataRow { Fields = new Dictionary<string, string> { ["Name"] = "Elsewhere fleet" } } };
+        var middle = new ChangeItem { State = ItemState.Skipped, Resource = ResourceKind.Fleets, Kind = ChangeKind.Create, After = new DataRow { Fields = new Dictionary<string, string> { ["Name"] = "Other fleet" } }, Dependencies = [dependency.Id] };
+        w.Jobs.Add(new BatchJob { Mode = RunMode.Online, Items =
+        [
+            dependency,
+            middle,
+            new ChangeItem { State = ItemState.Skipped, Resource = ResourceKind.Routes, Kind = ChangeKind.Update, Before = route, After = route, Dependencies = [middle.Id] }
+        ] });
+        var plan = Build(w);
+        var blocked = plan.Entries.Where(e => e.Disposition == ReviewDisposition.Blocked).Select(e => (Number(e.Change.After.LocalId), e.Reason!.Code)).ToArray();
+        Assert.Equal(blocks ? [(30, "ReviewOpenTaskItem")] : [], blocked);
+    }
+
     // 3.1 (D7): a conflict blocks only its own row's change.
     [Fact]
     public void A_conflict_blocks_only_the_change_of_its_row()
