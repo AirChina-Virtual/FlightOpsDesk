@@ -8,6 +8,21 @@ public class TaskJobViewModelTests
     static TaskJobViewModel Model(BatchJob job, LocalizationService language)
         => new(job, language, () => true, () => RunMode.Online, () => Task.CompletedTask, () => Task.CompletedTask, () => Task.CompletedTask, () => Task.CompletedTask);
 
+    // An online task's card offers to continue it; only a demo task's card offers to resume the demo task.
+    [Theory]
+    [InlineData(RunMode.Online, "zh-CN", "继续")]
+    [InlineData(RunMode.Online, "en-US", "Continue")]
+    [InlineData(RunMode.Demo, "zh-CN", "恢复演示任务")]
+    [InlineData(RunMode.Demo, "en-US", "Resume demo task")]
+    public void The_resume_button_continues_an_online_task_and_resumes_a_demo_task(RunMode mode, string language, string label)
+    {
+        var text = new LocalizationService();
+        text.SetLanguage(language);
+        var vm = Model(new BatchJob { Mode = mode, Items = [new ChangeItem { State = ItemState.Pending }] }, text);
+        Assert.True(vm.ShowsResume);
+        Assert.Equal(label, vm.ResumeLabel);
+    }
+
     [Fact]
     public void Task_presentation_never_observes_mutable_uncommitted_status_or_item_changes()
     {

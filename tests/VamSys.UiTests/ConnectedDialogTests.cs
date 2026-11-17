@@ -262,6 +262,69 @@ public class ConnectedDialogTests
         Assert.Equal("4", route.Get("Fleet IDs"));
     }
 
+    // The end-of-round lookup settles a create whose answer carried no ID, and the items skipped because of it run in that
+    // same round. In the window: connecting, the review page, its confirmation and the task center (the submission runs
+    // the program's own executor against the mock server). The drafts are seeded; the server misbehaves only on the
+    // fleet's POST (ConnectedUiFixture.UnreadableFleetCreate). The headless counterpart is
+    // ConnectedUiFixtureTests.Dependents_of_a_create_settled_at_the_end_of_the_round_run_in_that_round.
+    [WindowFact]
+    public void Dependents_of_a_create_settled_at_the_end_of_the_round_run_in_that_round()
+    {
+        using var app = Connected("connected-same-round", Scenario.DependentsOfUnreadableCreate, out var server, out var remote);
+        using var owner = server;
+        const string Submit = "提交工作区修改", Completed = "已完成并核对", Resume = "继续";
+        var before = remote.Server.Requests.Count;
+        // A failure says what the review holds back and why (each entry's disposition and reason, and any blocker).
+        var status = app.Context;
+        app.Context = () => $"{status!()} | review {app.Query("review-state", TimeSpan.FromSeconds(10)).ToJsonString()}";
+        app.SelectItem("变更审阅");
+        app.Wait(() => app.FindNamed(Submit, ControlType.Button).FirstOrDefault(b => b.Current.IsEnabled), "the review is ready").Invoke();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        app.DialogPrimary(Submit).Invoke();
+        app.Until(() => app.First("任务中心", ControlType.ListItem).IsSelected(), "the task center opens");
+        // While the task runs the card can show 继续 and 核对未知结果: items are pending, and the fleet is unknown until the
+        // end-of-round lookup. They must be disabled then (the window is busy with the task: gate.CanAct is false; a click
+        // would be refused). Once the task reads 已完成并核对 they must go within a few seconds (the card's update is
+        // flushed on the presentation timer). Every change of what is shown is recorded with the time since the submission,
+        // whether the button was enabled and the status text at that moment, so a failure says which of the two it was.
+        // This samples about every 100 ms: it does not prove a button was never enabled between two samples.
+        var samples = new List<(long Ms, string Label, bool Shown, bool Enabled, string Status)>();
+        void Sample()
+        {
+            var text = app.Name("StatusLabel");
+            foreach (var label in new[] { Resume, Review })
+            {
+                var button = app.FindNamed(label, ControlType.Button).FirstOrDefault();
+                var (shown, enabled) = (button != null, button?.Current.IsEnabled ?? false);
+                var last = samples.LastOrDefault(s => s.Label == label);
+                // The first record of a label is when it first shows; after that, every change of shown, enabled or status.
+                if (last.Label is null ? shown : (last.Shown, last.Enabled, last.Status) != (shown, enabled, text))
+                    samples.Add((clock.ElapsedMilliseconds, label, shown, enabled, text));
+            }
+        }
+        string Seen() => string.Join("; ", samples.Select(s => $"{s.Ms} ms {s.Label} {(s.Shown ? s.Enabled ? "enabled" : "disabled" : "gone")} (status '{s.Status}')"));
+        bool Finished() => app.Name("StatusLabel").StartsWith(Completed, StringComparison.Ordinal);
+        app.Until(() => { Sample(); return Finished(); }, "the task completes and is verified", TimeSpan.FromSeconds(60));
+        var completedAt = clock.ElapsedMilliseconds;
+        var cleared = Poll(() => { Sample(); return app.Shown(Resume, ControlType.Button) || app.Shown(Review, ControlType.Button) ? null : "cleared"; }, TimeSpan.FromSeconds(5));
+        app.Close();
+
+        Assert.True(cleared != null, $"The finished task still offers to resume or to check unknown results 5 s after '{Completed}' ({completedAt} ms): {Seen()}");
+        Assert.False(samples.Any(s => s.Shown && s.Enabled && !s.Status.StartsWith(Completed, StringComparison.Ordinal)), $"A button was enabled while the task ran: {Seen()}");
+        var writes = remote.Server.Requests.Skip(before).Where(r => r.Method != "GET").ToList();
+        Assert.All(writes, r => Assert.Equal("POST", r.Method));
+        Assert.Equal(3, writes.Count);
+        Assert.EndsWith("/fleet", writes[0].Path, StringComparison.Ordinal);
+        Assert.EndsWith("/fleet/90/aircraft", writes[1].Path, StringComparison.Ordinal);
+        Assert.EndsWith("/routes", writes[2].Path, StringComparison.Ordinal);
+        var job = Stored(app.DataDirectory).Jobs.Single();
+        Assert.Equal(JobStatus.Completed, job.StatusCode);
+        Assert.All(job.Items, i => Assert.Equal(ItemState.Succeeded, i.State));
+        var fleet = job.Items.Single(i => i.Resource == ResourceKind.Fleets);
+        var found = Assert.Single(fleet.RecoveryCandidates);
+        Assert.Equal(("90", "Automatic"), (found.RemoteId, found.Source));
+    }
+
     // 1.6: two deletes in the same situation are confirmed with one answer.
     [WindowFact]
     public void Two_deletes_without_receipt_whose_records_are_gone_are_confirmed_together()

@@ -116,6 +116,51 @@ public class ConnectionServiceTests
         Assert.True(finished.Service.CanRefresh());
     }
 
+    // A task whose only item not yet final is a skipped one: a new fleet (in the given state) and an aircraft skipped
+    // because of it. The window asks CanRefresh before both "从 API 刷新" and the single-resource refresh
+    // (MainWindow.RefreshApi(only) calls it the same way for both) and shows the refusal's message.
+    static BatchJob SkippedBehind(ItemState dependency, RunMode mode = RunMode.Online)
+    {
+        var fleet = new ChangeItem { State = dependency, Resource = ResourceKind.Fleets, Kind = ChangeKind.Create };
+        var aircraft = new ChangeItem { State = ItemState.Skipped, Resource = ResourceKind.Aircraft, Kind = ChangeKind.Create, Dependencies = [fleet.Id] };
+        return new BatchJob { Mode = mode, Items = [fleet, aircraft, new ChangeItem { State = ItemState.Succeeded }] };
+    }
+
+    [Theory]
+    [InlineData(ItemState.Succeeded)]   // "Continue" would send the aircraft now
+    [InlineData(ItemState.Unknown)]     // the fleet may still be settled, and the aircraft sent after it
+    public void A_skipped_item_that_continue_can_still_send_refuses_a_refresh_with_the_pending_task_message(ItemState dependency)
+    {
+        var f = new Fixture(RunMode.Online);
+        f.Session.Workspace.Jobs.Add(SkippedBehind(dependency));
+        var refused = Assert.Throws<InvalidOperationException>(() => f.Service.CanRefresh());
+        Assert.Equal("ApiPendingJob", Code(refused));
+        var language = new LocalizationService();
+        var shown = language.Format(MessageErrors.Describe(refused));
+        Assert.Equal(language.Get("ApiPendingJob"), shown);
+        Assert.DoesNotContain("[ApiPendingJob]", shown, StringComparison.Ordinal);
+        Assert.NotEmpty(shown);
+    }
+
+    [Theory]
+    [InlineData(ItemState.Failed)]
+    [InlineData(ItemState.Conflict)]
+    public void A_skipped_item_that_can_never_run_does_not_hold_back_a_refresh(ItemState dependency)
+    {
+        var f = new Fixture(RunMode.Online);
+        f.Session.Workspace.Jobs.Add(SkippedBehind(dependency));
+        Assert.True(f.Service.CanRefresh());
+    }
+
+    [Fact]
+    public void A_demo_task_never_holds_back_a_refresh()
+    {
+        var f = new Fixture(RunMode.Online);
+        f.Session.Workspace.Jobs.Add(SkippedBehind(ItemState.Unknown, RunMode.Demo));
+        f.Session.Workspace.Jobs.Add(new BatchJob { Mode = RunMode.Demo, Items = [new ChangeItem { State = ItemState.Pending }] });
+        Assert.True(f.Service.CanRefresh());
+    }
+
     [Fact]
     public async Task A_refresh_saves_each_staged_snapshot_and_reports_progress_then_reads_the_parameters()
     {

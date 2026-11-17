@@ -949,6 +949,7 @@
   <data name="ReviewChanged" xml:space="preserve"><value>审阅内容或提交条件已变化，已更新清单。请核对后再次提交。</value></data>
   <data name="ReviewInclude" xml:space="preserve"><value>本次提交{resource}</value></data>
   <data name="ReviewLeftOut" xml:space="preserve"><value>另有 {count} 项依赖未勾选资源中的新建，本次不提交。</value></data>
+  <data name="TaskResume" xml:space="preserve"><value>继续</value></data>
   <data name="TaskContinueRemaining" xml:space="preserve"><value>继续提交剩余 {count} 项</value></data>
   <data name="TaskContinueReady" xml:space="preserve"><value>样本已核对通过，同类修改还有 {count} 项，可在审阅页继续提交。</value></data>
   <data name="ReviewSummaryLine" xml:space="preserve"><value>{resource} · {kind}：{count} 项</value></data>

@@ -340,7 +340,10 @@ public sealed partial class MainWindow
     object ReviewVerificationState() => new { resources = reviewPlan?.Entries.Select(e => e.Planned.Resource.ToString()).Distinct().ToArray(),
         total = reviewPlan?.Entries.Count, ready = reviewPlan?.SubmitItems.Count, resourcePickerVisible = ResourceBar.Visibility == Visibility.Visible,
         renderedText = FindVisual<ListView>(PageHost) is { } list ? FindVisual<TextBlock>(list)?.Text : null,
-        rows = (FindVisual<ListView>(PageHost)?.Items.Count ?? 0), mode = workspace.Mode.ToString() };
+        rows = (FindVisual<ListView>(PageHost)?.Items.Count ?? 0), mode = workspace.Mode.ToString(),
+        // Why an entry is held back: its disposition and reason (with the reason's arguments, e.g. the field of a validation issue).
+        entries = reviewPlan?.Entries.Select(e => $"{e.Planned.Resource} {e.Planned.Kind} {e.Disposition} {e.Reason?.Code} {(e.Reason is { } reason ? L(reason) : "")}".TrimEnd()).ToArray(),
+        blockers = reviewPlan?.Blockers.Select(b => b.Code).ToArray() };
     // dataQueryTask can complete before the first row containers and cell editors are realised, or a
     // superseded query can return early; wait until the page is really usable (10 s at most).
     async Task WaitForDataPageReady()

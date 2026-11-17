@@ -74,7 +74,8 @@ public sealed class TaskJobViewModel : ObservableObject
     readonly Func<ChangeItem, IReadOnlyList<string>>? removableFleets;
     public string DetailsLabel => language.Get("Text_979A332955");
     public string ReviewLabel => language.Get("ApiUnknownReview");
-    public string ResumeLabel => language.Get("Text_9C4801C86B");
+    // An online task "continues" (as the guide, the changelog and the task messages call it); only a demo task resumes the demo.
+    public string ResumeLabel => language.Get(Job.Mode == RunMode.Demo ? "Text_9C4801C86B" : "TaskResume");
     public string RetryLabel => language.Get("Text_6A1C23202F");
     public string ExportLabel => language.Get("ApiEvidenceExport");
     public string VerifyDeletesLabel => language.Get("ApiVerifyDeletes");

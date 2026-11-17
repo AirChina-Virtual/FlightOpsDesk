@@ -41,6 +41,42 @@ public static class ConnectedUiFixture
         RouteRefusedForFleets,
         // Two soft deletes never answered whose records are gone now (1.6): one dialog confirms both.
         TwoDeletesWithoutReceiptGone,
+        // No task yet: drafts of a new fleet and of an aircraft and a scheduled route that use it. The server creates the
+        // fleet but answers its POST with a body that carries no ID (UnreadableFleetCreate), so the window's own
+        // submission settles the fleet only in the end-of-round lookup and then runs the two dependents in that round.
+        DependentsOfUnreadableCreate,
+    }
+
+    /// <summary>The scheduled route's callsign in <see cref="Scenario.DependentsOfUnreadableCreate"/>.</summary>
+    public const string DependentRouteCallsign = "CAO900";
+
+    /// <summary>
+    /// The server applies the fleet's POST (the record is created as fleet/90, created now on its clock) but answers
+    /// 201 with a body from which no ID can be read; every other request is answered normally.
+    /// </summary>
+    public static Func<RecordedRequest, FakeResponse?> UnreadableFleetCreate(FakeRemote remote) => r =>
+    {
+        if (r.Method != "POST" || !r.Path.EndsWith("/fleet", StringComparison.Ordinal))
+            return null;
+        remote.Respond(r);
+        remote.Rows["fleet/90"]["created_at"] = DateTimeOffset.UtcNow.ToString("O");
+        return FakeResponse.WithStatus(201, """{"result":"created"}""");
+    };
+
+    /// <summary>
+    /// Plans and runs the workspace's drafts as one online task with the real executor against <paramref name="remote"/>,
+    /// as the window's submission does after its review (the headless counterpart of a window test; the review page and
+    /// the task center are not involved).
+    /// </summary>
+    public static async Task<BatchJob> SubmitInProcess(FakeRemote remote, Workspace workspace)
+    {
+        var requests = InstantTime.Requests();
+        var tokens = new TokenProvider(_ => Task.FromResult(new AccessToken("seed-token", requests.Clock.GetUtcNow().AddHours(1))), requests.Clock);
+        using var client = new HttpClient(remote.Server, disposeHandler: false);
+        workspace.Mode = RunMode.Online;
+        var api = new OperationsAdapter(new OperationsTransport(client, OperationsAdapter.BaseUri, "ui-seed", tokens, requests), workspace);
+        await Execute(api, workspace);
+        return workspace.Jobs.Last();
     }
 
     const string RefusedForFleets = """{"message":"Fleet 'Fleet 5' (ID: 5) is not approved for callsign prefix 'CAO' and flight number prefix 'CA'. (and 1 more error)","errors":{"fleet_ids.1":["Fleet 'Fleet 5' (ID: 5) is not approved for callsign prefix 'CAO' and flight number prefix 'CA'."],"fleet_ids.2":["Fleet 'Fleet 6 spare' (ID: 6) is not approved for callsign prefix 'CAO' and flight number prefix 'CA'."]}}""";
@@ -74,6 +110,8 @@ public static class ConnectedUiFixture
         // The program opens the workspace offline and connects; the parameter list it reads then decides the prefixes.
         if (scenario is Scenario.UnapprovedFleet or Scenario.RouteRefusedForFleets)
             remote.Intercept = r => r.Method == "GET" && r.Path.EndsWith("/parameters", StringComparison.Ordinal) ? Parameters("4") : null;
+        if (scenario == Scenario.DependentsOfUnreadableCreate)
+            remote.Intercept = UnreadableFleetCreate(remote);
         store.Save(workspace);
         using (var pooled = new Microsoft.Data.Sqlite.SqliteConnection(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder { DataSource = Path.Combine(directory, "workspaces.db") }.ToString()))
             Microsoft.Data.Sqlite.SqliteConnection.ClearPool(pooled);
@@ -160,6 +198,16 @@ public static class ConnectedUiFixture
             case Scenario.UnapprovedFleet:
                 Edit(workspace, ResourceKind.Routes, "10", ("Fleet IDs", "4,6"));
                 return;
+            case Scenario.DependentsOfUnreadableCreate:
+                {
+                    var fleet = NewRow(("Name", "Fleet 9"), ("Type Code", "A320"), ("Type (pax/cargo/...)", "cargo"), ("Max Freight", "10000"), ("Parameter IDs", "1"));
+                    var reference = LocalReference.Format(fleet.LocalId);
+                    workspace.Resources[ResourceKind.Fleets].Draft.Add(fleet);
+                    workspace.Resources[ResourceKind.Aircraft].Draft.Add(NewRow(("Name", "Plane Nine"), ("Registration", "QA-NINE"), ("Fleet ID", reference)));
+                    workspace.Resources[ResourceKind.Routes].Draft.Add(NewRow(("Type", "scheduled"), ("Callsign", DependentRouteCallsign), ("Flight Number", "CA900"),
+                        (Dep, "EGLL"), (Arr, "EGKK"), ("Fleet IDs", reference)));
+                    return;
+                }
             case Scenario.DeleteAnsweredButReadable:
                 Edit(workspace, ResourceKind.Airports, "103", ("_delete", "TRUE"));
                 remote.Intercept = FirstWrite("DELETE", _ => new FakeResponse(System.Net.HttpStatusCode.NoContent, null));
