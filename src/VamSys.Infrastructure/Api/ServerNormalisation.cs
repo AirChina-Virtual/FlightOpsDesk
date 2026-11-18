@@ -29,12 +29,14 @@ internal sealed record NormalisationRule(string Probe, string Evidence)
 //   - H:MM:SS times, a number for cost_index and any other form of the route string were refused with 422.
 //   - tags keep their order and duplicates; cost_index keeps "auto" and "050" as sent; a fleet name keeps its case and
 //     inner spaces. These already compare equal and need no rule.
-//   - a created aircraft's internal_remarks read back null (POST answer and GET). That is a lost value, not a rewrite.
+//   - a created aircraft's internal_remarks sent with the POST read back null. That is a lost value, not a rewrite: the
+//     create sends them in a PUT after the POST instead (AircraftPlanner); only "" → null is a rewrite (rule above).
 internal static class ServerNormalisation
 {
     public const string Report = "artifacts/write-evidence/report.json";
     public const string Run = "FODESK-WE 20261118T001624Z";
     const string Evidence = Report + ", run " + Run;
+    const string RemarksEvidence = "artifacts/write-evidence/aircraft-remarks.json, run FODESK-WE 20261118T005911Z";
 
     public static readonly NormalisationRule None = new("", "");
 
@@ -53,6 +55,7 @@ internal static class ServerNormalisation
             [(ResourceKind.Aircraft, "hexcode")] = R("g4-aircraft hexcode lowercase") with { Upper = true },
             [(ResourceKind.Aircraft, "passengers")] = R("g4-aircraft passengers number-as-string") with { NumberString = true },
             [(ResourceKind.Aircraft, "cargo")] = R("g4-aircraft cargo number-as-string") with { NumberString = true },
+            [(ResourceKind.Aircraft, "internal_remarks")] = new NormalisationRule("aircraftInternalRemarks PUT empty string", RemarksEvidence) { EmptyToNull = true },
             [(ResourceKind.Aircraft, "fin_number")] = R("g4-aircraft fin_number empty-string") with { EmptyToNull = true },
             [(ResourceKind.Routings, "remarks")] = R("g4-routing remarks trim-padding, empty-string") with { Trim = true, EmptyToNull = true },
             [(ResourceKind.Routings, "days_of_operation")] = R("g4-routing days_of_operation array-order, case") with { LowerDays = true },

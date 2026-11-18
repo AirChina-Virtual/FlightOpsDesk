@@ -17,13 +17,15 @@ if(args.Length==2 && args[0]=="--verify-read-only")
 }
 if(args.Length>=2 && args[0]=="--write-evidence")
 {
-    // --write-evidence <report.json> [--dry-run] [--max-requests N]
+    // --write-evidence <report.json> [--dry-run] [--max-requests N] [--only aircraft-internal-remarks]
     var dryRun = false;
+    string? only = null;
     var max = WriteEvidence.DefaultMaxRequests;
     for (var i = 2; i < args.Length; i++)
         if (args[i] == "--dry-run") dryRun = true;
         else if (args[i] == "--max-requests" && i + 1 < args.Length && int.TryParse(args[++i], out var n) && n > 0) max = n;
-        else { Console.Error.WriteLine("Unknown option " + args[i] + ". Usage: --write-evidence <report.json> [--dry-run] [--max-requests N]"); Environment.ExitCode = 2; return; }
+        else if (args[i] == "--only" && i + 1 < args.Length && WriteEvidence.OnlyChoices.Contains(args[i + 1])) only = args[++i];
+        else { Console.Error.WriteLine("Unknown option " + args[i] + ". Usage: --write-evidence <report.json> [--dry-run] [--max-requests N] [--only " + string.Join("|", WriteEvidence.OnlyChoices) + "]"); Environment.ExitCode = 2; return; }
     using var stop = new CancellationTokenSource();
     using var abandon = new CancellationTokenSource();
     // First Ctrl+C: stop after the request in flight and clean up. Second: give up the cleanup as well.
@@ -36,7 +38,7 @@ if(args.Length>=2 && args[0]=="--write-evidence")
         { abandon.Cancel(); Console.Error.WriteLine("放弃清理：没有删除的记录会列在报告和控制台里。"); }
     };
     Console.CancelKeyPress += onCancel;
-    try { Environment.ExitCode = await WriteEvidence.RunAsync(args[1], new(dryRun, max), stop: stop.Token, abandonCleanup: abandon.Token); }
+    try { Environment.ExitCode = await WriteEvidence.RunAsync(args[1], new(dryRun, max, only), stop: stop.Token, abandonCleanup: abandon.Token); }
     catch (Exception e) when (e is HttpRequestException or TaskCanceledException or InvalidOperationException or IOException)
     { Console.Error.WriteLine("Write evidence could not run: " + e.Message); Environment.ExitCode = WriteEvidence.NotStarted; }
     finally { Console.CancelKeyPress -= onCancel; }

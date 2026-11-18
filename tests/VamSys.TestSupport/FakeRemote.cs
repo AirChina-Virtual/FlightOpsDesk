@@ -25,6 +25,12 @@ public sealed class FakeRemote
     /// before 2026-11-16) and a data wrapper for routings. Both shapes must keep being understood.
     /// </summary>
     public bool SwapCreateShapes;
+    /// <summary>
+    /// Live 2026-11-18 (artifacts/write-evidence/aircraft-remarks.json, run FODESK-WE 20261118T005911Z): a created aircraft does
+    /// not keep the internal_remarks sent with the POST (answer and reads: null); a later PUT keeps them. Off by default so
+    /// tests that only need a plain create keep their echo.
+    /// </summary>
+    public bool AircraftCreateDropsInternalRemarks;
     int nextId = 90;
     readonly HashSet<string> registered = [];
 
@@ -202,6 +208,8 @@ public sealed class FakeRemote
         // fleets (fleets: 2026-11-12, route 14217362), nor the remarks sent with it (2026-11-16, route 14327585).
         if (collection == "routes" && body["type"]?.ToString() == "jumpseat")
         { row["callsign"] = null; row["flight_number"] = null; row["fleet_ids"] = null; if (row.ContainsKey("remarks")) row["remarks"] = null; }
+        if (AircraftCreateDropsInternalRemarks && collection.StartsWith("fleet/", StringComparison.Ordinal) && row.ContainsKey("internal_remarks"))
+            row["internal_remarks"] = null;
         row["created_at"] = Stamp;
         row["updated_at"] = Stamp;
         Rows[path] = row;

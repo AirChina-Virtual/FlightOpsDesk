@@ -36,6 +36,13 @@ internal sealed class FleetPlanner(ApiContext ctx, RequestPlanners siblings) : R
 
 internal sealed class AircraftPlanner(ApiContext ctx, RequestPlanners siblings) : RequestPlanner(ctx, siblings, ResourceKind.Aircraft)
 {
+    // Live 2026-11-18 (artifacts/write-evidence/aircraft-remarks.json, run FODESK-WE 20261118T005911Z): internal_remarks sent
+    // with the POST are not kept (the 201 answer, the single GET and the fleet's aircraft list all read null), while a PUT of
+    // that field alone is kept. Leaving it out of the POST also keeps the POST's own read-back check (MatchesCreated) true,
+    // which a resumed create needs before it may send the PUT.
+    static readonly IReadOnlySet<string> RemarksByPut = new HashSet<string>(StringComparer.Ordinal) { "internal_remarks" };
+    protected override IReadOnlySet<string> NotKeptByCreate => RemarksByPut;
+
     // The fleet is part of the address (fleet/{id}/aircraft), not of the body: a create validates it, an update of it
     // is a move and has its own request (see PlanSpecialOperation).
     public override bool TryPlanColumn(ChangeItem c, string field, string text, bool create, bool preview, Dictionary<string, object?> body)

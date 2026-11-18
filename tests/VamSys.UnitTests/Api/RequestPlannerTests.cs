@@ -222,6 +222,37 @@ public class RequestPlannerTests
         Is(Only(steps), HttpMethod.Post, "fleet/4/aircraft", """{"name":"Plane Two","registration":"QA-TEST","cargo":2205}""");
     }
 
+    // The server does not keep internal_remarks sent with the create (201 answer and later reads: null) but keeps it from
+    // a PUT (artifacts/write-evidence/aircraft-remarks.json, run FODESK-WE 20261118T005911Z). So it leaves the POST and is
+    // sent once the record exists, as a PUT of that field alone to the created record.
+    [Fact]
+    public void Aircraft_internal_remarks_are_sent_by_a_put_to_the_created_aircraft_not_with_the_post()
+    {
+        var kit = Kit();
+        var steps = kit.Api.Plan(ApiKit.Create(ResourceKind.Aircraft, ("Name", "Plane Two"), ("Registration", "QA-TEST"), ("Fleet ID", "4"), ("Internal Remarks", "hangar 3")));
+        Assert.Equal(2, steps.Count);
+        Is(steps[0], HttpMethod.Post, "fleet/4/aircraft", """{"name":"Plane Two","registration":"QA-TEST"}""");
+        Is(steps[1], HttpMethod.Put, "{created}", """{"internal_remarks":"hangar 3"}""");
+        // without internal remarks the create stays one POST
+        var plain = kit.Api.Plan(ApiKit.Create(ResourceKind.Aircraft, ("Name", "Plane Two"), ("Registration", "QA-TEST"), ("Fleet ID", "4"), ("Internal Remarks", "")));
+        Is(Only(plain), HttpMethod.Post, "fleet/4/aircraft", """{"name":"Plane Two","registration":"QA-TEST"}""");
+        // an update keeps sending it in its one PUT
+        var aircraft = kit.Map(ResourceKind.Aircraft, ApiKit.Aircraft8);
+        Is(Only(kit.Api.Plan(ApiKit.Update(ResourceKind.Aircraft, aircraft, ("Internal Remarks", "x")))), HttpMethod.Put, "fleet/4/aircraft/8", """{"internal_remarks":"x"}""");
+    }
+
+    [Fact]
+    public void A_saved_aircraft_create_with_internal_remarks_resumes_with_its_two_steps()
+    {
+        var kit = Kit();
+        var item = ApiKit.Create(ResourceKind.Aircraft, ("Name", "P"), ("Registration", "QA-1"), ("Fleet ID", "4"), ("Internal Remarks", "note"));
+        var planned = kit.Api.Plan(item);
+        OperationsAdapter.PrepareSteps(item, planned);
+        var saved = kit.Api.ExecutionPlan(item);
+        Assert.Equal(["POST", "PUT"], saved.Select(s => s.Method.Method));
+        Assert.Equal("{created}", saved[1].Path);
+    }
+
     [Fact]
     public void Aircraft_create_needs_a_positive_fleet_id()
     {

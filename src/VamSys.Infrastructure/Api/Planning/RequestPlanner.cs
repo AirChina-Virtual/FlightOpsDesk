@@ -52,6 +52,9 @@ internal abstract class RequestPlanner(ApiContext ctx, RequestPlanners siblings,
     protected virtual object ConvertTemporal(ChangeItem c, FieldSpec spec, string field, string wire, string text) => text;
     // Rules for the finished body (a route needs fleets, a plausible type, flight number length, ordered dates).
     protected virtual void CheckBody(ChangeItem c, bool create, Dictionary<string, object?> body) { }
+    // Create-schema fields the server does not keep from the POST: they go in the PUT to the created record instead.
+    protected virtual IReadOnlySet<string> NotKeptByCreate => EmptyFields;
+    static readonly IReadOnlySet<string> EmptyFields = new HashSet<string>();
 
     // ---- shared sequence ---------------------------------------------------------------------------------------
 
@@ -108,15 +111,18 @@ internal abstract class RequestPlanner(ApiContext ctx, RequestPlanners siblings,
 
     static string[] Tokens(string text) => text.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
-    // A create is a POST of the properties the create schema knows plus, when there are more, a PUT to the new record.
+    // A create is a POST of the properties the create schema knows (less those the POST does not keep) plus, when there are
+    // more, a PUT to the new record. The PUT is sent only after the POST's answer gave the id (StepWriter); after an
+    // interruption only a PUT still saved as unsent is sent, and only to that id (UnknownResolver.CanResumeCreate).
     List<ApiStep> Steps(ChangeItem c, bool create, bool preview, string path, Dictionary<string, object?> body)
     {
         var steps = new List<ApiStep>();
         if (create)
         {
             var properties = ContractValidator.CreateProperties(c.Resource);
-            var first = body.Where(p => properties.TryGetProperty(p.Key, out _)).ToDictionary();
-            var rest = body.Where(p => !properties.TryGetProperty(p.Key, out _)).ToDictionary();
+            bool InPost(string wire) => properties.TryGetProperty(wire, out _) && !NotKeptByCreate.Contains(wire);
+            var first = body.Where(p => InPost(p.Key)).ToDictionary();
+            var rest = body.Where(p => !InPost(p.Key)).ToDictionary();
             ContractValidator.ValidateBody(c.Resource, true, first);
             steps.Add(new(HttpMethod.Post, Ctx.Paths.Path(c.Resource, c.After, preview: preview), first));
             if (rest.Count > 0)

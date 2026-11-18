@@ -22,11 +22,11 @@ public sealed class WriteEvidenceTests : IDisposable
 
     sealed record Result(int Code, string Console, JsonNode Report, string Text);
 
-    async Task<Result> RunAsync(FakeRemote remote, string typed = WriteEvidence.ConfirmWord, bool dryRun = false, CancellationTokenSource? stop = null)
+    async Task<Result> RunAsync(FakeRemote remote, string typed = WriteEvidence.ConfirmWord, bool dryRun = false, CancellationTokenSource? stop = null, string? only = null)
     {
         var clock = new TestTime();
         using var output = new StringWriter();
-        var run = WriteEvidence.RunAsync(report, new(dryRun), remote.Server, () => ("client", "secret-value"), Origin,
+        var run = WriteEvidence.RunAsync(report, new(dryRun, Only: only), remote.Server, () => ("client", "secret-value"), Origin,
             new RequestCoordinator(clock), new StringReader(typed + "\n"), output, stop?.Token ?? CancellationToken.None);
         await clock.Drive(run);
         var text = await File.ReadAllTextAsync(report, TestContext.Current.CancellationToken);
@@ -269,4 +269,123 @@ public sealed class WriteEvidenceTests : IDisposable
     [Fact]
     public void AFieldMissingFromTheReadBackIsMissing()
         => Assert.Equal("missing", Normalisation.Classify(JsonValue.Create("x"), null, present: false));
+
+    // --only aircraft-internal-remarks (2026-11-18): one fleet and one aircraft, three PUTs of internal_remarks alone.
+
+    // Live behaviour seen on 2026-11-18: the internal remarks sent with an aircraft create are not kept (null).
+    static FakeResponse? DropRemarksOnCreate(FakeRemote remote, RecordedRequest r)
+    {
+        if (r.Method != "POST" || !Relative(r).EndsWith("/aircraft", StringComparison.Ordinal))
+            return null;
+        var body = JsonNode.Parse(r.Body!)!.AsObject();
+        body["internal_remarks"] = null;
+        return remote.Respond(r with { Body = body.ToJsonString() });
+    }
+
+    static bool IsAircraft(RecordedRequest r) => Relative(r).Contains("/aircraft", StringComparison.Ordinal);
+
+    [Fact]
+    public async Task AircraftRemarksOnlyFindsThatAPutKeepsThemAndTouchesNoRoutes()
+    {
+        var remote = Remote();
+        var before = Snapshot(remote);
+        remote.Intercept = r => DropRemarksOnCreate(remote, r);
+
+        var result = await RunAsync(remote, only: WriteEvidence.AircraftInternalRemarks);
+
+        Assert.Equal(WriteEvidence.Completed, result.Code);
+        var json = result.Report;
+        Assert.Equal(WriteEvidence.AircraftInternalRemarks, (string?)json["only"]);
+        // Only parameters, fleets and the new fleet / aircraft: no route or routing is read or written.
+        Assert.DoesNotContain(remote.Server.Requests, r => Relative(r).StartsWith("route", StringComparison.Ordinal));
+        Assert.Equal(2, remote.Server.Requests.Count(r => r.Method == "POST"));
+        Assert.All(remote.Server.Requests.Where(r => r.Method == "PUT"), r =>
+        {
+            Assert.True(IsAircraft(r));
+            Assert.Equal(["internal_remarks"], JsonNode.Parse(r.Body!)!.AsObject().Select(p => p.Key));
+        });
+        Assert.Equal(3, remote.Server.Requests.Count(r => r.Method == "PUT"));
+        Assert.Equal(before.Keys.Order(), remote.Rows.Keys.Order());
+        ExistingUntouched(remote, before);
+        Assert.Equal(["g4-aircraft", "g4-fleet"], json["cleanup"]!.AsArray().Select(c => (string)c!["record"]!));
+        Assert.True((int)json["requestCount"]! <= (int)json["plan"]!["expectedRequests"]!, json["requestCount"]!.ToJsonString());
+
+        var remarks = json["aircraftInternalRemarks"]!;
+        Assert.False((bool)remarks["postSaved"]!);
+        Assert.True((bool)remarks["putSaved"]!);
+        var steps = remarks["steps"]!.AsArray();
+        Assert.Equal(["create (POST)", "PUT value-1", "PUT value-2", "PUT empty-string"], steps.Select(s => (string)s!["step"]!));
+        // After the create the field is there and null, in the single read and in the fleet's list.
+        Assert.True((bool)steps[0]!["single"]!["present"]!);
+        Assert.Null(steps[0]!["single"]!["value"]);
+        Assert.True((bool)steps[0]!["list"]!["found"]!);
+        Assert.True((bool)steps[0]!["list"]!["present"]!);
+        Assert.Equal((string?)steps[1]!["sent"], (string?)steps[1]!["single"]!["value"]);
+        Assert.Equal((string?)steps[2]!["sent"], (string?)steps[2]!["list"]!["value"]);
+        Assert.Contains("PUT 能保存 internal_remarks", result.Console, StringComparison.Ordinal);
+        Assert.Contains("POST 新建时没有保存该字段", result.Console, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AircraftRemarksOnlyFindsThatAPutDropsThemAndTellsAbsentFromNull()
+    {
+        var remote = Remote();
+        remote.Intercept = r =>
+        {
+            if (DropRemarksOnCreate(remote, r) is { } created)
+                return created;
+            // This server accepts the PUT but keeps nothing of it, and leaves the field out of the aircraft list.
+            if (r.Method == "PUT" && IsAircraft(r))
+                return remote.Respond(r with { Body = "{}" });
+            if (r.Method == "GET" && Relative(r).EndsWith("/aircraft", StringComparison.Ordinal))
+            {
+                var page = JsonNode.Parse(remote.Respond(r).Json!)!;
+                foreach (var row in page["data"]!.AsArray())
+                    row!.AsObject().Remove("internal_remarks");
+                return FakeResponse.Ok(page.ToJsonString());
+            }
+            return null;
+        };
+
+        var result = await RunAsync(remote, only: WriteEvidence.AircraftInternalRemarks);
+
+        Assert.Equal(WriteEvidence.Completed, result.Code);
+        var remarks = result.Report["aircraftInternalRemarks"]!;
+        Assert.False((bool)remarks["putSaved"]!);
+        var steps = remarks["steps"]!.AsArray();
+        Assert.All(steps, s =>
+        {
+            Assert.True((bool)s!["single"]!["present"]!);
+            Assert.Null(s["single"]!["value"]);
+            Assert.True((bool)s["list"]!["found"]!);
+            Assert.False((bool)s["list"]!["present"]!);
+        });
+        Assert.All(steps.Skip(1), s => Assert.Equal(200, (int)s!["writeStatus"]!));
+        Assert.Contains("PUT 不能保存 internal_remarks", result.Console, StringComparison.Ordinal);
+        Assert.Contains("字段不存在", result.Console, StringComparison.Ordinal);
+        Assert.Empty(result.Report["leftovers"]!.AsArray());
+    }
+
+    [Fact]
+    public async Task AircraftRemarksOnlyDryRunReadsNoRoutesAndWritesNothing()
+    {
+        var remote = Remote();
+        var result = await RunAsync(remote, dryRun: true, only: WriteEvidence.AircraftInternalRemarks);
+
+        Assert.Equal(WriteEvidence.Completed, result.Code);
+        Assert.All(remote.Server.Requests, r => Assert.Equal("GET", r.Method));
+        Assert.Equal(["parameters", "fleet"], remote.Server.Requests.Select(Relative));
+        var plan = result.Report["plan"]!;
+        Assert.Equal(["g4-fleet", "g4-aircraft"], plan["records"]!.AsArray().Select(r => (string)r!["key"]!));
+        Assert.Equal(3, (int)plan["requestsAfterConfirmation"]!["PUT"]!);
+        Assert.Contains("只测飞机 internal_remarks", result.Console, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnUnknownOnlyValueIsRefusedBeforeAnyRequest()
+    {
+        var remote = Remote();
+        await Assert.ThrowsAsync<ArgumentException>(() => WriteEvidence.RunAsync(report, new(Only: "routes"), remote.Server, () => ("client", "secret-value"), Origin, stop: TestContext.Current.CancellationToken));
+        Assert.Empty(remote.Server.Requests);
+    }
 }

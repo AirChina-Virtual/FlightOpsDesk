@@ -68,6 +68,8 @@ public class ServerNormalisationTests
     [InlineData(ResourceKind.Aircraft, "fin_number", "\"\"", "null")]
     [InlineData(ResourceKind.Routings, "remarks", "\"\"", "null")]
     [InlineData(ResourceKind.Routes, "remarks", "\"\"", "null")]
+    // aircraft internal remarks: a PUT of "" reads back null (aircraft-remarks.json, run FODESK-WE 20261118T005911Z)
+    [InlineData(ResourceKind.Aircraft, "internal_remarks", "\"\"", "null")]
     // weekday lists come back lower-case (and sorted Monday..Sunday)
     [InlineData(ResourceKind.Routings, "days_of_operation", "[\"Wednesday\"]", "[\"wednesday\"]")]
     [InlineData(ResourceKind.Routes, "service_days", "[\"Wednesday\"]", "[\"wednesday\"]")]
@@ -110,7 +112,7 @@ public class ServerNormalisationTests
     // null stands only for an empty string, never for a value that was lost
     [InlineData(ResourceKind.Routes, "remarks", "\"x\"", "null")]
     [InlineData(ResourceKind.Aircraft, "name", "\"\"", "null")]
-    // the internal remarks of a created aircraft read back null: not relaxed (see VERIFIED-API-SCOPE)
+    // internal remarks that were not kept (as when sent with the POST) are a lost value, not a rewrite
     [InlineData(ResourceKind.Aircraft, "internal_remarks", "\"FODESK-WE 20261118T001624Z\"", "null")]
     // a number must keep its value
     [InlineData(ResourceKind.Fleets, "max_pax", "\"120\"", "121")]
@@ -152,13 +154,15 @@ public class ServerNormalisationTests
     }
 
     [Fact]
-    public void A_created_aircraft_with_internal_remarks_still_fails_its_readback_when_the_server_drops_them()
+    public void A_created_aircraft_whose_internal_remarks_were_not_kept_fails_its_readback()
     {
         var kit = Kit();
         var item = ApiKit.Create(ResourceKind.Aircraft, ("Name", "P"), ("Registration", "QA-1"), ("Fleet ID", "4"), ("Internal Remarks", "note"));
         var current = kit.Map(ResourceKind.Aircraft, """{"id":9,"airline_id":7,"fleet_id":4,"registration":"QA-1","name":"P","internal_remarks":null}""");
         var result = kit.Api.VerifyReadback(item, current, item.After, OperationsAdapter.ExpectedValues(kit.Api.Plan(item)));
         Assert.Equal(new ApiFieldDifference("internal_remarks", "\"note\"", "null"), Assert.Single(result.Differences));
+        // the answered POST alone is checked without them: they are only expected once the PUT was sent
+        Assert.True(kit.Api.VerifyReadback(item, current, item.After, OperationsAdapter.ExpectedValues([kit.Api.Plan(item)[0]])).Passed);
     }
 
     // ---- the register itself --------------------------------------------------------------------------------------
@@ -170,8 +174,7 @@ public class ServerNormalisationTests
         foreach (var ((kind, wire), rule) in ServerNormalisation.Rules)
         {
             Assert.NotNull(FieldSpecs.Get(kind).FindByWire(wire));
-            Assert.Contains("FODESK-WE 20261118T001624Z", rule.Evidence, StringComparison.Ordinal);
-            Assert.Contains("artifacts/write-evidence/report.json", rule.Evidence, StringComparison.Ordinal);
+            Assert.Matches(@"^artifacts/write-evidence/[a-z-]+\.json, run FODESK-WE \d{8}T\d{6}Z$", rule.Evidence);
             Assert.False(string.IsNullOrWhiteSpace(rule.Probe));
         }
     }
@@ -180,7 +183,7 @@ public class ServerNormalisationTests
     public void Fields_the_evidence_showed_unchanged_or_refused_have_no_rule()
     {
         foreach (var (kind, wire) in new[] { (ResourceKind.Routings, "route"), (ResourceKind.Routings, "tag"), (ResourceKind.Routes, "tag"),
-                     (ResourceKind.Routes, "cost_index"), (ResourceKind.Aircraft, "internal_remarks"), (ResourceKind.Fleets, "type") })
+                     (ResourceKind.Routes, "cost_index"), (ResourceKind.Fleets, "type") })
             Assert.False(ServerNormalisation.Rules.ContainsKey((kind, wire)), $"{kind} {wire}");
         Assert.False(ServerNormalisation.For(ResourceKind.Fleets, "name").Upper);
     }

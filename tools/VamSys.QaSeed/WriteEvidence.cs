@@ -6,8 +6,9 @@ using System.Text.Json.Nodes;
 using VamSys.Core;
 using VamSys.Infrastructure;
 
-// --write-evidence <report.json> [--dry-run] [--max-requests N]
-public sealed record WriteEvidenceOptions(bool DryRun = false, int MaxRequests = WriteEvidence.DefaultMaxRequests);
+// --write-evidence <report.json> [--dry-run] [--max-requests N] [--only aircraft-internal-remarks]
+// Only: null runs the whole G4 / G8 set; WriteEvidence.AircraftInternalRemarks runs that one probe alone.
+public sealed record WriteEvidenceOptions(bool DryRun = false, int MaxRequests = WriteEvidence.DefaultMaxRequests, string? Only = null);
 
 // Phase 6 of the improvement plan (6.1 G4, 6.2 G8): real writes against the vAMSYS Operations API, run by hand.
 // It creates its own records (named with a run marker), writes values a server might normalise to them and reads
@@ -23,6 +24,11 @@ public static class WriteEvidence
     public const string ConfirmWord = "WRITE";
     public const string MarkerPrefix = "FODESK-WE";
     public const int DefaultMaxRequests = 200;
+    // --only aircraft-internal-remarks (2026-11-18): the live run read back null for the internal remarks an aircraft
+    // was created with. This probe alone finds out whether a PUT keeps them: one fleet, one aircraft in it, three PUTs
+    // of internal_remarks only, each read back from the single aircraft and from the fleet's aircraft list.
+    public const string AircraftInternalRemarks = "aircraft-internal-remarks";
+    public static IReadOnlyList<string> OnlyChoices { get; } = [AircraftInternalRemarks];
     // Exit codes: done and clean; the plan was declined; could not start; stopped early but clean; records left behind.
     public const int Completed = 0, Declined = 1, NotStarted = 2, StoppedClean = 3, LeftRecords = 4;
     // G8: every route type but the two whose soft delete is already proven (IndependentApiEvidence).
@@ -34,6 +40,8 @@ public static class WriteEvidence
         Func<(string Id, string Secret)>? credentials = null, Uri? origin = null, RequestCoordinator? coordinator = null,
         TextReader? input = null, TextWriter? output = null, CancellationToken stop = default, CancellationToken abandonCleanup = default)
     {
+        if (options.Only is { } only && !OnlyChoices.Contains(only))
+            throw new ArgumentException($"Unknown --only value '{only}'. Known: {string.Join(", ", OnlyChoices)}", nameof(options));
         var (clientId, secret) = (credentials ?? ReadOnlyVerification.Prompt)();
         var run = new Run(reportPath, options, inner, clientId, secret, origin ?? OperationsEndpoints.Origin, coordinator,
             input ?? Console.In, output ?? Console.Out, stop, abandonCleanup);
@@ -84,10 +92,11 @@ public static class WriteEvidence
         readonly OperationsTransport transport;
         readonly TimeProvider clock;
         readonly JsonObject report = [];
-        readonly JsonArray requests = [], createReadback = [], probes = [], softDeletes = [], cleanup = [];
+        readonly JsonArray requests = [], createReadback = [], probes = [], softDeletes = [], cleanup = [], remarkSteps = [];
         readonly List<Target> targets = [];
         readonly List<Probe> plannedProbes = [];
         readonly string runId, marker;
+        bool Focused => options.Only == AircraftInternalRemarks;
 
         public Run(string reportPath, WriteEvidenceOptions options, HttpMessageHandler? inner, string clientId, string secret, Uri origin,
             RequestCoordinator? coordinator, TextReader input, TextWriter log, CancellationToken stop, CancellationToken abandonCleanup)
@@ -121,17 +130,21 @@ public static class WriteEvidence
             report["marker"] = marker;
             report["dryRun"] = options.DryRun;
             report["maxRequests"] = options.MaxRequests;
+            report["only"] = options.Only;
 
             Discovery found;
-            try { found = await DiscoverAsync(); }
+            try { found = Focused ? await DiscoverFleetAsync() : await DiscoverAsync(); }
             catch (Exception e) when (e is StopRun or ApiResponseException or ApiAccessException or HttpRequestException or TaskCanceledException
                 or InvalidOperationException or FormatException or KeyNotFoundException or JsonException or RequestNotSentException)
             {
                 await log.WriteLineAsync("只读发现失败，没有发出任何写入：" + e.Message);
                 return await FinishAsync("discovery failed: " + e.Message, NotStarted);
             }
-            Plan(found);
-            var expected = await PrintPlanAsync(found);
+            if (Focused)
+                PlanAircraftRemarks(found);
+            else
+                Plan(found);
+            var expected = Focused ? await PrintAircraftRemarksPlanAsync(found) : await PrintPlanAsync(found);
             if (expected > options.MaxRequests)
             {
                 await log.WriteLineAsync($"预计请求 {expected} 次，超过上限 {options.MaxRequests}：未写入。用 --max-requests 调高上限后重试。");
@@ -156,7 +169,7 @@ public static class WriteEvidence
             string outcome;
             try
             {
-                await WriteAsync();
+                await (Focused ? WriteAircraftRemarksAsync() : WriteAsync());
                 outcome = "completed";
             }
             catch (StopRun e) { outcome = "stopped: " + e.Message; }
@@ -253,6 +266,34 @@ public static class WriteEvidence
             return found;
         }
 
+        // --only aircraft-internal-remarks: the parameters and the fleet list only (no routes). The new fleet links an
+        // approved, unrestricted parameter and copies the type code of one of that parameter's fleets.
+        async Task<Discovery> DiscoverFleetAsync()
+        {
+            await log.WriteLineAsync("只读发现：航司参数、机队（只发 GET）……");
+            var parameters = await ReadAllAsync("parameters");
+            var fleets = await ReadAllAsync("fleet");
+            var earlier = fleets.Where(f => Text(f, "name").StartsWith(MarkerPrefix, StringComparison.OrdinalIgnoreCase))
+                .Select(f => "fleet/" + f.GetProperty("id")).ToList();
+            foreach (var p in parameters.Where(p => p.TryGetProperty("approved", out var a) && a.ValueKind == JsonValueKind.True
+                && p.TryGetProperty("restricted", out var r) && r.ValueKind == JsonValueKind.False))
+                foreach (var fleet in Ids(p, "fleet_ids"))
+                    if (fleets.FirstOrDefault(f => Id(f, "id") == fleet) is { ValueKind: JsonValueKind.Object } row && Text(row, "code").Length == 4)
+                    {
+                        var found = new Discovery(p.GetProperty("id").ToString(), Text(p, "icao_code"), Text(p, "iata_code"), fleet, Text(row, "code"), 0, 0, 0, 0, [], earlier);
+                        report["discovery"] = new JsonObject
+                        {
+                            ["parameterId"] = found.ParameterId,
+                            ["fleetId"] = found.FleetId,
+                            ["fleetCode"] = found.FleetCode,
+                            ["earlierRunRecords"] = new JsonArray(earlier.Select(e => (JsonNode?)e).ToArray()),
+                            ["requests"] = guard.Sent
+                        };
+                        return found;
+                    }
+            throw new StopRun("没有找到已批准、未受限且关联了带 4 位机型代码机队的航司参数");
+        }
+
         async Task<List<JsonElement>> ReadAllAsync(string resource)
         {
             var rows = new List<JsonElement>();
@@ -263,29 +304,9 @@ public static class WriteEvidence
 
         // ---- the plan ------------------------------------------------------------------------------------------
 
-        void Plan(Discovery d)
+        // The fleet (hidden in Phoenix, linked to the parameter found) and an aircraft in it, as G4 creates them.
+        void AddFleetAndAircraft(Discovery d)
         {
-            var today = clock.GetUtcNow().UtcDateTime.Date;
-            // Hidden routes that start in 60 days and run for 30: no pilot can book them while they exist.
-            var start = today.AddDays(60);
-            string Iso(DateTime day, string time = "00:00:00", string offset = "+00:00") => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "T" + time + offset;
-            JsonObject RouteBody(string type, string number) => new()
-            {
-                ["type"] = type,
-                ["departure_id"] = d.DepartureId,
-                ["arrival_id"] = d.ArrivalId,
-                ["callsign"] = d.Icao + number,
-                ["flight_number"] = d.Iata + number,
-                ["fleet_ids"] = new JsonArray(d.FleetId),
-                ["departure_time"] = "08:00:00",
-                ["arrival_time"] = "10:00:00",
-                ["start_date"] = Iso(start),
-                ["end_date"] = Iso(start.AddDays(30)),
-                ["service_days"] = new JsonArray("monday"),
-                ["hidden"] = true,
-                ["remarks"] = $"{marker} {type}",
-                ["internal_remarks"] = $"{marker} {type}"
-            };
             var stamp = runId[9..15];
             targets.Add(new("g4-fleet", "机队", "G4")
             {
@@ -313,6 +334,32 @@ public static class WriteEvidence
                     ["internal_remarks"] = marker
                 }
             });
+        }
+
+        void Plan(Discovery d)
+        {
+            var today = clock.GetUtcNow().UtcDateTime.Date;
+            // Hidden routes that start in 60 days and run for 30: no pilot can book them while they exist.
+            var start = today.AddDays(60);
+            string Iso(DateTime day, string time = "00:00:00", string offset = "+00:00") => day.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "T" + time + offset;
+            JsonObject RouteBody(string type, string number) => new()
+            {
+                ["type"] = type,
+                ["departure_id"] = d.DepartureId,
+                ["arrival_id"] = d.ArrivalId,
+                ["callsign"] = d.Icao + number,
+                ["flight_number"] = d.Iata + number,
+                ["fleet_ids"] = new JsonArray(d.FleetId),
+                ["departure_time"] = "08:00:00",
+                ["arrival_time"] = "10:00:00",
+                ["start_date"] = Iso(start),
+                ["end_date"] = Iso(start.AddDays(30)),
+                ["service_days"] = new JsonArray("monday"),
+                ["hidden"] = true,
+                ["remarks"] = $"{marker} {type}",
+                ["internal_remarks"] = $"{marker} {type}"
+            };
+            AddFleetAndAircraft(d);
             targets.Add(new("g4-routing", "航路", "G4")
             {
                 Collection = "routings",
@@ -336,7 +383,7 @@ public static class WriteEvidence
             // for routings, routes and aircraft) or inside every probed value (fleet name).
             static JsonNode Raw(string json) => JsonNode.Parse(json)!;
             void P(string record, string field, string variant, JsonNode? value) => plannedProbes.Add(new(record, field, variant, value));
-            var reg = "FDW" + stamp;
+            var reg = "FDW" + runId[9..15];
             P("g4-fleet", "name", "trim-padding", $"  {marker} fleet t1  ");
             P("g4-fleet", "name", "lowercase", $"{marker} fleet c2".ToLowerInvariant());
             P("g4-fleet", "name", "inner-whitespace", $"{marker}  fleet   w3");
@@ -431,6 +478,130 @@ public static class WriteEvidence
             return total;
         }
 
+        // ---- --only aircraft-internal-remarks ------------------------------------------------------------------
+
+        const string Remarks = "internal_remarks";
+
+        void PlanAircraftRemarks(Discovery d)
+        {
+            AddFleetAndAircraft(d);
+            plannedProbes.Add(new("g4-aircraft", Remarks, "value-1", $"{marker} ir1"));
+            plannedProbes.Add(new("g4-aircraft", Remarks, "value-2", $"{marker} ir2"));
+            plannedProbes.Add(new("g4-aircraft", Remarks, "empty-string", ""));
+        }
+
+        // Each step reads the aircraft twice: alone (as after any write) and in its fleet's list.
+        int RemarkReads => 1 + plannedProbes.Count;
+
+        async Task<int> PrintAircraftRemarksPlanAsync(Discovery d)
+        {
+            var reads = guard.Sent;
+            var after = targets.Count * 2 + plannedProbes.Count * 2 + RemarkReads + targets.Count * 2;
+            var total = reads + after;
+            report["plan"] = new JsonObject
+            {
+                ["records"] = new JsonArray(targets.Select(t => (JsonNode?)new JsonObject
+                    { ["key"] = t.Key, ["label"] = t.Label, ["post"] = t.Collection, ["body"] = t.Body.DeepClone() }).ToArray()),
+                ["probes"] = new JsonArray(plannedProbes.Select(p => (JsonNode?)new JsonObject
+                    { ["record"] = p.Record, ["field"] = p.Field, ["variant"] = p.Variant, ["value"] = p.Value?.DeepClone() }).ToArray()),
+                ["requestsAfterConfirmation"] = new JsonObject
+                {
+                    ["POST"] = targets.Count,
+                    ["PUT"] = plannedProbes.Count,
+                    ["DELETE"] = targets.Count,
+                    ["GET"] = targets.Count + plannedProbes.Count + RemarkReads + targets.Count
+                },
+                ["expectedRequests"] = total
+            };
+            var w = new System.Text.StringBuilder();
+            w.AppendLine();
+            w.AppendLine($"===== 写入取证计划：只测飞机 internal_remarks（运行标记：{marker}）=====");
+            w.AppendLine($"服务器：{origin.AbsoluteUri}");
+            w.AppendLine($"只读引用（不修改）：航司参数 #{d.ParameterId}、机队 #{d.FleetId} 的机型代码 {d.FleetCode}。不读、不写航线和航路。");
+            if (d.Earlier.Count > 0)
+                w.AppendLine($"注意：服务器上已有带 {MarkerPrefix} 标记的机队（以前的运行留下，本次不会处理）：{string.Join(", ", d.Earlier)}");
+            w.AppendLine("将新建以下记录（带运行标记，结束时先删飞机、后删机队；机队对 Phoenix 隐藏）：");
+            var i = 1;
+            foreach (var t in targets)
+                w.AppendLine($"  {i++,2}. {t.Label,-6} POST {t.Collection}  {t.Body.ToJsonString(Compact)}");
+            w.AppendLine($"飞机新建后 GET 回读；再依次 PUT 只含 {Remarks} 的请求体，每次后 GET 回读：");
+            foreach (var p in plannedProbes)
+                w.AppendLine($"      {p.Variant,-14} {p.Value?.ToJsonString(Compact)}");
+            w.AppendLine($"新建后和每次 PUT 后另读一次机队下的飞机列表（共 {RemarkReads} 次），区分字段不存在与 null。");
+            w.AppendLine($"预计请求：只读发现已用 {reads} 次；确认后 POST {targets.Count}、PUT {plannedProbes.Count}、DELETE {targets.Count}、GET {targets.Count + plannedProbes.Count + RemarkReads + targets.Count}，"
+                + $"共约 {after} 次；全程约 {total} 次，约 {Math.Ceiling(after * 1.2 / 60)} 分钟。上限 {options.MaxRequests} 次。");
+            w.AppendLine("Ctrl+C：当前请求完成后停止并清理；再按一次放弃清理。");
+            await log.WriteLineAsync(w.ToString());
+            return total;
+        }
+
+        async Task WriteAircraftRemarksAsync()
+        {
+            var fleet = targets.First(t => t.Key == "g4-fleet");
+            var aircraft = targets.First(t => t.Key == "g4-aircraft");
+            if (!await CreateAsync(fleet))
+            { aircraft.State = "skipped"; return; }
+            aircraft.Collection = $"fleet/{fleet.Id}/aircraft";
+            if (!await CreateAsync(aircraft))
+                return;
+            await RemarkStepAsync(aircraft, "create (POST)", aircraft.Body[Remarks], null, aircraft.Last);
+            foreach (var probe in plannedProbes)
+            {
+                var result = await ProbeAsync(aircraft, probe);
+                var read = result.ContainsKey("readback");
+                await RemarkStepAsync(aircraft, "PUT " + probe.Variant, probe.Value, (int?)result["putStatus"], read ? aircraft.Last : null);
+            }
+        }
+
+        // One step of the probe: what was sent, what the single GET held, and what the fleet's aircraft list holds.
+        async Task RemarkStepAsync(Target aircraft, string step, JsonNode? sent, int? putStatus, JsonObject? single)
+        {
+            var entry = new JsonObject { ["step"] = step, ["sent"] = sent?.DeepClone(), ["writeStatus"] = putStatus };
+            remarkSteps.Add(entry);
+            entry["single"] = FieldState(single, read: single != null);
+            var list = await SendAsync(HttpMethod.Get, aircraft.Collection + "?page%5Bsize%5D=100", null, "aircraft list " + aircraft.Key);
+            Require(list);
+            var row = list.Ok && list.Body?["data"] is JsonArray rows
+                ? rows.OfType<JsonObject>().FirstOrDefault(r => r["id"]?.ToString() == aircraft.Id) : null;
+            entry["list"] = FieldState(row, read: list.Ok);
+            entry["list"]!["status"] = list.Status;
+            entry["list"]!["found"] = row != null;
+            entry["saved"] = single != null && single.TryGetPropertyValue(Remarks, out var value) && JsonNode.DeepEquals(value, sent);
+        }
+
+        static JsonObject FieldState(JsonObject? row, bool read)
+        {
+            if (!read || row is null)
+                return new() { ["read"] = read, ["present"] = false };
+            return row.TryGetPropertyValue(Remarks, out var value)
+                ? new() { ["read"] = true, ["present"] = true, ["value"] = value?.DeepClone() }
+                : new() { ["read"] = true, ["present"] = false };
+        }
+
+        static string Shown(JsonNode? state) => state is null || !(bool)state["read"]! ? "未读到"
+            : !(bool)state["present"]! ? "字段不存在" : state["value"] is null ? "null" : state["value"]!.ToJsonString(Compact);
+
+        // The verdict: a PUT of a non-empty value read back unchanged means PUT keeps the field.
+        JsonObject RemarksConclusion()
+        {
+            var puts = remarkSteps.OfType<JsonObject>().Where(s => ((string)s["step"]!).StartsWith("PUT", StringComparison.Ordinal)
+                && s["sent"] is JsonValue v && v.GetValue<string>().Length > 0).ToList();
+            var answered = puts.Where(s => s["writeStatus"] is JsonValue st && (int)st is >= 200 and < 300 && (bool)s["single"]!["read"]!).ToList();
+            var create = remarkSteps.OfType<JsonObject>().FirstOrDefault(s => (string?)s["step"] == "create (POST)");
+            var putSaved = answered.Count == 0 ? (bool?)null : answered.All(s => (bool)s["saved"]!) ? true : answered.Any(s => (bool)s["saved"]!) ? null : false;
+            return new()
+            {
+                ["postSaved"] = create is null ? null : (bool)create["saved"]!,
+                ["putSaved"] = putSaved,
+                ["conclusion"] = putSaved switch
+                {
+                    true => "PUT keeps internal_remarks",
+                    false => "PUT does not keep internal_remarks",
+                    _ => answered.Count == 0 ? "undetermined: no accepted PUT was read back" : "undetermined: PUTs disagree"
+                }
+            };
+        }
+
         // ---- writes --------------------------------------------------------------------------------------------
 
         async Task WriteAsync()
@@ -506,24 +677,24 @@ public static class WriteEvidence
             return true;
         }
 
-        async Task ProbeAsync(Target t, Probe p)
+        async Task<JsonObject> ProbeAsync(Target t, Probe p)
         {
             var result = new JsonObject { ["record"] = t.Key, ["id"] = t.Id, ["field"] = p.Field, ["variant"] = p.Variant, ["sent"] = p.Value?.DeepClone() };
             probes.Add(result);
             if (t.State != "created")
-            { result["kind"] = "skipped"; result["note"] = "record not created"; return; }
+            { result["kind"] = "skipped"; result["note"] = "record not created"; return result; }
             var put = await SendAsync(HttpMethod.Put, t.Path!, new JsonObject { [p.Field] = p.Value?.DeepClone() }, "G4 probe " + t.Key);
             Require(put);
             result["putStatus"] = put.Status;
             if (!put.Ok)
                 result["putError"] = put.Error;
             if (!put.Ok && put.Status < 500)
-            { result["kind"] = "rejected"; return; }
+            { result["kind"] = "rejected"; return result; }
             var get = await SendAsync(HttpMethod.Get, t.Path!, null, "G4 readback " + t.Key);
             Require(get);
             result["readStatus"] = get.Status;
             if (!get.Ok)
-            { result["kind"] = "read-failed"; return; }
+            { result["kind"] = "read-failed"; return result; }
             var row = Row(get.Body)!;
             var present = row.TryGetPropertyValue(p.Field, out var actual);
             // Without a read-back after the create (it was not 2xx), nothing is known of the value before.
@@ -537,6 +708,7 @@ public static class WriteEvidence
             result["sameAsBefore"] = same;
             result["kind"] = kind == "other" && same ? "not-applied" : kind;
             t.Last = row;
+            return result;
         }
 
         async Task SoftDeleteAsync(Target t)
@@ -695,6 +867,12 @@ public static class WriteEvidence
             report["G4_summary"] = new JsonArray(probes.Concat(createReadback).GroupBy(p => (string?)p!["kind"] ?? "(none)")
                 .OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => (JsonNode?)new JsonObject { ["kind"] = g.Key, ["count"] = g.Count() }).ToArray());
             report["G8_softDelete"] = softDeletes;
+            if (Focused)
+            {
+                var verdict = RemarksConclusion();
+                verdict["steps"] = remarkSteps;
+                report["aircraftInternalRemarks"] = verdict;
+            }
             report["cleanup"] = cleanup;
             report["leftovers"] = new JsonArray(left.Select(t => (JsonNode?)new JsonObject
             {
@@ -717,6 +895,18 @@ public static class WriteEvidence
             w.AppendLine($"结果：{outcome}；共发出 {guard.Sent} 次请求；报告：{Path.GetFullPath(reportPath)}");
             if (probes.Count + createReadback.Count > 0)
                 w.AppendLine("G4 回读差异：" + string.Join("，", report["G4_summary"]!.AsArray().Select(k => $"{k!["kind"]} {k["count"]}")));
+            if (Focused && report["aircraftInternalRemarks"] is JsonObject remarks)
+            {
+                w.AppendLine("飞机 internal_remarks：");
+                foreach (var step in remarkSteps)
+                    w.AppendLine($"  {step!["step"],-22} 发送 {step["sent"]?.ToJsonString(Compact) ?? "null"}{(step["writeStatus"] is { } ws ? $"（HTTP {ws}）" : "")} → 单条 GET {Shown(step["single"])}；列表 {Shown(step["list"])}");
+                w.AppendLine("结论：" + ((bool?)remarks["putSaved"] switch
+                {
+                    true => "PUT 能保存 internal_remarks（PUT 后回读与发送值一致）",
+                    false => "PUT 不能保存 internal_remarks（PUT 被接受，但回读与发送值不一致）",
+                    _ => "无法判断（" + remarks["conclusion"] + "）"
+                }) + ((bool?)remarks["postSaved"] switch { true => "；POST 新建时保存了该字段", false => "；POST 新建时没有保存该字段", _ => "" }));
+            }
             foreach (var s in softDeletes)
                 w.AppendLine($"G8 {s!["type"],-14} 航线 {s["id"]}：DELETE {s["deleteStatus"]?.ToString() ?? "无应答"}，随后 GET {s["getAfterDeleteStatus"]?.ToString() ?? "-"}");
             if (left.Count > 0)

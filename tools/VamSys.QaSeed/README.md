@@ -11,7 +11,7 @@ net10.0 控制台程序，只提供命令行入口，供 `scripts/open-datagrid-
 | `--export-diagnostic-replay <JSON路径>` | 通过模拟 422/500 生成脱敏诊断与 SHA-256 |
 | `--check-contract <仓库目录>` | 契约漂移检查（综合优化计划 4.3），见下 |
 | `--verify-read-only <报告JSON路径>` | 对真实 vAMSYS 的只读验证（综合优化计划 5.1），见下 |
-| `--write-evidence <报告JSON路径> [--dry-run] [--max-requests N]` | 对真实 vAMSYS 的写入取证（综合优化计划 6.1 G4、6.2 G8），只处理本轮自建的记录，见下 |
+| `--write-evidence <报告JSON路径> [--dry-run] [--max-requests N] [--only aircraft-internal-remarks]` | 对真实 vAMSYS 的写入取证（综合优化计划 6.1 G4、6.2 G8；`--only` 只跑一项小探测），只处理本轮自建的记录，见下 |
 
 所有 `--seed-*` 入口在写入前都会拒绝已有文件的目录。
 
@@ -77,3 +77,18 @@ dotnet run --no-build --project tools/VamSys.QaSeed -c Release -- --write-eviden
 ~~~
 
 工具本身的测试见 `IntegrationTests.Packaging.WriteEvidenceTests`（模拟服务器）：正常流程（含一次 429、服务器规范化的分类、某类航线删除后仍可读）、确认被拒、dry-run、中途传输失败后清理、Ctrl+C 后清理、只写自建 ID、清理失败时的报告，以及差异类型的分类。
+
+### 只测飞机 internal_remarks（`--only aircraft-internal-remarks`）
+
+2026-11-18 的真实运行中，新建飞机时随 POST 发送的 `internal_remarks` 在 201 应答和随后的 GET 里都是 null。这项小探测只查一件事：PUT 能不能保存这个字段。只读发现只读航司参数和机队列表（不读航线），然后新建 1 个机队（与 G4 相同，对 Phoenix 隐藏）和其下 1 架飞机（POST 带 `internal_remarks`），回读；再依次 PUT 只含 `internal_remarks` 的请求体：两个不同的非空值、空字符串，每次后 GET 回读。新建后和每次 PUT 后另读一次机队下的飞机列表，单条 GET 和列表都区分“字段不存在”与 null。最后先删飞机、后删机队。不读、不写航线和航路。守卫、确认词 `WRITE`、`--dry-run`、Ctrl+C 清理、请求上限和退出码与完整运行相同。
+
+控制台结尾逐步列出发送值、单条 GET 和列表读到的值，并给出结论（PUT 后回读与发送的非空值一致即“PUT 能保存”）；报告的 `aircraftInternalRemarks` 含 `postSaved`、`putSaved`、`conclusion` 和每一步的 `steps`。
+
+**预计请求数（vCCA）。** 只读发现 3 次（取令牌、航司参数、机队各 1 次，机队超过 100 个时多几页）；确认后 POST 2、PUT 3、GET 11（新建回读 2、PUT 后回读 3、飞机列表 4、清理后回读 2）、DELETE 2，共 18 次；全程约 21 次。按 2026-11-18 实测每次约 1.5 秒，约半分钟。
+
+~~~powershell
+dotnet run --no-build --project tools/VamSys.QaSeed -c Release -- --write-evidence artifacts/write-evidence/aircraft-remarks-plan.json --only aircraft-internal-remarks --dry-run
+dotnet run --no-build --project tools/VamSys.QaSeed -c Release -- --write-evidence artifacts/write-evidence/aircraft-remarks.json --only aircraft-internal-remarks
+~~~
+
+测试见 `WriteEvidenceTests` 中 `AircraftRemarksOnly*`：服务器保存与不保存该字段两种情形（含列表不返回该字段）、只跑这一项时不读写航线和航路、dry-run 只读参数和机队；未知的 `--only` 值在发出任何请求前被拒绝。
