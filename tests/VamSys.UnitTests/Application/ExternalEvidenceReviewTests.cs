@@ -98,6 +98,30 @@ public class ExternalEvidenceReviewTests
         Assert.Equal(type is "scheduled" or "jumpseat", IndependentApiEvidence.Covers(update, ApiContracts.Sha256));
     }
 
+    // An aircraft's internal remarks were updated live by a PUT of that field alone, twice, and read back the same from the
+    // aircraft and from its fleet's list (artifacts/write-evidence/aircraft-remarks.json, run FODESK-WE 20261118T005911Z).
+    [Fact]
+    public void Aircraft_internal_remarks_updates_open_in_full_but_not_when_an_unverified_field_rides_along()
+    {
+        var remarks = Enumerable.Range(0, 5).Select(_ => Update(ResourceKind.Aircraft, "Internal Remarks", "hangar 3")).ToList();
+        Assert.Equal(5, Submitted(remarks, ApiContracts.Sha256));
+        Assert.Equal(3, Submitted(remarks, "other-contract"));
+
+        var mixed = Enumerable.Range(0, 5).Select(_ =>
+        {
+            var item = Update(ResourceKind.Aircraft, "Internal Remarks", "hangar 3");
+            item.Fields["SELCAL"] = new(FieldIntent.Set, "AB-CD");
+            return item;
+        }).ToList();
+        Assert.Equal(3, Submitted(mixed, ApiContracts.Sha256));
+        // a verified field next to it keeps it open
+        var withName = Update(ResourceKind.Aircraft, "Internal Remarks", "hangar 3");
+        withName.Fields["Name"] = new(FieldIntent.Set, "Plane");
+        Assert.True(IndependentApiEvidence.Covers(withName, ApiContracts.Sha256));
+        // only the aircraft's field: routings keep their internal remarks outside the evidence
+        Assert.False(IndependentApiEvidence.Covers(Update(ResourceKind.Routings, "Internal Remarks", "x"), ApiContracts.Sha256));
+    }
+
     [Fact]
     public void A_route_type_the_api_does_not_know_is_not_covered_for_delete()
     {

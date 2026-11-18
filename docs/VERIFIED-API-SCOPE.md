@@ -12,7 +12,7 @@
 |---|---|---|---|
 | 机场 | ICAO/IATA、Name | Name | 原请求 204 与同 ID 详情 404 完整对应后确认 API 不可见 |
 | 机队 | Name、Type Code、Type、Max Passengers、Max Freight、Hide in Phoenix、Parameter IDs；已测类型 pax-cargo／cargo | Name、Max Passengers、Max Freight | 详情不可见后按既有永久删除规则核对 |
-| 飞机 | Fleet ID、Name、Registration、Passengers、Freight、Internal Remarks | Name、Freight；另支持单独只改 Fleet ID 的跨机队移动 | 按既有永久删除规则核对 |
+| 飞机 | Fleet ID、Name、Registration、Passengers、Freight、Internal Remarks | Name、Freight、Internal Remarks（2026-11-18 补充取证）；另支持单独只改 Fleet ID 的跨机队移动 | 按既有永久删除规则核对 |
 | 航路 | 起降机场、Route String、Remarks | Remarks | 按既有永久删除规则核对 |
 | scheduled 航线 | 类型、呼号、班号、起降机场、非空 Fleet IDs、时刻、Routing、隐藏、有效日期、备注、内部备注、Service Days | Remarks、Cost Index、起降时刻；非空机队集合替换／追加／移除 | 完整 204／404 证据后确认 API 不可见 |
 | jumpseat 航线 | 类型、呼号、班号、起降机场、时刻、Routing、隐藏、有效日期、备注、内部备注、Cost Index、Service Days | Remarks、Cost Index、起降时刻 | 完整 204／404 证据后确认 API 不可见 |
@@ -56,7 +56,7 @@
 - 带非 UTC 偏移的日期，服务器丢掉偏移、保留墙上时间（`08:00+08:00` 存成 `08:00+00:00`），这是另一个时刻。程序发送日期一律为 `+00:00`（本地时间的航线不能在线提交），不会遇到；遇到时仍判不一致。
 - 被 422 拒收的：`H:MM:SS` 时间、数字形式的 cost_index（只接受字符串）、去空格或小写的航路 route string。
 - 只测了一个字段的改写不推广到同类字段：arrival_time 没有 `HH:MM` 规则、end_date 没有“只写日期”规则、start_date 没有“丢弃毫秒”规则；程序本来也不会发出这些形式。
-- **飞机 Internal Remarks（已采用“新建后补一次 PUT”，2026-11-17）。** 新建时随 POST 发送的 `internal_remarks` 不保存：201 应答、单条 GET 和机队下的飞机列表都是 null。补充取证（`artifacts/write-evidence/aircraft-remarks.json`，运行标记 `FODESK-WE 20261118T005911Z`）证明只含 `internal_remarks` 的 PUT 返回 200、两处回读与发送值一致、可多次修改，PUT 空字符串回读为 null。所以在线新建飞机且填写了 Internal Remarks 时，程序先 POST（不带这一列），拿到新飞机 ID 后再对它 PUT 一次只含 `internal_remarks` 的请求，然后回读核对全部值；没填写时只发 POST。PUT 只在 POST 应答给出 ID 之后发出；POST 应答丢失时不发 PUT（找回的候选 ID 也不发）；PUT 收到 429 或未发出时，“继续”先回读核对 POST 写入的值，再只补发 PUT，不会再次新建；PUT 超时、5xx 或应答丢失时不重发，按回读结果判定。飞机 `internal_remarks` 登记了“空字符串→null”的回读规则。
+- **飞机 Internal Remarks（已采用“新建后补一次 PUT”，2026-11-17）。** 新建时随 POST 发送的 `internal_remarks` 不保存：201 应答、单条 GET 和机队下的飞机列表都是 null。补充取证（`artifacts/write-evidence/aircraft-remarks.json`，运行标记 `FODESK-WE 20261118T005911Z`）证明只含 `internal_remarks` 的 PUT 返回 200、两处回读与发送值一致、可多次修改，PUT 空字符串回读为 null。所以在线新建飞机且填写了 Internal Remarks 时，程序先 POST（不带这一列），拿到新飞机 ID 后再对它 PUT 一次只含 `internal_remarks` 的请求，然后回读核对全部值；没填写时只发 POST。PUT 只在 POST 应答给出 ID 之后发出；POST 应答丢失时不发 PUT（找回的候选 ID 也不发）；PUT 收到 429 或未发出时，“继续”先回读核对 POST 写入的值，再只补发 PUT，不会再次新建；PUT 超时、5xx 或应答丢失时不重发，按回读结果判定。飞机 `internal_remarks` 登记了“空字符串→null”的回读规则。修改已有飞机的 Internal Remarks 同样有证据（两次非空值 PUT 都 200，单条和列表回读一致），自 2026-11-17 起列入上表“修改”范围，不再受首次样本限制；同一条修改里夹带未验证字段（如 SELCAL）时仍按原规则。清空仍按“未验证清空”禁用。
 
 **软删除（G8）。** cargo、charter、training、vfr、repositioning 航线各新建一条后 DELETE 均 204，随后 GET 均 404，与 scheduled、jumpseat 相同。这些类型的删除现在按同一套 204＋404 证据自动核对“API 已核对不可见”，审阅时不再受首次样本限制；它们的新建和修改没有新证据，仍保留样本限制。
 

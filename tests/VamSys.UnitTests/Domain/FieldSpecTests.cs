@@ -153,7 +153,7 @@ public class FieldSpecTests
         Assert.Equal(["Name", "Type Code", "Type (pax/cargo/...)", "Max Passengers", "Max Freight", "Hide in Phoenix", "Parameter IDs"], Covered(ResourceKind.Fleets, ChangeKind.Create));
         Assert.Equal(["Name", "Max Passengers", "Max Freight"], Covered(ResourceKind.Fleets, ChangeKind.Update));
         Assert.Equal(["Name", "Registration", "Fleet ID", "Passengers", "Freight", "Internal Remarks"], Covered(ResourceKind.Aircraft, ChangeKind.Create));
-        Assert.Equal(["Name", "Freight"], Covered(ResourceKind.Aircraft, ChangeKind.Update));
+        Assert.Equal(["Name", "Freight", "Internal Remarks"], Covered(ResourceKind.Aircraft, ChangeKind.Update));
         Assert.Equal(["Fleet ID"], Covered(ResourceKind.Aircraft, ChangeKind.Update, move: true));
         Assert.Equal([Dep, Arr, "Route String", "Remarks"], Covered(ResourceKind.Routings, ChangeKind.Create));
         Assert.Equal(["Remarks"], Covered(ResourceKind.Routings, ChangeKind.Update));

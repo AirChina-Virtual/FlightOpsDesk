@@ -116,7 +116,10 @@ public static class FieldSpecs
             new("Hex Code", "hexcode"),
             new("Passengers", "passengers", FieldType.Integer, Evidence: C),
             new("Freight", "cargo", FieldType.KgInteger, Evidence: C | U),
-            new("Internal Remarks", "internal_remarks", Evidence: C)
+            // Update: a PUT of internal_remarks alone, twice, read back the same from the aircraft and its fleet's list
+            // (artifacts/write-evidence/aircraft-remarks.json, run FODESK-WE 20261118T005911Z, aircraftInternalRemarks).
+            // A create sends it in a PUT after the POST (AircraftPlanner): the POST does not keep it.
+            new("Internal Remarks", "internal_remarks", Evidence: C | U)
         ]),
         [ResourceKind.Routings] = new(ResourceKind.Routings, "ID",
         [

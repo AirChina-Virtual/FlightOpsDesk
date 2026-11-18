@@ -22,6 +22,14 @@
 人工查看（明暗主题、高对比度、100%／150%／200% 缩放、读屏抽查、单元格首次点击）已于 2026-11-16 由用户在正式包上完成，未报告问题；软件真实写入验收不在上表内。云端 CI 于 2026-11-09 首次在私有远端运行：恢复、分析器基线、构建和单元测试通过；集成测试第一次有 1 个进程终止测试读库报 `disk I/O error`，重跑通过，测试已改为等数据库文件释放后再检查（见 [综合优化计划](IMPROVEMENT-PLAN-2026-11-08.md) 0.5）。原始结果归档在 `archive/2026-11-03-r8/measurements.zip`。
 
 
+## 修改飞机的 Internal Remarks 列入已验证范围（2026-11-17）
+
+依据同一份补充取证（`artifacts/write-evidence/aircraft-remarks.json`，运行标记 `FODESK-WE 20261118T005911Z`）。先写测试并确认在旧逻辑上失败（2 项），再在字段表里给飞机 Internal Remarks 加上“修改”证据：
+- `ExternalEvidenceReviewTests` +1：5 条只改飞机 Internal Remarks 的修改在固定契约下全部提交（旧逻辑只提交 3 条样本），其他契约仍为 3 条；夹带 SELCAL 时仍为 3 条；与 Name 一起改时仍在证据内；航路的 Internal Remarks 仍不在证据内。
+- `FieldSpecTests`：飞机修改的证据字段为 Name、Freight、Internal Remarks；跨机队移动仍只有 Fleet ID。
+
+快速检查通过（单元测试 1,868 项，集成测试 755 项通过、1 项跳过）。没有连接真实服务器。
+
 ## 新建飞机的 Internal Remarks 改为 POST 后补 PUT（2026-11-17）
 
 依据补充取证 `artifacts/write-evidence/aircraft-remarks.json`（运行标记 `FODESK-WE 20261118T005911Z`）：POST 带的 `internal_remarks` 不保存，只含它的 PUT 保存，PUT 空字符串回读为 null。先写测试并确认在旧逻辑上失败（单元 4 项、集成 5 项），再改代码：
