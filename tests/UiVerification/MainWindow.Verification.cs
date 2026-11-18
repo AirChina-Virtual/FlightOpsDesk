@@ -293,7 +293,7 @@ public sealed partial class MainWindow
             return new{step,scrollableHeight=vertical.ScrollableHeight,scrollableWidth=horizontal.ScrollableWidth,down,up,downAgain,right,left,state=DataVerificationState()};
         }
         if(command.StartsWith("data-row:"))
-        {var view=visible[int.Parse(command[9..])];return new{id=view.Row.LocalId,deleted=Schemas.Deleted(view.Row),fields=view.Row.Fields,focused=Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(RootGrid.XamlRoot)?.GetType().Name,editors=CountVisual<TextBox>(table!)};}
+        {var view=visible[int.Parse(command[9..])];return new{id=view.Row.LocalId,deleted=Schemas.Deleted(view.Row),fields=view.Row.Fields,focused=Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(RootGrid.XamlRoot)?.GetType().Name,editors=CountVisual<TextBox>(table!),hints=view.Cells.Where(c=>c.Hint!=null).ToDictionary(c=>c.Field,c=>c.Hint)};}
         if(command.StartsWith("data-mark-deleted:"))
         {
             // Marks a shown row deleted in memory only, then rebinds it as a page refresh would.

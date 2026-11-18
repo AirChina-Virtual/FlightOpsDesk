@@ -50,6 +50,8 @@ public sealed partial class WorkspaceStore
     public void SaveLanguage(string language) => settings.SaveLanguage(language);
     public string LoadTableDensity() => settings.LoadTableDensity();
     public void SaveTableDensity(string density) => settings.SaveTableDensity(density);
+    public IReadOnlyList<string> LoadHiddenColumns(ResourceKind kind) => settings.LoadHiddenColumns(kind);
+    public void SaveHiddenColumns(ResourceKind kind, IReadOnlyCollection<string> columns) => settings.SaveHiddenColumns(kind, columns);
 
     public List<(Guid Id, string Name)> List()
     {

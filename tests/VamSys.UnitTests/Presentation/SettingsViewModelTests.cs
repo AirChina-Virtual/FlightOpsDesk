@@ -32,6 +32,8 @@ public class SettingsViewModelTests
         public void SaveLanguage(string language) => throw new IOException("injected");
         public string LoadTableDensity() => "comfortable";
         public void SaveTableDensity(string density) { }
+        public IReadOnlyList<string> LoadHiddenColumns(ResourceKind kind) => [];
+        public void SaveHiddenColumns(ResourceKind kind, IReadOnlyCollection<string> columns) { }
     }
 
     [Fact]

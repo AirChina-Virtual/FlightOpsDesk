@@ -102,6 +102,40 @@ public class ToolbarTests
         app.First("记录详情", ControlType.MenuItem).Invoke();
         app.One("RowDetails");
         Assert.Single(app.Query("data-state")["selectedRows"]!.AsArray());
+
+        // A hidden column stays hidden after a restart, for its resource only (kept in app_settings like the density).
+        app.SelectResource("机场");
+        app.Until(() => Total() != all, "the airports are shown");
+        var airportColumns = app.Query("data-state").Int("columns");
+        app.SelectResource("航线");
+        app.Until(() => Total() == all, "back to the routes");
+        HideTags(app);
+        app.Until(() => app.Query("data-state").Int("columns") == columns - 1, "Tags is hidden again");
         app.Close();
+
+        using var next = app.Reopen();
+        // The program starts with the first workspace by name, the empty "我的航空公司": back to the demo.
+        next.Query("workspace-back");
+        next.Until(() => next.Query("state").Str("workspaceName")?.StartsWith("演示航空公司", StringComparison.Ordinal) == true, "the demo workspace is open");
+        next.SelectItem("数据管理");
+        next.SelectResource("航线");
+        next.Until(() => next.Query("data-state").Int("total") == all && next.Query("data-state").Int("columns") == columns - 1, "Tags is still hidden after the restart");
+        next.SelectResource("机场");
+        next.Until(() => next.Query("data-state").Int("total") != all && next.Query("data-state").Int("columns") == airportColumns, "the airports keep all their columns");
+        next.SelectResource("航线");
+        next.Until(() => next.Query("data-state").Int("total") == all, "back to the routes");
+        next.One("DataView").Expand();
+        ((ExpandCollapsePattern)next.First("显示的列", ControlType.MenuItem).GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
+        next.First("显示全部列", ControlType.MenuItem).Invoke();
+        next.Until(() => next.Query("data-state").Int("columns") == columns, "all columns again");
+        next.Close();
+    }
+
+    static void HideTags(AppWindow app)
+    {
+        app.One("DataView").Expand();
+        ((ExpandCollapsePattern)app.First("显示的列", ControlType.MenuItem).GetCurrentPattern(ExpandCollapsePattern.Pattern)).Expand();
+        app.First("Tags", ControlType.MenuItem).Toggle();
+        app.One("DataView").Collapse();
     }
 }

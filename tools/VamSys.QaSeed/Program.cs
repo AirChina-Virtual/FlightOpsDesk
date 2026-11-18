@@ -51,6 +51,8 @@ if(args.Length==2 && args[0]=="--check-contract")
     { Console.Error.WriteLine("Contract check could not run: " + e.Message); Environment.ExitCode = 2; }
     return;
 }
+if(args.Length>=1 && args[0]=="--compare-performance")
+{ Environment.ExitCode = PerformanceComparison.Run(args.Skip(1).ToList(), Console.Out, Console.Error); return; }
 if(args.Length==2 && args[0]=="--export-diagnostic-replay"){await DiagnosticReplayExport.ExportDiagnostics(args[1]);return;}
 
 // A seed for looking at the data page by hand, package checks, diagnostic replays and the contract drift check; benchmarks are in tests/VamSys.Benchmarks.

@@ -1,0 +1,37 @@
+{
+ "rows": 20000,
+ "opened": {
+  "milliseconds": 420.2364
+ },
+ "search": {
+  "milliseconds": 107.0258
+ },
+ "benchmark": {
+  "paging": {
+   "median": 6.8757,
+   "p95": 7.7487,
+   "max": 30.7883
+  },
+  "language": {
+   "median": 20.5753,
+   "p95": 21.3004,
+   "max": 24.9052
+  },
+  "edit": {
+   "median": 0.564,
+   "p95": 0.7277,
+   "max": 0.7912
+  },
+  "buildsBefore": 1,
+  "buildsAfter": 1,
+  "queriesBefore": 5,
+  "queriesAfter": 5
+ },
+ "workingSetBytes": 551641088,
+ "undoWithSave": {
+  "totalMedian": 5.7409,
+  "totalP95": 10.0076,
+  "redoMedian": 4.8143,
+  "redoP95": 10.4133
+ }
+}

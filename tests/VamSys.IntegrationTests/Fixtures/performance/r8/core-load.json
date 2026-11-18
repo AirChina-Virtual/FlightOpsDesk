@@ -1,0 +1,58 @@
+{
+ "Runtime": "10.0.12",
+ "Warmups": 5,
+ "Samples": 20,
+ "Cases": [
+  {
+   "Name": "load-20",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 20,
+   "JsonBytes": 1542533,
+   "Metrics": {
+    "MedianMs": 15.1153,
+    "P95Ms": 81.1676,
+    "MedianAllocatedBytes": 10686496,
+    "GcCollections": [
+     17,
+     14,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "load-20",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 20,
+   "JsonBytes": 31124533,
+   "Metrics": {
+    "MedianMs": 394.0519,
+    "P95Ms": 438.0521,
+    "MedianAllocatedBytes": 209953520,
+    "GcCollections": [
+     362,
+     362,
+     31
+    ]
+   }
+  },
+  {
+   "Name": "load-20",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 20,
+   "JsonBytes": 78344533,
+   "Metrics": {
+    "MedianMs": 994.3127,
+    "P95Ms": 1104.4076,
+    "MedianAllocatedBytes": 525612752,
+    "GcCollections": [
+     860,
+     860,
+     31
+    ]
+   }
+  }
+ ]
+}

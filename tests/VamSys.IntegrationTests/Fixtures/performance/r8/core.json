@@ -1,0 +1,680 @@
+{
+ "Runtime": "10.0.12",
+ "Architecture": "X64",
+ "Warmups": 5,
+ "Samples": 20,
+ "Cases": [
+  {
+   "Name": "plan",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 0.3286,
+    "P95Ms": 0.459,
+    "MedianAllocatedBytes": 39936,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 1000,
+   "Percent": 1,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 0.275,
+    "P95Ms": 0.3291,
+    "MedianAllocatedBytes": 50712,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 1000,
+   "Percent": 10,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 0.3773,
+    "P95Ms": 0.454,
+    "MedianAllocatedBytes": 146176,
+    "GcCollections": [
+     1,
+     1,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 1000,
+   "Percent": 100,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 0.9667,
+    "P95Ms": 1.5066,
+    "MedianAllocatedBytes": 1096584,
+    "GcCollections": [
+     1,
+     1,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "cold-index",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 0.0498,
+    "P95Ms": 0.0658,
+    "MedianAllocatedBytes": 35432,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "warm-index",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 100,
+   "Metrics": {
+    "MedianMs": 0.0071,
+    "P95Ms": 0.0084,
+    "MedianAllocatedBytes": 0,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "undo-redo",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 0.0084,
+    "P95Ms": 0.0095,
+    "MedianAllocatedBytes": 3344,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "replace",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 0.0095,
+    "P95Ms": 0.0099,
+    "MedianAllocatedBytes": 6512,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "undo-redo",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 10,
+   "Metrics": {
+    "MedianMs": 0.077,
+    "P95Ms": 0.0884,
+    "MedianAllocatedBytes": 21088,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "replace",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 10,
+   "Metrics": {
+    "MedianMs": 0.0806,
+    "P95Ms": 0.0825,
+    "MedianAllocatedBytes": 49224,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "undo-redo",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 100,
+   "Metrics": {
+    "MedianMs": 0.7683,
+    "P95Ms": 0.7873,
+    "MedianAllocatedBytes": 198992,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "replace",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 100,
+   "Metrics": {
+    "MedianMs": 0.8483,
+    "P95Ms": 1.1287,
+    "MedianAllocatedBytes": 478392,
+    "GcCollections": [
+     1,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "validate-20",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 20,
+   "Metrics": {
+    "MedianMs": 0.1796,
+    "P95Ms": 0.2002,
+    "MedianAllocatedBytes": 123112,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "structural-undo-redo",
+   "Rows": 1000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 0.3573,
+    "P95Ms": 0.4946,
+    "MedianAllocatedBytes": 87968,
+    "GcCollections": [
+     2,
+     2,
+     1
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 7.2081,
+    "P95Ms": 8.1165,
+    "MedianAllocatedBytes": 757056,
+    "GcCollections": [
+     1,
+     1,
+     1
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 20000,
+   "Percent": 1,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 7.3942,
+    "P95Ms": 14.7,
+    "MedianAllocatedBytes": 969368,
+    "GcCollections": [
+     2,
+     2,
+     1
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 20000,
+   "Percent": 10,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 8.2821,
+    "P95Ms": 31.0559,
+    "MedianAllocatedBytes": 2870112,
+    "GcCollections": [
+     5,
+     2,
+     1
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 20000,
+   "Percent": 100,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 45.9327,
+    "P95Ms": 86.7563,
+    "MedianAllocatedBytes": 22081648,
+    "GcCollections": [
+     41,
+     41,
+     8
+    ]
+   }
+  },
+  {
+   "Name": "cold-index",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 0.3543,
+    "P95Ms": 0.4457,
+    "MedianAllocatedBytes": 672872,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "warm-index",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 100,
+   "Metrics": {
+    "MedianMs": 0.0056,
+    "P95Ms": 0.0056,
+    "MedianAllocatedBytes": 0,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "undo-redo",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 0.0103,
+    "P95Ms": 0.0163,
+    "MedianAllocatedBytes": 3344,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "replace",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 0.0114,
+    "P95Ms": 0.0172,
+    "MedianAllocatedBytes": 6512,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "undo-redo",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 10,
+   "Metrics": {
+    "MedianMs": 0.0749,
+    "P95Ms": 0.1066,
+    "MedianAllocatedBytes": 21088,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "replace",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 10,
+   "Metrics": {
+    "MedianMs": 0.0673,
+    "P95Ms": 0.076,
+    "MedianAllocatedBytes": 49224,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "undo-redo",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 100,
+   "Metrics": {
+    "MedianMs": 0.1973,
+    "P95Ms": 14.4894,
+    "MedianAllocatedBytes": 198992,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "replace",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 100,
+   "Metrics": {
+    "MedianMs": 0.3658,
+    "P95Ms": 0.4208,
+    "MedianAllocatedBytes": 471992,
+    "GcCollections": [
+     1,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "validate-20",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 20,
+   "Metrics": {
+    "MedianMs": 0.9374,
+    "P95Ms": 1.1943,
+    "MedianAllocatedBytes": 1781672,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "structural-undo-redo",
+   "Rows": 20000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 2.4158,
+    "P95Ms": 3.0919,
+    "MedianAllocatedBytes": 1666848,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 17.6876,
+    "P95Ms": 18.4731,
+    "MedianAllocatedBytes": 1885144,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 50000,
+   "Percent": 1,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 20.1107,
+    "P95Ms": 21.46,
+    "MedianAllocatedBytes": 2413576,
+    "GcCollections": [
+     1,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 50000,
+   "Percent": 10,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 21.1338,
+    "P95Ms": 24.7046,
+    "MedianAllocatedBytes": 7216552,
+    "GcCollections": [
+     9,
+     9,
+     1
+    ]
+   }
+  },
+  {
+   "Name": "plan",
+   "Rows": 50000,
+   "Percent": 100,
+   "K": 0,
+   "Metrics": {
+    "MedianMs": 168.7049,
+    "P95Ms": 199.3068,
+    "MedianAllocatedBytes": 54934144,
+    "GcCollections": [
+     93,
+     93,
+     10
+    ]
+   }
+  },
+  {
+   "Name": "cold-index",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 1.7155,
+    "P95Ms": 2.0243,
+    "MedianAllocatedBytes": 1675688,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "warm-index",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 100,
+   "Metrics": {
+    "MedianMs": 0.001,
+    "P95Ms": 0.001,
+    "MedianAllocatedBytes": 0,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "undo-redo",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 0.0018,
+    "P95Ms": 0.0023,
+    "MedianAllocatedBytes": 3344,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "replace",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 0.0036,
+    "P95Ms": 0.0038,
+    "MedianAllocatedBytes": 6448,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "undo-redo",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 10,
+   "Metrics": {
+    "MedianMs": 0.0173,
+    "P95Ms": 0.0178,
+    "MedianAllocatedBytes": 21024,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "replace",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 10,
+   "Metrics": {
+    "MedianMs": 0.0328,
+    "P95Ms": 0.0473,
+    "MedianAllocatedBytes": 48520,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "undo-redo",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 100,
+   "Metrics": {
+    "MedianMs": 0.1663,
+    "P95Ms": 0.188,
+    "MedianAllocatedBytes": 198928,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "replace",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 100,
+   "Metrics": {
+    "MedianMs": 0.3291,
+    "P95Ms": 0.3733,
+    "MedianAllocatedBytes": 471928,
+    "GcCollections": [
+     1,
+     1,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "validate-20",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 20,
+   "Metrics": {
+    "MedianMs": 3.549,
+    "P95Ms": 4.1654,
+    "MedianAllocatedBytes": 4392656,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "Name": "structural-undo-redo",
+   "Rows": 50000,
+   "Percent": 0,
+   "K": 1,
+   "Metrics": {
+    "MedianMs": 6.5328,
+    "P95Ms": 6.9487,
+    "MedianAllocatedBytes": 4152480,
+    "GcCollections": [
+     0,
+     0,
+     0
+    ]
+   }
+  }
+ ]
+}

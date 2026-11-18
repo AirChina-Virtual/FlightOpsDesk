@@ -44,7 +44,7 @@ public sealed partial class EditableCell : ContentControl
         HorizontalContentAlignment = HorizontalAlignment.Stretch;
         VerticalContentAlignment = VerticalAlignment.Stretch;
         CharacterReceived += TypedOnCell;
-        Unloaded += (_, _) => { pointerOver = false; CloseOwnHint(); };
+        Unloaded += (_, _) => hintHelper?.Unloaded();
     }
     // Recycled for another row: an open editor belongs to the previous cell.
     void CellChanged(CellViewModel? old, CellViewModel? next) => EndEdit(false, normalize: false);
@@ -100,56 +100,13 @@ public sealed partial class EditableCell : ContentControl
     }
     protected override void OnPointerCaptureLost(PointerRoutedEventArgs e) { base.OnPointerCaptureLost(e); pressed = false; }
 
-    // The hint (a problem, the server's value, why the cell is read-only) is shown in a tooltip made when the pointer first
-    // rests on this cell control. A bound tooltip on every cell tripled the time of a page change: every rebind replaced
-    // thousands of tooltips. The tooltip reads the hint when it opens, so a recycled cell shows its current row's hint.
-    ToolTip? hintTip;
-    bool pointerOver;
-    // A tooltip opened from code stays open until code closes it (the service only closes the ones it opened): at most one
-    // hint is open, and it closes when the pointer leaves, editing starts, the cell unloads or another hint opens.
-    static ToolTip? openHint;
-    internal static void CloseHint()
-    {
-        if (openHint is { } open)
-        { openHint = null; open.IsOpen = false; }
-    }
-    void CloseOwnHint()
-    {
-        if (hintTip is { } tip && ReferenceEquals(openHint, tip))
-            CloseHint();
-        else if (hintTip is { IsOpen: true } own)
-            own.IsOpen = false;
-    }
-    protected override void OnPointerEntered(PointerRoutedEventArgs e)
-    {
-        base.OnPointerEntered(e);
-        pointerOver = true;
-        if (hintTip != null || Cell?.Hint is null)
-            return;
-        var tip = hintTip = new ToolTip();
-        tip.Opened += (_, _) =>
-        {
-            if (Cell?.Hint is { } hint)
-                tip.Content = hint;
-            else
-                tip.IsOpen = false;
-        };
-        ToolTipService.SetToolTip(this, tip);
-        // The service starts listening only now, after this entry: open the first one after the usual pause.
-        var timer = DispatcherQueue.CreateTimer();
-        timer.Interval = TimeSpan.FromMilliseconds(UiTokens.HintDelayMilliseconds);
-        timer.IsRepeating = false;
-        timer.Tick += (_, _) =>
-        {
-            if (!pointerOver || editorRoot is not null || Cell?.Hint is null || !IsLoaded)
-                return;
-            CloseHint();
-            openHint = tip;
-            tip.IsOpen = true;
-        };
-        timer.Start();
-    }
-    protected override void OnPointerExited(PointerRoutedEventArgs e) { base.OnPointerExited(e); pointerOver = false; CloseOwnHint(); }
+    // The hint (a problem, the server's value, why the cell is read-only): see CellHint. Not shown while editing.
+    CellHint? hintHelper;
+    CellHint Hint => hintHelper ??= new CellHint(this, () => Cell, () => editorRoot is not null);
+    internal static void CloseHint() => CellHint.CloseOpen();
+    void CloseOwnHint() => hintHelper?.Close();
+    protected override void OnPointerEntered(PointerRoutedEventArgs e) { base.OnPointerEntered(e); Hint.Entered(); }
+    protected override void OnPointerExited(PointerRoutedEventArgs e) { base.OnPointerExited(e); hintHelper?.Exited(); }
     protected override void OnTapped(TappedRoutedEventArgs e) { base.OnTapped(e); if (editorRoot != null) e.Handled = true; }
 
     internal void BeginEdit(FocusState focus = FocusState.Programmatic, string? replaceWith = null)

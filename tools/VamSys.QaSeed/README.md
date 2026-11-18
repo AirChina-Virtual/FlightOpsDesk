@@ -10,6 +10,7 @@ net10.0 控制台程序，只提供命令行入口，供 `scripts/open-datagrid-
 | `--verify-package <目录>`、`--verify-qa-package <目录>` | 打包检查（`PackageChecks`），`scripts/build.ps1 -Publish` 每次发布都会运行 |
 | `--export-diagnostic-replay <JSON路径>` | 通过模拟 422/500 生成脱敏诊断与 SHA-256 |
 | `--check-contract <仓库目录>` | 契约漂移检查（综合优化计划 4.3），见下 |
+| `--compare-performance --baseline <路径> --current <路径> [--limit 10]` | 与 R0 基线的性能比对（I14），只读已有测量结果，见 [性能报告](../../docs/PERFORMANCE.md#与-r0-基线自动比对i14) |
 | `--verify-read-only <报告JSON路径>` | 对真实 vAMSYS 的只读验证（综合优化计划 5.1），见下 |
 | `--write-evidence <报告JSON路径> [--dry-run] [--max-requests N] [--only aircraft-internal-remarks]` | 对真实 vAMSYS 的写入取证（综合优化计划 6.1 G4、6.2 G8；`--only` 只跑一项小探测），只处理本轮自建的记录，见下 |
 

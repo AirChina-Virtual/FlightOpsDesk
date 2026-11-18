@@ -1,3 +1,5 @@
+using VamSys.Core;
+
 namespace VamSys.Infrastructure;
 
 // app_settings: per-installation preferences that are not part of any workspace.
@@ -7,6 +9,27 @@ internal sealed class SettingsRepository(StorageContext context)
     public void SaveLanguage(string language) => Save("language", language == "en-US" ? language : "zh-CN");
     public string LoadTableDensity() => Load("table_density") == "compact" ? "compact" : "comfortable";
     public void SaveTableDensity(string density) => Save("table_density", density == "compact" ? "compact" : "comfortable");
+
+    // The columns hidden from the view menu, one key per resource ("hidden_columns.Routes"), as a JSON array of column
+    // names. A value that is not such an array reads as nothing hidden. Which names still apply is decided by the caller.
+    public IReadOnlyList<string> LoadHiddenColumns(ResourceKind kind)
+    {
+        var value = Load(HiddenColumnsKey(kind));
+        if (value is null)
+            return [];
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(value);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array
+                || doc.RootElement.EnumerateArray().Any(e => e.ValueKind != System.Text.Json.JsonValueKind.String))
+                return [];
+            return doc.RootElement.EnumerateArray().Select(e => e.GetString()!).Distinct(StringComparer.Ordinal).ToList();
+        }
+        catch (System.Text.Json.JsonException) { return []; }
+    }
+    public void SaveHiddenColumns(ResourceKind kind, IReadOnlyCollection<string> columns)
+        => Save(HiddenColumnsKey(kind), System.Text.Json.JsonSerializer.Serialize(columns.Distinct(StringComparer.Ordinal).ToArray()));
+    static string HiddenColumnsKey(ResourceKind kind) => "hidden_columns." + kind;
 
     string? Load(string key)
     {

@@ -374,11 +374,7 @@ public sealed partial class MainWindow : Window
         return leading.Concat(Data.Columns.Count == 0 ? Schemas.All[resource].Columns : Data.Columns).Distinct().ToList();
     }
     // The columns the table shows: all but the ones hidden from the view menu (never the status or the key).
-    List<string> DisplayColumns()
-    {
-        var all = AllColumns();
-        return hiddenColumns.TryGetValue(resource, out var hidden) && hidden.Count > 0 ? all.Where(c => !hidden.Contains(c)).ToList() : all;
-    }
+    List<string> DisplayColumns() => HiddenColumns.Shown(resource, AllColumns()).ToList();
     // Rebuilt on every render; the shown one is refreshed when the language changes.
     ImportPage? shownImportPage;
     UIElement BuildImportPage() => shownImportPage = new ImportPage(new ImportViewModel(localization),

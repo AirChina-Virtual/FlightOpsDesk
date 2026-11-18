@@ -36,6 +36,9 @@ public interface IUserSettings
     void SaveLanguage(string language);
     string LoadTableDensity();
     void SaveTableDensity(string density);
+    // The column names hidden from the view menu for one resource, as stored (HiddenColumnsPreference decides which apply).
+    IReadOnlyList<string> LoadHiddenColumns(ResourceKind kind);
+    void SaveHiddenColumns(ResourceKind kind, IReadOnlyCollection<string> columns);
 }
 
 // A restartable one-shot timer; the window backs it with the dispatcher.

@@ -73,6 +73,77 @@ public class ConnectedDialogTests
         Assert.Single(routes.Undo);
     }
 
+    // 2.5: connected, with the airline parameters read (they approve fleet 4 only), the Fleet IDs cell of a route names its
+    // unapproved fleets on hover; once every fleet is approved the hint is gone. The edits go through the cell's own fleet
+    // picker; the seeded draft is "4,6". Nothing is written to the server.
+    [WindowFact]
+    public void The_fleet_cell_names_an_unapproved_fleet_on_hover_until_every_fleet_is_approved()
+    {
+        using var app = Connected("connected-fleet-hint", Scenario.UnapprovedFleet, out var server, out var remote);
+        using var owner = server;
+        const string Choose = "选择机型", Apply = "应用", Spare = "Fleet 6 spare · A320 · ", Marker = "尚未获准";
+        const string Expected = "这些机队尚未获准使用本航线呼号和班号的前缀，提交前会被拦下：Fleet 6 spare (6)";
+        var before = remote.Server.Requests.Count;
+        app.SelectItem("数据管理");
+        app.SelectResource("航线");
+        app.Until(() => app.Rows().Length > 0, "the routes are shown");
+        int Route() => Enumerable.Range(0, app.Rows().Length).First(i => app.Query("data-row:" + i)["fields"]!.Str("Callsign") == "CAO100");
+        // The fleets as a set: the picker decides their order.
+        // The hint the cell's model holds (what the tooltip will show), read through the QA pipe.
+        string? ModelHint() => app.Query("data-row:" + Route())["hints"]?["Fleet IDs"]?.ToString();
+        string Fleets() => string.Join(",", (app.Query("data-row:" + Route())["fields"]!.Str("Fleet IDs") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal));
+        // The route's own row in the window, found by its callsign cell: the QA row numbers (data-row) are in the page's order,
+        // which need not be the order UI Automation lists the rows in, and another route has unapproved fleets too.
+        AutomationElement FleetButton() => app.Wait(() => app.Rows().Where(r => Below(r, new AndCondition(new PropertyCondition(AutomationElement.NameProperty, "Callsign"),
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Edit))).Any(c => c.Text() == "CAO100"))
+            .Select(r => Below(r, new AndCondition(new PropertyCondition(AutomationElement.NameProperty, Choose), new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button))).FirstOrDefault())
+            .FirstOrDefault(b => b != null), "the fleet button of route CAO100");
+        void ToggleSpare(string after)
+        {
+            FleetButton().Invoke();
+            app.Wait(() => app.FindAll(new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.CheckBox))
+                .FirstOrDefault(c => c.Current.Name.StartsWith(Spare, StringComparison.Ordinal)), "fleet 6 in the picker").Toggle();
+            app.DialogPrimary(Apply).Invoke();
+            app.DialogClosed();
+            app.Until(() => Fleets() == after, $"the route's fleets become {after}");
+        }
+        // The hint the pointer brings up on the route's fleet cell, or null when none comes within the limit.
+        // Injected pointer moves reach the table only once the window has had a real click (a run with UI Automation
+        // invokes alone saw no pointer events at all): the status bar is clicked first, which also moves the pointer off
+        // the table, then the pointer rests on the cell. Retried every 1.5 s, as a person would move the mouse again.
+        string? Hint(TimeSpan limit)
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            while (clock.Elapsed < limit)
+            {
+                app.Foreground();
+                app.HoverOn(FleetButton(), "the route's fleet cell", away: false);
+                if (Poll(() => OpenToolTip() is { } tip && tip.Contains(Marker, StringComparison.Ordinal) ? tip : null, TimeSpan.FromSeconds(1.5)) is { } shown)
+                    return shown;
+            }
+            return null;
+        }
+        var quiet = TimeSpan.FromSeconds(3); // six times the hint's delay
+
+        app.Context = () => $"route fleets {Fleets()} | model hint '{ModelHint()}' | open tooltip '{OpenToolTip()}' | {app.LastClick}";
+        app.Until(() => Fleets() == "4,6", "the seeded draft");
+        app.Until(() => ModelHint() == Expected, "the seeded draft's cell names fleet 6");
+        ToggleSpare("4");
+        app.Until(() => ModelHint() is null, "no hint once every fleet is approved");
+        Assert.Null(Hint(quiet));
+        ToggleSpare("4,6");
+        app.Until(() => ModelHint() == Expected, "the cell names fleet 6 again");
+        var shown = Hint(DefaultWait);
+        Assert.True(shown == Expected, $"The hovered fleet cell shows tooltip '{shown}' instead of the hint; {app.Context!()}");
+        ToggleSpare("4");
+        app.Until(() => ModelHint() is null, "no hint again");
+        Assert.Null(Hint(quiet));
+        app.Close();
+
+        NoWrites(remote, before);
+        Assert.Equal("4", Stored(app.DataDirectory).Resources[ResourceKind.Routes].Draft.Single(r => r.Identity?.RemoteId == "10").Get("Fleet IDs"));
+    }
+
     // 5.2 E5: the data menu refreshes only the page's resource and what it refers to.
     [WindowFact]
     public void The_data_menu_refreshes_only_the_routes_with_their_airports_and_fleets()

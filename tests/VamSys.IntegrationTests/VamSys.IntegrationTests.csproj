@@ -27,5 +27,5 @@
     </ItemGroup>
     <Copy SourceFiles="@(ProcessChildFile)" DestinationFiles="@(ProcessChildFile->'$(OutDir)ProcessChild/%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
-  <ItemGroup><None Update="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+  <ItemGroup><None Update="Fixtures/**/*.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
 </Project>

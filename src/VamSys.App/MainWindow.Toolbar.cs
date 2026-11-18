@@ -12,8 +12,9 @@ namespace VamSys.App;
 // resource is chosen with tabs that carry each resource's number of pending changes.
 public sealed partial class MainWindow
 {
-    // Columns hidden from the view menu, per resource, for this run of the program.
-    readonly Dictionary<ResourceKind, HashSet<string>> hiddenColumns = [];
+    // Columns hidden from the view menu, per resource, kept in the user's settings across runs.
+    HiddenColumnsPreference? hiddenColumnsPreference;
+    HiddenColumnsPreference HiddenColumns => hiddenColumnsPreference ??= new(settings);
     // The commands and the selection they need ("active", "deleted", "delete"), and whether they apply here.
     readonly List<(Control Item, string? Tag, Func<bool> Applies)> menuCommands = [];
     Grid? dataActions;
@@ -140,33 +141,31 @@ public sealed partial class MainWindow
             menu.Items.Add(Density("DensityCompact", "compact"));
             menu.Items.Add(new MenuFlyoutSeparator());
             var columns = new MenuFlyoutSubItem { Text = L("TableColumns") };
-            var hidden = hiddenColumns.TryGetValue(resource, out var set) ? set : [];
-            var fixedColumns = new[] { "_delete", Schemas.All[resource].Key };
-            foreach (var column in AllColumns().Where(c => !fixedColumns.Contains(c)))
+            var tableColumns = AllColumns();
+            var hidden = HiddenColumns.Hidden(resource, tableColumns);
+            var fixedColumns = HiddenColumnsPreference.Fixed(resource);
+            foreach (var column in tableColumns.Where(c => !fixedColumns.Contains(c)))
             {
                 var item = new ToggleMenuFlyoutItem { Text = ApiOperationPolicy.FieldLabel(column, localization), IsChecked = !hidden.Contains(column) };
-                item.Click += (_, _) => ShowColumn(column, item.IsChecked);
+                item.Click += async (_, _) => await UserAction(() => ShowColumns(() => HiddenColumns.Show(resource, column, item.IsChecked, AllColumns())));
                 columns.Items.Add(item);
             }
             columns.Items.Add(new MenuFlyoutSeparator());
             var all = new MenuFlyoutItem { Text = L("TableColumnsAll"), IsEnabled = hidden.Count > 0 };
-            all.Click += (_, _) => { hiddenColumns.Remove(resource); ShowDataPageRows(false); };
+            all.Click += async (_, _) => await UserAction(() => ShowColumns(() => HiddenColumns.ShowAll(resource, AllColumns())));
             columns.Items.Add(all);
             menu.Items.Add(columns);
         };
         return button;
     }
-    void ShowColumn(string column, bool shown)
+    // The change is saved first (HiddenColumnsPreference); a failed save is reported and the table stays as it was.
+    Task ShowColumns(Action change)
     {
         if (!CanEditData())
-            return;
-        if (!hiddenColumns.TryGetValue(resource, out var hidden))
-            hiddenColumns[resource] = hidden = new(StringComparer.Ordinal);
-        if (shown)
-            hidden.Remove(column);
-        else
-            hidden.Add(column);
+            return Task.CompletedTask;
+        change();
         ShowDataPageRows(false);
+        return Task.CompletedTask;
     }
 
     // --- The commands ---

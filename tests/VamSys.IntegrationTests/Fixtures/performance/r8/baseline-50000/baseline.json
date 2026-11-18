@@ -1,0 +1,516 @@
+{
+ "rows": 50000,
+ "machine": {
+  "cpu": "Intel(R) Core(TM) Ultra 9 185H",
+  "os": "Microsoft Windows NT 10.0.26300.0",
+  "logicalProcessors": 22
+ },
+ "startup": [
+  {
+   "launch": 0,
+   "startup": {
+    "constructedMilliseconds": 1915.7838,
+    "firstFrameMilliseconds": 2119.1062,
+    "page": "workspace",
+    "routes": 50000
+   },
+   "memory": {
+    "page": "workspace",
+    "managedBytes": 249547840,
+    "heapBytes": 260409672,
+    "committedBytes": 262795264,
+    "workingSetBeforeCollect": 471867392,
+    "workingSetBytes": 470917120,
+    "privateBytes": 372056064
+   }
+  },
+  {
+   "launch": 1,
+   "startup": {
+    "constructedMilliseconds": 1893.4961,
+    "firstFrameMilliseconds": 2098.866,
+    "page": "workspace",
+    "routes": 50000
+   },
+   "memory": {
+    "page": "workspace",
+    "managedBytes": 249526976,
+    "heapBytes": 260351496,
+    "committedBytes": 262795264,
+    "workingSetBeforeCollect": 470175744,
+    "workingSetBytes": 469512192,
+    "privateBytes": 371261440
+   }
+  },
+  {
+   "launch": 2,
+   "startup": {
+    "constructedMilliseconds": 1877.2612,
+    "firstFrameMilliseconds": 2083.8769,
+    "page": "workspace",
+    "routes": 50000
+   },
+   "memory": {
+    "page": "workspace",
+    "managedBytes": 249527040,
+    "heapBytes": 260342272,
+    "committedBytes": 262803456,
+    "workingSetBeforeCollect": 470409216,
+    "workingSetBytes": 469618688,
+    "privateBytes": 370868224
+   }
+  },
+  {
+   "launch": 3,
+   "startup": {
+    "constructedMilliseconds": 1832.3047,
+    "firstFrameMilliseconds": 2036.3566,
+    "page": "workspace",
+    "routes": 50000
+   },
+   "memory": {
+    "page": "workspace",
+    "managedBytes": 249527136,
+    "heapBytes": 260395136,
+    "committedBytes": 262766592,
+    "workingSetBeforeCollect": 472219648,
+    "workingSetBytes": 471392256,
+    "privateBytes": 372776960
+   }
+  },
+  {
+   "launch": 4,
+   "startup": {
+    "constructedMilliseconds": 1849.2917,
+    "firstFrameMilliseconds": 2048.5398,
+    "page": "workspace",
+    "routes": 50000
+   },
+   "memory": {
+    "page": "workspace",
+    "managedBytes": 249529456,
+    "heapBytes": 260355624,
+    "committedBytes": 262799360,
+    "workingSetBeforeCollect": 470863872,
+    "workingSetBytes": 470069248,
+    "privateBytes": 372301824
+   }
+  }
+ ],
+ "workspaceLoad": [
+  {
+   "samples": [
+    950.9935,
+    776.7789,
+    993.3205
+   ],
+   "allocatedBytes": [
+    638193984,
+    638193800,
+    638193840
+   ]
+  },
+  {
+   "samples": [
+    919.0561,
+    768.2753,
+    1039.8258
+   ],
+   "allocatedBytes": [
+    638193888,
+    638193800,
+    638194600
+   ]
+  },
+  {
+   "samples": [
+    947.5736,
+    725.3744,
+    1002.4935
+   ],
+   "allocatedBytes": [
+    638193984,
+    638193800,
+    638194032
+   ]
+  },
+  {
+   "samples": [
+    956.283,
+    800.6943,
+    1001.5046
+   ],
+   "allocatedBytes": [
+    638193888,
+    638193800,
+    638193944
+   ]
+  },
+  {
+   "samples": [
+    923.1994,
+    764.1984,
+    998.4172
+   ],
+   "allocatedBytes": [
+    638193880,
+    638193800,
+    638193928
+   ]
+  }
+ ],
+ "dataOpen": {
+  "milliseconds": 331.7236
+ },
+ "scroll": {
+  "page200": {
+   "step": 120,
+   "scrollableHeight": 7749.999847412109,
+   "scrollableWidth": 2914.6666870117188,
+   "down": {
+    "frames": 65,
+    "durationMilliseconds": 1175.5591,
+    "minimum": 2.6381,
+    "median": 16.6724,
+    "p95": 19.0267,
+    "max": 135.6348,
+    "over17": 22,
+    "over33": 1,
+    "over50": 1,
+    "gen0": 1,
+    "gen2": 1
+   },
+   "up": {
+    "frames": 65,
+    "durationMilliseconds": 1004.1614,
+    "minimum": 4.1143,
+    "median": 16.6654,
+    "p95": 16.8982,
+    "max": 20.7979,
+    "over17": 18,
+    "over33": 0,
+    "over50": 0,
+    "gen0": 0,
+    "gen2": 0
+   },
+   "downAgain": {
+    "frames": 65,
+    "durationMilliseconds": 1020.7331,
+    "minimum": 4.0942,
+    "median": 16.6573,
+    "p95": 16.7969,
+    "max": 44.5039,
+    "over17": 18,
+    "over33": 1,
+    "over50": 0,
+    "gen0": 1,
+    "gen2": 0
+   },
+   "right": {
+    "frames": 25,
+    "durationMilliseconds": 100.0955,
+    "minimum": 3.092,
+    "median": 4.1829,
+    "p95": 5.0155,
+    "max": 5.2029,
+    "over17": 0,
+    "over33": 0,
+    "over50": 0,
+    "gen0": 0,
+    "gen2": 0
+   },
+   "left": {
+    "frames": 25,
+    "durationMilliseconds": 100.0071,
+    "minimum": 3.3771,
+    "median": 4.1661,
+    "p95": 4.2575,
+    "max": 4.9684,
+    "over17": 0,
+    "over33": 0,
+    "over50": 0,
+    "gen0": 0,
+    "gen2": 0
+   }
+  },
+  "page500": {
+   "step": 120,
+   "scrollableHeight": 19749.99935913086,
+   "scrollableWidth": 2914.6666870117188,
+   "down": {
+    "frames": 165,
+    "durationMilliseconds": 2876.7036,
+    "minimum": 2.6256,
+    "median": 16.6672,
+    "p95": 17.7275,
+    "max": 142.7696,
+    "over17": 51,
+    "over33": 3,
+    "over50": 1,
+    "gen0": 3,
+    "gen2": 1
+   },
+   "up": {
+    "frames": 165,
+    "durationMilliseconds": 2737.463,
+    "minimum": 4.1051,
+    "median": 16.6675,
+    "p95": 16.8419,
+    "max": 52.8379,
+    "over17": 45,
+    "over33": 2,
+    "over50": 1,
+    "gen0": 2,
+    "gen2": 0
+   },
+   "downAgain": {
+    "frames": 165,
+    "durationMilliseconds": 2749.9678,
+    "minimum": 4.0661,
+    "median": 16.6621,
+    "p95": 16.7932,
+    "max": 129.8377,
+    "over17": 34,
+    "over33": 3,
+    "over50": 1,
+    "gen0": 3,
+    "gen2": 1
+   },
+   "right": {
+    "frames": 25,
+    "durationMilliseconds": 99.8087,
+    "minimum": 3.4185,
+    "median": 4.1624,
+    "p95": 4.288,
+    "max": 4.813,
+    "over17": 0,
+    "over33": 0,
+    "over50": 0,
+    "gen0": 0,
+    "gen2": 0
+   },
+   "left": {
+    "frames": 25,
+    "durationMilliseconds": 100.0506,
+    "minimum": 4.0609,
+    "median": 4.1705,
+    "p95": 4.2809,
+    "max": 4.2851,
+    "over17": 0,
+    "over33": 0,
+    "over50": 0,
+    "gen0": 0,
+    "gen2": 0
+   }
+  }
+ },
+ "workspaceSwitch": [
+  {
+   "awayMilliseconds": 26.3566,
+   "backMilliseconds": 1122.8782
+  },
+  {
+   "awayMilliseconds": 10.2364,
+   "backMilliseconds": 899.4037
+  },
+  {
+   "awayMilliseconds": 6.4805,
+   "backMilliseconds": 1258.073
+  },
+  {
+   "awayMilliseconds": 9.7475,
+   "backMilliseconds": 1127.9331
+  },
+  {
+   "awayMilliseconds": 7.5652,
+   "backMilliseconds": 1213.4276
+  }
+ ],
+ "review": [
+  {
+   "changed": 1000,
+   "entries": 1000,
+   "rows": 1001,
+   "current": true,
+   "planMilliseconds": [
+    310.2026,
+    235.9164,
+    202.9697
+   ],
+   "contentKeyMilliseconds": [
+    5.2562,
+    2.2068,
+    2.067
+   ],
+   "renderMilliseconds": [
+    362.3493,
+    226.7163,
+    210.5147
+   ],
+   "renderStallMilliseconds": [
+    50.3478,
+    20.2521,
+    18.6352
+   ],
+   "submitCheckMilliseconds": [
+    433.1008,
+    212.6016,
+    331.0686
+   ],
+   "submitCheckStallMilliseconds": [
+    159.2972,
+    25.3884,
+    123.2473
+   ],
+   "submitCheckGcPauseMilliseconds": [
+    164.446,
+    37.35,
+    152.783
+   ],
+   "submitCheckAllocatedBytes": [
+    58995848,
+    58986360,
+    58986432
+   ]
+  },
+  {
+   "changed": 10000,
+   "entries": 10000,
+   "rows": 10001,
+   "current": true,
+   "planMilliseconds": [
+    233.2789,
+    227.4375,
+    215.6053
+   ],
+   "contentKeyMilliseconds": [
+    20.8198,
+    20.6304,
+    23.8425
+   ],
+   "renderMilliseconds": [
+    269.2971,
+    242.2009,
+    235.8059
+   ],
+   "renderStallMilliseconds": [
+    36.9174,
+    22.1608,
+    19.1233
+   ],
+   "submitCheckMilliseconds": [
+    243.381,
+    242.8112,
+    355.119
+   ],
+   "submitCheckStallMilliseconds": [
+    17.687,
+    22.8565,
+    136.8603
+   ],
+   "submitCheckGcPauseMilliseconds": [
+    41.182,
+    39.045,
+    151.828
+   ],
+   "submitCheckAllocatedBytes": [
+    70319216,
+    70324336,
+    70320976
+   ]
+  },
+  {
+   "changed": 50000,
+   "entries": 50000,
+   "rows": 50001,
+   "current": true,
+   "planMilliseconds": [
+    328.5244,
+    305.5594,
+    340.3404
+   ],
+   "contentKeyMilliseconds": [
+    99.651,
+    109.7997,
+    100.4484
+   ],
+   "renderMilliseconds": [
+    413.8171,
+    346.4543,
+    431.2724
+   ],
+   "renderStallMilliseconds": [
+    39.6793,
+    21.9357,
+    201.914
+   ],
+   "submitCheckMilliseconds": [
+    412.024,
+    398.5106,
+    553.4664
+   ],
+   "submitCheckStallMilliseconds": [
+    25.4935,
+    25.9764,
+    171.3555
+   ],
+   "submitCheckGcPauseMilliseconds": [
+    100.117,
+    84.664,
+    256.482
+   ],
+   "submitCheckAllocatedBytes": [
+    120404904,
+    120415312,
+    120405144
+   ]
+  }
+ ],
+ "memory": {
+  "start": {
+   "page": "workspace",
+   "managedBytes": 249376920,
+   "heapBytes": 260041032,
+   "committedBytes": 262668288,
+   "workingSetBeforeCollect": 443084800,
+   "workingSetBytes": 437166080,
+   "privateBytes": 349224960
+  },
+  "dataPage": {
+   "page": "data",
+   "managedBytes": 258624600,
+   "heapBytes": 271553480,
+   "committedBytes": 272146432,
+   "workingSetBeforeCollect": 506388480,
+   "workingSetBytes": 510406656,
+   "privateBytes": 412135424
+  },
+  "afterScroll": {
+   "page": "data",
+   "managedBytes": 265895352,
+   "heapBytes": 293093768,
+   "committedBytes": 310042624,
+   "workingSetBeforeCollect": 714420224,
+   "workingSetBytes": 713568256,
+   "privateBytes": 619376640
+  },
+  "afterSwitch": {
+   "page": "data",
+   "managedBytes": 269021200,
+   "heapBytes": 293836800,
+   "committedBytes": 295403520,
+   "workingSetBeforeCollect": 721408000,
+   "workingSetBytes": 710774784,
+   "privateBytes": 622059520
+  },
+  "review": {
+   "page": "review",
+   "managedBytes": 352377640,
+   "heapBytes": 414093272,
+   "committedBytes": 614793216,
+   "workingSetBeforeCollect": 1050353664,
+   "workingSetBytes": 1043505152,
+   "privateBytes": 951541760
+  }
+ }
+}

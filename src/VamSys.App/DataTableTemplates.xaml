@@ -17,10 +17,17 @@
     </local:EditableCell>
   </DataTemplate>
   <DataTemplate x:Key="FleetTemplate" x:DataType="vm:CellViewModel">
-    <Button Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind local:UiTokens.CellMargin(Compact)}" FontSize="{StaticResource BodyFontSize}" Padding="{StaticResource CellButtonPadding}" HorizontalContentAlignment="Left"
-        IsEnabled="{x:Bind IsEnabled, Mode=OneWay}" Command="{x:Bind ChooseFleet}" AutomationProperties.Name="{x:Bind FleetAutomationName, Mode=OneWay}">
-      <TextBlock Text="{x:Bind DisplayValue, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
-    </Button>
+    <!-- 2.5: a problem (such as a route's fleets that are not approved for its prefixes) outlines the button as it does a
+         text cell, and the button's tooltip shows the hint (FleetCell). -->
+    <Grid Width="{x:Bind Width}" Height="{x:Bind Height}" Margin="{x:Bind local:UiTokens.CellMargin(Compact)}">
+      <Button HorizontalAlignment="Stretch" VerticalAlignment="Stretch" FontSize="{StaticResource BodyFontSize}" Padding="{StaticResource CellButtonPadding}" HorizontalContentAlignment="Left"
+          IsEnabled="{x:Bind IsEnabled, Mode=OneWay}" Command="{x:Bind ChooseFleet}" AutomationProperties.Name="{x:Bind FleetAutomationName, Mode=OneWay}"
+          ToolTipService.ToolTip="{x:Bind Hint, Mode=OneWay}">
+        <TextBlock Text="{x:Bind DisplayValue, Mode=OneWay}" TextTrimming="CharacterEllipsis"/>
+      </Button>
+      <Border IsHitTestVisible="False" Visibility="{x:Bind local:FleetCell.IssueShown(Look), Mode=OneWay}" BorderBrush="{ThemeResource StatusErrorBrush}"
+          BorderThickness="{StaticResource CellIssueBorderThickness}" CornerRadius="{StaticResource CellCornerRadius}"/>
+    </Grid>
   </DataTemplate>
   <DataTemplate x:Key="StatusTemplate" x:DataType="vm:CellViewModel">
     <TextBlock Width="{x:Bind Width}" Margin="{x:Bind local:UiTokens.CellMargin(Compact)}" Padding="{StaticResource CellTextPadding}" FontSize="{StaticResource BodyFontSize}" VerticalAlignment="Center" Text="{x:Bind DisplayValue, Mode=OneWay}"/>

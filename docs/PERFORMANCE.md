@@ -222,6 +222,19 @@ JSON 加载中位数：1,000 行 24.9043 → 15.5515 ms，2 万行 437.2899 → 
 - 撤销历史只记录变化的行。2 万行时，新增一步的保存量约 1.5 KB；编辑单元格后的自动保存只写对应的行。
 - 在线任务结束后，会把请求量、限流等待、保存统计和各项结束状态的计数（`ItemResults`）写入数据目录的 `performance/<工作区>/<任务>/<执行>.json`，其中不包含凭据或请求内容。
 
+## 与 R0 基线自动比对（I14）
+
+门槛“比 R0 基线慢不超过 10%”由 QA 工具判定，不再手工对表。它只读已有的测量结果，不做测量；测量仍要在空闲机器上按下一节“测量方法与复现”的命令进行。
+
+~~~powershell
+./.tools/dotnet/dotnet.exe run --project tools/VamSys.QaSeed -c Release -- --compare-performance --baseline artifacts/r0-baseline --current artifacts/ui-tests --current artifacts/core-performance/current.json
+~~~
+
+- 每侧可以给多个文件或目录，目录会逐层查找。认得三种文件：数据页的 `benchmark.json`（`DataPerformanceTests`，R0 的 `data-perf-*`）、综合基线的 `baseline.json`（`BaselineMeasurements`）、核心基准的输出（`--benchmark-core`、`--benchmark-core-load`，含 `Cases`）。同一项在一侧出现两次（同一目录下有两轮结果）时不猜，按无法比对处理。
+- 比对的项与“重构前后对比（R8）”两张表相同：数据页的打开、搜索、翻页／切换语言／单格编辑 P95、带保存的撤销与重做（中位数、P95）、结束时工作集；综合基线的启动、读取工作区、离开／返回、200 和 500 行页面滚动 P95、各规模审阅的计划／渲染／提交前检查／最长停顿（各取中位数）、两项工作集；核心基准每个场景的中位数。基线不足 1 ms 的核心场景列出但不判定。
+- 逐项给出“通过”“超过 10%”“缺项”（基线有、当前没测）、“不判定”“新增”（只有当前有，不判定）。退出码：0 全部通过；1 有项超过门槛；3 没有超过但有缺项；2 无法比对（路径不存在、读不到测量、同一项两次、参数错）。`--limit` 改门槛百分比。
+- 检查本身的测试是 `IntegrationTests.Packaging.PerformanceComparisonTests`，用的是 R0 和 R8 测量的精简副本（`tests/VamSys.IntegrationTests/Fixtures/performance`）。对这两份数据，工具给出的结果与 R8 的人工比对一致：那两张表里加粗的三项超过门槛，核心基准 1 ms 以上没有一项超过；另外多出一项 **2 万行带保存的重做 P95**（8.5→10.4 ms，+22.9%），那张表没有列重做。它和 2 万行撤销 P95 一样来自尾部：20 个样本的中位数反而从 6.2 降到 4.8 ms，最慢 3 个是 8.0、8.3、10.4 ms（另有 1 个 117 ms 的离群值不进 P95）。同样不判定为退化，根因未查。
+
 ## 测量方法与复现
 
 窗口测量需要通过 `UiVerification=true` 构建 QA 版本，并使用隔离的数据目录。脚本会自行生成合成数据，只操作自己启动的进程。

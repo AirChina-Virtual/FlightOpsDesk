@@ -100,6 +100,15 @@ public sealed class FakeStorage : IWorkspaceStorage, IUserSettings
     public void SaveLanguage(string language) => Language = language;
     public string LoadTableDensity() => Density;
     public void SaveTableDensity(string density) => Density = density;
+    public readonly Dictionary<ResourceKind, List<string>> HiddenColumns = [];
+    public bool FailHiddenColumns;
+    public IReadOnlyList<string> LoadHiddenColumns(ResourceKind kind) => HiddenColumns.TryGetValue(kind, out var columns) ? columns.ToList() : [];
+    public void SaveHiddenColumns(ResourceKind kind, IReadOnlyCollection<string> columns)
+    {
+        if (FailHiddenColumns)
+            throw new IOException("injected");
+        HiddenColumns[kind] = columns.ToList();
+    }
 }
 
 public sealed class FakeTimer : IAutosaveTimer

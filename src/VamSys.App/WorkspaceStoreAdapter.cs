@@ -43,6 +43,8 @@ public sealed class WorkspaceStoreAdapter(WorkspaceStore store) : IWorkspaceStor
     public void SaveLanguage(string language) => store.SaveLanguage(language);
     public string LoadTableDensity() => store.LoadTableDensity();
     public void SaveTableDensity(string density) => store.SaveTableDensity(density);
+    public IReadOnlyList<string> LoadHiddenColumns(ResourceKind kind) => store.LoadHiddenColumns(kind);
+    public void SaveHiddenColumns(ResourceKind kind, IReadOnlyCollection<string> columns) => store.SaveHiddenColumns(kind, columns);
 }
 
 // The autosave quiet-period timer, backed by the dispatcher.

@@ -595,6 +595,52 @@ public sealed partial class AppWindow : IDisposable
     /// <summary>As <see cref="ClickOn"/>, with the right mouse button.</summary>
     public void RightClickOn(AutomationElement element, string what) => MouseClick(Target(element, what), MouseRightDown, MouseRightUp);
 
+    /// <summary>Moves the pointer onto the element's centre (waiting as <see cref="ClickOn"/> does) without clicking.</summary>
+    /// Unless <paramref name="away"/> is false, the pointer first goes 200 pixels up (or down), so the control sees a new
+    /// entry even when the pointer already rested there; that point may be on another control. Each position is followed
+    /// by a small injected move: SetCursorPos alone does not always raise pointer events in the window.
+    public void HoverOn(AutomationElement element, string what, bool away = true)
+    {
+        var (x, y) = Target(element, what);
+        if (away)
+        {
+            MoveTo(x, y - 200 > 0 ? y - 200 : y + 200);
+            Thread.Sleep(100);
+        }
+        MoveTo(x, y);
+    }
+
+    // Moves the pointer there in eight injected absolute moves from where it is, as a hand would: a jump with SetCursorPos
+    // (even followed by a one-pixel move) often raised no pointer events in the window.
+    static void MoveTo(int x, int y)
+    {
+        GetCursorPos(out var from);
+        var (width, height) = (GetSystemMetrics(0), GetSystemMetrics(1));
+        for (var step = 1; step <= 8; step++)
+        {
+            var px = from.X + (x - from.X) * step / 8;
+            var py = from.Y + (y - from.Y) * step / 8;
+            mouse_event(MouseMove | MouseAbsolute, (uint)(px * 65535L / Math.Max(1, width - 1)), (uint)(py * 65535L / Math.Max(1, height - 1)), 0, 0);
+            Thread.Sleep(15);
+        }
+        SetCursorPos(x, y);
+        Thread.Sleep(50);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct CursorPoint { public int X, Y; }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GetCursorPos(out CursorPoint point);
+
+    [LibraryImport("user32.dll")]
+    private static partial int GetSystemMetrics(int index);
+
+    /// <summary>The text of the tooltip shown anywhere on screen, or null when none is open.</summary>
+    public static string? OpenToolTip()
+        => AutomationElement.RootElement.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ToolTip))?.Current.Name;
+
     static void MouseClick((int X, int Y) point, uint down, uint up)
     {
         SetCursorPos(point.X, point.Y);
@@ -678,7 +724,7 @@ public sealed partial class AppWindow : IDisposable
         public const byte Enter = 0x0D, Escape = 0x1B, Tab = 0x09;
     }
 
-    const uint KeyUp = 0x0002, MouseLeftDown = 0x0002, MouseLeftUp = 0x0004, MouseRightDown = 0x0008, MouseRightUp = 0x0010, PrintFullContent = 2;
+    const uint KeyUp = 0x0002, MouseMove = 0x0001, MouseAbsolute = 0x8000, MouseLeftDown = 0x0002, MouseLeftUp = 0x0004, MouseRightDown = 0x0008, MouseRightUp = 0x0010, PrintFullContent = 2;
 
     const uint OwnerWindow = 4;
 
