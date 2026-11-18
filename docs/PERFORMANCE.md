@@ -103,7 +103,7 @@
 
 ## R6 数据表新旧控件对比（2026-10-29）
 
-`scripts/measure-datagrid-ab.ps1` 在同一台机器上交替运行旧表格与 `DataGrid` 控件各 3 轮（旧新、新旧、旧新）：每轮 `test-data-performance-ui -Rows 50000`、`-Rows 20000`，以及 `test-baseline-ui -Rows 50000 -Launches 1`。5 万行中位数：打开 454／344 ms，搜索 224／222 ms，翻页 7.83／6.75 ms，单格编辑 0.57／0.62 ms，撤销 5.37／4.97 ms，滚动每帧 16.75／16.81 ms；原生内存增长 274／271 MiB。各项都满足"不慢于旧控件 10%"的门槛。打开时间按次分成约 310–345 ms 与 420–460 ms 两簇，原因未查明，因此不作提速结论。逐项解读见 [R6-DATAGRID.md](R6-DATAGRID.md)；原始结果在 `archive/2026-11-03-r8/measurements.zip` 的 `artifacts/r6-d3/`。D4 删除旧表格时一并删除了该脚本（git 历史中可找回）。
+`scripts/measure-datagrid-ab.ps1` 在同一台机器上交替运行旧表格与 `DataGrid` 控件各 3 轮（旧新、新旧、旧新）：每轮 `test-data-performance-ui -Rows 50000`、`-Rows 20000`，以及 `test-baseline-ui -Rows 50000 -Launches 1`。5 万行中位数：打开 454／344 ms，搜索 224／222 ms，翻页 7.83／6.75 ms，单格编辑 0.57／0.62 ms，撤销 5.37／4.97 ms，滚动每帧 16.75／16.81 ms；原生内存增长 274／271 MiB。各项都满足"不慢于旧控件 10%"的门槛。打开时间按次分成约 310–345 ms 与 420–460 ms 两簇，原因未查明，因此不作提速结论。逐项解读见 [R6-DATAGRID.md](history/R6-DATAGRID.md)；原始结果在 `archive/2026-11-03-r8/measurements.zip` 的 `artifacts/r6-d3/`。D4 删除旧表格时一并删除了该脚本（git 历史中可找回）。
 
 ## R2 收尾验收（2026-10-22，未通过）
 

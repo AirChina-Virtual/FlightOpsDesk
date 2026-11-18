@@ -40,8 +40,7 @@ try {
     Copy-Item $readme (Join-Path $staging 'README.md')
     New-Item -ItemType Directory -Force (Join-Path $staging 'docs'), (Join-Path $staging 'examples') | Out-Null
     Copy-Item docs/STORAGE-MIGRATION.md (Join-Path $staging 'docs/STORAGE-MIGRATION.md')
-    $guide = [IO.File]::ReadAllText((Join-Path $repo 'docs/USER-GUIDE.md')).Replace('[性能报告与复现方式](PERFORMANCE.md)', '项目源码中的 docs/PERFORMANCE.md')
-    [IO.File]::WriteAllText((Join-Path $staging 'docs/USER-GUIDE.md'), $guide, [Text.UTF8Encoding]::new($false))
+    Copy-Item docs/USER-GUIDE.md (Join-Path $staging 'docs/USER-GUIDE.md')
     Copy-Item examples/*.csv (Join-Path $staging 'examples')
     $check = if ($UiVerification) { '--verify-qa-package' } else { '--verify-package' }
     & $sdk run --no-build --project tools/VamSys.QaSeed/VamSys.QaSeed.csproj -c Release -- $check $staging

@@ -1,42 +1,58 @@
 # 文档导航
 
-## 使用或升级程序
+## 使用程序
 
 | 文档 | 内容 |
 |---|---|
-| [使用指南](USER-GUIDE.md) | 怎样连接、编辑、审阅、提交、处理冲突和恢复任务，以及数据保存在哪里 |
-| [升级与恢复说明](STORAGE-MIGRATION.md) | 旧数据怎样升级，备份怎样生成，以及为什么不能随意换回旧备份 |
-| [名称和图标说明](BRANDING.md) | 软件名称、图标文件的位置，以及旧工作区是否还能使用 |
-
-## 了解实现和测试
-
-| 文档 | 内容 |
-|---|---|
-| [API 支持情况](API-CONTRACTS.md) | 程序依据哪些官方文档，支持哪些操作，还有哪些操作未开放 |
-| [能力验证矩阵](CAPABILITY-MATRIX.md) | 分别登记契约、独立真实 API、软件模拟与软件真实流程证据 |
-| [已验证 API 开放范围](VERIFIED-API-SCOPE.md) | 固定证据基线的字段／类型范围、飞机移动、软删除与历史只读核对 |
-| [测试报告](TEST-REPORT.md) | 当前检查了什么、结果如何，以及还有哪些没有验证 |
-| [回归清单](REGRESSION-LEDGER.md) | 每个已修复问题对应的测试，以及回植检查 |
-| [速度与资源占用报告](PERFORMANCE.md) | 大量数据下的处理时间、滚动帧、内存占用和测量方法 |
-| [代码优化计划](OPTIMIZATION-PLAN.md) | 优化时必须遵守的要求、已完成的优化和后续方向 |
-| [彻底重构计划](REFACTOR-PLAN-2026-10-20.md) | R0 至 R8 的目标、边界、阶段进度和验收记录 |
-| [综合优化计划（2026-11-08）](IMPROVEMENT-PLAN-2026-11-08.md) | 提交后自动核对、提交前拦截、审阅流程和在线验收的分阶段计划，当前执行顺序以此为准 |
-| [审查与优化问题清单](REVIEW-AND-PLAN-2026-10-20.md) | A 至 G 问题编号、行为修复和待决定事项 |
-| [中英文维护说明](LOCALIZATION.md) | 怎样添加提示文字，以及切换语言时需要注意什么 |
+| [使用指南](USER-GUIDE.md) | 连接、读取、编辑、审阅、提交、任务核对、本地数据；随正式包附带 |
+| [升级与恢复](STORAGE-MIGRATION.md) | 旧数据怎样升级、备份怎样生成，以及为什么不能随意换回旧备份；随正式包附带 |
+| [名称和图标](BRANDING.md) | 软件名称、图标文件，以及旧工作区是否还能用 |
 | [更新日志](../CHANGELOG.md) | 各次更新的主要变化 |
-| [历史记录](history/) | 此前各轮的测试报告、性能报告、优化计划，以及 R2 验收的五份性能对照 CSV；原文保存 |
 
-contracts 目录保存官方 API 文档的副本。报告中的“本地测试通过”“窗口检查通过”和“真实账号测试通过”是不同的结果：模拟测试通过，不表示已经在真实航空公司环境中验证。
+## 参考资料（随代码更新）
 
-报告中提到的 artifacts 路径，有些对应的原始文件已压缩到本机 archive 目录，可以按各归档目录中的清单查找，详见 [本地产物与归档](../README.md#本地产物与归档)。
+| 文档 | 内容 |
+|---|---|
+| [架构速览](ARCHITECTURE.md) | 项目分层、依赖方向、文件放在哪里、改动时容易踩的坑 |
+| [API 支持情况](API-CONTRACTS.md) | 依据哪份官方契约、支持哪些操作、哪些仍禁用 |
+| [能力验证矩阵](CAPABILITY-MATRIX.md) | 每项能力的契约、独立真实 API、模拟回归和软件真实写入证据，以及各次真实验收的记录 |
+| [已验证 API 开放范围](VERIFIED-API-SCOPE.md) | 解除首次样本限制的字段和类型、服务器改写的等价规则、软删除核对 |
+| [代码优化要求](OPTIMIZATION-PLAN.md) | 任何优化都不能违反的规则、明确不做的优化、已完成的优化和后续方向（阶段 7） |
+| [中英文维护](LOCALIZATION.md) | 怎样添加提示文字，切换语言时要注意什么 |
+
+## 测试与性能
+
+| 文档 | 内容 |
+|---|---|
+| [测试报告](TEST-REPORT.md) | 各轮检查了什么、结果如何、还有什么没验证 |
+| [需求覆盖矩阵](TEST-COVERAGE.md) | 每条需求由哪些测试覆盖（由清单测试核对） |
+| [回归清单](REGRESSION-LEDGER.md) | 每个已修复的问题对应的测试，以及回植检查 |
+| [速度与资源占用](PERFORMANCE.md) | 大数据量下的耗时、滚动帧、内存，测量和自动比对的方法 |
+
+“本地测试通过”“窗口测试通过”“真实账号测试通过”是不同层次的结果：模拟服务器上通过，不代表已经在真实航空公司环境中验证。`contracts` 目录保存官方 API 契约的固定副本。
 
 ## 修改代码
 
-每个项目都有单独的说明，包括文件分工、处理步骤和运行方法：
+各项目的 README 说明文件分工、处理步骤和运行方法：
 
-- [App：程序界面](../src/VamSys.App/README.md)：窗口、数据表格、审阅、任务进度、关闭保存和图标。
-- [Domain：数据处理规则](../src/VamSys.Domain/README.md)：字段规格、判断修改、撤销历史、CSV、分配机型和检查删除。
-- [Application：端口与应用编排](../src/VamSys.Application/README.md)：通用执行、检查点、待保存编辑和安全关闭；R4 的会话与用例服务仍待实现。
-- [Infrastructure：服务器通信](../src/VamSys.Infrastructure/README.md)：发送 API 请求、查重和中断后恢复。
-- [Storage：本地数据库](../src/VamSys.Storage/README.md)：保存数据、读取、旧格式升级和备份。
-- [测试说明](../tests/README.md)：运行命令、各测试项目的用途、窗口脚本、QA 工具与基准。
+- [Domain：业务规则](../src/VamSys.Domain/README.md)
+- [Application：会话、用例与端口](../src/VamSys.Application/README.md)
+- [Storage：本地数据库](../src/VamSys.Storage/README.md)
+- [Infrastructure：服务器通信](../src/VamSys.Infrastructure/README.md)
+- [App：程序界面](../src/VamSys.App/README.md)
+- [测试说明](../tests/README.md)、[窗口测试](../tests/VamSys.UiTests/README.md)、[QaSeed 工具](../tools/VamSys.QaSeed/README.md)
+
+## 历史记录
+
+[history](history/) 保存已完成的计划和旧报告，原文保留，只修正了链接：
+
+| 文档 | 内容 |
+|---|---|
+| [彻底重构计划](history/REFACTOR-PLAN-2026-10-20.md) | R0–R8 的目标、不变规则、阶段进度和验收（已完成） |
+| [审查与优化问题清单](history/REVIEW-AND-PLAN-2026-10-20.md) | A–G 问题编号与修复（已完成） |
+| [综合优化计划](history/IMPROVEMENT-PLAN-2026-11-08.md) | 阶段 0–7、决定事项 D1–D11；阶段 0–6 已完成，阶段 7 待测量 |
+| [数据表重写记录](history/R6-DATAGRID.md) | R6 新旧表格控件的对比与切换 |
+| [软件真实流程验收清单](history/ACCEPTANCE-4.2.md) | 4.2 验收的操作步骤（结果见能力验证矩阵） |
+| 其余文件 | 2026-10-19 以前的测试报告、性能报告、优化计划，以及 R2 的性能对照 CSV |
+
+`agent-briefs` 是重构期间给子代理的任务说明，作为记录保留，其中的委派规则已不再适用。报告中提到的 artifacts 路径，原始文件可能已压缩到本机 archive 目录，见 [本地产物与归档](../README.md#本地产物与归档)。
