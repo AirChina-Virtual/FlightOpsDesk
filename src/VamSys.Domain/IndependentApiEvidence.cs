@@ -6,6 +6,11 @@ public static class IndependentApiEvidence
 {
     public const string ContractHash = "1EC1A869FC3C6F4D70A7A6ECD50170D5D915551794E796F9F34D5AFB944D78C2";
     public const string EvidenceId = "vcca-isolated-20261020";
+    // G8 (plan 6.2 / 6.3): DELETE 204 then GET 404 for these route types was seen live in the write evidence
+    // (artifacts/write-evidence/report.json, run FODESK-WE 20261118T001624Z, G8_softDelete). Only their deletes are covered;
+    // creates and updates of these types keep the sampling limit. scheduled and jumpseat are covered by EvidenceId.
+    public const string WriteEvidenceRun = "FODESK-WE 20261118T001624Z";
+    public static readonly IReadOnlyList<string> SoftDeleteRouteTypes = ["cargo", "charter", "training", "vfr", "repositioning"];
     public static bool IsMove(ChangeItem item) => item.Resource == ResourceKind.Aircraft && item.Kind == ChangeKind.Update && item.Fields.ContainsKey("Fleet ID");
     public static bool IsSoftDelete(ChangeItem item) => item.Kind == ChangeKind.Delete && item.Resource is ResourceKind.Airports or ResourceKind.Routes;
     public static bool CanCheckDeletion(ChangeItem item) => IsSoftDelete(item) && item.State is ItemState.Unknown or ItemState.ManuallyConfirmed;
@@ -18,7 +23,7 @@ public static class IndependentApiEvidence
             return false;
         var type = (item.Before ?? item.After).Get("Type");
         if (item.Resource == ResourceKind.Routes && type is not ("scheduled" or "jumpseat"))
-            return false;
+            return item.Kind == ChangeKind.Delete && SoftDeleteRouteTypes.Contains(type);
         if (item.Resource == ResourceKind.Fleets && item.Kind == ChangeKind.Create && item.After.Get("Type (pax/cargo/...)") is not ("pax-cargo" or "cargo"))
             return false;
         if (item.Kind == ChangeKind.Delete)

@@ -124,7 +124,7 @@ public static class ReadOnlyVerification
         return 0;
     }
 
-    static (string, string) Prompt()
+    internal static (string, string) Prompt()
     {
         var id = Environment.GetEnvironmentVariable("VAMSYS_CLIENT_ID");
         var secret = Environment.GetEnvironmentVariable("VAMSYS_CLIENT_SECRET");
@@ -148,7 +148,7 @@ public static class ReadOnlyVerification
         return (id, secret);
     }
 
-    static TokenProvider Tokens(HttpClient client, Uri tokenUri, string clientId, string secret, string? scope) => new(async ct =>
+    internal static TokenProvider Tokens(HttpClient client, Uri tokenUri, string clientId, string secret, string? scope) => new(async ct =>
     {
         var (status, token, _) = await RequestTokenAsync(client, tokenUri, clientId, secret, scope, ct);
         return token ?? throw new InvalidOperationException($"Token request with scope '{scope}' failed: HTTP {(int)status}.");

@@ -27,11 +27,40 @@
 
 ## 软删除与历史任务的只读核对
 
-机场、scheduled 和 jumpseat 航线只在以下证据同时成立时自动成功：原始 DELETE 返回 204、对应唯一步骤已保存为 ResponseReceived、VA 与远端 ID 一致，随后同一路径 GET 返回 404，且请求时间对应。任务显示“API 已核对不可见”，不宣称物理删除。
+机场和所有类型的航线（scheduled、jumpseat；2026-11-18 起另有 cargo、charter、training、vfr、repositioning，只限删除）只在以下证据同时成立时自动成功：原始 DELETE 返回 204、对应唯一步骤已保存为 ResponseReceived、VA 与远端 ID 一致，随后同一路径 GET 返回 404，且请求时间对应。任务显示“API 已核对不可见”，不宣称物理删除。
 
 任务中心的“API 只读核对删除”仅处理 Unknown 或人工确认的软删除项，只发 GET；同任务内的 Pending 项不执行。原先人工确认的任务可以补充 API 证据，并保留 `WasManuallyConfirmed` 来源。缺原始回执、GET 200、权限错误或临时读取失败时不改成成功，也不重发 DELETE。人工确认和 API 核对均在持久化成功后才更新内存。
 
 升级、连接和解锁不会自动运行已有任务，也不会自动改写人工确认记录。工作区能力标记只由软件本次实际回读成功登记；外部基线只改变审阅放行范围。
+
+## 2026-11-18 写入取证
+
+用户于 2026-11-18 00:16–00:20 UTC 用 `VamSys.QaSeed --write-evidence` 对真实 vCCA 运行一次（运行标记 `FODESK-WE 20261118T001624Z`，153 次请求，自建 9 条记录全部清理），报告为 `artifacts/write-evidence/report.json`。
+
+**回读等价规则（G4）。** 写后回读只对下列字段接受对应改写，规则登记在 `ServerNormalisation`，每条注明报告条目；其余字段和其余改写仍严格比对，不一致保持“结果未知”。
+
+| 改写 | 字段 | 报告条目 |
+|---|---|---|
+| 去首尾空格 | 机队 name、飞机 name、registration、航路 remarks、航线 remarks | `trim-padding` |
+| 转大写 | 机队 code、飞机 registration、selcal、hexcode、航线 callsign、flight_number | `lowercase` |
+| 数字字符串→数字 | 机队 max_pax、max_cargo，飞机 passengers、cargo，航线 altitude | `number-as-string` |
+| 空字符串→null | 飞机 fin_number，航路 remarks，航线 remarks | `empty-string` |
+| 星期名小写（并按周一到周日排序） | 航路 days_of_operation，航线 service_days | `case`、`array-order` |
+| `HH:MM`→`HH:MM:00` | 航线 departure_time | `time-without-seconds` |
+| 只写日期→当日 00:00 UTC | 航线 start_date | `date-only` |
+| 丢弃毫秒 | 航线 end_date | `date-fraction` |
+
+以下情况本来就相等，不需要规则：`130.0`→`130`；数组中的字符串 ID→数字（航线 fleet_ids、机队 parameter_ids，原有按 ID 集合比对）；`Z`→`+00:00`；cost_index 的 `auto`、`050` 原样保存；tag 不排序、不去重；机队 name 不改大小写、内部连续空格保留。
+
+不放宽的：
+- 带非 UTC 偏移的日期，服务器丢掉偏移、保留墙上时间（`08:00+08:00` 存成 `08:00+00:00`），这是另一个时刻。程序发送日期一律为 `+00:00`（本地时间的航线不能在线提交），不会遇到；遇到时仍判不一致。
+- 被 422 拒收的：`H:MM:SS` 时间、数字形式的 cost_index（只接受字符串）、去空格或小写的航路 route string。
+- 只测了一个字段的改写不推广到同类字段：arrival_time 没有 `HH:MM` 规则、end_date 没有“只写日期”规则、start_date 没有“丢弃毫秒”规则；程序本来也不会发出这些形式。
+- **飞机 Internal Remarks。** 新建时随 POST 发送，201 应答和随后的 GET 都是 `internal_remarks: null`。程序在新建飞机时会发送这一列（上表“创建”范围包含它），所以填了 Internal Remarks 的飞机新建会在两次回读后都显示不一致、标为“结果未知”，只能人工“接受服务器的值”（草稿保留填写的值并列为冲突）。这不是格式改写而是值没有保存，未登记规则。处理办法待决定，候选：（一）在线新建飞机时不发送并阻止填写 Internal Remarks，同时从上表“创建”范围移除；（二）先查明修改（PUT）能否保存它，能则改为新建后补一次 PUT。见 [综合优化计划](IMPROVEMENT-PLAN-2026-11-08.md) 6.3。
+
+**软删除（G8）。** cargo、charter、training、vfr、repositioning 航线各新建一条后 DELETE 均 204，随后 GET 均 404，与 scheduled、jumpseat 相同。这些类型的删除现在按同一套 204＋404 证据自动核对“API 已核对不可见”，审阅时不再受首次样本限制；它们的新建和修改没有新证据，仍保留样本限制。
+
+**前缀检查（2.1）。** 本次航线都用合法前缀 CCA／CA，没有测被拒情况；cargo、charter、training、vfr 的前缀检查仍是按决定 D11 阻止，尚无服务端证据。
 
 ## 证据索引与未开放边界
 
@@ -39,6 +68,7 @@
 - `flightops-api-complete/route-followup`：jumpseat CRUD 及 204／404 删除回读。呼号、班号列表筛选的失败不列为已验证能力。
 - `flightops-scheduled-9677`：新机队参数关联、scheduled 创建、Remarks／Cost Index／带秒数时刻更新、机队集合 A→AB→B→A，以及 204／404 清理闭环。参数 ID 只是该次测试样本，程序不硬编码它。
 - `flightops-weight-isolation`：省略单位的容量写入成功；显式单位和 SimBrief 的 500 仍是失败证据。
+- `artifacts/write-evidence/report.json`（运行标记 `FODESK-WE 20261118T001624Z`）：G4 回读规范化 41 项探测和 103 项新建回读，G8 五种航线类型的删除 204／404。见上节。
 
 这些材料位于本机历史证据目录，不随正式包分发。公开源码中的范围实现为 `IndependentApiEvidence`；回归直接调用实际适配器、执行器、存储和只读核对服务。173 个操作中 96 次成功的旧汇总不能泛化成完整 API 开放。
 

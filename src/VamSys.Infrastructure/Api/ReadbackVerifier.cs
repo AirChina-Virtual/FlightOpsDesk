@@ -159,14 +159,14 @@ internal sealed class ReadbackVerifier(ApiContext ctx, RequestPlanners planners)
     }
 
     // Wire values are equal when they mean the same: dates by instant, id arrays as sets (the response may use string
-    // ids where requests use integers), everything else structurally.
+    // ids where requests use integers), everything else structurally. On top of that, a field registered in
+    // ServerNormalisation also accepts the rewrites the live write evidence showed for it (G4, plan 6.3).
     static bool WireEquivalent(ResourceKind kind, string wire, JsonElement actual, JsonElement wanted)
     {
         var type = FieldSpecs.Get(kind).FindByWire(wire)?.Type ?? default;
+        var rule = ServerNormalisation.For(kind, wire);
         if (type == FieldType.Date)
-            return actual.ValueKind == JsonValueKind.String && wanted.ValueKind == JsonValueKind.String
-                && DateTimeOffset.TryParse(actual.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var a)
-                && DateTimeOffset.TryParse(wanted.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.None, out var b) && a == b;
+            return ServerNormalisation.Date(rule, actual, wanted);
         if (wanted.ValueKind == JsonValueKind.Array)
         {
             if (actual.ValueKind != JsonValueKind.Array)
@@ -174,11 +174,13 @@ internal sealed class ReadbackVerifier(ApiContext ctx, RequestPlanners planners)
             // The documented response allows string IDs, while requests require integer IDs.
             string Key(JsonElement value) => (type == FieldType.IdList || type == FieldType.ParameterIdList)
                 && long.TryParse(value.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var id)
-                ? "id:" + id.ToString(CultureInfo.InvariantCulture) : value.ValueKind == JsonValueKind.String ? "string:" + value.GetString() : value.GetRawText();
+                ? "id:" + id.ToString(CultureInfo.InvariantCulture)
+                : value.ValueKind == JsonValueKind.String ? "string:" + (rule.LowerDays ? value.GetString()!.ToLowerInvariant() : value.GetString())
+                : value.GetRawText();
             var keys = actual.EnumerateArray().Select(Key).ToArray();
             return keys.Distinct().Count() == keys.Length && wanted.EnumerateArray().Select(Key).ToHashSet().SetEquals(keys);
         }
-        return JsonElement.DeepEquals(actual, wanted);
+        return JsonElement.DeepEquals(actual, wanted) || ServerNormalisation.Scalar(rule, actual, wanted);
     }
 
     // Grid text equality: set-valued columns compare as sets of trimmed, non-empty entries, everything else as text.

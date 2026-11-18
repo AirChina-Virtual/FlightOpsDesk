@@ -11,6 +11,7 @@ net10.0 控制台程序，只提供命令行入口，供 `scripts/open-datagrid-
 | `--export-diagnostic-replay <JSON路径>` | 通过模拟 422/500 生成脱敏诊断与 SHA-256 |
 | `--check-contract <仓库目录>` | 契约漂移检查（综合优化计划 4.3），见下 |
 | `--verify-read-only <报告JSON路径>` | 对真实 vAMSYS 的只读验证（综合优化计划 5.1），见下 |
+| `--write-evidence <报告JSON路径> [--dry-run] [--max-requests N]` | 对真实 vAMSYS 的写入取证（综合优化计划 6.1 G4、6.2 G8），只处理本轮自建的记录，见下 |
 
 所有 `--seed-*` 入口在写入前都会拒绝已有文件的目录。
 
@@ -53,3 +54,26 @@ dotnet run --no-build --project tools/VamSys.QaSeed -c Release -- --verify-read-
 ~~~
 
 检查本身的测试见 `IntegrationTests.Packaging.ReadOnlyVerificationTests`（模拟服务器）。
+
+## 真实写入取证（6.1、6.2）
+
+`WriteEvidence` 由用户手动对真实 vCCA 运行一次，取得两项证据：**G4** 服务器会不会规范化写入的值（首尾空格、大小写、数字与字符串、日期与时刻格式、数组顺序与重复等），**G8** cargo、charter、training、vfr、repositioning 航线删除后是 404 还是仍能读到。结果只写进报告，产品的比对和删除核对不变（改动属于 6.3）。
+
+**流程。** ① 只读发现（只发 GET）：读航司参数、机队列表和全部航线，选一条已有的 scheduled 航线作模板，只读引用它的机队、两个机场和对应的航司参数（呼号／班号前缀），并挑出没有航线使用过的班号（从 9999 往下）；已有带 `FODESK-WE` 标记的航线或机队（以前的运行留下）只在计划里提示，不处理。② 打印完整计划：要新建的 9 条记录及其请求体、41 个探测值、每类请求次数、预计请求数和耗时。③ 输入确认词 `WRITE` 后才写入；其他任何输入都取消，不发写请求。④ G4：新建机队（对 Phoenix 隐藏，关联模板参数）、其下一架飞机、一条航路、一条 scheduled 航线，各回读一次；再逐个探测：每次 PUT 一个字段的一个值，随后 GET，记录发送值、回读值、修改前的值、是否严格相等、差异类型（`trim`、`case`、`number-string`、`date-format`、`array-order`、`empty-to-null`、`not-applied` 等，见 `Normalisation`；422 等拒绝记为 `rejected`）。⑤ G8：五种类型各新建一条航线，回读，DELETE，再 GET，记录状态码和读到的内容。⑥ 清理：按航线、航路、飞机、机队的顺序删除仍存在的自建记录，每条删除后再 GET 一次。
+
+**安全。** 新建的航线全部隐藏、60 天后才生效、带 `FODESK-WE <UTC时间>` 标记（备注和内部备注）；机队名称、飞机名称与内部备注、航路备注也带标记。一层处理器在请求发出前拒绝：确认前的任何写请求；不是计划内集合的 POST；不是本轮新建应答所给 ID 的 PUT／DELETE；超过上限的请求（默认 200 次，其中 18 次留给清理）。读请求走产品传输层（每秒最多 1 次、遵守 429／Retry-After）；写入收到 429 时按 Retry-After 等待后最多再发 2 次（服务器未处理）。新建没有得到可用应答（超时、5xx、应答无 ID）或请求未发出、401／403 时立即停止并清理；新建被 422 等拒绝只跳过这一项（飞机依赖机队）。Ctrl+C 在当前请求完成后停止并清理，再按一次放弃清理。清理不掉的记录（含“POST 已发出但没有取得 ID”的）在报告 `leftovers` 和控制台用 `!!` 醒目列出 ID、路径和标记，退出码 4。
+
+凭据读取与 `--verify-read-only` 相同（环境变量 `VAMSYS_CLIENT_ID`、`VAMSYS_CLIENT_SECRET`，否则在控制台输入，密钥不回显），凭据和令牌不写入报告。报告含发现结果、计划、每条记录的状态、`G4_createReadback`、`G4_probes`、`G4_summary`、`G8_softDelete`、`cleanup`、`leftovers`，`requests`（确认后的每个请求：方法、路径、状态码、发送的请求体、应答或错误）和 `wire`（实际发出的每个请求，含发现阶段的读取、重试和取令牌：方法、路径、状态码，不含请求体和游标值）。
+
+退出码：0 完成且全部清理（`--dry-run` 也是 0）；1 未确认；2 无法开始（发现失败、超过上限、参数错误）；3 中途停止但已全部清理；4 有记录没有清理掉。
+
+**预计请求数（vCCA）。** 服务器每页最多返回 100 条（5.1 结果），读约 3,600 条航线约 36 次，发现阶段共约 40 次；确认后 POST 9、PUT 41、DELETE 9、GET 59，共 118 次；全程约 160 次，按 5.1 实测每次约 1.1 秒，约 3 分钟。实际数以控制台打印的计划为准。
+
+~~~powershell
+# 先只看计划（只发 GET）
+dotnet run --no-build --project tools/VamSys.QaSeed -c Release -- --write-evidence artifacts/write-evidence/plan.json --dry-run
+# 真实写入（打印计划后输入 WRITE 确认）
+dotnet run --no-build --project tools/VamSys.QaSeed -c Release -- --write-evidence artifacts/write-evidence/report.json
+~~~
+
+工具本身的测试见 `IntegrationTests.Packaging.WriteEvidenceTests`（模拟服务器）：正常流程（含一次 429、服务器规范化的分类、某类航线删除后仍可读）、确认被拒、dry-run、中途传输失败后清理、Ctrl+C 后清理、只写自建 ID、清理失败时的报告，以及差异类型的分类。

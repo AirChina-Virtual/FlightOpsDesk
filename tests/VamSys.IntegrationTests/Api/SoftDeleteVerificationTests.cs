@@ -46,6 +46,38 @@ public class SoftDeleteVerificationTests
         Assert.Equal(1, Count(s.World, "DELETE"));
     }
 
+    // G8 (plan 6.2 / 6.3): the live write evidence (artifacts/write-evidence/report.json, run FODESK-WE 20261118T001624Z)
+    // showed DELETE 204 then GET 404 for cargo, charter, training, vfr and repositioning routes as well, so their deletes
+    // complete on the same proof as scheduled and jumpseat ones.
+    [Theory]
+    [InlineData("cargo")]
+    [InlineData("charter")]
+    [InlineData("training")]
+    [InlineData("vfr")]
+    [InlineData("repositioning")]
+    public async Task Deletes_of_every_other_route_type_are_proven_by_204_then_404(string type)
+    {
+        using var s = new StoredWorld();
+        var json = $$"""{"id":20,"departure_id":101,"arrival_id":102,"type":"{{type}}","callsign":"CAO200","flight_number":"CA200","fleet_ids":[4],"hidden":true,"remarks":"other type"}""";
+        s.Remote.AddRow("routes/20", json);
+        using (var doc = System.Text.Json.JsonDocument.Parse(json))
+        {
+            var row = s.World.Api.FromJson(ResourceKind.Routes, doc.RootElement);
+            s.W.Resources[ResourceKind.Routes].Snapshot.Add(row.Dup());
+            s.W.Resources[ResourceKind.Routes].Draft.Add(row.Dup());
+        }
+        s.World.MarkDelete(ResourceKind.Routes, "20");
+        var job = s.Submit();
+        await s.Run(job);
+        var item = job.Items.Single();
+        Assert.Equal(ItemState.Succeeded, item.State);
+        Assert.Equal("ApiInvisible", item.DeletionVerification!.Outcome);
+        Assert.Equal(204, item.DeletionVerification.WriteStatus);
+        Assert.Equal(404, item.DeletionVerification.ReadStatus);
+        Assert.Contains(ApiOperationPolicy.Key(item), s.Disk.VerifiedOperations);
+        Assert.Equal(1, Count(s.World, "DELETE"));
+    }
+
     [Theory]
     [InlineData("none")]
     [InlineData("status")]

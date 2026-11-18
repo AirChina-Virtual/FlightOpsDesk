@@ -76,6 +76,36 @@ public class ExternalEvidenceReviewTests
         Assert.False(IndependentApiEvidence.Covers(jumpseat, ApiContracts.Sha256));
     }
 
+    // G8: DELETE 204 then GET 404 was seen live for every route type (scheduled and jumpseat on 2026-10-20; the other five in
+    // artifacts/write-evidence/report.json, run FODESK-WE 20261118T001624Z). Only the delete is covered for the other five.
+    [Theory]
+    [InlineData("scheduled")]
+    [InlineData("jumpseat")]
+    [InlineData("cargo")]
+    [InlineData("charter")]
+    [InlineData("training")]
+    [InlineData("vfr")]
+    [InlineData("repositioning")]
+    public void Route_deletes_of_every_type_are_covered_but_other_types_stay_uncovered_for_writes(string type)
+    {
+        var route = new DataRow { Fields = new Dictionary<string, string> { ["Type"] = type } };
+        var delete = new ChangeItem { Resource = ResourceKind.Routes, Kind = ChangeKind.Delete, Before = route, After = route.With("_delete", "TRUE"), Fields = [] };
+        Assert.True(IndependentApiEvidence.Covers(delete, ApiContracts.Sha256));
+        Assert.False(IndependentApiEvidence.Covers(delete, "other-contract"));
+        var update = Update(ResourceKind.Routes, "Remarks", "x");
+        update.Before = update.Before!.With("Type", type);
+        update.After = update.After.With("Type", type);
+        Assert.Equal(type is "scheduled" or "jumpseat", IndependentApiEvidence.Covers(update, ApiContracts.Sha256));
+    }
+
+    [Fact]
+    public void A_route_type_the_api_does_not_know_is_not_covered_for_delete()
+    {
+        var route = new DataRow { Fields = new Dictionary<string, string> { ["Type"] = "ferry" } };
+        var delete = new ChangeItem { Resource = ResourceKind.Routes, Kind = ChangeKind.Delete, Before = route, After = route.With("_delete", "TRUE"), Fields = [] };
+        Assert.False(IndependentApiEvidence.Covers(delete, ApiContracts.Sha256));
+    }
+
     [Fact]
     public void External_evidence_never_bypasses_the_real_preview_validation()
     {
