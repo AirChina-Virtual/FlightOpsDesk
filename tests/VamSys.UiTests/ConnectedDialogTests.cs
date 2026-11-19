@@ -18,7 +18,7 @@ public class ConnectedDialogTests
 {
     const string Review = "核对未知结果", Close = "关闭";
 
-    static AppWindow Connected(string name, Scenario scenario, out LoopbackOperationsServer server, out FakeRemote remote)
+    internal static AppWindow Connected(string name, Scenario scenario, out LoopbackOperationsServer server, out FakeRemote remote)
     {
         FakeRemote? seeded = null;
         var app = StartConnected(name, directory => (seeded = ConnectedUiFixture.Seed(directory, scenario)).Server, out server);
@@ -38,7 +38,7 @@ public class ConnectedDialogTests
 
     static ChangeItem StoredItem(AppWindow app) => Stored(app.DataDirectory).Jobs.Single().Items.Single();
 
-    static void NoWrites(FakeRemote remote, int before)
+    internal static void NoWrites(FakeRemote remote, int before)
         => Assert.All(remote.Server.Requests.Skip(before), r => Assert.Equal("GET", r.Method));
 
     static AutomationElement OpenReview(AppWindow app, string primary)

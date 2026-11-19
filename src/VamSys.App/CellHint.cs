@@ -58,11 +58,37 @@ sealed class CellHint(Control owner, Func<CellViewModel?> cell, Func<bool> suppr
     }
 }
 
-// 2.5: a fleet cell (Fleet ID, Fleet IDs, Parameter IDs) is a button that opens the picker. Its hint is a plain bound tooltip
-// (FleetTemplate) left to the tooltip service: one per row, not one per cell. Making the tooltip on hover, as CellHint does,
-// crashed the window (a COM "catastrophic failure") when the pointer swept over several fleet buttons.
+// 2.5: a fleet cell (Fleet ID, Fleet IDs, Parameter IDs) is a button that opens the picker. Its hint goes to the tooltip
+// service, which opens and closes it. Making the tooltip on hover, as CellHint does, crashed the window (a COM "catastrophic
+// failure") when the pointer swept over several fleet buttons. A plain bound tooltip (ToolTipService.ToolTip bound to the
+// hint) made the service wrap every new hint text in a new tooltip, so a language switch replaced the tooltip of every
+// fleet cell on the page and took 15-19% longer. Hint (bound in FleetTemplate) instead makes the button's tooltip once, when
+// the first hint arrives, and later only changes its text. A cell without a hint has no tooltip, so nothing (not even an
+// empty box) opens on it; when a hint comes back the button gets a new one, so a tooltip is made only when a cell goes from
+// no hint to a hint. The tooltip is removed with ClearValue: after SetToolTip(button, null) no tooltip set later on that
+// button opened again (the 2.5 window test failed).
 public static class FleetCell
 {
     // The outline of a cell with a problem (CellViewModel.Look 2), as CellIssueBoxStyle marks a text cell.
     public static Visibility IssueShown(int look) => look == 2 ? Visibility.Visible : Visibility.Collapsed;
+
+    public static readonly DependencyProperty HintProperty =
+        DependencyProperty.RegisterAttached("Hint", typeof(string), typeof(FleetCell), new PropertyMetadata(null, HintChanged));
+    public static string? GetHint(DependencyObject target) => (string?)target.GetValue(HintProperty);
+    public static void SetHint(DependencyObject target, string? value) => target.SetValue(HintProperty, value);
+
+    static void HintChanged(DependencyObject target, DependencyPropertyChangedEventArgs change)
+    {
+        var hint = change.NewValue as string;
+        var tip = ToolTipService.GetToolTip(target) as ToolTip;
+        if (string.IsNullOrEmpty(hint))
+        {
+            if (tip != null)
+                target.ClearValue(ToolTipService.ToolTipProperty);
+        }
+        else if (tip != null)
+            tip.Content = hint;
+        else
+            ToolTipService.SetToolTip(target, new ToolTip { Content = hint });
+    }
 }

@@ -224,6 +224,9 @@ public sealed partial class AppWindow : IDisposable
         throw new TimeoutException("The window did not close.");
     }
 
+    /// <summary>Whether the program is still running (false after a crash).</summary>
+    public bool Running => !process.HasExited;
+
     /// <summary>Ends the process without letting the program save or close, as a crash or power loss would.</summary>
     public void Kill()
     {
