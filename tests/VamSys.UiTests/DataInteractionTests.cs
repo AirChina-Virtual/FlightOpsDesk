@@ -135,6 +135,14 @@ public class DataInteractionTests
         app.Query("language:zh-CN");
         Assert.True(app.Query("review-stale").Bool("refreshed"), "Stale review was accepted");
 
+        // Leaving the review empties the page WinUI frees only later: its plan and rows can be collected at once.
+        var released = app.Query("review-release");
+        Assert.False(released.Bool("shownPlan"), "The shown plan was kept after leaving the review");
+        Assert.False(released.Bool("shownPage"), "The window still points at the left review page");
+        Assert.False(released.Bool("planAlive"), "The left review page still holds its plan");
+        // The old list's realized containers keep their few rows until WinUI frees the page; the rest go now.
+        Assert.True(released.Int("rowsAlive") < released.Int("rows"), $"The left review page still holds all its rows: {released.ToJsonString()}");
+
         app.Close();
     }
 }

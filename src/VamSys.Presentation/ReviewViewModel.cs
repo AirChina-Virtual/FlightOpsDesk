@@ -166,8 +166,9 @@ public sealed class ReviewViewModel(Workspace workspace, ILocalizationService la
 {
     WorkspaceReviewPlan? plan;
     int conflicts;
+    bool released;
 
-    public bool IsPreparing => plan is null;
+    public bool IsPreparing => plan is null && !released;
     public bool IsShown => plan is not null;
     public string PreparingText => language.Get("ReviewPreparing");
 
@@ -208,6 +209,8 @@ public sealed class ReviewViewModel(Workspace workspace, ILocalizationService la
     public void Show(WorkspaceReviewPlan shown, bool canEdit, bool canResolveConflicts, Func<ResourceKind, Task> export,
         Func<ReviewEntry, IReadOnlyList<string>>? deniedFleets = null, Func<ReviewEntry, IReadOnlyList<string>, Task>? removeFleets = null)
     {
+        if (released)
+            return;
         plan = shown;
         conflicts = workspace.Resources.Sum(p => p.Value.Conflicts.Count);
         canEditShown = canEdit;
@@ -232,6 +235,23 @@ public sealed class ReviewViewModel(Workspace workspace, ILocalizationService la
             }
         }
         Rows = rows;
+        OnPropertyChanged(string.Empty);
+    }
+
+    // The page was replaced or left. WinUI frees a page that left the tree only some time later, and until then the page
+    // would keep the plan, its submission items and every row alive through the next full collection, which WinUI asks
+    // for and which pauses in proportion to what is still alive. The page keeps only an empty shell: no plan, no rows
+    // (the list is told, so it lets go of its items too), and nothing can be submitted or resolved from it.
+    public void Release()
+    {
+        if (released)
+            return;
+        released = true;
+        plan = null;
+        Rows = [];
+        CanSubmit = false;
+        canEditShown = false;
+        CanResolveConflicts = false;
         OnPropertyChanged(string.Empty);
     }
 

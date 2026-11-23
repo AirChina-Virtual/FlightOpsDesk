@@ -129,6 +129,71 @@ public class ReviewViewModelTests
     }
 
     [Fact]
+    public void A_released_page_keeps_no_rows_or_plan_and_can_no_longer_submit()
+    {
+        var workspace = new Workspace { Mode = RunMode.Demo };
+        workspace.Resources[ResourceKind.Fleets].Conflicts.Add(new MergeConflict(Guid.NewGuid(), "Name", "a", "b", "c"));
+        var (model, _, _) = Shown(workspace, new WorkspaceReviewPlan([Entry(ResourceKind.Fleets), Entry(ResourceKind.Routes)], []));
+        Assert.True(model.CanSubmit);
+        Assert.True(model.CanResolveConflicts);
+        Assert.Equal(4, model.Rows.Count);
+        var changed = new List<string?>();
+        model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        model.Release();
+
+        // One notification for every property, so the list's ItemsSource lets go of the old rows too.
+        Assert.Equal([string.Empty], changed);
+        Assert.Empty(model.Rows);
+        Assert.Empty(model.Chosen);
+        Assert.False(model.CanSubmit);
+        Assert.False(model.CanResolveConflicts);
+        // An empty shell: neither preparing nor showing a plan, and nothing read from the plan any more.
+        Assert.False(model.IsPreparing);
+        Assert.False(model.IsShown);
+        Assert.False(model.ShowsNothingToReview);
+        Assert.Equal("", model.Counts);
+        Assert.False(model.ShowsBlockers);
+        model.Release();
+        Assert.Single(changed);
+    }
+
+    [Fact]
+    public void A_plan_that_arrives_after_the_page_was_released_is_not_shown()
+    {
+        var model = new ReviewViewModel(new Workspace { Mode = RunMode.Demo }, new LocalizationService());
+        model.Release();
+        model.Show(new WorkspaceReviewPlan([Entry(ResourceKind.Fleets)], []), true, true, _ => Task.CompletedTask);
+        Assert.Empty(model.Rows);
+        Assert.False(model.CanSubmit);
+        Assert.False(model.IsShown);
+    }
+
+    [Fact]
+    public void A_released_page_no_longer_holds_its_plan_or_rows()
+    {
+        var language = new LocalizationService();
+        var model = new ReviewViewModel(new Workspace { Mode = RunMode.Demo }, language);
+        var (plan, row) = ShowWeakly(model);
+        model.Release();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.False(plan.IsAlive, "The released page still holds its plan");
+        Assert.False(row.IsAlive, "The released page still holds its rows");
+        GC.KeepAlive(model);
+    }
+
+    // Kept out of the test method so the JIT holds no hidden reference to the plan or the rows.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    static (WeakReference Plan, WeakReference Row) ShowWeakly(ReviewViewModel model)
+    {
+        var plan = new WorkspaceReviewPlan([Entry(ResourceKind.Fleets), Entry(ResourceKind.Routes)], []);
+        model.Show(plan, true, true, _ => Task.CompletedTask);
+        return (new WeakReference(plan), new WeakReference(model.Rows[1]));
+    }
+
+    [Fact]
     public void A_language_refresh_translates_the_header_and_every_row()
     {
         var language = new LocalizationService();

@@ -196,6 +196,7 @@ verification-command:prepare => tests/UiVerification
 verification-command:progress => tests/UiVerification
 verification-command:release => tests/UiVerification
 verification-command:review-fixture => tests/UiVerification
+verification-command:review-release => tests/UiVerification
 verification-command:review-stale => tests/UiVerification
 verification-command:review-state => tests/UiVerification
 verification-command:startup => tests/UiVerification

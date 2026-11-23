@@ -255,6 +255,8 @@ public sealed partial class MainWindow : Window
         cellEdits.ResetContinuation();
         ResourceBar.Visibility = shell.ShowsResourceBar ? Visibility.Visible : Visibility.Collapsed;
         RefreshShell();
+        if (shell.Page != ShellPage.Review)
+            ReleaseReviewPage();
         PageHost.Content = shell.Page switch
         {
             ShellPage.Data => DataPage(),

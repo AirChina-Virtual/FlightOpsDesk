@@ -37,10 +37,24 @@ public sealed partial class MainWindow
 
     string ReviewChangeText(ChangeItem item, ReviewSummaries summaries) => ReviewTexts.ChangeText(PlannedChange.Wrap(item), localization, summaries);
 
+    // The review page was replaced or left, or its workspace cleared. WinUI frees the page only some time after it leaves
+    // the tree; until then it would keep the plan, its submission items and every row alive through the full collection
+    // WinUI asks for, whose pause grows with what is alive. The page is emptied now, and the shown plan is dropped: only
+    // a submission from the page being shown reads it, and a new page shows its own.
+    void ReleaseReviewPage()
+    {
+        if (shownReviewPage is not { } page)
+            return;
+        shownReviewPage = null;
+        page.Model.Release();
+        reviews.Invalidate();
+    }
+
     Task reviewLoad = Task.CompletedTask;
     // The page appears at once; the plan is built on a worker and the page filled when it is ready.
     UIElement BuildReviewPage()
     {
+        ReleaseReviewPage();
         var owner = workspace;
         var model = new ReviewViewModel(owner, localization);
         var page = shownReviewPage = new ReviewPage(model, new ReviewPageActions(

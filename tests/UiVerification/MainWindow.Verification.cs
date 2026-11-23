@@ -96,6 +96,17 @@ public sealed partial class MainWindow
                 await Save(); SelectPane(ShellPage.Review); Render(); await reviewLoad; RootGrid.UpdateLayout();
                 return ReviewVerificationState();
             case "review-state":await reviewLoad;return ReviewVerificationState();
+            case "review-release":
+            {
+                // Leaves the shown review for the data page. WinUI still holds the old page for a while; its plan must
+                // already be collectable, and of its rows only those its list had realized may stay.
+                await reviewLoad;
+                var (plan,row,old,rows)=WeakReview();
+                SelectPane(ShellPage.Data);await dataQueryTask;RootGrid.UpdateLayout();
+                await Task.Delay(200);
+                GC.Collect();GC.WaitForPendingFinalizers();GC.Collect();
+                return new{planAlive=plan.IsAlive,rowAlive=row.IsAlive,rowsAlive=rows.Count(r=>r.IsAlive),rows=rows.Length,pageAlive=old.IsAlive,shownPlan=reviewPlan is not null,shownPage=shownReviewPage is not null};
+            }
             case "review-stale":
             {
                 { var fleets = workspace.Resources[ResourceKind.Fleets].Draft; fleets[0] = fleets[0].With("Name", "QA changed after review"); }
@@ -337,6 +348,11 @@ public sealed partial class MainWindow
         {visible[0].Cells.Single(c=>c.Field=="Name").Value=command[5..];return new{edited=true};}
         return new{error="Unknown QA command"};
     }
+    // Weak references to the shown review's plan, a change row and the page, taken outside the async state machine.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    (WeakReference Plan,WeakReference Row,WeakReference Page,WeakReference[] Rows) WeakReview()
+        => (new(reviewPlan??throw new InvalidOperationException("No review shown")),new(reviewRows.First(r=>!r.IsHeading)),new(shownReviewPage),
+            reviewRows.Select(r=>new WeakReference(r)).ToArray());
     object ReviewVerificationState() => new { resources = reviewPlan?.Entries.Select(e => e.Planned.Resource.ToString()).Distinct().ToArray(),
         total = reviewPlan?.Entries.Count, ready = reviewPlan?.SubmitItems.Count, resourcePickerVisible = ResourceBar.Visibility == Visibility.Visible,
         renderedText = FindVisual<ListView>(PageHost) is { } list ? FindVisual<TextBlock>(list)?.Text : null,
