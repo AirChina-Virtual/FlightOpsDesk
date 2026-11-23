@@ -62,10 +62,15 @@ public static class Schemas
         var issues = new List<Issue>();
         var snapshot = data.Snapshot.ToDictionary(r => r.LocalId);
         void Add(DataRow r, string f, MessageDescriptor m) => issues.Add(new(r.LocalId, f, m));
-        var duplicates = data.Draft.Where(r => Key(kind, r) != "").GroupBy(r => Key(kind, r)).Where(g => g.Count() > 1);
-        foreach (var group in duplicates)
-        foreach (var r in group)
-            Add(r, schema.Key, Messages.Define("Text_DA77CC5B62"));
+        // Most workspaces have no duplicate keys: one set finds that out, and the grouping that lists them (in the same order
+        // as always) runs only when there are some.
+        if (HasDuplicateKey(data.Draft, r => Key(kind, r)))
+        {
+            var duplicates = data.Draft.Where(r => Key(kind, r) != "").GroupBy(r => Key(kind, r)).Where(g => g.Count() > 1);
+            foreach (var group in duplicates)
+            foreach (var r in group)
+                Add(r, schema.Key, Messages.Define("Text_DA77CC5B62"));
+        }
         foreach (var r in data.Draft)
         {
             snapshot.TryGetValue(r.LocalId, out var before);
@@ -79,16 +84,27 @@ public static class Schemas
             ResourceKind.Aircraft => RegistrationSignature,
             _ => NameSignature
         };
-        foreach (var group in data.Draft.Where(r => !Deleted(r)).GroupBy(r => kind == ResourceKind.Routes && r.Get("Type") == "jumpseat"
-            ? string.Join("\u001f", r.Get("Departure Airport (ICAO/IATA)"), r.Get("Arrival Airport (ICAO/IATA)"), ApiOperationPolicy.JumpseatSignature(r))
-            : string.Join("\u001f", signatureFields.Select(r.Get))))
-            if (group.Count() > 1 && group.Any(r => Key(kind, r) == ""))
-                foreach (var r in group.Where(r => Key(kind, r) == ""))
-                    Add(r, schema.Key, Messages.Define("Text_CDDA93CCD1"));
+        // Only rows without a key are flagged, so the signatures (a string per row, a JSON one per jumpseat) are built only
+        // when the resource has such a row.
+        if (data.Draft.Any(r => !Deleted(r) && Key(kind, r) == ""))
+            foreach (var group in data.Draft.Where(r => !Deleted(r)).GroupBy(r => kind == ResourceKind.Routes && r.Get("Type") == "jumpseat"
+                ? string.Join("\u001f", r.Get("Departure Airport (ICAO/IATA)"), r.Get("Arrival Airport (ICAO/IATA)"), ApiOperationPolicy.JumpseatSignature(r))
+                : string.Join("\u001f", signatureFields.Select(r.Get))))
+                if (group.Count() > 1 && group.Any(r => Key(kind, r) == ""))
+                    foreach (var r in group.Where(r => Key(kind, r) == ""))
+                        Add(r, schema.Key, Messages.Define("Text_CDDA93CCD1"));
         var deletedIds = data.Draft.Where(Deleted).Select(r => r.LocalId).ToHashSet();
         if (deletedIds.Count > 0)
             issues.AddRange(new DeletionService().CheckReferences(workspace, kind, deletedIds));
         return issues;
+    }
+    static bool HasDuplicateKey(List<DataRow> rows, Func<DataRow, string> key)
+    {
+        var seen = new HashSet<string>(rows.Count);
+        foreach (var row in rows)
+            if (key(row) is { Length: > 0 } text && !seen.Add(text))
+                return true;
+        return false;
     }
     // The rules that look at one row alone (and at the keys of other resources it refers to). The table shows these on
     // the cells as they are edited; Validate adds the rules that compare rows with each other.
@@ -179,15 +195,28 @@ public static class Schemas
                         Add(r, endpoint.Csv, Messages.Define("Text_31E5AEFD06"));
             void Reference(string field, ResourceKind target)
             {
-                foreach (var id in r.Get(field).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                    if (!pass.ReferenceKeys(target).Contains(id.ToUpperInvariant()) && !pass.LocalKeys(target).Contains(id))
-                        Add(r, field, Messages.Define("Text_5CDAFFB468", ("arg0", id), ("arg1", All[target].Name)));
+                var text = r.Get(field);
+                // One reference (the usual case) is the trimmed text itself, as the split would give it, without the array.
+                if (!text.Contains(',', StringComparison.Ordinal))
+                {
+                    if (text.Trim() is { Length: > 0 } single)
+                        Check(field, target, single);
+                    return;
+                }
+                foreach (var id in text.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    Check(field, target, id);
+            }
+            void Check(string field, ResourceKind target, string id)
+            {
+                if (!pass.ReferenceKeys(target).Contains(id.ToUpperInvariant()) && !pass.LocalKeys(target).Contains(id))
+                    Add(r, field, Messages.Define("Text_5CDAFFB468", ("arg0", id), ("arg1", All[target].Name)));
             }
             // A single fleet is required before the aircraft fleet reference is resolved.
             if (kind == ResourceKind.Aircraft && FleetAssignmentService.Tokens(r.Get("Fleet ID")).Count != 1)
                 Add(r, "Fleet ID", Messages.Define("Text_06FE405F2A"));
-            foreach (var reference in spec.References)
-                Reference(reference.Csv, reference.Reference!.Value);
+            var references = spec.References;
+            for (var n = 0; n < references.Count; n++)
+                Reference(references[n].Csv, references[n].Reference!.Value);
         }
     }
 }
@@ -199,10 +228,15 @@ public sealed class ValidationPass(Workspace workspace)
     readonly Dictionary<DataRow, string> keys = new(ReferenceEqualityComparer.Instance);
     readonly Dictionary<ResourceKind, HashSet<string>> referenceKeys = [];
     readonly Dictionary<ResourceKind, HashSet<string>> localKeys = [];
+    // A key that is the key field's own text (already trimmed and in upper case, such as a numeric ID) is not kept: computing
+    // it again copies nothing, while keeping it costs an entry per row. Only keys that needed a copy are kept.
     public string Key(ResourceKind kind, DataRow row)
     {
-        if (!keys.TryGetValue(row, out var key))
-            keys[row] = key = Schemas.Key(kind, row);
+        if (keys.TryGetValue(row, out var key))
+            return key;
+        key = Schemas.Key(kind, row);
+        if (!ReferenceEquals(key, row.Get(Schemas.All[kind].Key)))
+            keys[row] = key;
         return key;
     }
     public HashSet<string> ReferenceKeys(ResourceKind kind)

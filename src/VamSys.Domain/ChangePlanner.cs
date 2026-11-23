@@ -68,6 +68,9 @@ public sealed class ChangePlanner : IChangePlanner
         foreach (var snapshot in data.Snapshot)
             baseline.Add(snapshot.LocalId, snapshot);
         var changed = new List<string>();
+        // Changes of a batch edit name the same fields: they share one array of names (a planned change never edits its
+        // array in place; resolving a reference gives it a new one).
+        string[] last = [];
         foreach (var row in data.Draft)
         {
             baseline.TryGetValue(row.LocalId, out var before);
@@ -80,8 +83,19 @@ public sealed class ChangePlanner : IChangePlanner
                 continue;
             if (before is null && delete)
                 continue;
-            result.Add(new(kind, delete ? ChangeKind.Delete : before is null ? ChangeKind.Create : ChangeKind.Update, row, before, changed.Count == 0 ? [] : [.. changed]));
+            if (!SameNames(changed, last))
+                last = changed.Count == 0 ? [] : [.. changed];
+            result.Add(new(kind, delete ? ChangeKind.Delete : before is null ? ChangeKind.Create : ChangeKind.Update, row, before, last));
         }
+    }
+    static bool SameNames(List<string> names, string[] other)
+    {
+        if (names.Count != other.Length)
+            return false;
+        for (var n = 0; n < other.Length; n++)
+            if (!string.Equals(names[n], other[n], StringComparison.Ordinal))
+                return false;
+        return true;
     }
     static bool Changed(KeyValuePair<string, string> field, DataRow? baseline)
         => field.Key != "_delete" && (baseline is null || !baseline.FieldEntries().TryGetValue(field.Key, out var old) || old != field.Value);

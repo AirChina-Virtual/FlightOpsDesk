@@ -109,10 +109,14 @@ public sealed class PlannedChange
             var value = after.Get(name);
             fields.Add(name, new(value == "" ? FieldIntent.Clear : FieldIntent.Set, value));
         }
-        return item = new ChangeItem(after, fields)
+        item = new ChangeItem(after, fields)
         {
             Id = Id, Resource = resource, Kind = kind, Before = before,
-            RequiresAirlineParameter = requiresAirlineParameter, Dependencies = [.. dependencies]
+            RequiresAirlineParameter = requiresAirlineParameter
         };
+        // An item's dependency list is created on first use; most changes have none.
+        if (dependencies.Length > 0)
+            item.Dependencies = [.. dependencies];
+        return item;
     }
 }

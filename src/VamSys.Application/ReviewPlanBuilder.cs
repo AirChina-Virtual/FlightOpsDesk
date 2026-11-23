@@ -155,7 +155,9 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
             foreach (var name in Sorted(map))
             { Text(name); map.TryGetValue(name, out var text); Text(text); }
         }
-        // One reused buffer instead of a sorted copy per row; valid until the next call.
+        // One reused buffer instead of a sorted copy per row; valid until the next call. The names of a row are distinct, so
+        // any ordinal sort gives the same order; a cached comparison avoids a new delegate per sort (Array.Sort with a comparer).
+        static readonly Comparison<string> Ordinal = string.CompareOrdinal;
         string[] names = new string[32];
         public ArraySegment<string> Sorted(DataRow.RowFields fields)
         {
@@ -165,7 +167,7 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
             var next = 0;
             foreach (var key in fields.Keys)
                 names[next++] = key;
-            Array.Sort(names, 0, count, StringComparer.Ordinal);
+            names.AsSpan(0, count).Sort(Ordinal);
             return new(names, 0, count);
         }
         public ArraySegment<string> Sorted(PlannedChange change)
@@ -174,7 +176,7 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
             if (names.Length < count)
                 names = new string[count * 2];
             change.CopyFieldNames(names);
-            Array.Sort(names, 0, count, StringComparer.Ordinal);
+            names.AsSpan(0, count).Sort(Ordinal);
             return new(names, 0, count);
         }
         // Reasons and blockers are shared objects (one blocker can mark every entry): serialize each once.
@@ -192,7 +194,8 @@ public sealed class WorkspaceReviewPlan(IReadOnlyList<ReviewEntry> entries, IRea
     }
 }
 
-/// <summary>Local preview only. The supplied API preview must not send requests.</summary>
+/// <summary>Local preview only. The supplied API preview must not send requests, and must not keep or change the item it is
+/// given (the same scratch item is shown for each change that has no built item).</summary>
 public static class ReviewPlanBuilder
 {
     /// <summary>The whole background build of the review page (blockers, plan, content key), free of any window state.</summary>
@@ -203,7 +206,7 @@ public static class ReviewPlanBuilder
         // validation problem each block only the change of their own row; what depends on it is deferred. Online and demo
         // reviews validate the same way. The executor checks conflicts per item too (PreflightStage).
         var changes = planner.ScanWorkspace(w);
-        var changed = new HashSet<Guid>();
+        var changed = new HashSet<Guid>(changes.Count);
         foreach (var change in changes)
             changed.Add(change.After.LocalId);
         var rowBlocks = new Dictionary<Guid, MessageDescriptor>();
@@ -293,20 +296,24 @@ public static class ReviewPlanBuilder
         var samples = new Dictionary<string, int>(StringComparer.Ordinal);
         // The same reason objects are shared by all entries that have it (the key serializes each once).
         MessageDescriptor? connect = null, sample = null, evidence = null;
-        // Operation keys, evidence and the API preview read a ChangeItem. A change that has none yet gets its own transient item
-        // that refers to the planned rows (no row copies); it is not kept or shared with another change.
-        static ChangeItem ItemOf(PlannedChange change)
+        // Operation keys, evidence and the API preview read a ChangeItem. A change that has none yet is shown to them through
+        // one scratch item, refilled for each change (its rows, kind and changed fields; no row copies). They only read the
+        // item during the call and keep nothing of it, so one item serves the whole plan instead of an item and a field map
+        // per change; it is never returned from here or stored in the plan.
+        ChangeItem? scratch = null;
+        Dictionary<string, FieldChange>? scratchFields = null;
+        ChangeItem ItemOf(PlannedChange change)
         {
             if (change.BuiltItem is { } built)
                 return built;
-            var fields = new Dictionary<string, FieldChange>(change.FieldCount, StringComparer.Ordinal);
+            scratchFields ??= new(StringComparer.Ordinal);
+            scratchFields.Clear();
             foreach (var field in change.Fields())
-                fields.Add(field.Key, field.Value);
-            return new ChangeItem
-            {
-                Resource = change.Resource, Kind = change.Kind, Before = change.Before, After = change.After,
-                RequiresAirlineParameter = change.RequiresAirlineParameter, Fields = fields
-            };
+                scratchFields.Add(field.Key, field.Value);
+            scratch ??= new ChangeItem { Fields = scratchFields };
+            scratch.Resource = change.Resource; scratch.Kind = change.Kind; scratch.Before = change.Before; scratch.After = change.After;
+            scratch.RequiresAirlineParameter = change.RequiresAirlineParameter;
+            return scratch;
         }
         foreach (var change in changes)
         {

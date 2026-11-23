@@ -184,16 +184,21 @@ public sealed class ChangeItem
     public DataRow? Before { get; set; }
     public DataRow After { get; set; }
     public Dictionary<string, FieldChange> Fields { get; set; }
-    public List<Guid> Dependencies { get; set; } = [];
+    // The lists below are created on first use: a review builds an item per change and most items never fill them. A
+    // saved item writes and reads them as before (an untouched list is written as []).
+    List<Guid>? dependencies;
+    public List<Guid> Dependencies { get => dependencies ??= []; set => dependencies = value; }
     public ItemState State { get; set; }
     public string? RemoteId { get; set; }
     public Dictionary<string, JsonElement>? ApiExpectedValues { get; set; }
-    public List<BatchStep> ApiSteps { get; set; } = [];
+    List<BatchStep>? apiSteps;
+    public List<BatchStep> ApiSteps { get => apiSteps ??= []; set => apiSteps = value; }
     // Missing in old saved tasks: retain their original association semantics during recovery.
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
     public bool RequiresAirlineParameter { get; set; }
     public string? RecoveryCandidateId { get; set; }
-    public List<RecoveryCandidateAttempt> RecoveryCandidates { get; set; } = [];
+    List<RecoveryCandidateAttempt>? recoveryCandidates;
+    public List<RecoveryCandidateAttempt> RecoveryCandidates { get => recoveryCandidates ??= []; set => recoveryCandidates = value; }
     [System.Text.Json.Serialization.JsonIgnore]
     public bool CanProposeRecoveryId => State == ItemState.Unknown && Kind == ChangeKind.Create && !CreateCompleted && After.Identity == null;
     [System.Text.Json.Serialization.JsonIgnore]
@@ -225,13 +230,16 @@ public sealed class ChangeItem
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public ApiManualResolution? ManualResolution { get; set; }
     public ApiSnapshotComparison? PreflightComparison { get; set; }
-    public List<ApiFieldDifference> VerificationDifferences { get; set; } = [];
+    List<ApiFieldDifference>? verificationDifferences;
+    public List<ApiFieldDifference> VerificationDifferences { get => verificationDifferences ??= []; set => verificationDifferences = value; }
     public List<string>? PreCreateCandidateIds { get; set; }
     // E1: the records an unanswered create may have made, as the last search found them (none, or more than one, when
     // the program could not bind one itself); offered to the user to choose from.
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? FoundCreateCandidates { get; set; }
-    public string Message { get; set; } = Messages.Define("Text_637DA56123");
+    // The text of a new item is always the same (the Chinese text of Text_637DA56123): formatted once, not per item.
+    static readonly string NewMessage = Messages.Define("Text_637DA56123");
+    public string Message { get; set; } = NewMessage;
     public MessageDescriptor? Description { get; set; }
     public void SetMessage(MessageDescriptor description) { Description = description; Message = description.ToString(); }
 }
