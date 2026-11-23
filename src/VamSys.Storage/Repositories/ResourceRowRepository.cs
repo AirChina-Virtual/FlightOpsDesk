@@ -55,18 +55,21 @@ internal static class ResourceRowRepository
         using var names = FieldNames.BeginScope();
         observer?.Stage(WorkspaceLoadStage.Rows);
         var read = 0;
-        using (var cmd = Command(c, tx, "SELECT resource,collection,json,ordinal FROM resource_rows WHERE workspace_id=$w ORDER BY resource,collection,ordinal", ("$w", w.Id.ToString())))
-        using (var r = cmd.ExecuteReader())
+        // The JSON is read as SQLite stores it (UTF-8) and, in the shape the program writes, straight into each row;
+        // any other text is read the general way, from the same string a data reader would have made of it.
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        using (var r = new RowTextReader(c, "SELECT resource,collection,json,ordinal FROM resource_rows WHERE workspace_id=?1 ORDER BY resource,collection,ordinal", w.Id.ToString()))
         while (r.Read())
         {
-            var data = w.Resources[(ResourceKind)r.GetInt32(0)];
-            var rows = r.GetInt32(1) == 0 ? data.Snapshot : data.Draft;
-            var list = (r.GetInt32(0), r.GetInt32(1));
+            var data = w.Resources[(ResourceKind)r.Int32(0)];
+            var rows = r.Int32(1) == 0 ? data.Snapshot : data.Draft;
+            var list = (r.Int32(0), r.Int32(1));
             var position = expected.GetValueOrDefault(list);
-            if (r.GetInt32(3) != position)
-                gaps.Add((ResourceKind)r.GetInt32(0));
+            if (r.Int32(3) != position)
+                gaps.Add((ResourceKind)r.Int32(0));
             expected[list] = position + 1;
-            rows.Add(Decode<DataRow>(r.GetString(2))!);
+            var json = r.Text(2);
+            rows.Add(DataRowJson.TryRead(json, values) ?? Decode<DataRow>(System.Text.Encoding.UTF8.GetString(json))!);
             if (observer != null && ++read % ProgressRows == 0)
                 observer.Rows(read, total);
         }

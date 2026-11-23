@@ -96,7 +96,7 @@ public class WorkspaceLoadTests
         app.Query("workspace-pick-other");
         var failed = app.Wait(() => app.Query("load-state") is var s && s.Int("reads") > before.Int("reads") && !s.Bool("loading") && s.Bool("idle") ? s : null, "the failed read ends");
         Assert.Equal((Large, Large), (failed.Str("workspaceName"), failed.Str("pickerName")));
-        Assert.StartsWith("Operation did not complete: ", failed.Str("status"));
+        Assert.StartsWith("Operation did not complete: ", failed.Str("status"), StringComparison.Ordinal);
         Assert.True(failed.Bool("navigation") && failed.Bool("picker") && failed.Bool("page") && failed.Bool("canEdit"));
         Assert.False(failed.Bool("panel"));
 
@@ -142,7 +142,7 @@ public class WorkspaceLoadTests
             app.Query("workspace-pick-other");
         var settled = app.Wait(() => app.Query("load-state") is var s && !s.Bool("loading") && s.Bool("idle") && s.Str("pickerName") == s.Str("workspaceName") ? s : null, "the switches settle");
         Assert.False(settled.Bool("panel"));
-        Assert.DoesNotContain("Operation did not complete", settled.Str("status") ?? "");
+        Assert.DoesNotContain("Operation did not complete", settled.Str("status") ?? "", StringComparison.Ordinal);
         Pick(app, Large);
         var back = Idle(app, Large);
         Assert.Equal(Large, back.Str("pickerName"));

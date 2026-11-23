@@ -16,7 +16,24 @@ public static class FieldNames
         .Concat(FieldSpecs.All.Values.SelectMany(r => r.Fields).Select(f => f.Csv))
         .Distinct(StringComparer.Ordinal).ToFrozenDictionary(n => n, n => n, StringComparer.Ordinal);
 
+    static readonly FrozenDictionary<string, string>.AlternateLookup<ReadOnlySpan<char>> knownByText = known.GetAlternateLookup<ReadOnlySpan<char>>();
+
     [ThreadStatic] static Dictionary<string, string>? scoped;
+
+    /// <summary>The same as <see cref="Share(string)"/> for a name not yet made a string: a new string is made only when no
+    /// shared instance exists (outside a scope, for every name the field table does not know).</summary>
+    public static string Share(ReadOnlySpan<char> name)
+    {
+        if (knownByText.TryGetValue(name, out var shared))
+            return shared;
+        var table = scoped;
+        if (table == null)
+            return name.ToString();
+        var lookup = table.GetAlternateLookup<ReadOnlySpan<char>>();
+        if (!lookup.TryGetValue(name, out shared))
+            table.Add(shared = name.ToString(), shared);
+        return shared;
+    }
 
     /// <summary>The shared instance of <paramref name="name"/>: the field table's string, the current scope's, or the argument itself.</summary>
     public static string Share(string name)
