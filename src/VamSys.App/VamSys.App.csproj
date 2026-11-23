@@ -17,6 +17,9 @@
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Precompile the published package (release and QA): about 1.5 s faster on the first start after install, about 50 MB larger.
+         It only runs in the publish pipeline; build and test stay JIT. -->
+    <PublishReadyToRun>true</PublishReadyToRun>
     <CopyOutputSymbolsToPublishDirectory Condition="'$(UiVerification)' != 'true'">false</CopyOutputSymbolsToPublishDirectory>
   </PropertyGroup>
   <ItemGroup>

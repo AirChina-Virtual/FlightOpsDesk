@@ -22,6 +22,37 @@
 人工查看（明暗主题、高对比度、100%／150%／200% 缩放、读屏抽查、单元格首次点击）已于 2026-11-16 由用户在正式包上完成，未报告问题；软件真实写入验收不在上表内。云端 CI 于 2026-11-09 首次在私有远端运行：恢复、分析器基线、构建和单元测试通过；集成测试第一次有 1 个进程终止测试读库报 `disk I/O error`，重跑通过，测试已改为等数据库文件释放后再检查（见 [综合优化计划](history/IMPROVEMENT-PLAN-2026-11-08.md) 0.5）。原始结果归档在 `archive/2026-11-03-r8/measurements.zip`。
 
 
+## 发布包改用 ReadyToRun（2026-11-23）
+
+用户 2026-11-23 决定正式包和 QA 包都完整采用 ReadyToRun。分支 `build/ready-to-run`，基于 f81a389。原始数据、日志和脚本在 `artifacts/ready-to-run`（不在仓库里）。
+
+**改动。** 只有 `src/VamSys.App/VamSys.App.csproj` 加了 `PublishReadyToRun=true`。这个属性只在发布流程里起作用，所以 `scripts/build.ps1 -Publish` 和 `-Publish -UiVerification` 生成的包都是 ReadyToRun，普通的 Debug／Release 构建和 `dotnet test` 不变；要生成 JIT 包对比时在命令行加 `-p:PublishReadyToRun=false`。各项目的 `packages.lock.json` 没有变化，锁定模式还原照常通过。
+
+**确认包确实是 ReadyToRun。** 读 PE 头里 CLR 头的 `ManagedNativeHeader`（R2R 头）：两个包里程序自己的 6 个 dll、`CommunityToolkit.Mvvm`、`Microsoft.Data.Sqlite`、`System.Private.CoreLib`、`Microsoft.WinUI`、`WinRT.Runtime` 都带 R2R 头；`src/*/bin` 里普通构建的 `FlightOpsDesk.dll`、`VamSys.Domain.dll` 不带。两个包的隔离检查（`--verify-package`、`--verify-qa-package`）都通过：正式包 558 个文件、296,670,730 字节，QA 包 564 个文件、297,590,102 字节。
+
+**测试。**
+
+- `scripts/build.ps1 -Publish` 和 `-Publish -UiVerification` 各自先跑的 `check-all.ps1`（快速模式）都全部通过：Release 构建 0 错误、没有新增警告、单元测试 1,939 通过、集成测试 767 通过 1 跳过。
+- 全部普通窗口测试（`--explicit only --filter-not-trait Category=Measurement`，64 项）用新的正式包和 QA 包跑了两遍，各有 1 项失败，单独重跑都通过：
+  - 第一遍：`DataInteractionTests.Density_query_batch_lock_layouts_and_review_work_with_many_rows(rows: 50000)` 断言“输入的条件标为未应用”失败。原因在测试：验证命令写入搜索框后只等 50 ms 就读状态，而程序在输入停止 300 ms 后会自动应用条件，界面线程这期间卡住超过 300 ms 就会读到“已应用”。这个类单独重跑 3 次都通过；第二遍完整运行也通过。以前的报告没有记过这一项失败，和 ReadyToRun 无关的可能性大，但没有证实。
+  - 第二遍：`ConnectedDialogTests.The_fleet_cell_names_an_unapproved_fleet_on_hover_until_every_fleet_is_approved`（2.5 的机队提示测试）找不到元素，是已知的测试顺序依赖，单独重跑通过。
+
+**启动。** 同一份代码分别生成 JIT 包（`-p:PublishReadyToRun=false`）和 ReadyToRun 包，用 `startup-trials.ps1` 的做法交替 4 组（JIT、ReadyToRun，再反过来），每组把 QA 包复制到新目录，在 5 万行数据目录（`artifacts/workspace-load/equivalence-seed/routes-50000` 的副本）上启动 4 次。与 11-23 评估不同，这次每个 QA 进程启动后立刻绑到 P 核（`0xFFC03`）。测量前没有其他 dotnet／msbuild 进程，CPU 负载约 11%（浏览器和聊天软件开着）。结果（ms）：
+
+| | JIT | ReadyToRun |
+|---|---|---|
+| 刚复制的包第一次：构造结束／首帧 | 3,344–3,476／3,559–3,713 | 1,770–1,904／1,946–2,102 |
+| 刚复制的包第一次：工作区显示出来 | 4,972–5,353 | 3,379–3,751 |
+| 之后的启动（12 次中位数）：首帧／显示出来 | 602／1,796 | 452／1,643 |
+
+第一次启动早约 1.5 s，平时首帧和工作区显示各快约 150 ms，与评估一致。
+
+**包大小和发布耗时。** 正式包 246.3→296.7 MB，zip 97.8→113.6 MB；QA 包 247.0→297.6 MB，zip 98.2→114.0 MB。从空的 bin／obj 发布正式包 55 s→74–80 s，增量发布约 20→21–22 s。CI（`.github/workflows/ci.yml`）只做还原、构建和单元／集成测试，没有发布步骤，耗时不变，不需要改。
+
+**worktree 里的构建。** `scripts/build.ps1` 在 worktree 里找不到 `.tools/dotnet` 时会退回 PATH 上的 `dotnet`，而这台机器全局的 dotnet 没有 SDK。这次在 worktree 里建了指向 `vamsys/.tools` 的目录链接（`.tools` 已在 `.gitignore` 里），脚本没有改。
+
+**没有验证的。** 没有连接真实服务器（ReadyToRun 不改变程序逻辑）。没有在其他机器、没有 P／E 核的处理器或关闭 Defender 的环境上测启动。CI 上没有实际运行（这次没有推送）。窗口测量（`Category=Measurement`、`DataPerformanceTests`）没有重跑；ReadyToRun 主要影响 JIT，稳定状态下的计时预计变化不大，没有证实。
+
 ## 后台读取工作区、缩短读取（2026-11-23）
 
 阶段 7 第 3 项。分支 `perf/workspace-load`：3cce927（测量）、5e71647（后台读取）、a89b46b（缩短读取）、1f9e975 和 ac1e23a（窗口测试驱动与测量修正）。修改前的对照是 669a249 加上同一份测量代码（单独的 worktree，未提交）。原始数据在 `artifacts/workspace-load`。
@@ -96,7 +127,7 @@
 
 **第一次启动偶尔要 4.7–5.6 s 的原因（部分查明）。** 慢的总是一个 QA 包重新生成之后的第一次启动（这一轮修改前第 1 轮 5 万行 5.2 s、修改后第 2 轮 2 万行首帧 3.3 s），与数据目录是不是新建的无关。时间花在读取之前：构造函数结束得晚（修改前 5.2 s、修改后 3.1 s，正常 0.6–2.4 s）。专门的启动试验（`startup-trials.ps1`，每次把包复制到新目录，第一次启动后再启动 3 次，同一个 5 万行数据目录）稳定复现：刚复制的包第一次启动到构造结束要 3.6–3.7 s（修改前 5.5–5.7 s），之后 0.57–0.71 s。也就是说，慢的是第一次加载新写入的程序文件。这台机器开着 Windows Defender 实时保护，第一次加载新文件时会扫描，这是最可能的原因；没有管理员权限，没法排除扫描或清空文件缓存来证实。
 
-**ReadyToRun（只评估、没有采用）。** 用 `-p:PublishReadyToRun=true` 生成正式包和 QA 包（`artifacts/r2r`，不在仓库里）。正式包 246.3→296.6 MB（+50 MB，+20%），程序自己的 dll 大 2.5–3 倍。启动试验（5 万行，4 组）：
+**ReadyToRun（当时只评估，后来采用，见[发布包改用 ReadyToRun](#发布包改用-readytorun2026-11-23)）。** 用 `-p:PublishReadyToRun=true` 生成正式包和 QA 包（`artifacts/r2r`，不在仓库里）。正式包 246.3→296.6 MB（+50 MB，+20%），程序自己的 dll 大 2.5–3 倍。启动试验（5 万行，4 组）：
 
 | | 修改前（JIT） | 修改后（JIT） | 修改后（ReadyToRun） |
 |---|---|---|---|
@@ -104,7 +135,7 @@
 | 刚复制的包第一次：工作区显示出来（ms） | 5,467–5,666 | 5,479–5,713 | 3,880–4,358 |
 | 之后的启动（12 次中位数）：首帧／显示出来（ms） | 2,611／2,354 | 801／2,150 | 611／2,025 |
 
-ReadyToRun 让刚安装后的第一次启动早约 1.5 s 显示工作区，平时的启动只快约 0.1–0.2 s；代价是包大 50 MB。是否采用由用户决定。
+ReadyToRun 让刚安装后的第一次启动早约 1.5 s 显示工作区，平时的启动只快约 0.1–0.2 s；代价是包大 50 MB。用户同日决定采用。
 
 **没有验证的。** 没有连接真实服务器；读取期间在线任务的处理没有变化（任务运行时不能切换工作区），没有另做在线测试。慢的第一次启动是否确实来自 Defender 扫描没有证实。Server GC、`GCConserveMemory` 等没有在这次一起试。
 
