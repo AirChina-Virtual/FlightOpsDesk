@@ -58,10 +58,11 @@ public sealed partial class WorkspaceStore
         using var c = Open();
         return WorkspaceRepository.List(c);
     }
-    public Workspace Load(Guid id)
+    public Workspace Load(Guid id, IWorkspaceLoadObserver? observer = null)
     {
+        observer?.Stage(WorkspaceLoadStage.Open);
         using var c = Open();
-        return WorkspaceRepository.Load(c, id);
+        return WorkspaceRepository.Load(c, id, observer);
     }
 
     // Full saves: the whole workspace is rewritten. Used for a workspace that was never saved and as the fallback of the journal saves.

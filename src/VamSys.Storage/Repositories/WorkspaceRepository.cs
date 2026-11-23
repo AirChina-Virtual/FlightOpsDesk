@@ -18,14 +18,16 @@ internal static class WorkspaceRepository
     }
 
     // One read transaction: header, revision, jobs and resources always belong to the same committed state.
-    public static Workspace Load(SqliteConnection c, Guid id)
+    public static Workspace Load(SqliteConnection c, Guid id, IWorkspaceLoadObserver? observer = null)
     {
         using var tx = c.BeginTransaction(deferred: true);
+        observer?.Stage(WorkspaceLoadStage.Header);
         var w = Workspace.Deserialize((string)(Scalar(c, tx, "SELECT json FROM workspaces WHERE id=$id", ("$id", id.ToString())) ?? throw new KeyNotFoundException()));
         w.StorageRevision = Convert.ToInt64(Scalar(c, tx, "SELECT revision FROM workspace_revisions WHERE workspace_id=$id", ("$id", id.ToString())));
         JobRepository.Read(c, tx, w);
-        var gaps = ResourceRowRepository.Read(c, tx, w);
+        var gaps = ResourceRowRepository.Read(c, tx, w, observer);
         tx.Commit();
+        observer?.Stage(WorkspaceLoadStage.Journal);
         // What was just read is exactly what the database holds, so later saves can write only the difference.
         w.Journal().Adopt(w.Journal().Capture(w, RowSerializer.HeaderKey(w)), w.StorageRevision);
         foreach (var kind in gaps)

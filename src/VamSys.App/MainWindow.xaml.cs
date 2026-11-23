@@ -70,7 +70,9 @@ public sealed partial class MainWindow : Window
         RootGrid.ActualThemeChanged += (_, _) => UpdateCaptionTheme();
         RootGrid.Loaded += (_, _) => UpdateCaptionTheme();
         RootGrid.SizeChanged += (_, _) => { WorkspacePicker.Width = RootGrid.ActualWidth < 800 ? 140 : 230; AppTitleBar.Subtitle = RootGrid.ActualWidth < 1100 ? "" : L("Text_9750099F9F"); };
+        var loadStarted = System.Diagnostics.Stopwatch.GetTimestamp();
         session.Open(L("Text_707DBE0213"));
+        startupLoadMilliseconds = System.Diagnostics.Stopwatch.GetElapsedTime(loadStarted).TotalMilliseconds;
         InitializeResourceTabs();
         ReloadWorkspaces();
         autosave.Tick += async (_, _) => await Guard(async () => { await session.AutosaveElapsedAsync(); if (!gate.WorkInProgress) Status(() => L("Text_11584EAAA5")); });
@@ -95,8 +97,12 @@ public sealed partial class MainWindow : Window
         ready = true;
         SelectPane(ShellPage.Workspace);
         Render();
+        startupShownAt = DateTime.Now;
         verification?.Start();
     }
+    // The first workspace read: how long it took and when its page was shown (for the QA startup measurement).
+    double startupLoadMilliseconds;
+    DateTime? startupShownAt;
     // What the QA build attaches to the window: a theme override, its command pipe and storage barrier, and the dialog
     // it may close. Only the QA build implements CreateVerification; the product build attaches nothing.
     interface IWindowVerification

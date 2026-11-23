@@ -11,7 +11,9 @@ public sealed record MaintenanceOutcome(Workspace Workspace, string BackupDataba
 public interface IWorkspaceStorage
 {
     IReadOnlyList<WorkspaceListing> List();
-    Workspace Load(Guid id);
+    // Reads one workspace in a single read transaction. Safe on a worker thread: it opens its own connection and
+    // touches nothing but the new workspace. The observer, when given, is called on that same thread.
+    Workspace Load(Guid id, IWorkspaceLoadObserver? observer = null);
     // Writes the whole workspace (a workspace that was never saved, or a staged snapshot refresh).
     void Save(Workspace workspace);
     Task SaveAsync(Workspace workspace);
@@ -27,6 +29,20 @@ public interface IWorkspaceStorage
     MaintenancePreview PreviewMaintenance(Guid workspaceId);
     long StoredRevision(Guid workspaceId);
     Task<MaintenanceOutcome> BackupAndClearAsync(Guid workspaceId, long expectedRevision);
+}
+
+// The steps of a workspace read, in order. Rows and the history steps are read per resource, so Share, History,
+// Validate and Index repeat once per resource.
+public enum WorkspaceLoadStage { Open, Header, Metadata, Rows, Share, History, Validate, Index, Journal }
+
+// Follows a workspace read: the window shows its progress, the load benchmark times and weighs each step. Called on the
+// thread that reads, synchronously; an observer must not touch the workspace being read.
+public interface IWorkspaceLoadObserver
+{
+    // A step starts (and the previous one ends).
+    void Stage(WorkspaceLoadStage stage);
+    // Rows read so far of all the workspace's snapshot and draft rows; reported every few thousand rows and at the end.
+    void Rows(int read, int total);
 }
 
 // Preferences that belong to the person, not to a workspace.

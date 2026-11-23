@@ -29,9 +29,14 @@ public sealed class FakeStorage : IWorkspaceStorage, IUserSettings
     public Workspace Read(Guid id) => Workspace.Deserialize(Stored[id]);
 
     public IReadOnlyList<WorkspaceListing> List() => Stored.Select(p => new WorkspaceListing(p.Key, Workspace.Deserialize(p.Value).Name)).ToList();
-    public Workspace Load(Guid id)
+    // Runs on whatever thread the session loads on; BeforeLoad lets a test hold the read there.
+    public Action? BeforeLoad;
+    public Workspace Load(Guid id, IWorkspaceLoadObserver? observer = null)
     {
-        Calls.Add("load");
+        lock (Calls) Calls.Add("load");
+        BeforeLoad?.Invoke();
+        observer?.Stage(WorkspaceLoadStage.Rows);
+        observer?.Rows(0, 0);
         if (FailLoad?.Invoke() is { } error)
             throw error;
         return Workspace.Deserialize(Stored[id]);

@@ -27,8 +27,9 @@ internal static class HistoryRepository
         Execute(c, tx, "UPDATE resource_history_state SET undo_json='[]',redo_json='[]' WHERE workspace_id=$w AND resource=$r", ("$w", workspace), ("$r", kind));
     }
 
-    public static void Read(SqliteConnection c, SqliteTransaction tx, Guid id, ResourceKind kind, ResourceData data)
+    public static void Read(SqliteConnection c, SqliteTransaction tx, Guid id, ResourceKind kind, ResourceData data, IWorkspaceLoadObserver? observer = null)
     {
+        observer?.Stage(WorkspaceLoadStage.History);
         var args = new (string, object?)[] { ("$w", id.ToString()), ("$r", (int)kind) };
         Guid[] undo, redo;
         using (var cmd = Command(c, tx, "SELECT undo_json,redo_json FROM resource_history_state WHERE workspace_id=$w AND resource=$r", args))
@@ -51,9 +52,11 @@ internal static class HistoryRepository
         }
         if (undo.Length + redo.Length != steps.Count)
             throw StorageErrors.Block("StorageInvalid");
+        observer?.Stage(WorkspaceLoadStage.Validate);
         data.History = EditHistory.From(new([.. undo.Select(id => steps[id])], [.. redo.Select(id => steps[id])]));
         data.History.Validate(data);
         data.History.Acknowledge(data.History.Capture());
+        observer?.Stage(WorkspaceLoadStage.Index);
         data.InvalidateDraftIndex();
         if (data.Draft.Count > 0)
             data.FindDraftRow(data.Draft[0].LocalId);

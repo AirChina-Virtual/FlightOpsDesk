@@ -207,3 +207,4 @@ verification-command:workspace-away => tests/UiVerification
 verification-command:workspace-back => tests/UiVerification
 verification-command:workspace-load => tests/UiVerification
 verification-command:workspace-switch => tests/UiVerification
+verification-command:workspace-switch-stall => tests/UiVerification

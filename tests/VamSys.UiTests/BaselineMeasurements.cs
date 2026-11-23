@@ -59,6 +59,10 @@ public class BaselineMeasurements
         for (var n = 0; n < 5; n++)
             switches.Add(app.Query("workspace-switch", Slow));
         memory["afterSwitch"] = app.Query("memory", Slow);
+        // The same round trip from the workspace page: the longest UI-thread stall while the large workspace is read.
+        var switchStalls = new JsonArray();
+        for (var n = 0; n < 3; n++)
+            switchStalls.Add(app.Query("workspace-switch-stall", Slow));
         var reviews = new JsonArray();
         foreach (var count in new[] { 1000, 10000, rows })
             reviews.Add(app.Query($"review-bench:{count}", Slow));
@@ -71,7 +75,7 @@ public class BaselineMeasurements
             ["machine"] = new JsonObject { ["cpu"] = Cpu(), ["os"] = Environment.OSVersion.VersionString, ["logicalProcessors"] = Environment.ProcessorCount },
             ["startup"] = startups, ["workspaceLoad"] = loads, ["dataOpen"] = opened,
             ["scroll"] = new JsonObject { ["page200"] = scroll200, ["page500"] = scroll500 },
-            ["workspaceSwitch"] = switches, ["review"] = reviews, ["memory"] = memory, ["dataDirectory"] = app.DataDirectory
+            ["workspaceSwitch"] = switches, ["workspaceSwitchStall"] = switchStalls, ["review"] = reviews, ["memory"] = memory, ["dataDirectory"] = app.DataDirectory
         }.ToJsonString());
     }
 }

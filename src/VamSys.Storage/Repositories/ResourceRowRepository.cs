@@ -9,6 +9,9 @@ namespace VamSys.Infrastructure;
 // resource_metadata / resource_rows: column definitions, conflicts, snapshot and draft rows (history is HistoryRepository).
 internal static class ResourceRowRepository
 {
+    // How often a read reports its progress: often enough for a smooth count, rarely enough to cost nothing.
+    const int ProgressRows = 2000;
+
     public static void Write(SqliteConnection c, SqliteTransaction tx, FullPayload p)
     {
         Execute(c, tx, "DELETE FROM resource_metadata WHERE workspace_id=$w", ("$w", p.Id.ToString()));
@@ -31,11 +34,14 @@ internal static class ResourceRowRepository
 
     // Returns the resources whose stored positions are not 0, 1, 2, ... in either list (a task checkpoint or an older
     // program left gaps); the journal assumes positions equal list indexes, so those resources are rewritten once.
-    public static HashSet<ResourceKind> Read(SqliteConnection c, SqliteTransaction tx, Workspace w)
+    public static HashSet<ResourceKind> Read(SqliteConnection c, SqliteTransaction tx, Workspace w, IWorkspaceLoadObserver? observer = null)
     {
         var gaps = new HashSet<ResourceKind>();
         var expected = new Dictionary<(int Resource, int Collection), int>();
+        observer?.Stage(WorkspaceLoadStage.Metadata);
         w.Resources = Enum.GetValues<ResourceKind>().ToDictionary(k => k, _ => new ResourceData());
+        // Only for the progress shown while reading: how many rows there are in all.
+        var total = observer == null ? 0 : Convert.ToInt32(Scalar(c, tx, "SELECT count(*) FROM resource_rows WHERE workspace_id=$w", ("$w", w.Id.ToString())));
         using (var cmd = Command(c, tx, "SELECT resource,columns_json,conflicts_json,snapshot_at FROM resource_metadata WHERE workspace_id=$w", ("$w", w.Id.ToString())))
         using (var r = cmd.ExecuteReader())
         while (r.Read())
@@ -47,6 +53,8 @@ internal static class ResourceRowRepository
         }
         // Unknown (imported) field names are shared among the rows of this read only.
         using var names = FieldNames.BeginScope();
+        observer?.Stage(WorkspaceLoadStage.Rows);
+        var read = 0;
         using (var cmd = Command(c, tx, "SELECT resource,collection,json,ordinal FROM resource_rows WHERE workspace_id=$w ORDER BY resource,collection,ordinal", ("$w", w.Id.ToString())))
         using (var r = cmd.ExecuteReader())
         while (r.Read())
@@ -59,12 +67,16 @@ internal static class ResourceRowRepository
                 gaps.Add((ResourceKind)r.GetInt32(0));
             expected[list] = position + 1;
             rows.Add(Decode<DataRow>(r.GetString(2))!);
+            if (observer != null && ++read % ProgressRows == 0)
+                observer.Rows(read, total);
         }
+        observer?.Rows(read, total);
         // Before history validation and before the caller records the journal baseline, which keeps these row objects.
+        observer?.Stage(WorkspaceLoadStage.Share);
         foreach (var data in w.Resources.Values)
             data.ShareUnchangedDraftRows();
         foreach (var (kind, data) in w.Resources)
-            HistoryRepository.Read(c, tx, w.Id, kind, data);
+            HistoryRepository.Read(c, tx, w.Id, kind, data, observer);
         return gaps;
     }
 

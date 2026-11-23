@@ -174,7 +174,9 @@ public sealed partial class MainWindow
             case "startup":
             {
                 for(var n=0;n<300&&verificationFirstFrameMs is null;n++)await Task.Delay(16);
-                return new{constructedMilliseconds=verificationConstructedMs,firstFrameMilliseconds=verificationFirstFrameMs,page,routes=workspace.Resources[ResourceKind.Routes].Draft.Count};
+                // The first workspace read: how long it took and when it was shown, from process creation.
+                using var self=Process.GetCurrentProcess();var shown=startupShownAt is DateTime at?(at-self.StartTime).TotalMilliseconds:(double?)null;
+                return new{constructedMilliseconds=verificationConstructedMs,firstFrameMilliseconds=verificationFirstFrameMs,loadMilliseconds=startupLoadMilliseconds,shownMilliseconds=shown,page,routes=workspace.Resources[ResourceKind.Routes].Draft.Count};
             }
             case "workspace-load":
             {
@@ -196,9 +198,26 @@ public sealed partial class MainWindow
                 var home=workspace.Id;
                 if(verificationSwitchTarget is null){var target=new Workspace{Name="QA switch target"};storage.Save(target);verificationSwitchTarget=target.Id;ReloadWorkspaces();}
                 var away=Stopwatch.StartNew();await SwitchWorkspace(verificationSwitchTarget.Value);await dataQueryTask;RootGrid.UpdateLayout();away.Stop();
-                var back=Stopwatch.StartNew();await SwitchWorkspace(home);await dataQueryTask;RootGrid.UpdateLayout();back.Stop();
+                var back=Stopwatch.StartNew();double backStall;
+                using(var stall=new FrameStall()){await SwitchWorkspace(home);await dataQueryTask;RootGrid.UpdateLayout();back.Stop();backStall=stall.Longest;}
                 ReloadWorkspaces();
-                return new{awayMilliseconds=away.Elapsed.TotalMilliseconds,backMilliseconds=back.Elapsed.TotalMilliseconds,status=StatusLabel.Text,state=DataVerificationState()};
+                return new{awayMilliseconds=away.Elapsed.TotalMilliseconds,backMilliseconds=back.Elapsed.TotalMilliseconds,backStallMilliseconds=backStall,status=StatusLabel.Text,state=DataVerificationState()};
+            }
+            case "workspace-switch-stall":
+            {
+                // The same round trip from the workspace page, whose own rebuild is small: the longest time the UI thread
+                // produced no frame is then mostly the read itself when the read runs on the UI thread.
+                var home=workspace.Id;var shownPage=shell.Page;
+                if(verificationSwitchTarget is null){var target=new Workspace{Name="QA switch target"};storage.Save(target);verificationSwitchTarget=target.Id;ReloadWorkspaces();}
+                SelectPane(ShellPage.Workspace);RootGrid.UpdateLayout();await Task.Delay(200);
+                var away=Stopwatch.StartNew();double awayStall;
+                using(var stall=new FrameStall()){await SwitchWorkspace(verificationSwitchTarget.Value);RootGrid.UpdateLayout();away.Stop();awayStall=stall.Longest;}
+                await Task.Delay(200);
+                var back=Stopwatch.StartNew();double backStall;
+                using(var stall=new FrameStall()){await SwitchWorkspace(home);RootGrid.UpdateLayout();back.Stop();backStall=stall.Longest;}
+                ReloadWorkspaces();SelectPane(shownPage);await dataQueryTask;RootGrid.UpdateLayout();
+                return new{awayMilliseconds=away.Elapsed.TotalMilliseconds,backMilliseconds=back.Elapsed.TotalMilliseconds,awayStallMilliseconds=awayStall,backStallMilliseconds=backStall,
+                    routes=workspace.Resources[ResourceKind.Routes].Draft.Count,status=StatusLabel.Text};
             }
             case "arm":
                 verificationRelease.Reset();verificationFail=false;verificationEntered=false;verificationArmed=true;return new{armed=true};

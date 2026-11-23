@@ -8,6 +8,9 @@ if (args.Length == 2 && args[0] == "--benchmark-review") { CorePerformanceBenchm
 if (args.Length == 2 && args[0] == "--review-equivalence") { ReviewEquivalence.Run(args[1]); return; }
 if (args.Length == 2 && args[0] == "--benchmark-review-stages") { ReviewStageBenchmark.Run(args[1]); return; }
 if (args.Length == 2 && args[0] == "--benchmark-core-load") { CorePerformanceBenchmark.RunLoad(args[1]); return; }
+if (args.Length == 2 && args[0] == "--load-equivalence-seed") { LoadEquivalence.Seed(args[1]); return; }
+if (args.Length == 3 && args[0] == "--load-equivalence") { LoadEquivalence.Run(args[1], args[2]); return; }
+if (args.Length == 2 && args[0] == "--benchmark-load-stages") { LoadStageBenchmark.Run(args[1]); return; }
 if (args.Length == 2 && args[0] == "--benchmark-memory-load") { MemoryLoadBenchmark.Run(args[1]); return; }
 if (args.Length == 2 && args[0] == "--benchmark-performance") { await PerformanceScenarios.Benchmark(args[1]); return; }
 

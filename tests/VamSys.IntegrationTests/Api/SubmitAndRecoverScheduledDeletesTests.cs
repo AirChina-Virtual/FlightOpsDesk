@@ -19,7 +19,7 @@ public class SubmitAndRecoverScheduledDeletesTests
     sealed class StoreStorage(WorkspaceStore store) : IWorkspaceStorage
     {
         public IReadOnlyList<WorkspaceListing> List() => store.List().Select(x => new WorkspaceListing(x.Id, x.Name)).ToList();
-        public Workspace Load(Guid id) => store.Load(id);
+        public Workspace Load(Guid id, IWorkspaceLoadObserver? observer = null) => store.Load(id, observer);
         public void Save(Workspace workspace) => store.Save(workspace);
         public Task SaveAsync(Workspace workspace) => store.SaveAsync(workspace);
         public Task SaveChangesAsync(Workspace workspace, JournalScope scope) => store.SaveChangesAsync(workspace, scope);
