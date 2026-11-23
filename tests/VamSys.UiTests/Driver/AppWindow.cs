@@ -178,8 +178,25 @@ public sealed partial class AppWindow : IDisposable
             window.Dispose();
             throw;
         }
+        window.WaitForFirstWorkspace();
         return window;
     }
+
+    // Since 2026-11-23 the window appears before its first workspace is read and offers nothing (the loading panel covers
+    // the page, the picker and navigation are disabled) until the workspace is in place. A test acts as a person would:
+    // once the workspace picker can be used. A window without the picker (a startup error, the data location prompt)
+    // passes as soon as it is up; a process that exits passes at once.
+    void WaitForFirstWorkspace() => Poll(() =>
+    {
+        if (process.HasExited)
+            return "exited";
+        if (Handle == IntPtr.Zero)
+            return null;
+        var picker = Find("WorkspacePicker");
+        if (picker.Length > 0)
+            return picker[0].Current.IsEnabled ? "ready" : null;
+        return Find("WorkspaceLoadingPanel").Length == 0 && Find("Navigation").Length == 0 && FindAll(Condition.TrueCondition).Length > 0 ? "other window" : null;
+    }, QueryTimeout);
 
     // ---- the QA pipe ----------------------------------------------------------------------------------------------
 
