@@ -23,7 +23,10 @@ public sealed class DataRow
     public Guid LocalId { get; init; }
     public ResourceIdentity? Identity { get; init; }
     public string? RawApiJson { get; init; }
-    /// <summary>Read-only view of the fields in insertion order. Initialization copies the supplied pairs.</summary>
+    /// <summary>
+    /// Read-only view of the fields in insertion order. Initialization copies the supplied pairs; the field names are
+    /// replaced by their shared instances (<see cref="FieldNames"/>), which is how rows read from JSON share them.
+    /// </summary>
     public IReadOnlyDictionary<string, string> Fields
     {
         get => view ??= new FieldView(fields);
@@ -32,7 +35,7 @@ public sealed class DataRow
             fields = new(value?.Count ?? 0, StringComparer.Ordinal);
             if (value != null)
                 foreach (var pair in value)
-                    fields[pair.Key] = pair.Value;
+                    fields[FieldNames.Share(pair.Key)] = pair.Value;
             view = null;
         }
     }

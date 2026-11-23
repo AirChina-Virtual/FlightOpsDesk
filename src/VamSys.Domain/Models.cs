@@ -77,6 +77,43 @@ public sealed partial class ResourceData
             Draft[position] = row;
     }
     public void ClearHistory(bool invalidateIndex = true) { History.Clear(); if (invalidateIndex) InvalidateDraftIndex(); }
+    /// <summary>
+    /// After a read: every draft row whose content is exactly its snapshot row's (<see cref="DataRow.SameContent"/>) is
+    /// replaced by that snapshot row object, so an unchanged record is held once instead of twice. Rows are immutable
+    /// and both lists are compared separately everywhere (journal, history, planner), so sharing changes no result.
+    /// Positions and ids stay the same, so the draft index stays valid. Returns the number of rows now shared.
+    /// </summary>
+    public int ShareUnchangedDraftRows()
+    {
+        if (snapshot.Count == 0 || draft.Count == 0)
+            return 0;
+        Dictionary<Guid, DataRow>? byId = null;
+        var shared = 0;
+        for (var i = 0; i < draft.Count; i++)
+        {
+            var row = draft[i];
+            DataRow? baseline;
+            if (i < snapshot.Count && snapshot[i].LocalId == row.LocalId)
+                baseline = snapshot[i];
+            else
+            {
+                if (byId == null)
+                {
+                    byId = new(snapshot.Count);
+                    foreach (var s in snapshot)
+                        byId.TryAdd(s.LocalId, s);
+                }
+                baseline = byId.GetValueOrDefault(row.LocalId);
+            }
+            if (baseline == null)
+                continue;
+            if (!ReferenceEquals(baseline, row) && DataRow.SameContent(baseline, row))
+                draft[i] = baseline;
+            if (ReferenceEquals(draft[i], baseline))
+                shared++;
+        }
+        return shared;
+    }
     public HistoryMove UndoEdit() => History.Move(this, undo: true);
     public HistoryMove RedoEdit() => History.Move(this, undo: false);
 }

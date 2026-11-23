@@ -234,8 +234,10 @@ public sealed class ResourceDataConverter : JsonConverter<ResourceData>
     {
         using var document = JsonDocument.ParseValue(ref reader);
         var root = document.RootElement;
+        using var names = FieldNames.BeginScope();
         T Read<T>(string name, T fallback) => root.TryGetProperty(name, out var value) ? value.Deserialize<T>(options) ?? throw new JsonException(name) : fallback;
         var data = new ResourceData { Snapshot = Read<List<DataRow>>("Snapshot", []), Draft = Read<List<DataRow>>("Draft", []), Columns = Read<List<string>>("Columns", []), Conflicts = Read<List<MergeConflict>>("Conflicts", []), SnapshotAt = root.TryGetProperty("SnapshotAt", out var at) ? at.Deserialize<DateTimeOffset?>() : null };
+        data.ShareUnchangedDraftRows();
         if (root.TryGetProperty("History", out var h))
         {
             if (root.TryGetProperty("Undo", out _) || root.TryGetProperty("Redo", out _) || h.GetProperty("Version").GetInt32() != 1)

@@ -6,6 +6,7 @@ if (args.Length == 3 && args[0] == "--benchmark-journal") { await JournalBenchma
 if (args.Length == 2 && args[0] == "--benchmark-core") { CorePerformanceBenchmark.Run(args[1]); return; }
 if (args.Length == 2 && args[0] == "--benchmark-review") { CorePerformanceBenchmark.RunReview(args[1]); return; }
 if (args.Length == 2 && args[0] == "--benchmark-core-load") { CorePerformanceBenchmark.RunLoad(args[1]); return; }
+if (args.Length == 2 && args[0] == "--benchmark-memory-load") { MemoryLoadBenchmark.Run(args[1]); return; }
 if (args.Length == 2 && args[0] == "--benchmark-performance") { await PerformanceScenarios.Benchmark(args[1]); return; }
 
 Console.Error.WriteLine("Unknown or missing command. See tests/VamSys.Benchmarks/README.md for the benchmark entries.");

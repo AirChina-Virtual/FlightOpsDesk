@@ -45,6 +45,8 @@ internal static class ResourceRowRepository
             data.Conflicts = Decode<List<MergeConflict>>(r.GetString(2))!;
             data.SnapshotAt = r.IsDBNull(3) ? null : DateTimeOffset.Parse(r.GetString(3), CultureInfo.InvariantCulture);
         }
+        // Unknown (imported) field names are shared among the rows of this read only.
+        using var names = FieldNames.BeginScope();
         using (var cmd = Command(c, tx, "SELECT resource,collection,json,ordinal FROM resource_rows WHERE workspace_id=$w ORDER BY resource,collection,ordinal", ("$w", w.Id.ToString())))
         using (var r = cmd.ExecuteReader())
         while (r.Read())
@@ -58,6 +60,9 @@ internal static class ResourceRowRepository
             expected[list] = position + 1;
             rows.Add(Decode<DataRow>(r.GetString(2))!);
         }
+        // Before history validation and before the caller records the journal baseline, which keeps these row objects.
+        foreach (var data in w.Resources.Values)
+            data.ShareUnchangedDraftRows();
         foreach (var (kind, data) in w.Resources)
             HistoryRepository.Read(c, tx, w.Id, kind, data);
         return gaps;
