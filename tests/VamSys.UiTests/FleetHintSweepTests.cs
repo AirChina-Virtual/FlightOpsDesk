@@ -8,8 +8,9 @@ namespace VamSys.UiTests;
 
 /// <summary>
 /// 2.5: the fleet cells' hints under a moving pointer, in the QA package connected to the mock Operations server as in
-/// <see cref="ConnectedDialogTests"/>. A class of its own: added to that class, it changed the order of its tests, and the
-/// fleet-hint test there then saw no tooltip (on the code before this test was added as well).
+/// <see cref="ConnectedDialogTests"/>. A class of its own because it is about pointer input and the window staying up rather
+/// than a connected dialog. It was first split off because the fleet-hint test there seemed to depend on the order of tests;
+/// that failure came from the test itself and is fixed (docs/TEST-REPORT.md, 2026-11-23), and both pass in either class.
 /// </summary>
 public class FleetHintSweepTests
 {
@@ -33,7 +34,7 @@ public class FleetHintSweepTests
         int Hinted() => Enumerable.Range(0, app.Rows().Length).Count(i => app.Query("data-row:" + i)["hints"]?["Fleet IDs"] is not null);
         app.Until(() => Hinted() >= 2, "two routes with unapproved fleets");
         var buttons = app.Wait(() => FleetButtons(Choose) is { Length: >= 3 } found ? found : null, "three fleet buttons");
-        app.Context = () => $"running {app.Running} | open tooltip '{OpenToolTip()}' | {app.LastClick}";
+        app.Context = () => $"running {app.Running} | open tooltip '{app.OpenToolTip()}' | {app.LastClick}";
 
         app.Foreground();
         for (var pass = 0; pass < 4; pass++)
@@ -57,7 +58,7 @@ public class FleetHintSweepTests
                 foreach (var button in FleetButtons(name))
                 {
                     app.HoverOn(button, "a fleet button", away: false);
-                    if (Poll(() => OpenToolTip() is { } tip && tip.Contains(marker, StringComparison.Ordinal) ? tip : null, TimeSpan.FromSeconds(1.5)) is { } shown)
+                    if (Poll(() => app.OpenToolTip() is { } tip && tip.Contains(marker, StringComparison.Ordinal) ? tip : null, TimeSpan.FromSeconds(1.5)) is { } shown)
                         return shown;
                 }
             }

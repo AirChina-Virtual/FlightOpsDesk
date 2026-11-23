@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Windows.Automation;
 using VamSys.Core;
 using VamSys.Infrastructure;
@@ -87,11 +88,24 @@ public class ConnectedDialogTests
         app.SelectItem("数据管理");
         app.SelectResource("航线");
         app.Until(() => app.Rows().Length > 0, "the routes are shown");
-        int Route() => Enumerable.Range(0, app.Rows().Length).First(i => app.Query("data-row:" + i)["fields"]!.Str("Callsign") == "CAO100");
+        // The route's row as the QA pipe reads it in one read, or null while the table does not show it (after each fleet choice
+        // the page refills the table). The checks below wait through such a moment; reading "no row" as "no hint" would pass
+        // a check too early. This test once took the row count from UI Automation, read that many QA rows one by one and
+        // failed at once when none was the route: twice in full runs, right after a fleet choice. A route that stays away now
+        // fails the check by timeout, with the number of reads that missed it in the state.
+        var missed = 0;
+        JsonNode? Route()
+        {
+            if (app.Query("data-row-find:Callsign=CAO100") is { } row && row.Bool("shown"))
+                return row;
+            missed++;
+            return null;
+        }
+        bool RouteShows(Func<JsonNode, bool> holds) => Route() is { } route && holds(route);
+        // The hint the cell's model holds (what the tooltip will show).
+        static string? ModelHint(JsonNode route) => route["hints"]?["Fleet IDs"]?.ToString();
         // The fleets as a set: the picker decides their order.
-        // The hint the cell's model holds (what the tooltip will show), read through the QA pipe.
-        string? ModelHint() => app.Query("data-row:" + Route())["hints"]?["Fleet IDs"]?.ToString();
-        string Fleets() => string.Join(",", (app.Query("data-row:" + Route())["fields"]!.Str("Fleet IDs") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal));
+        static string Fleets(JsonNode route) => string.Join(",", (route["fields"]!.Str("Fleet IDs") ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal));
         // The route's own row in the window, found by its callsign cell: the QA row numbers (data-row) are in the page's order,
         // which need not be the order UI Automation lists the rows in, and another route has unapproved fleets too.
         AutomationElement FleetButton() => app.Wait(() => app.Rows().Where(r => Below(r, new AndCondition(new PropertyCondition(AutomationElement.NameProperty, "Callsign"),
@@ -105,12 +119,11 @@ public class ConnectedDialogTests
                 .FirstOrDefault(c => c.Current.Name.StartsWith(Spare, StringComparison.Ordinal)), "fleet 6 in the picker").Toggle();
             app.DialogPrimary(Apply).Invoke();
             app.DialogClosed();
-            app.Until(() => Fleets() == after, $"the route's fleets become {after}");
+            app.Until(() => RouteShows(r => Fleets(r) == after), $"the route's fleets become {after}");
         }
         // The hint the pointer brings up on the route's fleet cell, or null when none comes within the limit.
-        // Injected pointer moves reach the table only once the window has had a real click (a run with UI Automation
-        // invokes alone saw no pointer events at all): the status bar is clicked first, which also moves the pointer off
-        // the table, then the pointer rests on the cell. Retried every 1.5 s, as a person would move the mouse again.
+        // The window is brought to the front (injected pointer moves reach only the foreground window), then the pointer
+        // moves onto the cell and rests there. Retried every 1.5 s, as a person would move the mouse again.
         string? Hint(TimeSpan limit)
         {
             var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -118,25 +131,26 @@ public class ConnectedDialogTests
             {
                 app.Foreground();
                 app.HoverOn(FleetButton(), "the route's fleet cell", away: false);
-                if (Poll(() => OpenToolTip() is { } tip && tip.Contains(Marker, StringComparison.Ordinal) ? tip : null, TimeSpan.FromSeconds(1.5)) is { } shown)
+                if (Poll(() => app.OpenToolTip() is { } tip && tip.Contains(Marker, StringComparison.Ordinal) ? tip : null, TimeSpan.FromSeconds(1.5)) is { } shown)
                     return shown;
             }
             return null;
         }
         var quiet = TimeSpan.FromSeconds(3); // six times the hint's delay
 
-        app.Context = () => $"route fleets {Fleets()} | model hint '{ModelHint()}' | open tooltip '{OpenToolTip()}' | {app.LastClick}";
-        app.Until(() => Fleets() == "4,6", "the seeded draft");
-        app.Until(() => ModelHint() == Expected, "the seeded draft's cell names fleet 6");
+        app.Context = () => (Route() is { } route ? $"route fleets {Fleets(route)} | model hint '{ModelHint(route)}'" : "route CAO100 not shown")
+            + $" | reads without the route {missed} | open tooltip '{app.OpenToolTip()}' | {app.LastClick}";
+        app.Until(() => RouteShows(r => Fleets(r) == "4,6"), "the seeded draft");
+        app.Until(() => RouteShows(r => ModelHint(r) == Expected), "the seeded draft's cell names fleet 6");
         ToggleSpare("4");
-        app.Until(() => ModelHint() is null, "no hint once every fleet is approved");
+        app.Until(() => RouteShows(r => ModelHint(r) is null), "no hint once every fleet is approved");
         Assert.Null(Hint(quiet));
         ToggleSpare("4,6");
-        app.Until(() => ModelHint() == Expected, "the cell names fleet 6 again");
+        app.Until(() => RouteShows(r => ModelHint(r) == Expected), "the cell names fleet 6 again");
         var shown = Hint(DefaultWait);
         Assert.True(shown == Expected, $"The hovered fleet cell shows tooltip '{shown}' instead of the hint; {app.Context!()}");
         ToggleSpare("4");
-        app.Until(() => ModelHint() is null, "no hint again");
+        app.Until(() => RouteShows(r => ModelHint(r) is null), "no hint again");
         Assert.Null(Hint(quiet));
         app.Close();
 

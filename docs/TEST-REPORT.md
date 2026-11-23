@@ -22,6 +22,33 @@
 人工查看（明暗主题、高对比度、100%／150%／200% 缩放、读屏抽查、单元格首次点击）已于 2026-11-16 由用户在正式包上完成，未报告问题；软件真实写入验收不在上表内。云端 CI 于 2026-11-09 首次在私有远端运行：恢复、分析器基线、构建和单元测试通过；集成测试第一次有 1 个进程终止测试读库报 `disk I/O error`，重跑通过，测试已改为等数据库文件释放后再检查（见 [综合优化计划](history/IMPROVEMENT-PLAN-2026-11-08.md) 0.5）。原始结果归档在 `archive/2026-11-03-r8/measurements.zip`。
 
 
+## 两个偶发失败的窗口测试改稳（2026-11-23）
+
+分支 `test/flaky-window-tests`，基于 3907798。只改测试和 QA 验证命令（`tests/UiVerification`，只编进 QA 包），没有改产品代码。日志在 worktree 的 `artifacts/scratch`（不在仓库里）。
+
+**机队提示测试（`ConnectedDialogTests.The_fleet_cell_names_an_unapproved_fleet_on_hover_until_every_fleet_is_approved`）。**
+
+- 原因。留下的两次失败日志（`artifacts/ready-to-run/ui-all-2.log`、`artifacts/workspace-load/ui-all-2.log`）都不是找不到 tooltip，而是同一处 `Sequence contains no matching element`：第三次在机型框里切换 Fleet 6 之后，等待“航线机队变为 4”时，查找航线 CAO100 的 `Route()` 抛了异常。前一步“悬停时显示提示”的断言已经通过。`Route()` 先用 UI 自动化数出窗口里的行数 N，再经 QA 管道逐个读前 N 行（`data-row:0…N-1`），没有 CAO100 就直接抛出；它在 `Until` 的条件里，而 `Poll` 只把元素失效一类的异常当作“再等等”，所以这一次读不到就让测试立刻失败，不会等表格刷新完。两种行号来自两个地方，QA 管道一次一行地读，中间界面线程可以刷新表格。
+- 没有复现出具体是哪一瞬间读不到：在改好的测试里临时记录每次读取（单独 3 次、CPU 全核占满 3 次、整类 2 遍），以及点“应用”后 3 秒内 UI 自动化看到的行数（3 次切换各采样一次）和对话框打开时的行数，都是 3 行、都能找到 CAO100。所以“读不到”是短暂的，只能从失败栈确定在哪里失败、为什么一次就失败。
+- 另一处外部依赖。`AppWindow.OpenToolTip()` 原来在整个桌面上找第一个 tooltip。临时记录显示，悬停之前它就一直返回“有 tooltip”：本机另一个程序（Antigravity 编辑器）在 UI 自动化树里一直留着一个 tooltip（它的快捷键提示，UI 自动化报告为在屏幕上，整个测试过程都在）。哪个程序的 tooltip 排在前面就读哪个，排在前面的不是本程序时，本程序的提示就“看不到”。2026-11-19 记下的“看不到 tooltip”没有留下日志，不能确认是不是这个原因。
+- 改法。新增 QA 命令 `data-row-find:字段=值`，在界面线程上一次找出显示中的行，找不到返回 `{shown:false}`；`data-row` 和它共用 `DataRowState`。测试里的 `Route()` 改用它，找不到就返回 null；各项检查写成 `RouteShows(...)`，航线暂时不在时继续等，不会把“没有这一行”当成“没有提示”而提前通过。航线一直不出现时按超时失败，状态里写明“route CAO100 not shown”和读空的次数。`OpenToolTip()` 改为实例方法，只找本程序进程的 tooltip；`FleetHintSweepTests` 同样改用它。
+- 不再依赖顺序。临时把 `FleetHintSweepTests` 的用例放回 `ConnectedDialogTests`（也就是 11-19 出问题的排法），整类 15 项连续 2 遍通过，之后已撤回。xUnit 的顺序是固定的，所以又把这个用例分别紧接在 `FleetHintSweepTests` 和 `ConnectedDialogTests` 的其他 13 个用例之后各跑一次（各自一次 `dotnet test`，保留前一个用例留下的指针、前台窗口等桌面状态），14 次都通过。`FleetHintSweepTests` 仍放在自己的类里：它测的是指针输入和窗口不崩，不是连接后的对话框；类注释已改为这个理由。
+
+**数据页的“未应用条件”（`DataInteractionTests.Density_query_batch_lock_layouts_and_review_work_with_many_rows`）。**
+
+- 原因（在 ReadyToRun 一节已记）。QA 命令 `data-unapplied` 写入搜索框后 `await Task.Delay(50)` 再读，而搜索框在停止输入 300 ms 后自动应用条件；界面线程在这期间卡住超过 300 ms，计时器的 Tick 就可能先于这次读取执行，读到“已应用”。另外，应用一旦开始，下一条命令 `data-query` 会因为查询进行中（`gate.CanStartQuery` 为假）直接返回、不执行。
+- 改法。`data-unapplied` 先挂一个只用一次的 `TextChanged` 处理，再写入文字。程序自己的处理先订阅、先执行：显示“条件未应用”并启动 300 ms 计时器；同一次调度里接着执行这个处理，读出状态并记下计时器是否已启动，然后停掉计时器，再返回。计时器在这次调度之后才可能 Tick，所以无论界面线程多忙，读到的都是刚输入时的状态；停掉计时器避免它和下一条 `data-query` 抢着查询。测试新增一条断言：输入确实启动了自动应用的计时器（`autoApplyArmed`），原有断言不变（标为未应用、查询次数和总行数不变）。
+- 同一类里其他固定等待。`data-density`（80 ms）、`data-window`（100 ms）、`data-scroll`（50 ms）、`data-screenshot`（250 ms）等待后读的是布局结果，前面都有 `UpdateLayout()`，没有会改变被断言状态的计时器；界面线程卡住只会让等待变长，不会读到别的状态。窗口大小变化是异步的，但断言（密度、每页 200 行、未应用）不依赖窗口大小，只影响截图。所以没有改。
+
+**验证。** 正式包和 QA 包从这个分支重新生成（ReadyToRun），各自先跑的 `check-all.ps1` 都全部通过：Release 构建 0 错误、没有新增警告、单元测试 1,939、集成测试 767 通过 1 跳过。
+
+- 机队提示测试单独连续 10 次通过；加上第一次和上面 14 次接在其他用例后面的，单独运行共 25 次，全部通过。
+- 数据页测试（2 万行、5 万行两项）单独连续 10 次通过，加上第一次共 11 次，22 项全部通过；5 万行那次 `autoApplyArmed` 为真、标为未应用、总数 50,000、查询次数不变。
+- 全部普通窗口测试（`--explicit only --filter-not-trait Category=Measurement`，64 项）：用这两个包完整跑了 2 遍，都是 64 项全部通过（6 分 01 秒、6 分 20 秒）。`ToolbarTests` 两遍都没有因为真实鼠标点击没生效而失败。
+- `pwsh scripts/check-all.ps1`：全部通过（Release 构建 0 错误、没有新增警告、单元测试 1,939、集成测试 767 通过 1 跳过）。
+
+**没有验证的。** 没有复现出原来那次失败的具体瞬间（见上）。没有用改动前的测试在同样条件下多跑几轮来对比失败率。`Category=Measurement` 的测量和 `DataPerformanceTests` 没有重跑。
+
 ## 发布包改用 ReadyToRun（2026-11-23）
 
 用户 2026-11-23 决定正式包和 QA 包都完整采用 ReadyToRun。分支 `build/ready-to-run`，基于 f81a389。原始数据、日志和脚本在 `artifacts/ready-to-run`（不在仓库里）。
@@ -34,8 +61,8 @@
 
 - `scripts/build.ps1 -Publish` 和 `-Publish -UiVerification` 各自先跑的 `check-all.ps1`（快速模式）都全部通过：Release 构建 0 错误、没有新增警告、单元测试 1,939 通过、集成测试 767 通过 1 跳过。
 - 全部普通窗口测试（`--explicit only --filter-not-trait Category=Measurement`，64 项）用新的正式包和 QA 包跑了两遍，各有 1 项失败，单独重跑都通过：
-  - 第一遍：`DataInteractionTests.Density_query_batch_lock_layouts_and_review_work_with_many_rows(rows: 50000)` 断言“输入的条件标为未应用”失败。原因在测试：验证命令写入搜索框后只等 50 ms 就读状态，而程序在输入停止 300 ms 后会自动应用条件，界面线程这期间卡住超过 300 ms 就会读到“已应用”。这个类单独重跑 3 次都通过；第二遍完整运行也通过。以前的报告没有记过这一项失败，和 ReadyToRun 无关的可能性大，但没有证实。
-  - 第二遍：`ConnectedDialogTests.The_fleet_cell_names_an_unapproved_fleet_on_hover_until_every_fleet_is_approved`（2.5 的机队提示测试）找不到元素，是已知的测试顺序依赖，单独重跑通过。
+  - 第一遍：`DataInteractionTests.Density_query_batch_lock_layouts_and_review_work_with_many_rows(rows: 50000)` 断言“输入的条件标为未应用”失败。原因在测试：验证命令写入搜索框后只等 50 ms 就读状态，而程序在输入停止 300 ms 后会自动应用条件，界面线程这期间卡住超过 300 ms 就会读到“已应用”。这个类单独重跑 3 次都通过；第二遍完整运行也通过。已修好，见[两个偶发失败的窗口测试改稳](#两个偶发失败的窗口测试改稳2026-11-23)。以前的报告没有记过这一项失败，和 ReadyToRun 无关的可能性大，但没有证实。
+  - 第二遍：`ConnectedDialogTests.The_fleet_cell_names_an_unapproved_fleet_on_hover_until_every_fleet_is_approved`（2.5 的机队提示测试）报 `Sequence contains no matching element`，单独重跑通过。当时以为是测试顺序依赖；实际是测试本身读不到航线行就立即失败，已修好，见[两个偶发失败的窗口测试改稳](#两个偶发失败的窗口测试改稳2026-11-23)。
 
 **启动。** 同一份代码分别生成 JIT 包（`-p:PublishReadyToRun=false`）和 ReadyToRun 包，用 `startup-trials.ps1` 的做法交替 4 组（JIT、ReadyToRun，再反过来），每组把 QA 包复制到新目录，在 5 万行数据目录（`artifacts/workspace-load/equivalence-seed/routes-50000` 的副本）上启动 4 次。与 11-23 评估不同，这次每个 QA 进程启动后立刻绑到 P 核（`0xFFC03`）。测量前没有其他 dotnet／msbuild 进程，CPU 负载约 11%（浏览器和聊天软件开着）。结果（ms）：
 
@@ -94,7 +121,7 @@
 - 单元测试：`WorkspaceSessionTests` 新增 6 项（切换时读取在后台进行、调用方立刻拿回控制、门控全部锁住、自动保存不启动也不保存、保存和检查点等读取结束；读取失败保留当前工作区并已保存、解锁；启动读取锁住直到放好；启动读取失败保留占位工作区；检查点失败后的重新读取同样在后台并锁住；三种读取都报告进度）。`DataRowJsonTests` 27 项：各种行（全部航线字段、转义、中文、超长名字、身份、原始 JSON）读出的结果与通用反序列化相同，包括字段顺序、共用的字段名和字典容量；导入列名和相同的值在一次读取内共用；24 种其他形状和无效 UTF-8 都交给通用的方式。
 - 集成测试：`WorkspaceLoadObserverTests`（真实存储按顺序报告每一步和行数、都在读取线程上，带不带观察者读出的工作区相同，读完立刻保存什么都不写）；`RowReadTests`（直接写进数据库的多余属性、空值、转义的属性名、无效 UTF-8 的行，读出的结果与用通用反序列化读那段文本相同）。
 - 窗口测试 `WorkspaceLoadTests`（6 项）：切换时读取被挂住在已读 2,000 行处，面板显示进度（中文“已读取 2,000 / 40,006 行”、英文“2,000 of 40,006 rows read”），导航、选择器、页面都不可用，编辑、自动保存、提交、撤销都没有效果、没有保存，再选别的工作区不执行，放开后显示新工作区；读取失败保留当前工作区并提示，之后切换正常；读取期间关闭窗口会等读取结束再保存关闭，所有工作区都完整；连续快速选 6 次最后停在一个工作区、选择器与之一致；启动时构造结束时只有读取面板，导航、选择器、页面都不可用。窗口测试驱动启动程序后先等工作区选择器可用（像人一样，等第一个工作区显示出来），再开始操作。
-- 快速检查通过（单元测试 1,939 项，集成测试 767 项通过、1 项跳过）；完整检查通过（Release 和 Debug 各含全部集成测试 793 项，包括 journal 等价、迁移和真实进程终止等慢速测试，2 项跳过；分析器基线 45／47）。存储金样和迁移测试没有改动并通过。全部普通窗口用例 64 项：63 项通过，2.5 机型提示用例在整组运行时失败、单独运行通过（已知的执行顺序依赖，见下文 2026-11-19 一节）。
+- 快速检查通过（单元测试 1,939 项，集成测试 767 项通过、1 项跳过）；完整检查通过（Release 和 Debug 各含全部集成测试 793 项，包括 journal 等价、迁移和真实进程终止等慢速测试，2 项跳过；分析器基线 45／47）。存储金样和迁移测试没有改动并通过。全部普通窗口用例 64 项：63 项通过，2.5 机型提示用例在整组运行时失败、单独运行通过（当时记为执行顺序依赖；实际是测试本身的问题，已修好，见[两个偶发失败的窗口测试改稳](#两个偶发失败的窗口测试改稳2026-11-23)）。
 
 **窗口基线。** `BaselineMeasurements`（每种规模启动 5 次），修改前后的 QA 包交替各 3 轮（旧、新、新、旧、旧、新）。开始前执行了 `dotnet build-server shutdown`，没有其他 dotnet、msbuild 进程。第一次测量时 QA 命令在停顿探针看到最后一帧之前就读了结果，界面线程整段被占住时报告为 0（ac1e23a 修正），所以两个 QA 包重新生成后又完整交替跑了一遍，下表是第二遍（第一遍在 `first-pass`，其余数字与第二遍一致）。每格是 3 轮各自的值。
 
@@ -287,7 +314,7 @@ ReadyToRun 让刚安装后的第一次启动早约 1.5 s 显示工作区，平�
 ## 机型单元格提示不再在切换语言时整个替换（2026-11-19）
 
 机型单元格（Fleet ID、Fleet IDs、Parameter IDs 按钮）的提示改为每个按钮只建一个 tooltip，切换语言、翻页时只改它的文字；没有提示时不挂 tooltip，提示从无到有时才新建。不在悬停时创建，也不由代码打开，都交给 tooltip 服务。
-- 新窗口测试 `FleetHintSweepTests`（1 项）：指针在航线页的机型按钮上来回扫过 4 遍（在有提示的按钮上停够时间让提示弹出，其余快速经过），每遍后窗口仍在运行；随后提示能弹出，切到英文后弹出的是英文提示、不含中文。放在单独的类里：放进 `ConnectedDialogTests` 会改变该类的执行顺序，原有的 2.5 机型提示用例随之看不到 tooltip（修改前的代码也一样），单独跑或不加新用例时都通过。
+- 新窗口测试 `FleetHintSweepTests`（1 项）：指针在航线页的机型按钮上来回扫过 4 遍（在有提示的按钮上停够时间让提示弹出，其余快速经过），每遍后窗口仍在运行；随后提示能弹出，切到英文后弹出的是英文提示、不含中文。放在单独的类里：当时放进 `ConnectedDialogTests` 会改变该类的执行顺序，原有的 2.5 机型提示用例随之看不到 tooltip（修改前的代码也一样），单独跑或不加新用例时都通过。2026-11-23 测试改好后，放进 `ConnectedDialogTests` 也通过，不再依赖顺序，见[两个偶发失败的窗口测试改稳](#两个偶发失败的窗口测试改稳2026-11-23)。
 - 实现过程中，用 `SetToolTip(按钮, null)` 拿掉 tooltip 后，同一按钮之后再设的 tooltip 都不弹出（2.5 用例失败）；改为 `ClearValue` 后通过。
 - 窗口测试（正式包和 QA 包重新生成）：`ConnectedDialogTests` 14 项连续两轮通过；`FleetHintSweepTests`、`ToolbarTests`、`TableEditingTests`、`DialogTests`（13 项）、`ParameterPickerTests`、`LocalizationTests` 通过。
 - 快速检查通过（单元测试 1,874 项，集成测试 761 项通过、1 项跳过）。

@@ -46,8 +46,11 @@ public class DataInteractionTests
         var restored = app.Query("data-density:comfortable");
         Assert.Equal((before.Str("anchor"), 40.0), (restored.Str("anchor"), restored.Number("actualRowHeight")));
 
-        // A condition not yet applied does not change the results.
-        var unapplied = app.Query("data-unapplied:pending condition");
+        // A condition not yet applied does not change the results. The state is read as the typed text arrives, before the
+        // search box's pause could apply it, however busy the window is; the pause is then stopped (see data-unapplied).
+        var typed = app.Query("data-unapplied:pending condition");
+        Assert.True(typed.Bool("autoApplyArmed"), "Typing did not start the pause that applies the condition");
+        var unapplied = typed["state"]!;
         Assert.True(unapplied.Bool("unapplied"), "The typed condition is not marked as unapplied");
         Assert.Equal((restored.Int("queryBuilds"), rows), (unapplied.Int("queryBuilds"), unapplied.Int("total")));
         app.Query("""data-query:{"search":"","filter":0,"sort":null}""");
@@ -101,7 +104,7 @@ public class DataInteractionTests
 
         File.WriteAllText(Path.Combine(app.OutputDirectory, "summary.json"), new JsonObject
         {
-            ["rows"] = rows, ["initial"] = initial.DeepClone(), ["before"] = before, ["compact"] = compact, ["restored"] = restored, ["unapplied"] = unapplied,
+            ["rows"] = rows, ["initial"] = initial.DeepClone(), ["before"] = before, ["compact"] = compact, ["restored"] = restored, ["unapplied"] = typed,
             ["cancel"] = canceled, ["review"] = review, ["stale"] = stale, ["matrix"] = matrix, ["dataDirectory"] = app.DataDirectory
         }.ToJsonString());
 

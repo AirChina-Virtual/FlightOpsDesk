@@ -657,9 +657,13 @@ public sealed partial class AppWindow : IDisposable
     [LibraryImport("user32.dll")]
     private static partial int GetSystemMetrics(int index);
 
-    /// <summary>The text of the tooltip shown anywhere on screen, or null when none is open.</summary>
-    public static string? OpenToolTip()
-        => AutomationElement.RootElement.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ToolTip))?.Current.Name;
+    /// <summary>The text of this program's open tooltip, or null when none is open.</summary>
+    /// Only this program's: other programs keep tooltips in the automation tree too (an editor's stayed listed throughout a test run),
+    /// and the first tooltip on the whole desktop could be theirs, which hid this program's.
+    public string? OpenToolTip()
+        => AutomationElement.RootElement.FindFirst(TreeScope.Descendants, new AndCondition(
+            new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.ToolTip),
+            new PropertyCondition(AutomationElement.ProcessIdProperty, process.Id)))?.Current.Name;
 
     static void MouseClick((int X, int Y) point, uint down, uint up)
     {

@@ -379,7 +379,14 @@ public sealed partial class MainWindow
             return new{step,scrollableHeight=vertical.ScrollableHeight,scrollableWidth=horizontal.ScrollableWidth,down,up,downAgain,right,left,state=DataVerificationState()};
         }
         if(command.StartsWith("data-row:"))
-        {var view=visible[int.Parse(command[9..])];return new{id=view.Row.LocalId,deleted=Schemas.Deleted(view.Row),fields=view.Row.Fields,focused=Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(RootGrid.XamlRoot)?.GetType().Name,editors=CountVisual<TextBox>(table!),hints=view.Cells.Where(c=>c.Hint!=null).ToDictionary(c=>c.Field,c=>c.Hint)};}
+            return DataRowState(visible[int.Parse(command[9..])]);
+        if(command.StartsWith("data-row-find:"))
+        {
+            // The first shown row whose field has this value ("Field=value"), or {shown:false} while it is not shown (the table
+            // is refilled after an edit). One read on the UI thread: the row numbers of data-row can change between two queries.
+            var split=command.IndexOf('=',14);var field=command[14..split];var value=command[(split+1)..];
+            return visible.FirstOrDefault(v=>v.Row.Get(field)==value) is {} found?DataRowState(found):new{shown=false};
+        }
         if(command.StartsWith("data-mark-deleted:"))
         {
             // Marks a shown row deleted in memory only, then rebinds it as a page refresh would.
@@ -387,7 +394,24 @@ public sealed partial class MainWindow
             return new{id=view.Row.LocalId,readOnly=view.Cells.Where(c=>c.Field!="_delete").All(c=>c.IsReadOnly)};
         }
         if(command.StartsWith("data-page-input:")){DataPageJumpBox!.Text=command[16..];RestoreDataSelection();return DataVerificationState();}
-        if(command.StartsWith("data-unapplied:")){searchBox!.Text=command[15..];await Task.Delay(50);RootGrid.UpdateLayout();return DataVerificationState();}
+        if(command.StartsWith("data-unapplied:"))
+        {
+            // Typed text is unapplied until the search box's pause (300 ms) applies it. The box raises TextChanged on a later
+            // pass; the state is read in that same pass, right after the page's own handler (subscribed first) showed the
+            // notice and started the pause, so a busy UI thread cannot let the pause apply the text before the read. The pause
+            // is then stopped: an apply started later would race the next command (data-query), which applies the conditions.
+            var search=searchBox!;var read=new TaskCompletionSource<object>();
+            TextChangedEventHandler? typed=null;
+            typed=(_,_)=>
+            {
+                search.TextChanged-=typed;RootGrid.UpdateLayout();
+                var armed=queryPause?.IsRunning==true;var state=DataVerificationState();queryPause?.Stop();
+                read.TrySetResult(new{autoApplyArmed=armed,state});
+            };
+            search.TextChanged+=typed;search.Text=command[15..];
+            try{return await read.Task.WaitAsync(TimeSpan.FromSeconds(10));}
+            finally{search.TextChanged-=typed;}
+        }
         if(command.StartsWith("language:")){localization.SetLanguage(command[9..]);RootGrid.UpdateLayout();return new{language=localization.Language};}
         if(command.StartsWith("data-page:")){ChangeDataPage(int.Parse(command[10..]));RootGrid.UpdateLayout();return DataVerificationState();}
         if(command.StartsWith("data-size:")){DataPageSizeBox!.SelectedItem=int.Parse(command[10..]);RootGrid.UpdateLayout();return DataVerificationState();}
@@ -448,6 +472,9 @@ public sealed partial class MainWindow
             await dataQueryTask;
         }
     }
+    object DataRowState(RowViewModel view)=>new{shown=true,id=view.Row.LocalId,deleted=Schemas.Deleted(view.Row),fields=view.Row.Fields,
+        focused=Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(RootGrid.XamlRoot)?.GetType().Name,editors=CountVisual<TextBox>(table!),
+        hints=view.Cells.Where(c=>c.Hint!=null).ToDictionary(c=>c.Field,c=>c.Hint)};
     object DataVerificationState()
     {
         var scroll=table is null?null:FindVisual<ScrollViewer>(table);
