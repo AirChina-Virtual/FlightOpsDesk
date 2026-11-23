@@ -14,9 +14,39 @@ public sealed partial class MainWindow
     int verificationSaves,verificationActions,verificationDraftCommits,verificationFullCommits;
     Task? verificationLocalTask;
     double verificationConstructedMs;
+    object? verificationAtConstruction;
     double? verificationFirstFrameMs;
     Guid? verificationSwitchTarget;
     ContentDialog? verificationDialog;
+    // A workspace read held on its worker at its first row report (load-hold, released by load-release), or failed at its
+    // start (load-fail).
+    volatile bool verificationLoadHold,verificationLoadHeld,verificationLoadFail;
+    int verificationLoadReads;
+    readonly ManualResetEventSlim verificationLoadRelease=new();
+    sealed class VerificationLoadObserver(MainWindow window,IWorkspaceLoadObserver? inner):IWorkspaceLoadObserver
+    {
+        public void Stage(WorkspaceLoadStage stage)
+        {
+            if(stage==WorkspaceLoadStage.Open){Interlocked.Increment(ref window.verificationLoadReads);if(window.verificationLoadFail){window.verificationLoadFail=false;throw new IOException("QA injected read failure");}}
+            inner?.Stage(stage);
+        }
+        public void Rows(int read,int total)
+        {
+            inner?.Rows(read,total);
+            if(!window.verificationLoadHold)return;
+            window.verificationLoadHold=false;window.verificationLoadHeld=true;
+            try{if(!window.verificationLoadRelease.Wait(TimeSpan.FromSeconds(45)))throw new TimeoutException("QA read hold");}
+            finally{window.verificationLoadHeld=false;}
+        }
+    }
+    // What the window offers while (or after) a workspace is read.
+    object LoadVerificationState()=>new{
+        loading=gate.WorkspaceLoading,held=verificationLoadHeld,reads=verificationLoadReads,
+        panel=WorkspaceLoadingPanel.Visibility==Visibility.Visible,ring=WorkspaceLoadingRing.IsActive,text=WorkspaceLoadingText.Text,detail=WorkspaceLoadingDetail.Text,
+        navigation=Navigation.IsEnabled,picker=WorkspacePicker.IsEnabled,resources=ResourcePicker.IsEnabled,page=PageHost.IsEnabled,
+        canEdit=gate.CanEdit,canAct=gate.CanAct,canInvoke=gate.CanInvokeCommand,canRunTask=gate.CanRunTask,canSwitch=gate.CanSwitchContext,canNavigate=gate.CanNavigate,
+        autosavePending=autosave.IsEnabled,idle=gate.IsIdle,workspaceName=workspace.Name,pickerName=(WorkspacePicker.SelectedItem as WorkspaceChoice)?.Name,
+        jobs=workspace.Jobs.Count,status=StatusLabel.Text,shellPage=page,draftSaves=verificationDraftCommits,fullSaves=verificationFullCommits,dialog=verificationDialog!=null};
     partial void CreateVerification(ref IWindowVerification? hooks) => hooks = new WindowVerification(this);
     // The QA hooks the window calls; each forwards to the methods below.
     sealed class WindowVerification(MainWindow window) : IWindowVerification
@@ -41,6 +71,8 @@ public sealed partial class MainWindow
         var pipe=Environment.GetEnvironmentVariable("VAMSYS_QA_PIPE");if(string.IsNullOrWhiteSpace(pipe))return;
         // Process creation to the end of the window constructor, and to the first composition frame.
         var processStarted=Process.GetCurrentProcess().StartTime;verificationConstructedMs=(DateTime.Now-processStarted).TotalMilliseconds;
+        // What the window offered at the end of its constructor, before its first frame (the first read is still running).
+        verificationAtConstruction=LoadVerificationState();
         EventHandler<object>? firstFrame=null;
         firstFrame=(_,_)=>{Microsoft.UI.Xaml.Media.CompositionTarget.Rendering-=firstFrame;verificationFirstFrameMs=(DateTime.Now-processStarted).TotalMilliseconds;};
         Microsoft.UI.Xaml.Media.CompositionTarget.Rendering+=firstFrame;
@@ -51,6 +83,8 @@ public sealed partial class MainWindow
         RootGrid.AddHandler(UIElement.TappedEvent,new Microsoft.UI.Xaml.Input.TappedEventHandler((_,e)=>LogVerificationInput("tapped",e.OriginalSource)),true);
         RootGrid.AddHandler(UIElement.DoubleTappedEvent,new Microsoft.UI.Xaml.Input.DoubleTappedEventHandler((_,e)=>LogVerificationInput("double-tapped",e.OriginalSource)),true);
         Activated+=(_,e)=>LogVerificationInput("window "+e.WindowActivationState,null);
+        // Workspace reads after this point go through the QA observer, which can hold or fail them (load-hold, load-fail).
+        session.LoadObserver=new VerificationLoadObserver(this,session.LoadObserver);
         VamSys.Infrastructure.StorageTestHooks.SetBarrier(storage.Inner,p=>{
             if(p=="Draft:AfterCommit")Interlocked.Increment(ref verificationDraftCommits);
             if(p=="Full:AfterCommit")Interlocked.Increment(ref verificationFullCommits);
@@ -73,6 +107,8 @@ public sealed partial class MainWindow
     }
     async Task<object> VerificationCommand(string command)
     {
+        // The window appears before its first workspace is read; commands act on that workspace.
+        await startup;
         switch(command)
         {
             case "prepare":
@@ -176,11 +212,11 @@ public sealed partial class MainWindow
                 for(var n=0;n<300&&verificationFirstFrameMs is null;n++)await Task.Delay(16);
                 // The first workspace read: how long it took and when it was shown, from process creation.
                 using var self=Process.GetCurrentProcess();var shown=startupShownAt is DateTime at?(at-self.StartTime).TotalMilliseconds:(double?)null;
-                return new{constructedMilliseconds=verificationConstructedMs,firstFrameMilliseconds=verificationFirstFrameMs,loadMilliseconds=startupLoadMilliseconds,shownMilliseconds=shown,page,routes=workspace.Resources[ResourceKind.Routes].Draft.Count};
+                return new{constructedMilliseconds=verificationConstructedMs,firstFrameMilliseconds=verificationFirstFrameMs,loadMilliseconds=startupLoadMilliseconds,shownMilliseconds=shown,atConstruction=verificationAtConstruction,page,routes=workspace.Resources[ResourceKind.Routes].Draft.Count};
             }
             case "workspace-load":
             {
-                // The same synchronous load the constructor and workspace switch run on the UI thread.
+                // The store's read alone, timed on this thread (the window runs it on a worker since 2026-11-23).
                 var samples=new List<double>();var allocations=new List<long>();
                 for(var n=0;n<3;n++){var bytes=GC.GetAllocatedBytesForCurrentThread();var timer=Stopwatch.StartNew();_=storage.Load(workspace.Id);samples.Add(timer.Elapsed.TotalMilliseconds);allocations.Add(GC.GetAllocatedBytesForCurrentThread()-bytes);}
                 return new{samples,allocatedBytes=allocations};
@@ -202,6 +238,26 @@ public sealed partial class MainWindow
                 using(var stall=new FrameStall()){await SwitchWorkspace(home);await dataQueryTask;RootGrid.UpdateLayout();back.Stop();backStall=stall.Longest;}
                 ReloadWorkspaces();
                 return new{awayMilliseconds=away.Elapsed.TotalMilliseconds,backMilliseconds=back.Elapsed.TotalMilliseconds,backStallMilliseconds=backStall,status=StatusLabel.Text,state=DataVerificationState()};
+            }
+            case "load-hold":verificationLoadRelease.Reset();verificationLoadHold=true;return new{armed=true};
+            case "load-release":verificationLoadRelease.Set();return new{released=true};
+            case "load-fail":verificationLoadFail=true;return new{armed=true};
+            case "load-state":return LoadVerificationState();
+            case "load-try":
+            {
+                // Everything a person could start while a read runs; none of it may act.
+                var page0=page;var name=workspace.Resources[ResourceKind.Fleets].Draft.FirstOrDefault()?.Get("Name");
+                if(visible.Count>0)visible[0].Cells.Single(c=>c.Field=="Name").Value="QA edit during a read";
+                SaveSoon();
+                await SubmitWorkspace(workspace.Mode);
+                await MoveHistory(undo:true);
+                return new{pageBefore=page0,state=LoadVerificationState(),fleetName=workspace.Resources[ResourceKind.Fleets].Draft.FirstOrDefault()?.Get("Name"),fleetNameBefore=name};
+            }
+            case "workspace-pick-other":
+            {
+                // Picks, in the workspace picker, the first workspace that is not the shown one, as a person would.
+                var choices=(List<WorkspaceChoice>)WorkspacePicker.ItemsSource;
+                WorkspacePicker.SelectedItem=choices.First(w=>w.Id!=workspace.Id&&!ReferenceEquals(w,WorkspacePicker.SelectedItem));return new{requested=true};
             }
             case "workspace-switch-stall":
             {

@@ -26,6 +26,11 @@ public sealed class WorkspaceSession
     public InteractionGate Gate => gate;
     // Raised before a save that may change rows, so views built from the old rows can be dropped.
     public event Action? DataInvalidated;
+    // Raised when a workspace read starts (true) and when it has ended (false), on the thread that started it. The
+    // read itself runs on a worker; see ReadAsync.
+    public event Action<bool>? LoadingChanged;
+    // Told the steps and row count of every read, on the worker that reads (the window shows them as progress).
+    public IWorkspaceLoadObserver? LoadObserver { get; set; }
 
     internal IWorkspaceStorage Storage => storage;
     internal SemaphoreSlim SaveLock => saveLock;
@@ -34,17 +39,58 @@ public sealed class WorkspaceSession
     public IReadOnlyList<WorkspaceListing> ListWorkspaces() => storage.List();
 
     // Opens the first stored workspace, creating one when the database is empty. A workspace never starts online:
-    // the connection has to be made again.
-    public void Open(string defaultName)
+    // the connection has to be made again. The database is read on a worker; see ReadAsync.
+    public async Task OpenAsync(string defaultName)
     {
-        if (storage.List().Count == 0)
+        using var loading = BeginLoad();
+        var opened = await ReadAsync(observer =>
         {
-            workspace = new Workspace { Name = defaultName };
-            storage.Save(workspace);
+            if (storage.List().Count == 0)
+                storage.Save(new Workspace { Name = defaultName });
+            return storage.Load(storage.List()[0].Id, observer);
+        });
+        if (opened.Mode == RunMode.Online)
+            opened.Mode = RunMode.Offline;
+        workspace = opened;
+    }
+    // The same, waiting for it: for tests and tools without a UI thread.
+    public void Open(string defaultName) => OpenAsync(defaultName).GetAwaiter().GetResult();
+
+    // A workspace read. It runs on a worker so the window keeps drawing (and shows the progress), while the caller's
+    // load scope keeps everything that could change or save the current workspace waiting. It holds the save lock, so
+    // no save or task checkpoint runs at the same time either. The store opens its own connection for the read and
+    // touches nothing but the workspace it builds, which nobody else sees until the caller puts it in place on its own
+    // thread. A failed read throws there and leaves the current workspace as it was.
+    async Task<Workspace> ReadAsync(Func<IWorkspaceLoadObserver?, Workspace> read)
+    {
+        await saveLock.WaitAsync();
+        try
+        {
+            var observer = LoadObserver;
+            return await Task.Run(() => read(observer));
         }
-        workspace = storage.Load(storage.List()[0].Id);
-        if (workspace.Mode == RunMode.Online)
-            workspace.Mode = RunMode.Offline;
+        finally { saveLock.Release(); }
+    }
+    // Locks the window for a read (see InteractionGate.WorkspaceLoading) and tells it when the read starts and ends.
+    IDisposable BeginLoad()
+    {
+        autosave.Stop();
+        var scope = new LoadScope(this);
+        try
+        { LoadingChanged?.Invoke(true); }
+        catch { scope.Dispose(); throw; }
+        return scope;
+    }
+    sealed class LoadScope(WorkspaceSession owner) : IDisposable
+    {
+        IDisposable? scope = owner.gate.BeginWorkspaceLoad();
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref scope, null) is not { } ending)
+                return;
+            ending.Dispose();
+            owner.LoadingChanged?.Invoke(false);
+        }
     }
 
     // The journal save writes only what changed since the database last matched the workspace (nothing at all when
@@ -103,7 +149,7 @@ public sealed class WorkspaceSession
 
     public void ScheduleAutosave()
     {
-        if (!gate.CanStartUserAction)
+        if (!gate.CanStartUserAction || gate.WorkspaceLoading)
             return;
         autosave.Stop();
         autosave.Start();
@@ -122,21 +168,23 @@ public sealed class WorkspaceSession
         if (TakeAutosavePending())
             await SaveEditsAsync();
     }
-    // The quiet period ended.
+    // The quiet period ended. Never during a workspace read (the timer is stopped when one starts; this is the guard).
     public Task AutosaveElapsedAsync()
     {
         autosave.Stop();
-        return SaveEditsAsync();
+        return gate.WorkspaceLoading ? Task.CompletedTask : SaveEditsAsync();
     }
 
-    // Saves the current workspace and opens another; a failed save keeps the current one.
+    // Saves the current workspace and opens another; a failed save or read keeps the current one. The window stays
+    // locked from the save to the end of the read.
     public async Task SwitchWorkspaceAsync(Guid id)
     {
-        autosave.Stop();
+        using var loading = BeginLoad();
         await SaveAsync();
-        workspace = storage.Load(id);
-        if (workspace.Mode == RunMode.Online)
-            workspace.Mode = RunMode.Offline;
+        var opened = await ReadAsync(observer => storage.Load(id, observer));
+        if (opened.Mode == RunMode.Online)
+            opened.Mode = RunMode.Offline;
+        workspace = opened;
     }
     // Saves the current workspace, makes the given one current and saves it, so it exists in the database.
     public async Task ReplaceWithNewAsync(Workspace created)
@@ -147,11 +195,16 @@ public sealed class WorkspaceSession
     }
 
     // After a checkpoint could not be written the database decides: reload it, and when even that fails stop all saves.
-    public void ReloadAfterCheckpointFailure()
+    public async Task ReloadAfterCheckpointFailureAsync()
     {
-        autosave.Stop();
+        using var loading = BeginLoad();
+        var id = workspace.Id;
         try
-        { workspace = storage.Load(workspace.Id); workspace.Mode = RunMode.Offline; }
+        {
+            var reloaded = await ReadAsync(observer => storage.Load(id, observer));
+            reloaded.Mode = RunMode.Offline;
+            workspace = reloaded;
+        }
         catch { gate.BlockStorage(); }
     }
 

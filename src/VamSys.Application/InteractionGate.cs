@@ -5,7 +5,7 @@ namespace VamSys.Core;
 // Every state is entered through a scope that is disposed when the state ends, so the combinations stay consistent.
 public sealed class InteractionGate
 {
-    int interactiveOperations, dialogs, reviewLocks;
+    int interactiveOperations, dialogs, reviewLocks, workspaceLoads;
     bool busy, local, reviewLockOwnsLocal, querying;
 
     public InteractionGate(WindowCloseController? closing = null) => Closing = closing ?? new();
@@ -17,50 +17,54 @@ public sealed class InteractionGate
     public bool WorkInProgress => busy;
     public bool LocalOperationActive => local;
     public bool QueryInProgress => querying;
+    // A workspace is being read on a worker (startup, switch, reload after a failed checkpoint). Until it is in place
+    // nothing may change or save the current one: edits, navigation, the pickers, commands, work, tasks, queries, online
+    // requests and autosave all wait. Closing waits for the read to end.
+    public bool WorkspaceLoading => workspaceLoads > 0;
     public bool StorageBlocked { get; private set; }
     public int RunningUserActions => interactiveOperations;
     public int OpenDialogs => dialogs;
 
     // Cell edits, paging, selection, batch commands and submission need a quiet window with usable storage.
-    public bool CanEdit => IsOpen && !busy && !local && !querying && !StorageBlocked;
+    public bool CanEdit => IsOpen && !busy && !local && !querying && !StorageBlocked && !WorkspaceLoading;
     // The navigation pane ignores a selection while a local operation holds the lock.
-    public bool CanNavigate => IsOpen && !local;
+    public bool CanNavigate => IsOpen && !local && !WorkspaceLoading;
     // Workspace and resource pickers.
-    public bool CanSwitchContext => IsOpen && !busy && !local;
+    public bool CanSwitchContext => IsOpen && !busy && !local && !WorkspaceLoading;
     // An exclusive piece of work (connect, refresh, execute, import, validate).
-    public bool CanStartWork => IsOpen && !busy && !local;
+    public bool CanStartWork => IsOpen && !busy && !local && !WorkspaceLoading;
     // A new data query is only started in the same situation as other work.
     public bool CanStartQuery => CanStartWork;
     // A button or command may run its action unless a query or local operation is under way.
-    public bool CanInvokeCommand => !querying && !local;
+    public bool CanInvokeCommand => !querying && !local && !WorkspaceLoading;
     // The page-level guard of most commands: the window is open and no exclusive work is running.
-    public bool CanAct => IsOpen && !busy;
+    public bool CanAct => IsOpen && !busy && !WorkspaceLoading;
     // Executing, resuming or verifying a stored task.
-    public bool CanRunTask => IsOpen && !busy && !local && !querying;
+    public bool CanRunTask => IsOpen && !busy && !local && !querying && !WorkspaceLoading;
     // A user action (and the status it reports) only runs while the window is open.
     public bool CanStartUserAction => IsOpen;
     // Controls that follow the window's openness once nothing holds them locked.
     public bool ControlsEnabled => IsOpen;
     // Connection and refresh requests are dropped while exclusive work runs, whether or not the window is closing.
-    public bool CanRequestOnline => !busy;
+    public bool CanRequestOnline => !busy && !WorkspaceLoading;
     // The data page loads rows on show unless something else is busy.
-    public bool CanLoadOnShow => !busy && !querying;
-    public bool CanLoadOnBuild => !busy;
+    public bool CanLoadOnShow => !busy && !querying && !WorkspaceLoading;
+    public bool CanLoadOnBuild => !busy && !WorkspaceLoading;
     // Resolving conflicts from the review page.
-    public bool CanResolveConflicts => !busy && !local;
+    public bool CanResolveConflicts => !busy && !local && !WorkspaceLoading;
     // The window cannot start closing while any of these runs; the user is told to wait.
     public bool CloseBlockedByActivity => busy || local || interactiveOperations > 0 || dialogs > 0;
     // The shell's controls. Navigation stays usable during exclusive work (the pages guard their own commands); the
     // workspace and resource pickers and the page are locked by a local operation, the pickers also by work and while
     // closing saves.
-    public bool NavigationEnabled => IsOpen && !local;
+    public bool NavigationEnabled => IsOpen && !local && !WorkspaceLoading;
     public bool ContextPickersEnabled => CanSwitchContext;
-    public bool PageEnabled => !local;
+    public bool PageEnabled => !local && !WorkspaceLoading;
     public bool PaneToggleVisible => Closing.State != WindowCloseState.Saving;
     // The progress ring: anything still running, including the save before closing.
-    public bool ShowsActivity => busy || local || querying || reviewLocks > 0 || Closing.State == WindowCloseState.Saving;
+    public bool ShowsActivity => busy || local || querying || reviewLocks > 0 || WorkspaceLoading || Closing.State == WindowCloseState.Saving;
     // Nothing runs at all (QA state reports).
-    public bool IsIdle => interactiveOperations == 0 && !busy && !local && !querying && dialogs == 0;
+    public bool IsIdle => interactiveOperations == 0 && !busy && !local && !querying && dialogs == 0 && !WorkspaceLoading;
 
     // The window has saved and closed: the next close event goes through untouched.
     public bool HasClosed => Closing.State == WindowCloseState.Closed;
@@ -102,6 +106,12 @@ public sealed class InteractionGate
             tookLocal = true;
         }
         return new ReviewLockScope(this, tookLocal);
+    }
+    // A workspace read starts; see WorkspaceLoading. Reads may nest (the scope is counted).
+    public IDisposable BeginWorkspaceLoad()
+    {
+        workspaceLoads++;
+        return new Scope(() => workspaceLoads--);
     }
     public IDisposable? TryBeginUserAction()
     {

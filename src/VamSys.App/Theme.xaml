@@ -209,6 +209,7 @@
   <x:Double x:Key="WorkspaceChoiceMinWidth">320</x:Double>
   <x:Double x:Key="BusyIndicatorSize">18</x:Double>
   <x:Double x:Key="InlineProgressSize">20</x:Double>
+  <x:Double x:Key="WorkspaceLoadingIndicatorSize">48</x:Double>
 
   <!-- Dialog content heights -->
   <x:Double x:Key="FleetChoiceListHeight">180</x:Double>

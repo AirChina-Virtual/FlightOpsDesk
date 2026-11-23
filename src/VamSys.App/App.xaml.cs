@@ -49,6 +49,8 @@ public partial class App : Application
             }
             var main = new MainWindow();
             window = main;
+            // The first workspace is read after the window appears; a failed read is reported like any startup failure.
+            main.StartupFailed += ShowStartupFailure;
             main.Closed += (_, _) =>
             {
                 dataLease?.Dispose();
@@ -61,12 +63,17 @@ public partial class App : Application
         }
         catch (Exception e)
         {
-            dataLease?.Dispose();
-            dataLease = null;
-            RecordFailure(e);
-            var message = MessageErrors.Describe(e);
-            ShowStartupWindow(new TextBlock { Text = Both(language => language.Format(message)), TextWrapping = TextWrapping.Wrap });
+            ShowStartupFailure(e);
         }
+    }
+
+    void ShowStartupFailure(Exception e)
+    {
+        dataLease?.Dispose();
+        dataLease = null;
+        RecordFailure(e);
+        var message = MessageErrors.Describe(e);
+        ShowStartupWindow(new TextBlock { Text = Both(language => language.Format(message)), TextWrapping = TextWrapping.Wrap });
     }
 
     static string Both(Func<LocalizationService, string> text)

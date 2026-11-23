@@ -70,20 +70,18 @@ public sealed partial class MainWindow : Window
         RootGrid.ActualThemeChanged += (_, _) => UpdateCaptionTheme();
         RootGrid.Loaded += (_, _) => UpdateCaptionTheme();
         RootGrid.SizeChanged += (_, _) => { WorkspacePicker.Width = RootGrid.ActualWidth < 800 ? 140 : 230; AppTitleBar.Subtitle = RootGrid.ActualWidth < 1100 ? "" : L("Text_9750099F9F"); };
-        var loadStarted = System.Diagnostics.Stopwatch.GetTimestamp();
-        session.Open(L("Text_707DBE0213"));
-        startupLoadMilliseconds = System.Diagnostics.Stopwatch.GetElapsedTime(loadStarted).TotalMilliseconds;
+        InitializeWorkspaceLoad();
         InitializeResourceTabs();
-        ReloadWorkspaces();
         autosave.Tick += async (_, _) => await Guard(async () => { await session.AutosaveElapsedAsync(); if (!gate.WorkInProgress) Status(() => L("Text_11584EAAA5")); });
         AppWindow.Closing += async (_, e) =>
         {
-            if (gate.HasClosed)
+            // After a failed startup the app replaces this window with the startup error.
+            if (gate.HasClosed || startupFailed)
                 return;
             e.Cancel = true;
-            if (!gate.IsOpen)
+            if (!gate.IsOpen || !await WaitForWorkspaceLoadBeforeClosing())
                 return;
-            if (gate.CloseBlockedByActivity)
+            if (gate.CloseBlockedByActivity || gate.WorkspaceLoading)
             { Status(() => L("CloseBlocked")); return; }
             try
             {
@@ -94,10 +92,8 @@ public sealed partial class MainWindow : Window
             catch { Status(() => L("Text_7AF24B0E8E")); }
         };
         AddShortcuts();
-        ready = true;
-        SelectPane(ShellPage.Workspace);
-        Render();
-        startupShownAt = DateTime.Now;
+        // The window appears with the loading panel; the workspace page follows once the first read is in place.
+        startup = workspaceLoad = OpenFirstWorkspace();
         verification?.Start();
     }
     // The first workspace read: how long it took and when its page was shown (for the QA startup measurement).
@@ -242,14 +238,15 @@ public sealed partial class MainWindow : Window
     }
     async void WorkspaceChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (!ready || !gate.CanSwitchContext || WorkspacePicker.SelectedItem is not WorkspaceChoice choice || choice.Id == workspace.Id)
+        if (!ready || WorkspacePicker.SelectedItem is not WorkspaceChoice choice || choice.Id == workspace.Id)
             return;
+        if (!gate.CanSwitchContext)
+        {
+            // Another switch or a piece of work is still running: the choice is undone once this event is over.
+            DispatcherQueue.TryEnqueue(ShowCurrentWorkspaceChoice);
+            return;
+        }
         await SwitchWorkspace(choice.Id);
-    }
-    async Task SwitchWorkspace(Guid id)
-    {
-        CancelDataQuery();
-        await UserAction(async () => { await session.SwitchWorkspaceAsync(id); online.Release(id); Render(); });
     }
     void Render()
     {

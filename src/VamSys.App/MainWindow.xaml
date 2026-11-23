@@ -31,6 +31,15 @@
           <TextBlock x:Name="SnapshotLabel" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource SecondaryTextBrush}"/>
         </StackPanel>
         <ContentControl x:Name="PageHost" Grid.Row="2" Grid.ColumnSpan="2" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+        <!-- A workspace is being read (startup, switch, reload after a failed checkpoint): the page is covered until the
+             read is in place, so nothing of the old workspace can be used and nothing empty is offered. -->
+        <Grid x:Name="WorkspaceLoadingPanel" Grid.RowSpan="3" Grid.ColumnSpan="2" Visibility="Collapsed" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="{StaticResource SpacingLarge}">
+            <ProgressRing x:Name="WorkspaceLoadingRing" Width="{StaticResource WorkspaceLoadingIndicatorSize}" Height="{StaticResource WorkspaceLoadingIndicatorSize}" IsActive="False"/>
+            <TextBlock x:Name="WorkspaceLoadingText" HorizontalAlignment="Center" FontSize="{StaticResource SubtitleFontSize}"/>
+            <TextBlock x:Name="WorkspaceLoadingDetail" HorizontalAlignment="Center" Foreground="{ThemeResource SecondaryTextBrush}"/>
+          </StackPanel>
+        </Grid>
       </Grid>
     </NavigationView>
     <!-- The status bar is set off from the page, and an error in it has its own icon and colour. -->

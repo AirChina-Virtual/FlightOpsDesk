@@ -1143,4 +1143,9 @@
   <data name="DataMenuConflicts" xml:space="preserve"><value>数据 · 冲突 {count}</value></data>
   <data name="CellCopy" xml:space="preserve"><value>复制单元格</value></data>
   <data name="CellRestoreServer" xml:space="preserve"><value>还原为服务器上的值</value></data>
+  <data name="WorkspaceLoading" xml:space="preserve"><value>正在读取工作区…</value></data>
+  <data name="WorkspaceLoadingSaving" xml:space="preserve"><value>正在保存当前工作区</value></data>
+  <data name="WorkspaceLoadingRows" xml:space="preserve"><value>已读取 {read:N0} / {total:N0} 行</value></data>
+  <data name="WorkspaceLoadingHistory" xml:space="preserve"><value>正在读取撤销历史</value></data>
+  <data name="WorkspaceLoadingCloseLater" xml:space="preserve"><value>正在读取工作区，读取完成后关闭窗口。</value></data>
 </root>

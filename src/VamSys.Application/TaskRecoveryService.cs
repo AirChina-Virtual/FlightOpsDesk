@@ -70,10 +70,10 @@ public interface IRecoveryUi
 // checkpoint cannot be written the database decides: the workspace is reloaded and the session dropped.
 public sealed class TaskRecoveryService(WorkspaceSession session, IOnlineGateway online)
 {
-    void ReloadAfterCheckpointFailure()
+    async Task ReloadAfterCheckpointFailureAsync()
     {
         online.Release(session.Workspace.Id);
-        session.ReloadAfterCheckpointFailure();
+        await session.ReloadAfterCheckpointFailureAsync();
     }
     static ChangeItem Clone(ChangeItem item) => JsonSerializer.Deserialize<ChangeItem>(JsonSerializer.Serialize(item))!;
 
@@ -95,7 +95,7 @@ public sealed class TaskRecoveryService(WorkspaceSession session, IOnlineGateway
         { await online.Session(session.Workspace).ExecuteAsync(job, session.CheckpointWriter(), ct, progress); }
         catch (PersistenceException)
         {
-            ReloadAfterCheckpointFailure();
+            await ReloadAfterCheckpointFailureAsync();
             throw;
         }
     }
@@ -107,7 +107,7 @@ public sealed class TaskRecoveryService(WorkspaceSession session, IOnlineGateway
         { await online.Session(session.Workspace).VerifyDeletionsAsync(job, session.CheckpointWriter(), ct, progress); }
         catch (PersistenceException)
         {
-            ReloadAfterCheckpointFailure();
+            await ReloadAfterCheckpointFailureAsync();
             throw;
         }
     }
@@ -121,7 +121,7 @@ public sealed class TaskRecoveryService(WorkspaceSession session, IOnlineGateway
         { return await online.DiscardUnsentAsync(session.Workspace, job, session.CheckpointWriter()); }
         catch (PersistenceException)
         {
-            ReloadAfterCheckpointFailure();
+            await ReloadAfterCheckpointFailureAsync();
             throw;
         }
     }
@@ -168,7 +168,7 @@ public sealed class TaskRecoveryService(WorkspaceSession session, IOnlineGateway
                 handled.Add(entry.Item.Id);
                 try
                 { if (await apply(entry)) done++; }
-                catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
+                catch (PersistenceException) { await ReloadAfterCheckpointFailureAsync(); throw; }
                 ui.ItemChanged(job, entry.Item);
             }
             ui.ReportGroup(group, done, entries.Count);
@@ -255,7 +255,7 @@ public sealed class TaskRecoveryService(WorkspaceSession session, IOnlineGateway
                 return RecoveryOutcome.Nothing;
             try
             { await online.Session(workspace).ConfirmManualDeleteAsync(job, item, session.CheckpointWriter()); }
-            catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
+            catch (PersistenceException) { await ReloadAfterCheckpointFailureAsync(); throw; }
             ui.ItemChanged(job, item);
             return RecoveryOutcome.Nothing;
         }
@@ -290,7 +290,7 @@ public sealed class TaskRecoveryService(WorkspaceSession session, IOnlineGateway
         var writer = session.CheckpointWriter();
         try
         { if (deleted) await api.ConfirmWithoutReceiptAsync(job, review, writer); else await api.MarkUnchangedAsync(job, review, writer); }
-        catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
+        catch (PersistenceException) { await ReloadAfterCheckpointFailureAsync(); throw; }
         ui.ItemChanged(job, item);
         return deleted ? RecoveryOutcome.DeletedWithoutReceipt : RecoveryOutcome.UnchangedWithoutReceipt;
     }
@@ -313,7 +313,7 @@ public sealed class TaskRecoveryService(WorkspaceSession session, IOnlineGateway
             return RecoveryOutcome.Nothing;
         try
         { await online.Session(workspace).AcceptServerValueAsync(job, review, session.CheckpointWriter()); }
-        catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
+        catch (PersistenceException) { await ReloadAfterCheckpointFailureAsync(); throw; }
         ui.ItemChanged(job, item);
         return item.Kind == ChangeKind.Delete ? RecoveryOutcome.ServerRecordAccepted : RecoveryOutcome.ServerValueAccepted;
     }
@@ -327,7 +327,7 @@ public sealed class TaskRecoveryService(WorkspaceSession session, IOnlineGateway
         {
             try
             { proven = await online.Session(workspace).ResolveNotAppliedAsync(job, item, session.CheckpointWriter(), ct); }
-            catch (PersistenceException) { ReloadAfterCheckpointFailure(); throw; }
+            catch (PersistenceException) { await ReloadAfterCheckpointFailureAsync(); throw; }
         });
         if (proven is not bool result)
             return RecoveryOutcome.Nothing;

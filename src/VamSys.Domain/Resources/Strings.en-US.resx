@@ -1143,4 +1143,9 @@ Remote: {remote}</value>
   <data name="DataMenuConflicts" xml:space="preserve"><value>Data · {count} conflicts</value></data>
   <data name="CellCopy" xml:space="preserve"><value>Copy cell</value></data>
   <data name="CellRestoreServer" xml:space="preserve"><value>Restore the server value</value></data>
+  <data name="WorkspaceLoading" xml:space="preserve"><value>Loading the workspace…</value></data>
+  <data name="WorkspaceLoadingSaving" xml:space="preserve"><value>Saving the current workspace</value></data>
+  <data name="WorkspaceLoadingRows" xml:space="preserve"><value>{read:N0} of {total:N0} rows read</value></data>
+  <data name="WorkspaceLoadingHistory" xml:space="preserve"><value>Reading the undo history</value></data>
+  <data name="WorkspaceLoadingCloseLater" xml:space="preserve"><value>Loading the workspace. The window closes when it has loaded.</value></data>
 </root>

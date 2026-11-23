@@ -141,7 +141,7 @@ public class SubmissionServiceTests
         {
             if (change == "airline") f.Session.Workspace.AirlineId = "8";
             if (change == "mode") f.Session.Workspace.Mode = RunMode.Offline;
-            if (change == "instance") f.Session.ReloadAfterCheckpointFailure();
+            if (change == "instance") f.Session.ReloadAfterCheckpointFailureAsync().GetAwaiter().GetResult();
         };
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() => f.Submit());
         Assert.Equal("TaskStartBlocked", Code(error));

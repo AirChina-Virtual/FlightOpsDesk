@@ -272,13 +272,13 @@ public class WorkspaceSessionTests
     }
 
     [Fact]
-    public void After_a_checkpoint_failure_the_database_is_reloaded_and_when_that_fails_saving_stops()
+    public async Task After_a_checkpoint_failure_the_database_is_reloaded_and_when_that_fails_saving_stops()
     {
         var f = new Fixture();
         f.Session.Workspace.Mode = RunMode.Online;
         f.Session.ScheduleAutosave();
         var before = f.Session.Workspace;
-        f.Session.ReloadAfterCheckpointFailure();
+        await f.Session.ReloadAfterCheckpointFailureAsync();
         Assert.NotSame(before, f.Session.Workspace);
         Assert.Equal(RunMode.Offline, f.Session.Workspace.Mode);
         Assert.False(f.Timer.IsEnabled);
@@ -286,7 +286,7 @@ public class WorkspaceSessionTests
 
         var current = f.Session.Workspace;
         f.Storage.FailLoad = () => new IOException("unreadable");
-        f.Session.ReloadAfterCheckpointFailure();
+        await f.Session.ReloadAfterCheckpointFailureAsync();
         Assert.Same(current, f.Session.Workspace);
         Assert.True(f.Gate.StorageBlocked);
     }
@@ -314,5 +314,175 @@ public class WorkspaceSessionTests
         var job = new BatchJob();
         await f.Session.CheckpointWriter().WriteAsync(new(CheckpointKind.Task, job), CancellationToken.None);
         Assert.Same(job, f.Storage.Checkpoints.Single().Job);
+    }
+
+    // 2026-11-23, stage 7 item 3: workspace reads run on a worker while the window is locked.
+
+    // Holds the next read on its worker until released.
+    sealed class HeldRead
+    {
+        readonly ManualResetEventSlim release = new();
+        public readonly TaskCompletionSource Entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public HeldRead(FakeStorage storage) => storage.BeforeLoad = () => { Entered.TrySetResult(); release.Wait(TimeSpan.FromSeconds(30)); };
+        public Task WaitAsync() => Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        public void Release() => release.Set();
+    }
+
+    static void AssertLocked(InteractionGate gate)
+    {
+        Assert.True(gate.WorkspaceLoading);
+        Assert.False(gate.CanEdit);
+        Assert.False(gate.CanNavigate);
+        Assert.False(gate.NavigationEnabled);
+        Assert.False(gate.CanSwitchContext);
+        Assert.False(gate.ContextPickersEnabled);
+        Assert.False(gate.PageEnabled);
+        Assert.False(gate.CanStartWork);
+        Assert.False(gate.CanStartQuery);
+        Assert.False(gate.CanInvokeCommand);
+        Assert.False(gate.CanAct);
+        Assert.False(gate.CanRunTask);
+        Assert.False(gate.CanRequestOnline);
+        Assert.False(gate.CanLoadOnShow);
+        Assert.False(gate.CanLoadOnBuild);
+        Assert.False(gate.CanResolveConflicts);
+        Assert.True(gate.ShowsActivity);
+        Assert.False(gate.IsIdle);
+    }
+
+    [Fact]
+    public async Task A_switch_reads_on_a_worker_while_edits_navigation_work_and_saves_wait()
+    {
+        var f = new Fixture();
+        var other = f.Storage.Seed("second");
+        var current = f.Session.Workspace;
+        var changes = new List<bool>();
+        f.Session.LoadingChanged += changes.Add;
+        var held = new HeldRead(f.Storage);
+        var switching = f.Session.SwitchWorkspaceAsync(other.Id);
+        await held.WaitAsync();
+        // The caller got control back while the read is still running.
+        Assert.False(switching.IsCompleted);
+        Assert.Same(current, f.Session.Workspace);
+        AssertLocked(f.Gate);
+        Assert.Equal([true], changes);
+
+        // Autosave neither starts nor saves; a save or a task checkpoint waits for the read.
+        var calls = f.Storage.Calls.Count;
+        f.Session.ScheduleAutosave();
+        Assert.False(f.Timer.IsEnabled);
+        await f.Session.AutosaveElapsedAsync();
+        Assert.Equal(calls, f.Storage.Calls.Count);
+        var save = f.Session.SaveEditsAsync();
+        var checkpoint = f.Session.CheckpointWriter().WriteAsync(new(CheckpointKind.Task, new BatchJob()), CancellationToken.None);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.False(save.IsCompleted);
+        Assert.False(checkpoint.IsCompleted);
+        Assert.Equal(calls, f.Storage.Calls.Count);
+        Assert.Empty(f.Storage.Checkpoints);
+
+        held.Release();
+        await switching;
+        await save;
+        await checkpoint;
+        Assert.Equal(other.Id, f.Session.Workspace.Id);
+        Assert.False(f.Gate.WorkspaceLoading);
+        Assert.True(f.Gate.CanEdit && f.Gate.CanSwitchContext && f.Gate.NavigationEnabled && f.Gate.IsIdle);
+        Assert.Equal([true, false], changes);
+    }
+
+    [Fact]
+    public async Task A_failed_read_keeps_the_current_workspace_saved_and_unlocks_the_window()
+    {
+        var f = new Fixture();
+        var other = f.Storage.Seed("second");
+        var current = f.Session.Workspace;
+        current.Name = "edited before the switch";
+        var changes = new List<bool>();
+        f.Session.LoadingChanged += changes.Add;
+        f.Storage.FailLoad = () => new IOException("unreadable");
+        await Assert.ThrowsAsync<IOException>(() => f.Session.SwitchWorkspaceAsync(other.Id));
+        Assert.Same(current, f.Session.Workspace);
+        Assert.Equal("edited before the switch", f.Stored.Name);
+        Assert.False(f.Gate.WorkspaceLoading);
+        Assert.False(f.Gate.StorageBlocked);
+        Assert.True(f.Gate.CanEdit && f.Gate.CanSwitchContext);
+        Assert.Equal([true, false], changes);
+        // Saves go on as before.
+        current.Name = "saved after";
+        await f.Session.SaveAsync();
+        Assert.Equal("saved after", f.Stored.Name);
+    }
+
+    [Fact]
+    public async Task Opening_reads_on_a_worker_and_the_window_stays_locked_until_the_workspace_is_in_place()
+    {
+        var storage = new FakeStorage();
+        var stored = storage.Seed("stored", RunMode.Online);
+        var gate = new InteractionGate();
+        var session = new WorkspaceSession(storage, gate, new FakeTimer());
+        var placeholder = session.Workspace;
+        var held = new HeldRead(storage);
+        var opening = session.OpenAsync("default");
+        await held.WaitAsync();
+        Assert.False(opening.IsCompleted);
+        Assert.Same(placeholder, session.Workspace);
+        AssertLocked(gate);
+        held.Release();
+        await opening;
+        Assert.Equal(stored.Id, session.Workspace.Id);
+        Assert.Equal(RunMode.Offline, session.Workspace.Mode);
+        Assert.False(gate.WorkspaceLoading);
+    }
+
+    [Fact]
+    public async Task A_failed_first_read_leaves_the_placeholder_and_unlocks()
+    {
+        var storage = new FakeStorage();
+        storage.Seed("stored");
+        var gate = new InteractionGate();
+        var session = new WorkspaceSession(storage, gate, new FakeTimer());
+        var placeholder = session.Workspace;
+        storage.FailLoad = () => new IOException("unreadable");
+        await Assert.ThrowsAsync<IOException>(() => session.OpenAsync("default"));
+        Assert.Same(placeholder, session.Workspace);
+        Assert.False(gate.WorkspaceLoading);
+    }
+
+    [Fact]
+    public async Task A_reload_after_a_checkpoint_failure_also_reads_on_a_worker_with_the_window_locked()
+    {
+        var f = new Fixture();
+        var before = f.Session.Workspace;
+        var held = new HeldRead(f.Storage);
+        var reloading = f.Session.ReloadAfterCheckpointFailureAsync();
+        await held.WaitAsync();
+        Assert.False(reloading.IsCompleted);
+        AssertLocked(f.Gate);
+        Assert.Same(before, f.Session.Workspace);
+        held.Release();
+        await reloading;
+        Assert.NotSame(before, f.Session.Workspace);
+        Assert.False(f.Gate.WorkspaceLoading);
+    }
+
+    sealed class RecordingObserver : IWorkspaceLoadObserver
+    {
+        public readonly List<string> Calls = [];
+        public void Stage(WorkspaceLoadStage stage) { lock (Calls) Calls.Add(stage.ToString()); }
+        public void Rows(int read, int total) { lock (Calls) Calls.Add($"{read}/{total}"); }
+    }
+
+    [Fact]
+    public async Task Every_read_reports_to_the_load_observer()
+    {
+        var f = new Fixture();
+        var observer = new RecordingObserver();
+        f.Session.LoadObserver = observer;
+        var other = f.Storage.Seed("second");
+        await f.Session.SwitchWorkspaceAsync(other.Id);
+        await f.Session.ReloadAfterCheckpointFailureAsync();
+        await f.Session.OpenAsync("default");
+        Assert.Equal(3, observer.Calls.Count(c => c == "Rows"));
     }
 }
