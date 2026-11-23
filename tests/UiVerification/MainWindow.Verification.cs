@@ -235,7 +235,7 @@ public sealed partial class MainWindow
                 if(verificationSwitchTarget is null){var target=new Workspace{Name="QA switch target"};storage.Save(target);verificationSwitchTarget=target.Id;ReloadWorkspaces();}
                 var away=Stopwatch.StartNew();await SwitchWorkspace(verificationSwitchTarget.Value);await dataQueryTask;RootGrid.UpdateLayout();away.Stop();
                 var back=Stopwatch.StartNew();double backStall;
-                using(var stall=new FrameStall()){await SwitchWorkspace(home);await dataQueryTask;RootGrid.UpdateLayout();back.Stop();backStall=stall.Longest;}
+                {var stall=new FrameStall();try{await SwitchWorkspace(home);await dataQueryTask;RootGrid.UpdateLayout();back.Stop();}finally{stall.Dispose();}backStall=stall.Longest;}
                 ReloadWorkspaces();
                 return new{awayMilliseconds=away.Elapsed.TotalMilliseconds,backMilliseconds=back.Elapsed.TotalMilliseconds,backStallMilliseconds=backStall,status=StatusLabel.Text,state=DataVerificationState()};
             }
@@ -267,10 +267,10 @@ public sealed partial class MainWindow
                 if(verificationSwitchTarget is null){var target=new Workspace{Name="QA switch target"};storage.Save(target);verificationSwitchTarget=target.Id;ReloadWorkspaces();}
                 SelectPane(ShellPage.Workspace);RootGrid.UpdateLayout();await Task.Delay(200);
                 var away=Stopwatch.StartNew();double awayStall;
-                using(var stall=new FrameStall()){await SwitchWorkspace(verificationSwitchTarget.Value);RootGrid.UpdateLayout();away.Stop();awayStall=stall.Longest;}
+                {var stall=new FrameStall();try{await SwitchWorkspace(verificationSwitchTarget.Value);RootGrid.UpdateLayout();away.Stop();}finally{stall.Dispose();}awayStall=stall.Longest;}
                 await Task.Delay(200);
                 var back=Stopwatch.StartNew();double backStall;
-                using(var stall=new FrameStall()){await SwitchWorkspace(home);RootGrid.UpdateLayout();back.Stop();backStall=stall.Longest;}
+                {var stall=new FrameStall();try{await SwitchWorkspace(home);RootGrid.UpdateLayout();back.Stop();}finally{stall.Dispose();}backStall=stall.Longest;}
                 ReloadWorkspaces();SelectPane(shownPage);await dataQueryTask;RootGrid.UpdateLayout();
                 return new{awayMilliseconds=away.Elapsed.TotalMilliseconds,backMilliseconds=back.Elapsed.TotalMilliseconds,awayStallMilliseconds=awayStall,backStallMilliseconds=backStall,
                     routes=workspace.Resources[ResourceKind.Routes].Draft.Count,status=StatusLabel.Text};
