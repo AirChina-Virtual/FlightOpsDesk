@@ -210,6 +210,19 @@ public class RequestGoldenTests
         w.Verify("route_scheduled_fleet_ids_remove");
     }
 
+    // A cargo route (fleets 4,5) drops fleet 5 while it stays cargo: the same PUT, prefix preflight and set read-back as scheduled.
+    [Fact]
+    public async Task Route_cargo_fleet_ids_remove()
+    {
+        var w = new GoldenWorld(standard: false);
+        GoldenWorld.StandardData(w.Remote);
+        w.Remote.AddRow("routes/13", """{"id":13,"departure_id":101,"arrival_id":102,"type":"cargo","callsign":"CAO130","flight_number":"CA130","fleet_ids":[4,5],"hidden":false}""");
+        w.LoadRemote();
+        w.Edit(ResourceKind.Routes, "13", ("Fleet IDs", "4"));
+        await w.RunAsync();
+        w.Verify("route_cargo_fleet_ids_remove");
+    }
+
     [Fact]
     public async Task Route_update_time_keeps_original_seconds()
     {

@@ -45,6 +45,7 @@ internal sealed class ApiKit
     public const string Aircraft8 = """{"id":8,"airline_id":7,"fleet_id":4,"registration":"B-TEST","name":"Plane","cargo":1000}""";
     public const string Routing9 = """{"id":9,"airline_id":7,"departure_airport_id":101,"arrival_airport_id":102,"route":"DCT","remarks":"original","tag":["a"]}""";
     public const string Scheduled10 = """{"id":10,"departure_id":101,"arrival_id":102,"type":"scheduled","callsign":"CAO100","flight_number":"CA100","fleet_ids":[4],"hidden":true,"remarks":"original","updated_at":"2026-01-01T00:00:00Z"}""";
+    public const string Cargo13 = """{"id":13,"departure_id":101,"arrival_id":102,"type":"cargo","callsign":"CAO130","flight_number":"CA130","fleet_ids":[4,5],"departure_time":"08:00:00","arrival_time":"10:00:00","hidden":false}""";
     public const string Jumpseat11 = """{"id":11,"departure_id":101,"arrival_id":102,"type":"jumpseat","callsign":null,"flight_number":null,"remarks":"original jumpseat","hidden":false}""";
     public const string Scheduled12 = """{"id":12,"departure_id":101,"arrival_id":102,"type":"scheduled","callsign":"CAO120","flight_number":"CA120","fleet_ids":[4,5],"departure_time":"23:59:37","arrival_time":"01:20:15","start_date":"2026-10-01T00:00:00.1234567+00:00","hidden":false}""";
 

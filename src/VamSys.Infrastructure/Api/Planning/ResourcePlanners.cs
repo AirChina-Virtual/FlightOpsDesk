@@ -114,16 +114,22 @@ internal sealed class RoutingPlanner(ApiContext ctx, RequestPlanners siblings) :
 internal sealed class RoutePlanner(ApiContext ctx, RequestPlanners siblings) : EndpointPlanner(ctx, siblings, ResourceKind.Routes)
 {
     // Rules that depend on the route type and on what is stored. Jumpseats keep their identity (callsign, flight number)
-    // and type; scheduled routes may change their fleet set only while they stay scheduled.
+    // and type. A route that carries fleets may change its fleet set only while its type stays the same: the server keeps
+    // fleet_ids for every such type (scheduled proved live; cargo, charter, training, vfr and repositioning are sampled
+    // under their own capability key, see ApiOperationPolicy.Key), while a jumpseat keeps none and moving into or out of
+    // jumpseat clears them.
     protected override void CheckField(ChangeItem c, FieldSpec spec, string wire, string text, bool create)
     {
-        if (wire == "fleet_ids" && !create && !(c.Before?.Get("Type") == "scheduled" && c.After.Get("Type") == "scheduled"))
+        if (wire == "fleet_ids" && !create && !SameFleetCarryingType(c))
             throw Block("ApiFleetSet");
         if (!create && c.Before?.Get("Type") == "jumpseat" && spec.JumpseatReadOnly)
             throw Block("ApiJumpseatIdentity");
         if (wire == "type" && !create && (text == "jumpseat" || c.Before!.Get("Type") == "jumpseat"))
             throw Block("ApiJumpseat");
     }
+
+    static bool SameFleetCarryingType(ChangeItem c)
+        => c.Before?.Get("Type") is { } before && before == c.After.Get("Type") && Schemas.RouteTypes.Contains(before) && before != "jumpseat";
 
     // The grid shows HH:mm and UTC "yyyy-MM-dd HH:mm:ss"; the server stores HH:mm:ss and ISO 8601 with fractions.
     // Seconds and fractions the server already holds are kept when the grid does not show them. Local-time routes
@@ -164,10 +170,10 @@ internal sealed class RoutePlanner(ApiContext ctx, RequestPlanners siblings) : E
 
     protected override void CheckBody(ChangeItem c, bool create, Dictionary<string, object?> body)
     {
-        // A scheduled route needs a non-empty fleet set; a jumpseat has none.
+        // Every route type but jumpseat needs a non-empty fleet set (also on update: no type may be emptied); a jumpseat has none.
         if (create && c.After.Get("Type") != "jumpseat" && !body.ContainsKey("fleet_ids"))
             throw Block("ApiInvalid", "Fleet IDs");
-        if (body.ContainsKey("fleet_ids") && c.After.Get("Type") == "scheduled" && ((long[])body["fleet_ids"]!).Length == 0)
+        if (body.ContainsKey("fleet_ids") && c.After.Get("Type") != "jumpseat" && ((long[])body["fleet_ids"]!).Length == 0)
             throw Block("ApiInvalid", "Fleet IDs");
         // A jumpseat has no fleets: the server drops them (2026-11-12), so they are never sent.
         if (c.After.Get("Type") == "jumpseat" && body.TryGetValue("fleet_ids", out var jumpseatFleets) && ((long[])jumpseatFleets!).Length > 0)

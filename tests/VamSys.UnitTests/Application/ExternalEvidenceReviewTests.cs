@@ -1,5 +1,6 @@
 using VamSys.Core;
 using VamSys.Infrastructure;
+using VamSys.TestSupport;
 using VamSys.UnitTests.Api;
 
 namespace VamSys.UnitTests.Application;
@@ -120,6 +121,58 @@ public class ExternalEvidenceReviewTests
         Assert.True(IndependentApiEvidence.Covers(withName, ApiContracts.Sha256));
         // only the aircraft's field: routings keep their internal remarks outside the evidence
         Assert.False(IndependentApiEvidence.Covers(Update(ResourceKind.Routings, "Internal Remarks", "x"), ApiContracts.Sha256));
+    }
+
+    // The fleet-set capability is proved per route type: scheduled keeps its saved key, every other type has its own.
+    [Theory]
+    [InlineData("scheduled", "Routes:Update:FleetIds:Scheduled")]
+    [InlineData("cargo", "Routes:Update:FleetIds:Cargo")]
+    [InlineData("charter", "Routes:Update:FleetIds:Charter")]
+    [InlineData("training", "Routes:Update:FleetIds:Training")]
+    [InlineData("vfr", "Routes:Update:FleetIds:Vfr")]
+    [InlineData("repositioning", "Routes:Update:FleetIds:Repositioning")]
+    public void A_route_fleet_set_update_is_keyed_by_its_route_type(string type, string key)
+    {
+        var item = Update(ResourceKind.Routes, "Fleet IDs", "4");
+        item.Before = item.Before!.With("Type", type);
+        item.After = item.After.With("Type", type);
+        Assert.Equal(key, ApiOperationPolicy.Key(item));
+        // without a fleet change the plain key applies
+        Assert.Equal("Routes:Update", ApiOperationPolicy.Key(Update(ResourceKind.Routes, "Remarks", "x")));
+    }
+
+    // The 2026-27 winter-spring update: 11 cargo routes drop one fleet (26722,26724,26725,26728 -> 26722,26724,26725) and
+    // change their times, service days and cost index at the same time. They pass the real preview (planner and prefix
+    // check) and are sampled as Routes:Update:FleetIds:Cargo: the scheduled proof does not open them.
+    [Fact]
+    public async Task Cargo_routes_that_drop_a_fleet_are_sampled_under_their_own_key_and_never_blocked()
+    {
+        var kit = new ApiKit();
+        kit.LoadStandardAirportsAndFleets();
+        kit.Server.On(HttpMethod.Get, "parameters", FakeResponse.Ok("""{"data":[{"id":1,"airline_id":7,"icao_code":"CAO","iata_code":"CA","approved":true,"restricted":false,"fleet_ids":[4,5]}],"meta":{"next_cursor_url":null}}"""));
+        await kit.Api.ReadParametersAsync(TestContext.Current.CancellationToken);
+        var items = Enumerable.Range(0, 11).Select(n =>
+        {
+            var before = kit.Map(ResourceKind.Routes, ApiKit.Cargo13.Replace("\"id\":13", $"\"id\":{1300 + n}", StringComparison.Ordinal));
+            return ApiKit.Update(ResourceKind.Routes, before, ("Fleet IDs", "4"), ("Departure Time (HH:MM)", "09:15"), ("Arrival Time (HH:MM)", "11:40"),
+                ("Service Days", "monday,wednesday,friday"), ("Cost Index", "150"));
+        }).ToList();
+        var verified = new HashSet<string>(StringComparer.Ordinal) { "Routes:Update:FleetIds:Scheduled" };
+
+        var plan = ReviewPlanBuilder.Build(items, RunMode.Online, true, verified, item => kit.Api.PreviewPlan(item), externalEvidenceContractHash: ApiContracts.Sha256);
+
+        Assert.All(items, i => Assert.Equal("Routes:Update:FleetIds:Cargo", ApiOperationPolicy.Key(i)));
+        Assert.DoesNotContain(plan.Entries, e => e.Disposition == ReviewDisposition.Blocked);
+        Assert.Equal(3, plan.Entries.Count(e => e.Disposition == ReviewDisposition.Ready));
+        Assert.All(plan.Entries.Where(e => e.Disposition != ReviewDisposition.Ready), e =>
+        { Assert.Equal(ReviewDisposition.Deferred, e.Disposition); Assert.Equal("ReviewSample", e.Reason!.Code); });
+        Assert.Equal(3, plan.SubmitItems.Count);
+        // the request the first sample sends
+        var step = Assert.Single(kit.Api.Plan(items[0]));
+        Assert.Equal("""{"fleet_ids":[4],"departure_time":"09:15:00","arrival_time":"11:40:00","service_days":["monday","wednesday","friday"],"cost_index":"150"}""", ApiKit.Body(step));
+        // with the cargo key verified (after three samples read back), the rest open in full
+        verified.Add("Routes:Update:FleetIds:Cargo");
+        Assert.Equal(11, ReviewPlanBuilder.Build(items, RunMode.Online, true, verified, item => kit.Api.PreviewPlan(item), externalEvidenceContractHash: ApiContracts.Sha256).SubmitItems.Count);
     }
 
     [Fact]

@@ -442,6 +442,43 @@ public class RequestPlannerTests
         Assert.Equal("ApiFleetSet", ApiKit.BlockedWith(() => kit.Api.Plan(ApiKit.Update(ResourceKind.Routes, scheduled, ("Fleet IDs", "5"), ("Type", "jumpseat")))));
     }
 
+    // A cargo route keeps fleet_ids like a scheduled one, so its fleet set may change while it stays cargo (sampled under
+    // Routes:Update:FleetIds:Cargo, see ApiOperationPolicy.Key). Changing the type together with the fleets stays blocked.
+    [Fact]
+    public void Cargo_fleet_sets_can_change_while_the_type_stays_cargo()
+    {
+        var kit = Kit();
+        var cargo = kit.Map(ResourceKind.Routes, ApiKit.Cargo13);
+        Is(Only(kit.Api.Plan(ApiKit.Update(ResourceKind.Routes, cargo, ("Fleet IDs", "4")))), HttpMethod.Put, "routes/13", """{"fleet_ids":[4]}""");
+        Is(Only(kit.Api.Plan(ApiKit.Update(ResourceKind.Routes, cargo, ("Fleet IDs", "5"), ("Cost Index", "150")))), HttpMethod.Put, "routes/13", """{"fleet_ids":[5],"cost_index":"150"}""");
+    }
+
+    [Fact]
+    public void A_cargo_fleet_set_cannot_be_emptied()
+    {
+        var kit = Kit();
+        var cargo = kit.Map(ResourceKind.Routes, ApiKit.Cargo13);
+        // an empty cell is a clear, which this column never sends
+        var item = ApiKit.Update(ResourceKind.Routes, cargo, ("Fleet IDs", ""));
+        Assert.Equal("ApiClear", ApiKit.BlockedWith(() => kit.Api.Plan(item)));
+        Assert.Equal("Fleet IDs", ApiKit.BlockedField(() => kit.Api.Plan(item)));
+        // a value that names no fleet would send [], which no route type but jumpseat may hold
+        var blank = ApiKit.Update(ResourceKind.Routes, cargo, ("Fleet IDs", " , "));
+        Assert.Equal("Fleet IDs", ApiKit.BlockedField(() => kit.Api.Plan(blank)));
+    }
+
+    [Theory]
+    [InlineData("scheduled", "cargo")]
+    [InlineData("cargo", "scheduled")]
+    [InlineData("cargo", "charter")]
+    public void Fleets_cannot_change_together_with_the_route_type(string from, string to)
+    {
+        var kit = Kit();
+        var route = kit.Map(ResourceKind.Routes, from == "scheduled" ? ApiKit.Scheduled12 : ApiKit.Cargo13);
+        Assert.Equal(from, route.Get("Type"));
+        Assert.Equal("ApiFleetSet", ApiKit.BlockedWith(() => kit.Api.Plan(ApiKit.Update(ResourceKind.Routes, route, ("Type", to), ("Fleet IDs", "4")))));
+    }
+
     [Fact]
     public void A_jumpseat_keeps_its_identity_and_its_type()
     {

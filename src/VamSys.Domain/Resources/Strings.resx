@@ -779,7 +779,7 @@
     <value>使用 Orwell 中配置的 Operations Client ID 与 Secret。连接后手动刷新；草稿不会自动提交。API 重量按 kg，日期与时刻按 UTC。</value>
   </data>
   <data name="ApiFleetSet" xml:space="preserve">
-    <value>航线机型集合更新与清空语义尚未完成实例核实。</value>
+    <value>已有航线只能在类型不变时修改机型集合（jumpseat 除外）：同时修改类型和机型、修改 jumpseat 的机型，或改入、改出 jumpseat 时一并修改机型，都会被阻止。</value>
   </data>
   <data name="ApiRefreshResource" xml:space="preserve"><value>只刷新{resource}</value></data>
   <data name="DataSelectedCount" xml:space="preserve"><value>已选 {count} 条</value></data>

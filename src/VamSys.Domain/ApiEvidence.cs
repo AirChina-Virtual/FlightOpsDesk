@@ -80,11 +80,26 @@ public static class ApiOperationPolicy
     public static string Key(ChangeItem item) => item.Resource switch
     {
         ResourceKind.Aircraft when IndependentApiEvidence.IsMove(item) => "Aircraft:Update:FleetId:Move",
-        ResourceKind.Routes when item.Kind == ChangeKind.Update && item.Fields.ContainsKey("Fleet IDs") => "Routes:Update:FleetIds:Scheduled",
+        ResourceKind.Routes when item.Kind == ChangeKind.Update && item.Fields.ContainsKey("Fleet IDs") => FleetSetKey(item),
         ResourceKind.Routes when IsJumpseatCreate(item) => "Routes:Create:Jumpseat",
         ResourceKind.Fleets when item.Kind == ChangeKind.Create && item.After.Get("Parameter IDs") != "" => "Fleets:Create:ParameterIds",
         _ => PlainKey(item.Resource, item.Kind)
     };
+    // A route's fleet-set update is proved per route type: scheduled keeps its original key (saved verification marks and
+    // old jobs name it), and no other type may borrow the scheduled proof. The planner only lets the set change while the
+    // type stays the same, so the stored type (Before) names the operation. Written out so the capability inventory locks them.
+    static readonly IReadOnlyDictionary<string, string> FleetSetKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["scheduled"] = "Routes:Update:FleetIds:Scheduled",
+        ["cargo"] = "Routes:Update:FleetIds:Cargo",
+        ["charter"] = "Routes:Update:FleetIds:Charter",
+        ["training"] = "Routes:Update:FleetIds:Training",
+        ["vfr"] = "Routes:Update:FleetIds:Vfr",
+        ["repositioning"] = "Routes:Update:FleetIds:Repositioning",
+        ["jumpseat"] = "Routes:Update:FleetIds:Jumpseat",
+    };
+    static string FleetSetKey(ChangeItem item)
+        => FleetSetKeys.TryGetValue((item.Before ?? item.After).Get("Type"), out var key) ? key : "Routes:Update:FleetIds:Unknown";
     // The default key (resource, a colon, kind) for every defined pair, built once: the review asks for one key per change.
     static readonly string[,] PlainKeys = BuildPlainKeys();
     static string[,] BuildPlainKeys()

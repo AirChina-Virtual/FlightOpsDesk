@@ -779,7 +779,7 @@
     <value>Use the Operations Client ID and Secret configured in Orwell. Refresh manually after connecting; drafts are never submitted automatically. API weights use kg; dates and times use UTC.</value>
   </data>
   <data name="ApiFleetSet" xml:space="preserve">
-    <value>Route fleet replacement and clearing semantics have not been verified against an instance.</value>
+    <value>An existing route can change its fleet set only while its type stays the same (jumpseat excluded): changing the type and the fleets together, changing a jumpseat's fleets, or changing fleets while moving into or out of jumpseat is blocked.</value>
   </data>
   <data name="ApiRefreshResource" xml:space="preserve"><value>Refresh {resource} only</value></data>
   <data name="DataSelectedCount" xml:space="preserve"><value>{count} selected</value></data>

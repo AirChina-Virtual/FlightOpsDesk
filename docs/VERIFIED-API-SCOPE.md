@@ -17,7 +17,7 @@
 | scheduled 航线 | 类型、呼号、班号、起降机场、非空 Fleet IDs、时刻、Routing、隐藏、有效日期、备注、内部备注、Service Days | Remarks、Cost Index、起降时刻；非空机队集合替换／追加／移除 | 完整 204／404 证据后确认 API 不可见 |
 | jumpseat 航线 | 类型、呼号、班号、起降机场、时刻、Routing、隐藏、有效日期、备注、内部备注、Cost Index、Service Days | Remarks、Cost Index、起降时刻 | 完整 204／404 证据后确认 API 不可见 |
 
-未覆盖的字段或变体仍使用原有样本和兼容限制。例如，Tags 随创建、scheduled 创建时的 Cost Index、jumpseat 创建时的机队关联没有进入独立证据豁免。新的在线机队仍要求选择一个已批准、未受限的航司参数；既有机队参数改绑不开放。
+未覆盖的字段或变体仍使用原有样本和兼容限制。cargo、charter、training、vfr、repositioning 航线在类型不变时修改非空机队集合已开放，但不在上表证据内：每种类型用自己的能力键（如 `Routes:Update:FleetIds:Cargo`），按前三条样本执行，尚无真实写入证据。例如，Tags 随创建、scheduled 创建时的 Cost Index、jumpseat 创建时的机队关联没有进入独立证据豁免。新的在线机队仍要求选择一个已批准、未受限的航司参数；既有机队参数改绑不开放。
 
 ## 飞机跨机队移动
 
@@ -72,6 +72,6 @@
 
 这些材料位于本机历史证据目录，不随正式包分发。公开源码中的范围实现为 `IndependentApiEvidence`；回归直接调用实际适配器、执行器、存储和只读核对服务。173 个操作中 96 次成功的旧汇总不能泛化成完整 API 开放。
 
-继续禁用 weight_unit／lbs 换算、SimBrief 编辑、空航线机队集合、jumpseat 集合修改、进入或离开 jumpseat 的类型转换、既有机队参数改绑／解绑和未验证清空。新增真实写入验收不是本版自动步骤。
+继续禁用 weight_unit／lbs 换算、SimBrief 编辑、空航线机队集合、jumpseat 集合修改、进入或离开 jumpseat 的类型转换、改类型的同时修改机队、既有机队参数改绑／解绑和未验证清空。新增真实写入验收不是本版自动步骤。
 
 [能力矩阵](CAPABILITY-MATRIX.md) · [API 契约](API-CONTRACTS.md) · [测试报告](TEST-REPORT.md)
