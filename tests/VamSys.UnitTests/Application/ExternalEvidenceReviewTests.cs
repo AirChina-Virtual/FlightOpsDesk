@@ -37,17 +37,24 @@ public class ExternalEvidenceReviewTests
 
         Assert.Equal(8, Submitted(items, ApiContracts.Sha256, markers));
         Assert.Empty(markers);
-        // another contract falls back to the sampling limit
-        Assert.Equal(3, Submitted(items, "other-contract"));
+        Assert.All(Plan(items, ApiContracts.Sha256).Entries, e => Assert.Equal("ApiIndependentEvidence", e.Reason!.Code));
+        // another contract is not the evidence; these updates are still sent in full because they are verified operations
+        // (ApiOperationPolicy.ReleaseOf), and say nothing about evidence
+        Assert.False(IndependentApiEvidence.Covers(items[0], "other-contract"));
+        Assert.All(Plan(items, "other-contract").Entries, e => { Assert.Equal(ReviewDisposition.Ready, e.Disposition); Assert.Null(e.Reason); });
     }
+
+    static WorkspaceReviewPlan Plan(IReadOnlyList<ChangeItem> items, string? contractHash)
+        => ReviewPlanBuilder.Build(items, RunMode.Online, true, new HashSet<string>(), _ => { }, externalEvidenceContractHash: contractHash);
 
     public static TheoryData<ResourceKind> Kinds() => new(Enum.GetValues<ResourceKind>());
 
     [Fact]
-    public void An_unverified_field_variant_keeps_the_sampling_limit_even_with_independent_evidence()
+    public void An_unverified_field_variant_is_outside_the_independent_evidence_but_a_verified_operation_still_opens()
     {
         var untested = Enumerable.Range(0, 5).Select(_ => Update(ResourceKind.Routings, "Tags", "not-tested")).ToList();
-        Assert.Equal(3, Submitted(untested, ApiContracts.Sha256));
+        Assert.False(IndependentApiEvidence.Covers(untested[0], ApiContracts.Sha256));
+        Assert.All(Plan(untested, ApiContracts.Sha256).Entries, e => { Assert.Equal(ReviewDisposition.Ready, e.Disposition); Assert.Null(e.Reason); });
     }
 
     [Fact]
@@ -102,11 +109,14 @@ public class ExternalEvidenceReviewTests
     // An aircraft's internal remarks were updated live by a PUT of that field alone, twice, and read back the same from the
     // aircraft and from its fleet's list (artifacts/write-evidence/aircraft-remarks.json, run FODESK-WE 20261118T005911Z).
     [Fact]
-    public void Aircraft_internal_remarks_updates_open_in_full_but_not_when_an_unverified_field_rides_along()
+    public void Aircraft_internal_remarks_updates_are_covered_but_not_when_an_unverified_field_rides_along()
     {
         var remarks = Enumerable.Range(0, 5).Select(_ => Update(ResourceKind.Aircraft, "Internal Remarks", "hangar 3")).ToList();
+        Assert.True(IndependentApiEvidence.Covers(remarks[0], ApiContracts.Sha256));
+        Assert.False(IndependentApiEvidence.Covers(remarks[0], "other-contract"));
+        // Aircraft:Update is a verified operation, so all of them are sent either way
         Assert.Equal(5, Submitted(remarks, ApiContracts.Sha256));
-        Assert.Equal(3, Submitted(remarks, "other-contract"));
+        Assert.Equal(5, Submitted(remarks, "other-contract"));
 
         var mixed = Enumerable.Range(0, 5).Select(_ =>
         {
@@ -114,8 +124,9 @@ public class ExternalEvidenceReviewTests
             item.Fields["SELCAL"] = new(FieldIntent.Set, "AB-CD");
             return item;
         }).ToList();
-        Assert.Equal(3, Submitted(mixed, ApiContracts.Sha256));
-        // a verified field next to it keeps it open
+        Assert.False(IndependentApiEvidence.Covers(mixed[0], ApiContracts.Sha256));
+        Assert.Equal(5, Submitted(mixed, ApiContracts.Sha256));
+        // a verified field next to it keeps it covered
         var withName = Update(ResourceKind.Aircraft, "Internal Remarks", "hangar 3");
         withName.Fields["Name"] = new(FieldIntent.Set, "Plane");
         Assert.True(IndependentApiEvidence.Covers(withName, ApiContracts.Sha256));
@@ -125,6 +136,8 @@ public class ExternalEvidenceReviewTests
 
     // Route operations are keyed per route type. scheduled keeps the plain keys and its fleet-set key; a type outside the
     // API's list keeps the plain keys (the planner refuses it); deletes keep the plain key (G8 covers them independently).
+    // A jumpseat or unknown type has no fleet-set key (the planner always refuses that change): it falls back to the plain
+    // update key of its type.
     [Theory]
     [InlineData("scheduled", "Routes:Create", "Routes:Update", "Routes:Update:FleetIds:Scheduled")]
     [InlineData("cargo", "Routes:Create:Cargo", "Routes:Update:Cargo", "Routes:Update:FleetIds:Cargo")]
@@ -132,8 +145,9 @@ public class ExternalEvidenceReviewTests
     [InlineData("training", "Routes:Create:Training", "Routes:Update:Training", "Routes:Update:FleetIds:Training")]
     [InlineData("vfr", "Routes:Create:Vfr", "Routes:Update:Vfr", "Routes:Update:FleetIds:Vfr")]
     [InlineData("repositioning", "Routes:Create:Repositioning", "Routes:Update:Repositioning", "Routes:Update:FleetIds:Repositioning")]
-    [InlineData("jumpseat", "Routes:Create:Jumpseat", "Routes:Update:Jumpseat", "Routes:Update:FleetIds:Jumpseat")]
-    [InlineData("ferry", "Routes:Create", "Routes:Update", "Routes:Update:FleetIds:Unknown")]
+    [InlineData("jumpseat", "Routes:Create:Jumpseat", "Routes:Update:Jumpseat", "Routes:Update:Jumpseat")]
+    [InlineData("ferry", "Routes:Create", "Routes:Update", "Routes:Update")]
+    [InlineData("", "Routes:Create", "Routes:Update", "Routes:Update")]
     public void Route_operations_are_keyed_by_route_type(string type, string create, string update, string fleets)
     {
         Assert.Equal(create, ApiOperationPolicy.Key(RouteCreate(type)));
@@ -152,18 +166,28 @@ public class ExternalEvidenceReviewTests
     public void A_route_type_change_is_keyed_by_the_non_scheduled_type_it_involves(string from, string to, string key)
         => Assert.Equal(key, ApiOperationPolicy.Key(RouteUpdate(from, to, "Type", to)));
 
-    // By the user's decision (2026-11-24) the non-scheduled route operations skip the sample in every workspace. They are not
-    // independent evidence; the scheduled keys and the blocked fleet-set keys keep their rules.
+    // 2026-11-24: what the vCCA workspace verified, and what the user opened without evidence, skip the sample everywhere.
+    // Only an operation outside both (in practice Fleets:Create of an old job) is still sampled.
     [Fact]
-    public void Exactly_the_non_scheduled_route_operations_skip_the_sample()
+    public void Released_operations_are_the_verified_ones_and_the_user_decided_ones()
     {
+        string[] verified = ["Airports:Create", "Airports:Update", "Airports:Delete", "Fleets:Create:ParameterIds", "Fleets:Update", "Fleets:Delete",
+            "Aircraft:Create", "Aircraft:Update", "Aircraft:Delete", "Aircraft:Update:FleetId:Move", "Routings:Create", "Routings:Update", "Routings:Delete",
+            "Routes:Create", "Routes:Create:Jumpseat", "Routes:Update", "Routes:Update:FleetIds:Scheduled", "Routes:Delete"];
+        foreach (var key in verified)
+            Assert.Equal(SampleRelease.Verified, ApiOperationPolicy.ReleaseOf(key));
         foreach (var type in new[] { "Cargo", "Charter", "Training", "Vfr", "Repositioning" })
             foreach (var key in new[] { $"Routes:Create:{type}", $"Routes:Update:{type}", $"Routes:Update:FleetIds:{type}" })
-                Assert.True(ApiOperationPolicy.IsSampleExempt(key), key);
-        Assert.True(ApiOperationPolicy.IsSampleExempt("Routes:Update:Jumpseat"));
-        foreach (var key in new[] { "Routes:Create", "Routes:Update", "Routes:Delete", "Routes:Create:Jumpseat", "Routes:Update:FleetIds:Scheduled",
-                     "Routes:Update:FleetIds:Jumpseat", "Routes:Update:FleetIds:Unknown", "Fleets:Create:ParameterIds", "Aircraft:Update:FleetId:Move" })
-            Assert.False(ApiOperationPolicy.IsSampleExempt(key), key);
+                Assert.Equal(SampleRelease.UserDecided, ApiOperationPolicy.ReleaseOf(key));
+        Assert.Equal(SampleRelease.UserDecided, ApiOperationPolicy.ReleaseOf("Routes:Update:Jumpseat"));
+        foreach (var key in new[] { "Fleets:Create", "Routes:Read", "Something:Else" })
+            Assert.Equal(SampleRelease.Sampled, ApiOperationPolicy.ReleaseOf(key));
+        // every key the policy can produce is released except Fleets:Create
+        var produced = new List<string>();
+        foreach (var resource in Enum.GetValues<ResourceKind>())
+            foreach (var kind in Enum.GetValues<ChangeKind>())
+                produced.Add(ApiOperationPolicy.Key(new ChangeItem { Resource = resource, Kind = kind }));
+        Assert.Equal(["Fleets:Create"], produced.Where(k => ApiOperationPolicy.ReleaseOf(k) == SampleRelease.Sampled));
         foreach (var type in new[] { "cargo", "charter", "training", "vfr", "repositioning" })
         {
             Assert.False(IndependentApiEvidence.Covers(RouteCreate(type), ApiContracts.Sha256));
@@ -171,10 +195,44 @@ public class ExternalEvidenceReviewTests
         }
     }
 
-    // A new workspace (nothing verified): cargo creates, updates and fleet changes are all sent, with the user's-decision
-    // reason rather than the evidence one; scheduled creates and updates are still sampled.
+    // A new workspace (nothing verified) sends a typical change of every verified operation in full, with no reason and
+    // outside the independent evidence (another contract), and the user-decided ones with their own reason.
+    public static TheoryData<string> VerifiedChanges() => new(VerifiedSamples().Keys);
+    static Dictionary<string, Func<ChangeItem>> VerifiedSamples() => new()
+    {
+        ["Airports:Create"] = () => Create(ResourceKind.Airports, ("ICAO/IATA", "ZBAA"), ("Name", "Beijing")),
+        ["Airports:Update"] = () => Update(ResourceKind.Airports, "Name", "Beijing Capital"),
+        ["Airports:Delete"] = () => Delete(ResourceKind.Airports),
+        ["Fleets:Create:ParameterIds"] = () => Create(ResourceKind.Fleets, ("Name", "A330"), ("Parameter IDs", "1")),
+        ["Fleets:Update"] = () => Update(ResourceKind.Fleets, "Name", "A330-300"),
+        ["Fleets:Delete"] = () => Delete(ResourceKind.Fleets),
+        ["Aircraft:Create"] = () => Create(ResourceKind.Aircraft, ("Registration", "B-1234"), ("Fleet ID", "4")),
+        ["Aircraft:Update"] = () => Update(ResourceKind.Aircraft, "Name", "Plane"),
+        ["Aircraft:Delete"] = () => Delete(ResourceKind.Aircraft),
+        ["Aircraft:Update:FleetId:Move"] = () => Update(ResourceKind.Aircraft, "Fleet ID", "5"),
+        ["Routings:Create"] = () => Create(ResourceKind.Routings, ("Route String", "DCT")),
+        ["Routings:Update"] = () => Update(ResourceKind.Routings, "Tags", "a"),
+        ["Routings:Delete"] = () => Delete(ResourceKind.Routings),
+        ["Routes:Create"] = () => RouteCreate("scheduled"),
+        ["Routes:Create:Jumpseat"] = () => RouteCreate("jumpseat"),
+        ["Routes:Update"] = () => RouteUpdate("scheduled", "scheduled", "Tags", "t"),
+        ["Routes:Update:FleetIds:Scheduled"] = () => RouteUpdate("scheduled", "scheduled", "Fleet IDs", "4"),
+        ["Routes:Delete"] = () => Delete(ResourceKind.Routes),
+    };
+
+    [Theory]
+    [MemberData(nameof(VerifiedChanges))]
+    public void A_new_workspace_sends_every_verified_operation_in_full(string key)
+    {
+        var items = Enumerable.Range(0, 8).Select(_ => VerifiedSamples()[key]()).ToList();
+        Assert.Equal(key, ApiOperationPolicy.Key(items[0]));
+        var plan = ReviewPlanBuilder.Build(items, RunMode.Online, true, new HashSet<string>(), _ => { }, externalEvidenceContractHash: "other-contract");
+        Assert.All(plan.Entries, e => { Assert.Equal(ReviewDisposition.Ready, e.Disposition); Assert.Null(e.Reason); });
+        Assert.Equal(8, plan.SubmitItems.Count);
+    }
+
     [Fact]
-    public void A_new_workspace_sends_every_non_scheduled_route_operation_but_samples_scheduled_ones()
+    public void A_new_workspace_sends_every_non_scheduled_route_operation_with_the_user_decided_reason_and_samples_only_the_rest()
     {
         var updates = Enumerable.Range(0, 8).Select(n => RouteUpdate("cargo", "cargo", "Departure Time (HH:MM)", $"0{n}:15")).ToList();
         var creates = Enumerable.Range(0, 8).Select(_ => RouteCreate("cargo")).ToList();
@@ -185,13 +243,25 @@ public class ExternalEvidenceReviewTests
             Assert.All(plan.Entries, e => { Assert.Equal(ReviewDisposition.Ready, e.Disposition); Assert.Equal("ReviewUserDecided", e.Reason!.Code); });
             Assert.Equal(8, plan.SubmitItems.Count);
         }
-        // (Tags: a scheduled update outside the independent evidence)
-        Assert.Equal(3, Submitted(Enumerable.Range(0, 8).Select(n => RouteUpdate("scheduled", "scheduled", "Tags", "t" + n)).ToList(), ApiContracts.Sha256));
-        Assert.Equal(3, Submitted(Enumerable.Range(0, 8).Select(_ => RouteCreate("scheduled")).ToList(), ApiContracts.Sha256));
-        // the scheduled fleet-set key keeps its rule: outside the evidence contract it is sampled
-        Assert.Equal(3, Submitted(Enumerable.Range(0, 8).Select(_ => RouteUpdate("scheduled", "scheduled", "Fleet IDs", "4")).ToList(), "other-contract"));
-        // a verified scheduled mark still opens scheduled in full, as before
-        Assert.Equal(8, Submitted(Enumerable.Range(0, 8).Select(_ => RouteCreate("scheduled")).ToList(), ApiContracts.Sha256, ["Routes:Create"]));
+        // the sample itself remains: a plain fleet create (an old job's) is sampled until the workspace verified it
+        var plain = Enumerable.Range(0, 5).Select(_ => Create(ResourceKind.Fleets, ("Name", "Old"), ("Type (pax/cargo/...)", "pax"))).ToList();
+        Assert.Equal("Fleets:Create", ApiOperationPolicy.Key(plain[0]));
+        Assert.Equal(3, Submitted(plain, "other-contract"));
+        Assert.Equal(5, Submitted(plain, "other-contract", ["Fleets:Create"]));
+    }
+
+    static ChangeItem Create(ResourceKind kind, params (string Field, string Value)[] fields) => new()
+    {
+        Resource = kind,
+        Kind = ChangeKind.Create,
+        After = new() { Fields = fields.ToDictionary(f => f.Field, f => f.Value) },
+        Fields = fields.ToDictionary(f => f.Field, f => new FieldChange(FieldIntent.Set, f.Value))
+    };
+
+    static ChangeItem Delete(ResourceKind kind)
+    {
+        var row = new DataRow { Fields = new Dictionary<string, string> { ["Type"] = "scheduled" } };
+        return new() { Resource = kind, Kind = ChangeKind.Delete, Before = row, After = row.With("_delete", "TRUE"), Fields = [] };
     }
 
     // The 2026-27 winter-spring update: 11 cargo routes drop one fleet (26722,26724,26725,26728 -> 26722,26724,26725) and

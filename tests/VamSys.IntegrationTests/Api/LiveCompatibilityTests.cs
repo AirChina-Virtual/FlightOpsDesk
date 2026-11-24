@@ -176,14 +176,18 @@ public class LiveCompatibilityTests
         Assert.Equal("ApiClear", BlockedWith(() => w.Api.Plan(empty)));
     }
 
+    // Scheduled fleet sets keep their own key (not Routes:Update). Since 2026-11-24 that key is a verified operation in every
+    // workspace (ApiOperationPolicy.ReleaseOf), so all of them are sent even where nothing is verified.
     [Fact]
-    public void A_generic_route_update_verification_does_not_lift_the_sample_limit_of_scheduled_fleet_sets()
+    public void Scheduled_fleet_sets_have_their_own_key_which_is_released_as_verified()
     {
         var w = new GoldenWorld();
         var items = Enumerable.Range(0, 4).Select(_ => EditItem(w, ResourceKind.Routes, "10", "Fleet IDs", "5")).ToList();
-        var plan = ReviewPlanBuilder.Build(items, RunMode.Online, true, new HashSet<string> { "Routes:Update" }, _ => { });
-        Assert.Equal(3, plan.SubmitItems.Count);
-        Assert.Equal(1, plan.Entries.Count(e => e.Disposition == ReviewDisposition.Deferred));
+        Assert.All(items, i => Assert.Equal("Routes:Update:FleetIds:Scheduled", ApiOperationPolicy.Key(i)));
+        Assert.Equal(SampleRelease.Verified, ApiOperationPolicy.ReleaseOf("Routes:Update:FleetIds:Scheduled"));
+        var plan = ReviewPlanBuilder.Build(items, RunMode.Online, true, new HashSet<string>(), _ => { });
+        Assert.Equal(4, plan.SubmitItems.Count);
+        Assert.DoesNotContain(plan.Entries, e => e.Disposition == ReviewDisposition.Deferred);
     }
 
     // ---- airline parameter approval ---------------------------------------------------------------------------

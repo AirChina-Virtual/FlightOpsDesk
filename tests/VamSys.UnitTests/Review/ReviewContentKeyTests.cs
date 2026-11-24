@@ -79,7 +79,8 @@ public class ReviewContentKeyTests
     {
         var baseline = Key();
         Assert.NotEqual(baseline, Key(connected: false));
-        Assert.NotEqual(baseline, Key(verified: new HashSet<string> { "Routes:Update" }));
+        // (Fleets:Create: the one operation of the fixture that is still sampled)
+        Assert.NotEqual(baseline, Key(verified: new HashSet<string> { "Fleets:Create" }));
         Assert.NotEqual(baseline, Key(preview: item => { if (Number(item.After.LocalId) == 31) throw MessageErrors.Attach(new InvalidOperationException("x"), Messages.Define("ApiRefreshFirst")); }));
         Assert.NotEqual(baseline, Key(preview: item => { if (Number(item.After.LocalId) == 31) throw MessageErrors.Attach(new InvalidOperationException("x"), Messages.Define("ApiMoveSeparate")); }));
         var offline = Mixed(RunMode.Offline);

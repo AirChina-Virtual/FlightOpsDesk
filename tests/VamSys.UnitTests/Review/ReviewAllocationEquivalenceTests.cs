@@ -16,7 +16,7 @@ public class ReviewAllocationEquivalenceTests
     // SHA-256 of ReviewEquivalence.Describe (content key, every entry's handling, reason, fields and dependencies, the issues,
     // the validation issues, the submission items as saved and the requests they would send), from 6292ec1. Three Online cases changed
     // on purpose on 2026-11-24: their non-scheduled route changes skip the sample by the user's decision
-    // (ApiOperationPolicy.IsSampleExempt) and carry the ReviewUserDecided reason; with that turned off they still hash as before.
+    // (ApiOperationPolicy.ReleaseOf, UserDecided) and carry the ReviewUserDecided reason; with that turned off they still hash as before.
     static readonly Dictionary<string, string> Before = new()
     {
         ["mixed Demo"] = "C5F0A1F990F754AE7BBE8DAD91183124B268222103A9DEB3A0A795FF7903156B",

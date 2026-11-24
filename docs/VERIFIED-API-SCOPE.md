@@ -4,7 +4,7 @@
 
 基线标识为 `vcca-isolated-20261020`，只适用于固定契约 SHA-256 `1EC1A869FC3C6F4D70A7A6ECD50170D5D915551794E796F9F34D5AFB944D78C2`。程序不下载证据或自动替换契约，也不把该基线写入工作区的 `VerifiedOperations`。
 
-## 本版解除首次样本限制的请求范围
+## 独立真实证据覆盖的请求范围
 
 下表只列客户端已有的编辑字段；独立脚本中的其他字段不会因此自动成为客户端编辑能力。所有请求仍必须通过实际适配器校验、VA 归属检查、引用／批准预检和提交确认。
 
@@ -17,7 +17,7 @@
 | scheduled 航线 | 类型、呼号、班号、起降机场、非空 Fleet IDs、时刻、Routing、隐藏、有效日期、备注、内部备注、Service Days | Remarks、Cost Index、起降时刻；非空机队集合替换／追加／移除 | 完整 204／404 证据后确认 API 不可见 |
 | jumpseat 航线 | 类型、呼号、班号、起降机场、时刻、Routing、隐藏、有效日期、备注、内部备注、Cost Index、Service Days | Remarks、Cost Index、起降时刻 | 完整 204／404 证据后确认 API 不可见 |
 
-未覆盖的字段或变体仍使用原有样本和兼容限制。cargo、charter、training、vfr、repositioning 航线的新建、修改和类型不变时的非空机队集合修改都不在上表证据内。非 scheduled 航线（cargo、charter、training、vfr、repositioning）的新建、修改和同类型机队修改按类型分键：`Routes:Create:<Type>`、`Routes:Update:<Type>`、`Routes:Update:FleetIds:<Type>`（如 `Routes:Create:Cargo`），jumpseat 的普通修改为 `Routes:Update:Jumpseat`；scheduled 仍是 `Routes:Create`／`Routes:Update`／`Routes:Update:FleetIds:Scheduled`，jumpseat 新建仍是 `Routes:Create:Jumpseat`。改类型的修改按涉及的非 scheduled 类型取键（scheduled→cargo、cargo→scheduled 都是 `Routes:Update:Cargo`；两个非 scheduled 类型之间取改后的类型）。这些键由用户决定直接放开（2026-11-24）：任何工作区都不执行前三条样本，与有没有 `Routes:Create`／`Routes:Update` 验证记录无关，审阅页标注“按用户决定直接提交”。它们没有软件写入证据，不属于独立证据范围，提交后照常回读核对。scheduled 的三个键维持原规则；`Routes:Update:FleetIds:Jumpseat`／`Unknown` 仍在规划阶段被阻止。例如，Tags 随创建、scheduled 创建时的 Cost Index、jumpseat 创建时的机队关联没有进入独立证据豁免。新的在线机队仍要求选择一个已批准、未受限的航司参数；既有机队参数改绑不开放。
+未覆盖的字段或变体不在独立证据内（兼容限制照旧；是否走样本见下文“样本放开”）。cargo、charter、training、vfr、repositioning 航线的新建、修改和类型不变时的非空机队集合修改都不在上表证据内。非 scheduled 航线（cargo、charter、training、vfr、repositioning）的新建、修改和同类型机队修改按类型分键：`Routes:Create:<Type>`、`Routes:Update:<Type>`、`Routes:Update:FleetIds:<Type>`（如 `Routes:Create:Cargo`），jumpseat 的普通修改为 `Routes:Update:Jumpseat`；scheduled 仍是 `Routes:Create`／`Routes:Update`／`Routes:Update:FleetIds:Scheduled`，jumpseat 新建仍是 `Routes:Create:Jumpseat`。改类型的修改按涉及的非 scheduled 类型取键（scheduled→cargo、cargo→scheduled 都是 `Routes:Update:Cargo`；两个非 scheduled 类型之间取改后的类型）。**样本放开（2026-11-24 用户决定）。** 首次三条样本现在只在极少数情况下出现，放开不再依赖工作区自己的验证记录，任何工作区（包括全新的）都一样，由代码里的固定列表（`ApiOperationPolicy.ReleaseOf`）决定，分两类：① **已验证**：vCCA 工作区 2026-11-24 读取的验证记录中的写入能力，即 `Airports:Create／Update／Delete`、`Fleets:Create:ParameterIds`、`Fleets:Update／Delete`、`Aircraft:Create／Update／Delete`、`Aircraft:Update:FleetId:Move`、`Routings:Create／Update／Delete`、`Routes:Create`、`Routes:Create:Jumpseat`、`Routes:Update`、`Routes:Update:FleetIds:Scheduled`、`Routes:Delete`，都有软件真实写入并回读通过的记录，审阅页按普通提交显示；② **用户决定放开**：上述非 scheduled 类型的 `Routes:Create:<Type>`、`Routes:Update:<Type>`、`Routes:Update:FleetIds:<Type>` 和 `Routes:Update:Jumpseat`，没有软件写入证据，审阅页标注“按用户决定直接提交”，提交后照常回读核对。两类都不算独立证据（`IndependentApiEvidence.Covers` 不变），固定契约下的独立证据仍单独标注依据。仍走样本的只剩不在两类列表里的键，实际只有旧任务才会产生的 `Fleets:Create`（没有航司参数的新机队；新的在线新建必须选参数）；工作区验证记录仍会登记，并只对这类键起作用。jumpseat 和未知类型的机队修改在规划阶段一定被阻止（`ApiFleetSet`），不再有自己的能力键，取该类型的普通修改键。例如，Tags 随创建、scheduled 创建时的 Cost Index、jumpseat 创建时的机队关联没有进入独立证据豁免。新的在线机队仍要求选择一个已批准、未受限的航司参数；既有机队参数改绑不开放。
 
 ## 飞机跨机队移动
 

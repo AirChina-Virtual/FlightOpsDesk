@@ -2,6 +2,13 @@
 
 这里按日期记录主要变化。列出某次更新，不表示已经在 GitHub 发布了可下载的程序包或版本标签。
 
+## 2026-11-24 · 已验证的操作在任何工作区都不再走样本（尚未发布）
+
+- 以前每个工作区要自己先提交三条样本、回读通过后，才能整批提交这类操作；新建的工作区连已经在 vCCA 验证过的操作也要从头走样本。现在 vCCA 工作区已验证的写入能力（机场、机队、飞机、航路的新建／修改／删除，带参数的机队新建，飞机跨机队移动，scheduled 航线的新建、修改、机队修改和删除，jumpseat 新建，航线删除）在任何工作区都直接提交，审阅页按普通提交显示。
+- 非 scheduled 航线的操作仍注明“按用户决定直接提交”，它们没有软件写入证据。两类都不算独立证据。
+- 样本机制保留，现在只剩不在这两类里的操作会走样本，实际只有旧任务才会产生的、没有航司参数的机队新建。
+- 删掉了两个永远用不到的能力键 `Routes:Update:FleetIds:Jumpseat` 和 `Routes:Update:FleetIds:Unknown`：jumpseat 和未知类型的机队修改在规划阶段一定被阻止，现在取该类型的普通修改键。
+
 ## 2026-11-24 · 非 scheduled 航线的新建和修改按类型分键并直接放开（尚未发布）
 
 - 以前 cargo、charter、training、vfr、repositioning 航线的新建和修改与 scheduled 共用 `Routes:Create`／`Routes:Update`：scheduled 验证过以后，这些类型也跟着不再按样本执行，而文档写的是仍按样本。现在每种类型有自己的键（如 `Routes:Create:Cargo`、`Routes:Update:Cargo`，jumpseat 的普通修改为 `Routes:Update:Jumpseat`），scheduled 的键不变。改类型的修改按涉及的非 scheduled 类型取键。

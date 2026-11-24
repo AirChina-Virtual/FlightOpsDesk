@@ -8,6 +8,8 @@ public class ReviewPlanBehaviorTests
     // Locks the review as it was before the plan stopped copying rows.
 
     [Fact]
+    // 2026-11-24: every operation but Fleets:Create is released (ApiOperationPolicy.ReleaseOf), so only the fleet creates
+    // without a parameter are still sampled here.
     public void Online_connected_without_verification_allows_three_per_operation_and_defers_dependents()
     {
         var plan = Build(Mixed());
@@ -25,7 +27,7 @@ public class ReviewPlanBehaviorTests
             Routes Update #30 Ready - deps[] airlineParam=False fields[Remarks=Set:edited 30]
             Routes Update #31 Ready - deps[] airlineParam=False fields[Remarks=Set:edited 31]
             Routes Update #32 Ready - deps[] airlineParam=False fields[Remarks=Set:edited 32]
-            Routes Update #33 Deferred ReviewSample deps[] airlineParam=False fields[Remarks=Set:edited 33]
+            Routes Update #33 Ready - deps[] airlineParam=False fields[Remarks=Set:edited 33]
             Routes Update #34 Ready - deps[] airlineParam=False fields[Fleet IDs=Set:1,2]
             Routes Delete #35 Ready - deps[] airlineParam=False fields[]
             Routes Create #36 Ready - deps[11] airlineParam=False fields[ID=Clear:,Callsign=Set:QA0036,Flight Number=Set:0036,Type=Set:scheduled,Departure Airport (ICAO/IATA)=Set:ZBAA,Arrival Airport (ICAO/IATA)=Set:ZGGG,Remarks=Set:r36,Altitude=Set:33000,Fleet IDs=Set:local:0000000b-0000-0000-0000-000000000000,1]
@@ -201,7 +203,7 @@ public class ReviewPlanBehaviorTests
     {
         var plan = Build(Mixed());
         var deferred = plan.Entries.Where(e => e.Disposition == ReviewDisposition.Deferred).Select(e => (Number(e.Change.After.LocalId), e.Reason!.Code)).ToArray();
-        Assert.Equal([(14, "ReviewSample"), (33, "ReviewSample"), (38, "ReviewDependency")], deferred);
+        Assert.Equal([(14, "ReviewSample"), (38, "ReviewDependency")], deferred);
     }
 
     [Fact]

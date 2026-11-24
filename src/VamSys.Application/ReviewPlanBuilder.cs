@@ -334,10 +334,12 @@ public static class ReviewPlanBuilder
             {
                 var operation = ApiOperationPolicy.Key(item!);
                 external = IndependentApiEvidence.Covers(item!, externalEvidenceContractHash);
-                // A sample-exempt operation is sent in full by the user's decision, not on evidence; the page says so.
-                if (!verified.Contains(operation) && !external && ApiOperationPolicy.IsSampleExempt(operation))
+                // Released operations are sent in full in every workspace. A verified one reads like any operation the
+                // workspace verified itself (no reason); a user-decided one has no evidence, and the page says so.
+                var release = ApiOperationPolicy.ReleaseOf(operation);
+                if (!verified.Contains(operation) && !external && release == SampleRelease.UserDecided)
                 { entries.Add(new(change, ReviewDisposition.Ready, decided ??= Messages.Define("ReviewUserDecided"))); continue; }
-                if (!verified.Contains(operation) && !external)
+                if (!verified.Contains(operation) && !external && release == SampleRelease.Sampled)
                 {
                     var count = samples.GetValueOrDefault(operation);
                     samples[operation] = count + 1;

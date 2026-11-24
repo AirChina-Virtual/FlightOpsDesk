@@ -438,7 +438,10 @@ public class RequestPlannerTests
         var scheduled = kit.Map(ResourceKind.Routes, ApiKit.Scheduled10);
         Is(Only(kit.Api.Plan(ApiKit.Update(ResourceKind.Routes, scheduled, ("Fleet IDs", "5")))), HttpMethod.Put, "routes/10", """{"fleet_ids":[5]}""");
         var jumpseat = kit.Map(ResourceKind.Routes, ApiKit.Jumpseat11);
-        Assert.Equal("ApiFleetSet", ApiKit.BlockedWith(() => kit.Api.Plan(ApiKit.Update(ResourceKind.Routes, jumpseat, ("Fleet IDs", "4")))));
+        var jumpseatFleets = ApiKit.Update(ResourceKind.Routes, jumpseat, ("Fleet IDs", "4"));
+        Assert.Equal("ApiFleetSet", ApiKit.BlockedWith(() => kit.Api.Plan(jumpseatFleets)));
+        // a change the planner always refuses has no key of its own: it takes the jumpseat update key
+        Assert.Equal("Routes:Update:Jumpseat", ApiOperationPolicy.Key(jumpseatFleets));
         Assert.Equal("ApiFleetSet", ApiKit.BlockedWith(() => kit.Api.Plan(ApiKit.Update(ResourceKind.Routes, scheduled, ("Fleet IDs", "5"), ("Type", "jumpseat")))));
     }
 

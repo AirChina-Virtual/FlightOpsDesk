@@ -9,7 +9,7 @@ public static class IndependentApiEvidence
     // G8 (plan 6.2 / 6.3): DELETE 204 then GET 404 for these route types was seen live in the write evidence
     // (artifacts/write-evidence/report.json, run FODESK-WE 20261118T001624Z, G8_softDelete). Only their deletes are covered;
     // creates and updates of these types are not evidence. They skip the sample by the user's decision instead
-    // (ApiOperationPolicy.IsSampleExempt), which the review shows as such. scheduled and jumpseat are covered by EvidenceId.
+    // (ApiOperationPolicy.ReleaseOf, UserDecided), which the review shows as such. scheduled and jumpseat are covered by EvidenceId.
     public const string WriteEvidenceRun = "FODESK-WE 20261118T001624Z";
     public static readonly IReadOnlyList<string> SoftDeleteRouteTypes = ["cargo", "charter", "training", "vfr", "repositioning"];
     public static bool IsMove(ChangeItem item) => item.Resource == ResourceKind.Aircraft && item.Kind == ChangeKind.Update && item.Fields.ContainsKey("Fleet ID");

@@ -38,6 +38,9 @@ public sealed record AirlineParameter(string Id, string AirlineId, string IcaoCo
     public string Label => $"{IcaoCode} / {IataCode} · {Id}";
 }
 
+// How an operation is released from the review's first-three sample (ApiOperationPolicy.ReleaseOf).
+public enum SampleRelease { Sampled, Verified, UserDecided }
+
 public static class ApiOperationPolicy
 {
     public static bool IsJumpseatCreate(ChangeItem item) => item.Resource == ResourceKind.Routes && item.Kind == ChangeKind.Create && item.After.Get("Type") == "jumpseat";
@@ -80,7 +83,8 @@ public static class ApiOperationPolicy
     public static string Key(ChangeItem item) => item.Resource switch
     {
         ResourceKind.Aircraft when IndependentApiEvidence.IsMove(item) => "Aircraft:Update:FleetId:Move",
-        ResourceKind.Routes when item.Kind == ChangeKind.Update && item.Fields.ContainsKey("Fleet IDs") => FleetSetKey(item),
+        ResourceKind.Routes when item.Kind == ChangeKind.Update && item.Fields.ContainsKey("Fleet IDs")
+            && FleetSetKeys.TryGetValue((item.Before ?? item.After).Get("Type"), out var fleets) => fleets,
         ResourceKind.Routes when IsJumpseatCreate(item) => "Routes:Create:Jumpseat",
         ResourceKind.Routes when item.Kind == ChangeKind.Create && RouteCreateKeys.TryGetValue(item.After.Get("Type"), out var create) => create,
         ResourceKind.Routes when item.Kind == ChangeKind.Update && RouteUpdateKeys.TryGetValue(RouteUpdateType(item), out var update) => update,
@@ -116,24 +120,10 @@ public static class ApiOperationPolicy
         var after = item.After.Get("Type");
         return after != before && after != "scheduled" && Schemas.RouteTypes.Contains(after) ? after : before;
     }
-
-    // Operations the user decided on 2026-11-24 to send in full without the first-three sample, in every workspace and
-    // whatever it has verified: creates and plain updates of the non-scheduled, non-jumpseat route types, plain jumpseat
-    // updates, and fleet-set updates of those types. There is no software write evidence for them (they are not
-    // IndependentApiEvidence and the review does not present them as such); every write is still read back and checked.
-    // Routes:Update:FleetIds:Scheduled keeps its own rule, and the Jumpseat / Unknown fleet-set keys are blocked by the planner.
-    static readonly HashSet<string> SampleExemptKeys = new(StringComparer.Ordinal)
-    {
-        "Routes:Create:Cargo", "Routes:Create:Charter", "Routes:Create:Training", "Routes:Create:Vfr", "Routes:Create:Repositioning",
-        "Routes:Update:Cargo", "Routes:Update:Charter", "Routes:Update:Training", "Routes:Update:Vfr", "Routes:Update:Repositioning",
-        "Routes:Update:Jumpseat",
-        "Routes:Update:FleetIds:Cargo", "Routes:Update:FleetIds:Charter", "Routes:Update:FleetIds:Training", "Routes:Update:FleetIds:Vfr",
-        "Routes:Update:FleetIds:Repositioning",
-    };
-    public static bool IsSampleExempt(string key) => SampleExemptKeys.Contains(key);
-    // A route's fleet-set update is proved per route type: scheduled keeps its original key (saved verification marks and
-    // old jobs name it), and no other type may borrow the scheduled proof. The planner only lets the set change while the
-    // type stays the same, so the stored type (Before) names the operation. Written out so the capability inventory locks them.
+    // A route's fleet-set update is keyed per route type: scheduled keeps its original key (saved verification marks and
+    // old jobs name it). The planner only lets the set change while the type stays the same, so the stored type (Before)
+    // names the operation. A jumpseat (or an unknown type) has no fleet-set key: the planner always refuses that change
+    // (ApiFleetSet), so such an item falls back to the route's plain update key instead of a key nothing could ever send.
     static readonly IReadOnlyDictionary<string, string> FleetSetKeys = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         ["scheduled"] = "Routes:Update:FleetIds:Scheduled",
@@ -142,10 +132,56 @@ public static class ApiOperationPolicy
         ["training"] = "Routes:Update:FleetIds:Training",
         ["vfr"] = "Routes:Update:FleetIds:Vfr",
         ["repositioning"] = "Routes:Update:FleetIds:Repositioning",
-        ["jumpseat"] = "Routes:Update:FleetIds:Jumpseat",
     };
-    static string FleetSetKey(ChangeItem item)
-        => FleetSetKeys.TryGetValue((item.Before ?? item.After).Get("Type"), out var key) ? key : "Routes:Update:FleetIds:Unknown";
+
+    // Operations sent in full in every workspace, without the first-three sample and whatever the workspace has verified
+    // itself (decided by the user on 2026-11-24). Two kinds, kept apart because the review explains them differently:
+    //   Verified     proved by real software writes read back in a live workspace: the VerifiedOperations of the vCCA
+    //                workspace, read on 2026-11-24 (records in docs/CAPABILITY-MATRIX.md).
+    //   UserDecided  no software write evidence; opened by the user's decision. Every write is still read back and checked,
+    //                and none of them counts as IndependentApiEvidence.
+    // Anything else (in practice only Fleets:Create, which only an old job without the parameter requirement still makes)
+    // keeps the sample until the workspace has verified it.
+    static readonly IReadOnlyDictionary<string, SampleRelease> Released = new Dictionary<string, SampleRelease>(StringComparer.Ordinal)
+    {
+        // Verified (vCCA workspace, 2026-11-24)
+        ["Airports:Create"] = SampleRelease.Verified,
+        ["Airports:Update"] = SampleRelease.Verified,
+        ["Airports:Delete"] = SampleRelease.Verified,
+        ["Fleets:Create:ParameterIds"] = SampleRelease.Verified,
+        ["Fleets:Update"] = SampleRelease.Verified,
+        ["Fleets:Delete"] = SampleRelease.Verified,
+        ["Aircraft:Create"] = SampleRelease.Verified,
+        ["Aircraft:Update"] = SampleRelease.Verified,
+        ["Aircraft:Delete"] = SampleRelease.Verified,
+        ["Aircraft:Update:FleetId:Move"] = SampleRelease.Verified,
+        ["Routings:Create"] = SampleRelease.Verified,
+        ["Routings:Update"] = SampleRelease.Verified,
+        ["Routings:Delete"] = SampleRelease.Verified,
+        ["Routes:Create"] = SampleRelease.Verified,
+        ["Routes:Create:Jumpseat"] = SampleRelease.Verified,
+        ["Routes:Update"] = SampleRelease.Verified,
+        ["Routes:Update:FleetIds:Scheduled"] = SampleRelease.Verified,
+        ["Routes:Delete"] = SampleRelease.Verified,
+        // UserDecided (2026-11-24): the non-scheduled route types and plain jumpseat updates
+        ["Routes:Create:Cargo"] = SampleRelease.UserDecided,
+        ["Routes:Create:Charter"] = SampleRelease.UserDecided,
+        ["Routes:Create:Training"] = SampleRelease.UserDecided,
+        ["Routes:Create:Vfr"] = SampleRelease.UserDecided,
+        ["Routes:Create:Repositioning"] = SampleRelease.UserDecided,
+        ["Routes:Update:Cargo"] = SampleRelease.UserDecided,
+        ["Routes:Update:Charter"] = SampleRelease.UserDecided,
+        ["Routes:Update:Training"] = SampleRelease.UserDecided,
+        ["Routes:Update:Vfr"] = SampleRelease.UserDecided,
+        ["Routes:Update:Repositioning"] = SampleRelease.UserDecided,
+        ["Routes:Update:Jumpseat"] = SampleRelease.UserDecided,
+        ["Routes:Update:FleetIds:Cargo"] = SampleRelease.UserDecided,
+        ["Routes:Update:FleetIds:Charter"] = SampleRelease.UserDecided,
+        ["Routes:Update:FleetIds:Training"] = SampleRelease.UserDecided,
+        ["Routes:Update:FleetIds:Vfr"] = SampleRelease.UserDecided,
+        ["Routes:Update:FleetIds:Repositioning"] = SampleRelease.UserDecided,
+    };
+    public static SampleRelease ReleaseOf(string key) => Released.GetValueOrDefault(key, SampleRelease.Sampled);
     // The default key (resource, a colon, kind) for every defined pair, built once: the review asks for one key per change.
     static readonly string[,] PlainKeys = BuildPlainKeys();
     static string[,] BuildPlainKeys()
