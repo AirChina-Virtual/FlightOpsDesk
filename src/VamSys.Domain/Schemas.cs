@@ -47,11 +47,38 @@ public static class Schemas
     static readonly HashSet<string> FleetTypes = new(FleetTypeOrder, StringComparer.Ordinal);
     public static readonly IReadOnlyList<string> RouteTypeOrder = ["scheduled", "cargo", "charter", "training", "vfr", "repositioning", "jumpseat"];
     public static readonly IReadOnlySet<string> RouteTypes = new HashSet<string>(RouteTypeOrder, StringComparer.Ordinal);
-    static readonly string[] RouteSignature = ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Flight Number"];
     static readonly string[] RoutingSignature = ["Departure Airport (ICAO/IATA)", "Arrival Airport (ICAO/IATA)", "Route String"];
     static readonly string[] RegistrationSignature = ["Registration"];
     static readonly string[] NameSignature = ["Name"];
     static readonly string[] RouteIdentityFields = ["Callsign", "Flight Number"];
+    // vAMSYS keeps no uniqueness rule for routes: the create contract (route.store) has no "already exists" answer, and the
+    // vCCA server data read on 2026-11-23 holds 881 groups (2094 routes) that share departure, arrival and flight number and
+    // differ only in their schedule. So a new non-jumpseat route repeats another only when it also agrees on every one of
+    // these fields; with them no two of those 3578 server routes are the same. Validate (draft rows) and the online
+    // duplicate check (DuplicateFinder.IsDuplicate, server records) both use this rule.
+    public static readonly IReadOnlyList<string> RouteScheduleFields = ["Type", "Callsign", "Departure Time (HH:MM)", "Arrival Time (HH:MM)", "Service Days", "Start Date", "End Date"];
+    // Whether `other` (a draft row or a record read from the server) has the schedule the new route `created` would be
+    // given. A field `created` leaves empty decides nothing: the server may fill it in (it gives every route a start date),
+    // and the record such a create made must still be found (lost-POST recovery, resolving an Unknown create). The
+    // airports and the flight number are compared by the caller.
+    public static bool SameRouteSchedule(DataRow created, DataRow other)
+    {
+        foreach (var field in RouteScheduleFields)
+            if (RouteScheduleValue(field, created.Get(field)) is { Length: > 0 } value && value != RouteScheduleValue(field, other.Get(field)))
+                return false;
+        return true;
+    }
+    // The server stores callsigns in upper case and keeps service days in any order and case (G4). Grid times and dates
+    // are already in one form (HH:mm, UTC yyyy-MM-dd HH:mm:ss) on both sides.
+    static string RouteScheduleValue(string field, string value) => field switch
+    {
+        "Callsign" => value.Trim().ToUpperInvariant(),
+        "Service Days" => string.Join(',', value.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(d => d.ToLowerInvariant()).Distinct().Order(StringComparer.Ordinal)),
+        _ => value.Trim()
+    };
+    // A non-jumpseat route's flight number, as the server stores it (upper case).
+    static string RouteFlightNumber(DataRow row) => row.Get("Flight Number").Trim().ToUpperInvariant();
     public static List<Issue> Validate(Workspace workspace, ResourceKind kind) => Validate(workspace, kind, new ValidationPass(workspace));
     // One pass shares the row keys and reference-key sets between resources. Use a new pass after any row changed.
     public static List<Issue> Validate(Workspace workspace, ResourceKind kind, ValidationPass pass)
@@ -79,20 +106,23 @@ public static class Schemas
         // Flag possible duplicate creates without silently treating flight numbers as identities.
         var signatureFields = kind switch
         {
-            ResourceKind.Routes => RouteSignature,
             ResourceKind.Routings => RoutingSignature,
             ResourceKind.Aircraft => RegistrationSignature,
             _ => NameSignature
         };
         // Only rows without a key are flagged, so the signatures (a string per row, a JSON one per jumpseat) are built only
-        // when the resource has such a row.
+        // when the resource has such a row. Other routes share a signature by airports and flight number; within it a new
+        // route is flagged only when another row also has its schedule (RouteScheduleFields), as vAMSYS allows the rest.
         if (data.Draft.Any(r => !Deleted(r) && Key(kind, r) == ""))
             foreach (var group in data.Draft.Where(r => !Deleted(r)).GroupBy(r => kind == ResourceKind.Routes && r.Get("Type") == "jumpseat"
                 ? string.Join("\u001f", r.Get("Departure Airport (ICAO/IATA)"), r.Get("Arrival Airport (ICAO/IATA)"), ApiOperationPolicy.JumpseatSignature(r))
+                : kind == ResourceKind.Routes
+                ? string.Join("\u001f", r.Get("Departure Airport (ICAO/IATA)"), r.Get("Arrival Airport (ICAO/IATA)"), RouteFlightNumber(r))
                 : string.Join("\u001f", signatureFields.Select(r.Get))))
                 if (group.Count() > 1 && group.Any(r => Key(kind, r) == ""))
                     foreach (var r in group.Where(r => Key(kind, r) == ""))
-                        Add(r, schema.Key, Messages.Define("Text_CDDA93CCD1"));
+                        if (kind != ResourceKind.Routes || r.Get("Type") == "jumpseat" || group.Any(other => !ReferenceEquals(other, r) && SameRouteSchedule(r, other)))
+                            Add(r, schema.Key, Messages.Define("Text_CDDA93CCD1"));
         var deletedIds = data.Draft.Where(Deleted).Select(r => r.LocalId).ToHashSet();
         if (deletedIds.Count > 0)
             issues.AddRange(new DeletionService().CheckReferences(workspace, kind, deletedIds));

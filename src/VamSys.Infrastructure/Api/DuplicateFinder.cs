@@ -6,8 +6,11 @@ using static VamSys.Infrastructure.ApiErrors;
 namespace VamSys.Infrastructure;
 
 // Finds the remote records a new record would duplicate. A duplicate is decided by the resource's own rule (airport
-// code, registration, fleet name, route signature on the same airport pair); candidates are looked up through a
-// signature index that is published only after every page was read, so an incomplete read never hides a duplicate.
+// code, registration, fleet name, route flight number and schedule on the same airport pair); candidates are looked up
+// through a signature index that is published only after every page was read, so an incomplete read never hides a
+// duplicate. A route's signature is only its airports and flight number, a superset of its duplicates: IsDuplicate
+// narrows it by schedule, and reservations (CandidateReservations) keep the wider signature, so while a route create's
+// outcome is unknown the other creates with its flight number on that pair wait.
 internal sealed class DuplicateFinder(ApiContext ctx)
 {
     // The identity of a draft row as the duplicate rule sees it.
@@ -53,10 +56,13 @@ internal sealed class DuplicateFinder(ApiContext ctx)
                     && ctx.Identity.SameEndpoint(item.Resource, current, item.After, "Departure Airport (ICAO/IATA)")
                     && ctx.Identity.SameEndpoint(item.Resource, current, item.After, "Arrival Airport (ICAO/IATA)")
                     && new[] { "Departure Time (HH:MM)", "Arrival Time (HH:MM)", "Start Date", "End Date" }.All(f => current.Get(f) == "" || item.After.Get(f) == "" || current.Get(f) == item.After.Get(f));
+            // vAMSYS allows many routes with the same airports and flight number (other times, days or dates): a route is a
+            // duplicate only when it also has the new route's schedule (Schemas.SameRouteSchedule, the rule Validate uses).
             var signature = item.Resource == ResourceKind.Routes ? "Flight Number" : "Route String";
             return ctx.Identity.SameEndpoint(item.Resource, current, item.After, "Departure Airport (ICAO/IATA)")
                 && ctx.Identity.SameEndpoint(item.Resource, current, item.After, "Arrival Airport (ICAO/IATA)")
-                && current.Get(signature).Equals(item.After.Get(signature), StringComparison.OrdinalIgnoreCase);
+                && current.Get(signature).Equals(item.After.Get(signature), StringComparison.OrdinalIgnoreCase)
+                && (item.Resource != ResourceKind.Routes || Schemas.SameRouteSchedule(item.After, current));
         }
         var field = item.Resource == ResourceKind.Aircraft ? "Registration" : "Name";
         return current.Get(field).Equals(item.After.Get(field), StringComparison.OrdinalIgnoreCase);

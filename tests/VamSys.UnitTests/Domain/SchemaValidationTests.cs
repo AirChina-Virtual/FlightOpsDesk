@@ -91,6 +91,73 @@ public class SchemaValidationTests
     public void A_jumpseat_route_with_fleets_is_flagged_on_the_fleets()
         => Assert.Equal(["Fleet IDs"], Fields(Check(Base(), ResourceKind.Routes, ValidRoute(("Type", "jumpseat")))));
 
+    // ---- possible duplicate creates of routes: vAMSYS has no uniqueness rule for routes (881 groups of routes on vCCA share
+    // airports and flight number, 2026-11-23), so only a route that also repeats the schedule is flagged (Schemas.SameRouteSchedule).
+    const string PossibleDuplicate = "Text_CDDA93CCD1";
+
+    static Guid[] PossibleDuplicates(IEnumerable<Issue> issues) => issues.Where(i => i.Description.Code == PossibleDuplicate).Select(i => i.RowId).ToArray();
+
+    static DataRow Scheduled(string departure, string arrival, string days, params (string Field, string Value)[] more)
+        => ValidRoute([("Departure Time (HH:MM)", departure), ("Arrival Time (HH:MM)", arrival), ("Service Days", days), .. more]);
+
+    [Fact]
+    public void New_routes_with_an_existing_flight_number_but_another_schedule_are_not_possible_duplicates()
+    {
+        var existing = Scheduled("08:00", "10:00", "monday", ("ID", "77"));
+        var issues = Check(Base(), ResourceKind.Routes, existing,
+            Scheduled("09:00", "11:00", "monday"),
+            Scheduled("08:00", "10:00", "tuesday"),
+            Scheduled("08:00", "10:00", "monday", ("Callsign", "ACA124")),
+            Scheduled("08:00", "10:00", "monday", ("Type", "charter")),
+            Scheduled("08:00", "10:00", "monday", ("Start Date", "2027-01-01 00:00:00")),
+            Scheduled("08:00", "10:00", "monday", ("End Date", "2027-12-31 00:00:00")));
+
+        Assert.Empty(PossibleDuplicates(issues));
+    }
+
+    [Fact]
+    public void A_new_route_that_repeats_a_route_and_its_schedule_is_a_possible_duplicate()
+    {
+        var existing = Scheduled("08:00", "10:00", "monday,friday", ("ID", "77"));
+        // The server stores callsign and flight number in upper case and keeps days in any order.
+        var repeat = Scheduled("08:00", "10:00", "Friday, monday", ("Callsign", "aca123"), ("Flight Number", "ac123"));
+        var twin = Scheduled("12:00", "14:00", "sunday");
+        var otherTwin = Scheduled("12:00", "14:00", "sunday");
+        var issues = Check(Base(), ResourceKind.Routes, existing, repeat, twin, otherTwin);
+
+        Assert.Equal([repeat.LocalId, twin.LocalId, otherTwin.LocalId], PossibleDuplicates(issues));
+    }
+
+    [Fact]
+    public void A_schedule_field_a_new_route_leaves_empty_does_not_tell_it_apart()
+    {
+        // The server fills in what a create leaves out (every route gets a start date), so an empty field matches any value.
+        var existing = Scheduled("08:00", "10:00", "monday", ("ID", "77"), ("Start Date", "2027-01-01 00:00:00"));
+        var noStart = Scheduled("08:00", "10:00", "monday");
+        var otherStart = Scheduled("08:00", "10:00", "monday", ("Start Date", "2027-02-01 00:00:00"));
+        var issues = Check(Base(), ResourceKind.Routes, existing, noStart, otherStart);
+
+        Assert.Equal([noStart.LocalId], PossibleDuplicates(issues));
+    }
+
+    [Fact]
+    public void Review_lets_new_routes_with_one_flight_number_and_other_schedules_through_and_blocks_a_repeat()
+    {
+        var w = Base();
+        var existing = Scheduled("08:00", "10:00", "monday", ("ID", "77"));
+        CsvAdapter.Import(ResourceKind.Routes, w.Resources[ResourceKind.Routes], [existing], true);
+        var later = Scheduled("18:00", "20:00", "monday");
+        var weekend = Scheduled("08:00", "10:00", "saturday,sunday");
+        var repeat = Scheduled("08:00", "10:00", "monday");
+        w.Resources[ResourceKind.Routes].Draft = [.. w.Resources[ResourceKind.Routes].Draft, later, weekend, repeat];
+
+        var plan = ReviewPlanBuilder.BuildForWorkspace(new ChangePlanner(), w, RunMode.Demo, false, new HashSet<string>(), null);
+        var blocked = plan.Entries.Where(e => e.Disposition == ReviewDisposition.Blocked).Select(e => e.Planned.After.LocalId).ToArray();
+
+        Assert.Equal(3, plan.Entries.Count);
+        Assert.Equal([repeat.LocalId], blocked);
+    }
+
     [Theory]
     [InlineData("pax", "Max Passengers", "100", "")]
     [InlineData("pax", "Max Passengers", "", "Max Passengers")]

@@ -261,6 +261,40 @@ public class PreflightAndDuplicateStageTests
         Assert.Contains("11", duplicate.PreCreateCandidateIds!);
     }
 
+    // vAMSYS keeps many routes per airport pair and flight number (other times, days or dates): only a repeat of the
+    // schedule is a duplicate (Schemas.SameRouteSchedule). Route 12 is CA120 EGLL-EGKK, 23:59 to 01:20, no days.
+    [Fact]
+    public async Task A_route_with_an_existing_flight_number_but_another_schedule_is_created_and_a_repeat_is_refused()
+    {
+        var w = new GoldenWorld();
+        (string, string)[] Route(string departure, string arrival, params (string, string)[] more)
+            => [("Type", "scheduled"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", "CAO120"), ("Flight Number", "CA120"), ("Fleet IDs", "4"),
+                ("Departure Time (HH:MM)", departure), ("Arrival Time (HH:MM)", arrival), .. more];
+        w.New(ResourceKind.Routes, Route("08:00", "09:20"));
+        w.New(ResourceKind.Routes, Route("23:59", "01:20", ("Service Days", "saturday")));
+        w.New(ResourceKind.Routes, Route("23:59", "01:20"));
+        await w.RunAsync();
+        var items = w.Job!.Items;
+        Assert.Equal(ItemState.Succeeded, items[0].State);
+        // Route 12 has no days, so the server does not hold this one: a field only the new route fills tells it apart.
+        Assert.Equal(ItemState.Succeeded, items[1].State);
+        Assert.Equal("ApiDuplicate", Code(items[2]));
+        Assert.Equal(2, Count(w, "POST"));
+    }
+
+    [Fact]
+    public async Task Two_new_routes_with_the_same_schedule_in_one_job_create_one_record()
+    {
+        var w = new GoldenWorld();
+        for (var n = 0; n < 2; n++)
+            w.New(ResourceKind.Routes, ("Type", "scheduled"), (Dep, "EGLL"), (Arr, "EGKK"), ("Callsign", "CAO130"), ("Flight Number", "CA130"), ("Fleet IDs", "4"),
+                ("Departure Time (HH:MM)", "07:00"), ("Arrival Time (HH:MM)", "08:10"), ("Service Days", "monday,friday"));
+        await w.RunAsync();
+        Assert.Equal(ItemState.Succeeded, w.Job!.Items[0].State);
+        Assert.Equal("ApiDuplicate", Code(w.Job.Items[1]));
+        Assert.Equal(1, Count(w, "POST"));
+    }
+
     [Fact]
     public async Task A_create_for_an_airport_pair_reads_the_pair_once_for_the_whole_job()
     {

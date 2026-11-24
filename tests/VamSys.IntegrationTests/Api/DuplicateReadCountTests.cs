@@ -130,7 +130,8 @@ public class DuplicateReadCountTests
     public async Task A_route_renamed_earlier_in_the_job_frees_its_old_flight_number_and_blocks_the_new_one_in_the_pair_cache()
     {
         var w = new GoldenWorld();
-        w.Edit(ResourceKind.Routes, "10", ("Flight Number", "CA777"));
+        // A route is the same only with its schedule too (Schemas.SameRouteSchedule), so the callsign moves with the number.
+        w.Edit(ResourceKind.Routes, "10", ("Flight Number", "CA777"), ("Callsign", "CAO777"));
         InsertFirst(w, ResourceKind.Routes, Scheduled("CA801")); // reads the pair before the update is confirmed
         w.New(ResourceKind.Routes, Scheduled("CA100"));
         w.New(ResourceKind.Routes, Scheduled("CA777"));
