@@ -942,6 +942,7 @@ Remote: {remote}</value>
   <data name="ReviewMode" xml:space="preserve"><value>Mode: {mode}</value></data>
   <data name="ReviewConnect" xml:space="preserve"><value>Draft review only. Connect to check submission eligibility.</value></data>
   <data name="ReviewSample" xml:space="preserve"><value>Only the first three samples of this operation are included. Remaining changes stay in the draft.</value></data>
+  <data name="ReviewUserDecided" xml:space="preserve"><value>Sent in full by the user's decision, without the first-three sample (2026-11-24): there is no software write evidence for this kind of operation; every write is still read back and checked.</value></data>
   <data name="ReviewDependency" xml:space="preserve"><value>A required create operation is not in this submission. This change stays in the draft.</value></data>
   <data name="ReviewSubmit" xml:space="preserve"><value>Submit workspace changes</value></data>
   <data name="ReviewDemoSubmit" xml:space="preserve"><value>Simulate workspace submission</value></data>

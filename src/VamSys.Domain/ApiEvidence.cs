@@ -82,9 +82,55 @@ public static class ApiOperationPolicy
         ResourceKind.Aircraft when IndependentApiEvidence.IsMove(item) => "Aircraft:Update:FleetId:Move",
         ResourceKind.Routes when item.Kind == ChangeKind.Update && item.Fields.ContainsKey("Fleet IDs") => FleetSetKey(item),
         ResourceKind.Routes when IsJumpseatCreate(item) => "Routes:Create:Jumpseat",
+        ResourceKind.Routes when item.Kind == ChangeKind.Create && RouteCreateKeys.TryGetValue(item.After.Get("Type"), out var create) => create,
+        ResourceKind.Routes when item.Kind == ChangeKind.Update && RouteUpdateKeys.TryGetValue(RouteUpdateType(item), out var update) => update,
         ResourceKind.Fleets when item.Kind == ChangeKind.Create && item.After.Get("Parameter IDs") != "" => "Fleets:Create:ParameterIds",
         _ => PlainKey(item.Resource, item.Kind)
     };
+    // Route creates and updates are keyed per route type. scheduled keeps the plain keys (Routes:Create, Routes:Update) that
+    // saved verification marks and old jobs name; a jumpseat create keeps Routes:Create:Jumpseat. A type outside
+    // Schemas.RouteTypes also keeps the plain key: the planner refuses it before anything is sent.
+    static readonly IReadOnlyDictionary<string, string> RouteCreateKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["cargo"] = "Routes:Create:Cargo",
+        ["charter"] = "Routes:Create:Charter",
+        ["training"] = "Routes:Create:Training",
+        ["vfr"] = "Routes:Create:Vfr",
+        ["repositioning"] = "Routes:Create:Repositioning",
+    };
+    static readonly IReadOnlyDictionary<string, string> RouteUpdateKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["cargo"] = "Routes:Update:Cargo",
+        ["charter"] = "Routes:Update:Charter",
+        ["training"] = "Routes:Update:Training",
+        ["vfr"] = "Routes:Update:Vfr",
+        ["repositioning"] = "Routes:Update:Repositioning",
+        ["jumpseat"] = "Routes:Update:Jumpseat",
+    };
+    // An update is named by the stored type (Before). When it changes the type, the new type names it unless that is
+    // scheduled: a change that involves a non-scheduled type never takes the scheduled key (scheduled -> cargo is a cargo
+    // update, cargo -> scheduled stays one), and between two non-scheduled types the result decides.
+    static string RouteUpdateType(ChangeItem item)
+    {
+        var before = (item.Before ?? item.After).Get("Type");
+        var after = item.After.Get("Type");
+        return after != before && after != "scheduled" && Schemas.RouteTypes.Contains(after) ? after : before;
+    }
+
+    // Operations the user decided on 2026-11-24 to send in full without the first-three sample, in every workspace and
+    // whatever it has verified: creates and plain updates of the non-scheduled, non-jumpseat route types, plain jumpseat
+    // updates, and fleet-set updates of those types. There is no software write evidence for them (they are not
+    // IndependentApiEvidence and the review does not present them as such); every write is still read back and checked.
+    // Routes:Update:FleetIds:Scheduled keeps its own rule, and the Jumpseat / Unknown fleet-set keys are blocked by the planner.
+    static readonly HashSet<string> SampleExemptKeys = new(StringComparer.Ordinal)
+    {
+        "Routes:Create:Cargo", "Routes:Create:Charter", "Routes:Create:Training", "Routes:Create:Vfr", "Routes:Create:Repositioning",
+        "Routes:Update:Cargo", "Routes:Update:Charter", "Routes:Update:Training", "Routes:Update:Vfr", "Routes:Update:Repositioning",
+        "Routes:Update:Jumpseat",
+        "Routes:Update:FleetIds:Cargo", "Routes:Update:FleetIds:Charter", "Routes:Update:FleetIds:Training", "Routes:Update:FleetIds:Vfr",
+        "Routes:Update:FleetIds:Repositioning",
+    };
+    public static bool IsSampleExempt(string key) => SampleExemptKeys.Contains(key);
     // A route's fleet-set update is proved per route type: scheduled keeps its original key (saved verification marks and
     // old jobs name it), and no other type may borrow the scheduled proof. The planner only lets the set change while the
     // type stays the same, so the stored type (Before) names the operation. Written out so the capability inventory locks them.

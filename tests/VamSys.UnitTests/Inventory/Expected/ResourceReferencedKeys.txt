@@ -183,6 +183,7 @@ direct:ReviewShowAll => in resx
 direct:ReviewState_ => dynamic prefix of 4 resx keys
 direct:ReviewSummaryFleet => in resx
 direct:ReviewSummaryLine => in resx
+direct:ReviewUserDecided => in resx
 direct:ReviewValidationIssue => in resx
 direct:ReviewWorkspace => in resx
 direct:RouteJumpseatNoFleets => in resx

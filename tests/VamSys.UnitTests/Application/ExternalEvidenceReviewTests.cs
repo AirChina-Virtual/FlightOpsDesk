@@ -123,29 +123,82 @@ public class ExternalEvidenceReviewTests
         Assert.False(IndependentApiEvidence.Covers(Update(ResourceKind.Routings, "Internal Remarks", "x"), ApiContracts.Sha256));
     }
 
-    // The fleet-set capability is proved per route type: scheduled keeps its saved key, every other type has its own.
+    // Route operations are keyed per route type. scheduled keeps the plain keys and its fleet-set key; a type outside the
+    // API's list keeps the plain keys (the planner refuses it); deletes keep the plain key (G8 covers them independently).
     [Theory]
-    [InlineData("scheduled", "Routes:Update:FleetIds:Scheduled")]
-    [InlineData("cargo", "Routes:Update:FleetIds:Cargo")]
-    [InlineData("charter", "Routes:Update:FleetIds:Charter")]
-    [InlineData("training", "Routes:Update:FleetIds:Training")]
-    [InlineData("vfr", "Routes:Update:FleetIds:Vfr")]
-    [InlineData("repositioning", "Routes:Update:FleetIds:Repositioning")]
-    public void A_route_fleet_set_update_is_keyed_by_its_route_type(string type, string key)
+    [InlineData("scheduled", "Routes:Create", "Routes:Update", "Routes:Update:FleetIds:Scheduled")]
+    [InlineData("cargo", "Routes:Create:Cargo", "Routes:Update:Cargo", "Routes:Update:FleetIds:Cargo")]
+    [InlineData("charter", "Routes:Create:Charter", "Routes:Update:Charter", "Routes:Update:FleetIds:Charter")]
+    [InlineData("training", "Routes:Create:Training", "Routes:Update:Training", "Routes:Update:FleetIds:Training")]
+    [InlineData("vfr", "Routes:Create:Vfr", "Routes:Update:Vfr", "Routes:Update:FleetIds:Vfr")]
+    [InlineData("repositioning", "Routes:Create:Repositioning", "Routes:Update:Repositioning", "Routes:Update:FleetIds:Repositioning")]
+    [InlineData("jumpseat", "Routes:Create:Jumpseat", "Routes:Update:Jumpseat", "Routes:Update:FleetIds:Jumpseat")]
+    [InlineData("ferry", "Routes:Create", "Routes:Update", "Routes:Update:FleetIds:Unknown")]
+    public void Route_operations_are_keyed_by_route_type(string type, string create, string update, string fleets)
     {
-        var item = Update(ResourceKind.Routes, "Fleet IDs", "4");
-        item.Before = item.Before!.With("Type", type);
-        item.After = item.After.With("Type", type);
-        Assert.Equal(key, ApiOperationPolicy.Key(item));
-        // without a fleet change the plain key applies
-        Assert.Equal("Routes:Update", ApiOperationPolicy.Key(Update(ResourceKind.Routes, "Remarks", "x")));
+        Assert.Equal(create, ApiOperationPolicy.Key(RouteCreate(type)));
+        Assert.Equal(update, ApiOperationPolicy.Key(RouteUpdate(type, type, "Remarks", "x")));
+        Assert.Equal(fleets, ApiOperationPolicy.Key(RouteUpdate(type, type, "Fleet IDs", "4")));
+        var row = new DataRow { Fields = new Dictionary<string, string> { ["Type"] = type } };
+        Assert.Equal("Routes:Delete", ApiOperationPolicy.Key(new ChangeItem { Resource = ResourceKind.Routes, Kind = ChangeKind.Delete, Before = row, After = row.With("_delete", "TRUE") }));
+    }
+
+    // A type change is keyed by the non-scheduled type it involves, so it never takes the scheduled key.
+    [Theory]
+    [InlineData("scheduled", "cargo", "Routes:Update:Cargo")]
+    [InlineData("cargo", "scheduled", "Routes:Update:Cargo")]
+    [InlineData("cargo", "charter", "Routes:Update:Charter")]
+    [InlineData("training", "scheduled", "Routes:Update:Training")]
+    public void A_route_type_change_is_keyed_by_the_non_scheduled_type_it_involves(string from, string to, string key)
+        => Assert.Equal(key, ApiOperationPolicy.Key(RouteUpdate(from, to, "Type", to)));
+
+    // By the user's decision (2026-11-24) the non-scheduled route operations skip the sample in every workspace. They are not
+    // independent evidence; the scheduled keys and the blocked fleet-set keys keep their rules.
+    [Fact]
+    public void Exactly_the_non_scheduled_route_operations_skip_the_sample()
+    {
+        foreach (var type in new[] { "Cargo", "Charter", "Training", "Vfr", "Repositioning" })
+            foreach (var key in new[] { $"Routes:Create:{type}", $"Routes:Update:{type}", $"Routes:Update:FleetIds:{type}" })
+                Assert.True(ApiOperationPolicy.IsSampleExempt(key), key);
+        Assert.True(ApiOperationPolicy.IsSampleExempt("Routes:Update:Jumpseat"));
+        foreach (var key in new[] { "Routes:Create", "Routes:Update", "Routes:Delete", "Routes:Create:Jumpseat", "Routes:Update:FleetIds:Scheduled",
+                     "Routes:Update:FleetIds:Jumpseat", "Routes:Update:FleetIds:Unknown", "Fleets:Create:ParameterIds", "Aircraft:Update:FleetId:Move" })
+            Assert.False(ApiOperationPolicy.IsSampleExempt(key), key);
+        foreach (var type in new[] { "cargo", "charter", "training", "vfr", "repositioning" })
+        {
+            Assert.False(IndependentApiEvidence.Covers(RouteCreate(type), ApiContracts.Sha256));
+            Assert.False(IndependentApiEvidence.Covers(RouteUpdate(type, type, "Fleet IDs", "4"), ApiContracts.Sha256));
+        }
+    }
+
+    // A new workspace (nothing verified): cargo creates, updates and fleet changes are all sent, with the user's-decision
+    // reason rather than the evidence one; scheduled creates and updates are still sampled.
+    [Fact]
+    public void A_new_workspace_sends_every_non_scheduled_route_operation_but_samples_scheduled_ones()
+    {
+        var updates = Enumerable.Range(0, 8).Select(n => RouteUpdate("cargo", "cargo", "Departure Time (HH:MM)", $"0{n}:15")).ToList();
+        var creates = Enumerable.Range(0, 8).Select(_ => RouteCreate("cargo")).ToList();
+        var fleets = Enumerable.Range(0, 8).Select(_ => RouteUpdate("cargo", "cargo", "Fleet IDs", "4")).ToList();
+        foreach (var items in new[] { updates, creates, fleets })
+        {
+            var plan = ReviewPlanBuilder.Build(items, RunMode.Online, true, new HashSet<string>(), _ => { }, externalEvidenceContractHash: ApiContracts.Sha256);
+            Assert.All(plan.Entries, e => { Assert.Equal(ReviewDisposition.Ready, e.Disposition); Assert.Equal("ReviewUserDecided", e.Reason!.Code); });
+            Assert.Equal(8, plan.SubmitItems.Count);
+        }
+        // (Tags: a scheduled update outside the independent evidence)
+        Assert.Equal(3, Submitted(Enumerable.Range(0, 8).Select(n => RouteUpdate("scheduled", "scheduled", "Tags", "t" + n)).ToList(), ApiContracts.Sha256));
+        Assert.Equal(3, Submitted(Enumerable.Range(0, 8).Select(_ => RouteCreate("scheduled")).ToList(), ApiContracts.Sha256));
+        // the scheduled fleet-set key keeps its rule: outside the evidence contract it is sampled
+        Assert.Equal(3, Submitted(Enumerable.Range(0, 8).Select(_ => RouteUpdate("scheduled", "scheduled", "Fleet IDs", "4")).ToList(), "other-contract"));
+        // a verified scheduled mark still opens scheduled in full, as before
+        Assert.Equal(8, Submitted(Enumerable.Range(0, 8).Select(_ => RouteCreate("scheduled")).ToList(), ApiContracts.Sha256, ["Routes:Create"]));
     }
 
     // The 2026-27 winter-spring update: 11 cargo routes drop one fleet (26722,26724,26725,26728 -> 26722,26724,26725) and
     // change their times, service days and cost index at the same time. They pass the real preview (planner and prefix
-    // check) and are sampled as Routes:Update:FleetIds:Cargo: the scheduled proof does not open them.
+    // check), are keyed Routes:Update:FleetIds:Cargo and are all sent, in a workspace that has verified nothing.
     [Fact]
-    public async Task Cargo_routes_that_drop_a_fleet_are_sampled_under_their_own_key_and_never_blocked()
+    public async Task Cargo_routes_that_drop_a_fleet_are_all_sent_and_never_blocked()
     {
         var kit = new ApiKit();
         kit.LoadStandardAirportsAndFleets();
@@ -157,22 +210,36 @@ public class ExternalEvidenceReviewTests
             return ApiKit.Update(ResourceKind.Routes, before, ("Fleet IDs", "4"), ("Departure Time (HH:MM)", "09:15"), ("Arrival Time (HH:MM)", "11:40"),
                 ("Service Days", "monday,wednesday,friday"), ("Cost Index", "150"));
         }).ToList();
-        var verified = new HashSet<string>(StringComparer.Ordinal) { "Routes:Update:FleetIds:Scheduled" };
 
-        var plan = ReviewPlanBuilder.Build(items, RunMode.Online, true, verified, item => kit.Api.PreviewPlan(item), externalEvidenceContractHash: ApiContracts.Sha256);
+        var plan = ReviewPlanBuilder.Build(items, RunMode.Online, true, new HashSet<string>(), item => kit.Api.PreviewPlan(item), externalEvidenceContractHash: ApiContracts.Sha256);
 
         Assert.All(items, i => Assert.Equal("Routes:Update:FleetIds:Cargo", ApiOperationPolicy.Key(i)));
-        Assert.DoesNotContain(plan.Entries, e => e.Disposition == ReviewDisposition.Blocked);
-        Assert.Equal(3, plan.Entries.Count(e => e.Disposition == ReviewDisposition.Ready));
-        Assert.All(plan.Entries.Where(e => e.Disposition != ReviewDisposition.Ready), e =>
-        { Assert.Equal(ReviewDisposition.Deferred, e.Disposition); Assert.Equal("ReviewSample", e.Reason!.Code); });
-        Assert.Equal(3, plan.SubmitItems.Count);
-        // the request the first sample sends
+        Assert.All(plan.Entries, e => { Assert.Equal(ReviewDisposition.Ready, e.Disposition); Assert.Equal("ReviewUserDecided", e.Reason!.Code); });
+        Assert.Equal(11, plan.SubmitItems.Count);
         var step = Assert.Single(kit.Api.Plan(items[0]));
         Assert.Equal("""{"fleet_ids":[4],"departure_time":"09:15:00","arrival_time":"11:40:00","service_days":["monday","wednesday","friday"],"cost_index":"150"}""", ApiKit.Body(step));
-        // with the cargo key verified (after three samples read back), the rest open in full
-        verified.Add("Routes:Update:FleetIds:Cargo");
-        Assert.Equal(11, ReviewPlanBuilder.Build(items, RunMode.Online, true, verified, item => kit.Api.PreviewPlan(item), externalEvidenceContractHash: ApiContracts.Sha256).SubmitItems.Count);
+    }
+
+    static ChangeItem RouteCreate(string type) => new()
+    {
+        Resource = ResourceKind.Routes,
+        Kind = ChangeKind.Create,
+        After = new() { Fields = new Dictionary<string, string> { ["Type"] = type, ["Callsign"] = "CAO100", ["Tags"] = "t" } },
+        // Tags keep a create outside the independent evidence, so a scheduled one is sampled
+        Fields = new() { ["Type"] = new(FieldIntent.Set, type), ["Callsign"] = new(FieldIntent.Set, "CAO100"), ["Tags"] = new(FieldIntent.Set, "t") }
+    };
+
+    static ChangeItem RouteUpdate(string from, string to, string field, string value)
+    {
+        var before = new DataRow { Fields = new Dictionary<string, string> { ["Type"] = from } };
+        return new()
+        {
+            Resource = ResourceKind.Routes,
+            Kind = ChangeKind.Update,
+            Before = before,
+            After = before.With("Type", to).With(field, value),
+            Fields = new() { [field] = new(FieldIntent.Set, value) }
+        };
     }
 
     [Fact]

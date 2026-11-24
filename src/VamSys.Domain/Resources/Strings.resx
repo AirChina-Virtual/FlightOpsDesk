@@ -942,6 +942,7 @@
   <data name="ReviewMode" xml:space="preserve"><value>运行模式：{mode}</value></data>
   <data name="ReviewConnect" xml:space="preserve"><value>尚未连接，仅审阅草稿。连接后可检查提交条件。</value></data>
   <data name="ReviewSample" xml:space="preserve"><value>本次仅执行该类操作的前三条样本，其余修改保留为草稿。</value></data>
+  <data name="ReviewUserDecided" xml:space="preserve"><value>按用户决定直接提交，不执行前三条样本（2026-11-24）：这类操作没有软件写入证据，提交后照常回读核对。</value></data>
   <data name="ReviewDependency" xml:space="preserve"><value>依赖的创建操作不在本次提交清单中，保留为草稿。</value></data>
   <data name="ReviewSubmit" xml:space="preserve"><value>提交工作区修改</value></data>
   <data name="ReviewDemoSubmit" xml:space="preserve"><value>模拟提交工作区修改</value></data>

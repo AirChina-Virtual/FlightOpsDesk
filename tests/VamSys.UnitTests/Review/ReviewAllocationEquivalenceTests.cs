@@ -14,19 +14,21 @@ namespace VamSys.UnitTests.Review;
 public class ReviewAllocationEquivalenceTests
 {
     // SHA-256 of ReviewEquivalence.Describe (content key, every entry's handling, reason, fields and dependencies, the issues,
-    // the validation issues, the submission items as saved and the requests they would send), from 6292ec1.
+    // the validation issues, the submission items as saved and the requests they would send), from 6292ec1. Three Online cases changed
+    // on purpose on 2026-11-24: their non-scheduled route changes skip the sample by the user's decision
+    // (ApiOperationPolicy.IsSampleExempt) and carry the ReviewUserDecided reason; with that turned off they still hash as before.
     static readonly Dictionary<string, string> Before = new()
     {
         ["mixed Demo"] = "C5F0A1F990F754AE7BBE8DAD91183124B268222103A9DEB3A0A795FF7903156B",
-        ["mixed Online connected"] = "84819E6FA2D9C666980E094204AC666FD959CBC4DF2AB0D4904A9A880EC88CBB",
+        ["mixed Online connected"] = "D964B3395B0754EB4981D7C4458DFA27013B43A3D9F0D17F14BFFF683C638574",
         ["mixed Online"] = "9482BC15C71CD5985A50B61C7D76DDB93F094055A7FA0D6B5C2DDD99271E6645",
         ["mixed Offline"] = "0CBC2182BE7FFDDA03A4D4C57AAF43E7A2DEAE780853EBF60B766CFE75E34194",
         ["large 500 rows 0 changes Demo"] = "1C40C6DAA0FE62B6058DB70FB18924DB64856C0811B67A4B8AF0F3D51F408630",
         ["large 500 rows 50 changes Demo"] = "3E771AA3E56EE4BB28F5DEAC1D3ACA6F82D35C502C3F7ECC0BBC160397CC4CC1",
         ["large 500 rows 500 changes Demo"] = "6388109BABA0A017A58CC6F55B9CA12B60EE13EC52D8DF5C5BCC6D0981B9B8BD",
         ["large 500 rows 0 changes Online"] = "BD4CF2F2BAB796DFC9D1645F0E192C22263E8F832F95F7628D0351DB5DECACF6",
-        ["large 500 rows 50 changes Online"] = "751D15A8D9DEF6F53CA56223FFA3638EE70E8987D22E56D82B916F9DF56B081C",
-        ["large 500 rows 500 changes Online"] = "87E2869B4B9B7C5A93BB080D9AD5EF5C091412129FBAA69EB42453193D74EE6F",
+        ["large 500 rows 50 changes Online"] = "892D1175D552F1FCC01D6E17DF9E5047D4E744CAB2893E43789CFA2EA85622E6",
+        ["large 500 rows 500 changes Online"] = "2C6372AA4AA0C524E556D5A6E8218F0D1C342C13759B8D293ED4550D5CDE75E2",
     };
 
     public static TheoryData<string> Cases() => new(ReviewEquivalence.SmallCases().Select(c => c.Name));

@@ -63,14 +63,15 @@ Pilot API 是个人授权的 Authorization Code + PKCE，涉及 profile、bookin
 - 货物容量只接收、显示并提交 kg 的非负整数；CSV 原列名、未知列与字节格式规则保留，离线小数不自动取整。在线审阅明确阻止小数、负值和溢出。空值仍表示省略／继承，未开放清空。
 - 新在线机队选择一个 approved、unrestricted 参数，以字符串数组 `parameter_ids` 提交。参数查询只有只读模型，不新增资源 CRUD；旧 `Allowed Prefix IDs` 不自动映射，既有机队改绑／解绑禁用。旧任务缺少新选择要求标志时保留保存时的语义。
 - scheduled 机队集合使用 `Routes:Update:FleetIds:Scheduled`，不继承旧 `Routes:Update` 标记；整数请求与 string/number 响应按规范化集合完整核对，拒绝重复、缺少或新增成员。参数与机队批准信息只在当前连接、当前执行会话缓存；机队变化、读取失败或相关 422 失效。
-- 非 scheduled 的同类型机队集合修改（cargo、charter、training、vfr、repositioning，类型不变、集合非空）已开放，每种类型用自己的能力键 `Routes:Update:FleetIds:<Type>`（如 `Routes:Update:FleetIds:Cargo`），不借用 scheduled 的验证结果，按每类前三条样本执行、回读按集合完整核对后才继续，前缀预检照常运行。尚无真实写入证据。改类型的同时改机队、jumpseat 的机队修改仍阻止。
+- 非 scheduled 的同类型机队集合修改（cargo、charter、training、vfr、repositioning，类型不变、集合非空）已开放，每种类型用自己的能力键 `Routes:Update:FleetIds:<Type>`（如 `Routes:Update:FleetIds:Cargo`），由用户决定直接放开（2026-11-24），没有软件写入证据，提交后照常回读核对（按集合完整比对），前缀预检照常运行。改类型的同时改机队、jumpseat 的机队修改仍阻止。
+- 非 scheduled 航线（cargo、charter、training、vfr、repositioning）的新建、修改和同类型机队修改按类型分键：`Routes:Create:<Type>`、`Routes:Update:<Type>`、`Routes:Update:FleetIds:<Type>`（如 `Routes:Create:Cargo`），jumpseat 的普通修改为 `Routes:Update:Jumpseat`；scheduled 仍是 `Routes:Create`／`Routes:Update`／`Routes:Update:FleetIds:Scheduled`，jumpseat 新建仍是 `Routes:Create:Jumpseat`。改类型的修改按涉及的非 scheduled 类型取键（scheduled→cargo、cargo→scheduled 都是 `Routes:Update:Cargo`；两个非 scheduled 类型之间取改后的类型）。这些键由用户决定直接放开（2026-11-24）：任何工作区都不执行前三条样本，与有没有 `Routes:Create`／`Routes:Update` 验证记录无关，审阅页标注“按用户决定直接提交”。它们没有软件写入证据，不属于独立证据范围，提交后照常回读核对。scheduled 的三个键维持原规则；`Routes:Update:FleetIds:Jumpseat`／`Unknown` 仍在规划阶段被阻止。
 - 已有 jumpseat 允许呼号／班号为空并显示“服务端未保留”，这两个字段在线只读。创建仍提交合法必填值，只有这两个字段的显式 JSON null 可作为回读例外。机场、类型、远端 ID 与其他持久字段仍严格比较；缺字段或非空差异不豁免。
 - **各航线类型的服务器处理（2026-11-12 核查）**，来源：固定契约、vCCA 快照（3,580 条航线的原始 JSON，只读分析）、14217362 的写入与回读、独立脚本的已验证范围：
 
   | 类型 | 证据 | 机队 | 呼号／班号 | 其他字段 | 客户端规则 |
   |---|---|---|---|---|---|
   | scheduled | 快照 3,181 条；自建样本 CRUD | 保存，必填 | 保存，需前缀批准 | 时刻、Routing、备注、Service Days、日期按值保存 | 机队必填；前缀预检 |
-  | cargo | 快照 394 条；无软件写入 | 保存 | 保存 | 同上 | 同 scheduled；同类型机队修改按 `Routes:Update:FleetIds:Cargo` 小样本执行 |
+  | cargo | 快照 394 条；无软件写入 | 保存 | 保存 | 同上 | 同 scheduled；新建、修改、同类型机队修改由用户决定直接放开，提交后回读核对 |
   | repositioning | 快照 3 条；2026-11-06 软件新建 2 条 | 保存 | 保存，需前缀批准（422 证据） | 同上 | 同 scheduled |
   | training | 快照 2 条；无写入 | 保存 | 保存 | 同上 | 同 scheduled |
   | charter、vfr | 无（vCCA 没有这类航线） | 契约：必填 | 契约：必填 | 未知 | 同 scheduled |

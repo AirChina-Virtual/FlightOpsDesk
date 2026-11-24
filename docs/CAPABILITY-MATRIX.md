@@ -12,7 +12,8 @@
 | 航路标签随 POST | 新契约允许 | 未以本轮材料确认该变体 | 请求规划及回读通过 | 2026-11-16 航路新建、改备注、删除通过（见下方 2026-11-16 记录）；标签未填写，此变体仍未验收 |
 | scheduled 航线 CRUD | 实验接口，有字段声明 | 参数批准后自建样本通过 | 预检、字段修改、读回与未知恢复通过 | 2026-11-16 通过：新建、改备注、软删除 204／404（见下方 2026-11-16 记录） |
 | scheduled 非空机队集合 A→AB→B→A | fleet_ids 整数数组 | 同类型正向样本通过 | A→AB→B→A、去重、成员完全匹配、独立能力及实测豁免通过 | 2026-11-16 A→AB 回读通过；2026-11-18 新建带 AB 后 AB→A、A→B 回读通过，再软删除 204／404（见下方 2026-11-18 记录）。追加、移除、替换都已有软件真实写入记录 |
-| 非 scheduled 同类型非空机队集合（cargo 等） | fleet_ids 整数数组 | 无；快照中 394 条 cargo 均保存机队 | 类型不变才放行、集合非空、按类型独立能力键、集合完整核对、前缀预检通过 | 未验收：按 `Routes:Update:FleetIds:<Type>` 前三条样本执行，不借用 scheduled 结果 |
+| 非 scheduled 同类型非空机队集合（cargo 等） | fleet_ids 整数数组 | 无；快照中 394 条 cargo 均保存机队 | 类型不变才放行、集合非空、按类型独立能力键、集合完整核对、前缀预检通过 | 未验收：`Routes:Update:FleetIds:<Type>` 由用户决定直接放开（2026-11-24），没有软件写入证据，提交后照常回读核对 |
+| 非 scheduled 航线新建与修改（cargo 等） | 与 scheduled 相同的字段声明 | 无软件写入；2026-11-06 repositioning 新建两条为用户实际操作记录 | 按类型分键、预检与回读核对通过 | 未验收：`Routes:Create:<Type>`／`Routes:Update:<Type>` 由用户决定直接放开（2026-11-24），没有软件写入证据，提交后照常回读核对 |
 | 参数只读与新机队一个参数 | GET /parameters；parameter_ids 字符串数组 | 新机队关联现有批准参数成功 | 权限局部阻止、跨 VA、关联与前缀、旧字段拒绝通过 | 2026-11-16 两个新机队各带参数 9671 新建并回读通过（见下方 2026-11-16 记录） |
 | jumpseat 新建与呼号／班号 null | POST 仍必填 | 新建、详情、修改、删除通过；响应不保留两个标识 | 显式 null 例外、缺字段／非空差异拒绝通过 | 2026-11-16 新建、改备注、软删除通过；新建时发送的 remarks 未保存，修复后回读核对完成（见下方 2026-11-16 记录） |
 | jumpseat 无 ID 人工恢复 | 客户端额外保护 | 未以外部脚本验证软件恢复 | 排除旧 ID、请求窗口、持久字段、仅 GET 通过 | 2026-11-16 用过一次：输入 14327585 后回读核对通过（见下方 2026-11-16 记录） |
@@ -89,7 +90,7 @@
 - 既有机队参数改绑、解绑、集合替换及参数独立 CRUD。
 - 未验证清空及物理删除判定。软删除仅在完整 204／404 证据匹配后自动核对 API 不可见；没有回执的 404 不视为此次删除成功。
 
-能力键 `Routes:Update:FleetIds:Scheduled`、`Routes:Update:FleetIds:<Type>`（Cargo、Charter、Training、Vfr、Repositioning，各自独立）、`Routes:Create:Jumpseat`、`Fleets:Create:ParameterIds`、`Aircraft:Update:FleetId:Move` 独立登记，旧通用成功标记不替代新能力验证。工作区标记只由实际成功回读登记；外部基线在固定哈希匹配时独立解除其字段范围的首次样本限制，未覆盖变体仍使用原有规则。契约哈希变化和工作区清理会重置工作区标记。
+能力键 `Routes:Update:FleetIds:Scheduled`、`Routes:Update:FleetIds:<Type>`（Cargo、Charter、Training、Vfr、Repositioning，各自独立）、`Routes:Create:Jumpseat`、`Fleets:Create:ParameterIds`、`Aircraft:Update:FleetId:Move` 独立登记，旧通用成功标记不替代新能力验证。工作区标记只由实际成功回读登记；外部基线在固定哈希匹配时独立解除其字段范围的首次样本限制，未覆盖变体仍使用原有规则。契约哈希变化和工作区清理会重置工作区标记。非 scheduled 航线（cargo、charter、training、vfr、repositioning）的新建、修改和同类型机队修改按类型分键：`Routes:Create:<Type>`、`Routes:Update:<Type>`、`Routes:Update:FleetIds:<Type>`（如 `Routes:Create:Cargo`），jumpseat 的普通修改为 `Routes:Update:Jumpseat`；scheduled 仍是 `Routes:Create`／`Routes:Update`／`Routes:Update:FleetIds:Scheduled`，jumpseat 新建仍是 `Routes:Create:Jumpseat`。改类型的修改按涉及的非 scheduled 类型取键（scheduled→cargo、cargo→scheduled 都是 `Routes:Update:Cargo`；两个非 scheduled 类型之间取改后的类型）。这些键由用户决定直接放开（2026-11-24）：任何工作区都不执行前三条样本，与有没有 `Routes:Create`／`Routes:Update` 验证记录无关，审阅页标注“按用户决定直接提交”。它们没有软件写入证据，不属于独立证据范围，提交后照常回读核对。scheduled 的三个键维持原规则；`Routes:Update:FleetIds:Jumpseat`／`Unknown` 仍在规划阶段被阻止。
 
 本轮自动测试 260 项通过（缺旧版二进制基线时 259）；含 21 项范围开放、移动、删除只读核对、持久化与写入结果判定回归，覆盖短数字 Client ID、未发出／认证拒绝的写入、Unknown 未生效核对、旧版两步新建续传和空 VA 识别。没有 computer-use，没有新增真实业务写入，没有新增界面窗口视觉验收。vaMSYS 的三类重量异常已整理本地复现材料，尚未发送；异常本身并未由客户端修复。
 

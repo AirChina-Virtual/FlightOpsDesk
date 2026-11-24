@@ -2,10 +2,15 @@
 
 这里按日期记录主要变化。列出某次更新，不表示已经在 GitHub 发布了可下载的程序包或版本标签。
 
+## 2026-11-24 · 非 scheduled 航线的新建和修改按类型分键并直接放开（尚未发布）
+
+- 以前 cargo、charter、training、vfr、repositioning 航线的新建和修改与 scheduled 共用 `Routes:Create`／`Routes:Update`：scheduled 验证过以后，这些类型也跟着不再按样本执行，而文档写的是仍按样本。现在每种类型有自己的键（如 `Routes:Create:Cargo`、`Routes:Update:Cargo`，jumpseat 的普通修改为 `Routes:Update:Jumpseat`），scheduled 的键不变。改类型的修改按涉及的非 scheduled 类型取键。
+- 这些键和非 scheduled 的机队修改键（`Routes:Update:FleetIds:Cargo` 等）由用户决定直接放开（2026-11-24）：任何工作区都不执行前三条样本，审阅页注明“按用户决定直接提交”，不算作独立证据。它们没有软件写入证据，提交后照常回读核对。scheduled 的新建、修改和机队修改维持原规则。不做工作区迁移，已保存的验证记录和旧任务不变。
+
 ## 2026-11-24 · cargo 等航线可以在类型不变时修改机队（尚未发布）
 
 - 以前只有 scheduled 航线能修改机队，cargo、charter、training、vfr、repositioning 航线一改机队，整条修改（连同时刻、班期、Cost Index）都被阻止。现在这些类型只要类型不变、机队不为空，就可以修改机队。
-- 每种类型单独验证：例如 cargo 用 `Routes:Update:FleetIds:Cargo`，不借用 scheduled 已验证的结果，在线审阅先执行前三条，回读按机队集合完整核对通过后才能继续；前缀预检照常。这类修改还没有真实写入证据。
+- 每种类型有自己的键：例如 cargo 用 `Routes:Update:FleetIds:Cargo`，不借用 scheduled 的验证结果。由用户决定直接放开（2026-11-24），没有软件写入证据，提交后照常回读核对（按机队集合完整比对）；前缀预检照常。
 - 仍然阻止：改类型的同时改机队（包括 scheduled 和 cargo 互改）、jumpseat 的机队修改、改入或改出 jumpseat 时一并改机队，以及把机队改成空。提示文案已更新。
 
 ## 2026-11-24 · 发布 1.2.0 正式版

@@ -295,7 +295,7 @@ public static class ReviewPlanBuilder
         var entries = new List<ReviewEntry>(changes.Count);
         var samples = new Dictionary<string, int>(StringComparer.Ordinal);
         // The same reason objects are shared by all entries that have it (the key serializes each once).
-        MessageDescriptor? connect = null, sample = null, evidence = null;
+        MessageDescriptor? connect = null, sample = null, evidence = null, decided = null;
         // Operation keys, evidence and the API preview read a ChangeItem. A change that has none yet is shown to them through
         // one scratch item, refilled for each change (its rows, kind and changed fields; no row copies). They only read the
         // item during the call and keep nothing of it, so one item serves the whole plan instead of an item and a field map
@@ -334,6 +334,9 @@ public static class ReviewPlanBuilder
             {
                 var operation = ApiOperationPolicy.Key(item!);
                 external = IndependentApiEvidence.Covers(item!, externalEvidenceContractHash);
+                // A sample-exempt operation is sent in full by the user's decision, not on evidence; the page says so.
+                if (!verified.Contains(operation) && !external && ApiOperationPolicy.IsSampleExempt(operation))
+                { entries.Add(new(change, ReviewDisposition.Ready, decided ??= Messages.Define("ReviewUserDecided"))); continue; }
                 if (!verified.Contains(operation) && !external)
                 {
                     var count = samples.GetValueOrDefault(operation);

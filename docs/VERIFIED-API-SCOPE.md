@@ -17,7 +17,7 @@
 | scheduled 航线 | 类型、呼号、班号、起降机场、非空 Fleet IDs、时刻、Routing、隐藏、有效日期、备注、内部备注、Service Days | Remarks、Cost Index、起降时刻；非空机队集合替换／追加／移除 | 完整 204／404 证据后确认 API 不可见 |
 | jumpseat 航线 | 类型、呼号、班号、起降机场、时刻、Routing、隐藏、有效日期、备注、内部备注、Cost Index、Service Days | Remarks、Cost Index、起降时刻 | 完整 204／404 证据后确认 API 不可见 |
 
-未覆盖的字段或变体仍使用原有样本和兼容限制。cargo、charter、training、vfr、repositioning 航线在类型不变时修改非空机队集合已开放，但不在上表证据内：每种类型用自己的能力键（如 `Routes:Update:FleetIds:Cargo`），按前三条样本执行，尚无真实写入证据。例如，Tags 随创建、scheduled 创建时的 Cost Index、jumpseat 创建时的机队关联没有进入独立证据豁免。新的在线机队仍要求选择一个已批准、未受限的航司参数；既有机队参数改绑不开放。
+未覆盖的字段或变体仍使用原有样本和兼容限制。cargo、charter、training、vfr、repositioning 航线的新建、修改和类型不变时的非空机队集合修改都不在上表证据内。非 scheduled 航线（cargo、charter、training、vfr、repositioning）的新建、修改和同类型机队修改按类型分键：`Routes:Create:<Type>`、`Routes:Update:<Type>`、`Routes:Update:FleetIds:<Type>`（如 `Routes:Create:Cargo`），jumpseat 的普通修改为 `Routes:Update:Jumpseat`；scheduled 仍是 `Routes:Create`／`Routes:Update`／`Routes:Update:FleetIds:Scheduled`，jumpseat 新建仍是 `Routes:Create:Jumpseat`。改类型的修改按涉及的非 scheduled 类型取键（scheduled→cargo、cargo→scheduled 都是 `Routes:Update:Cargo`；两个非 scheduled 类型之间取改后的类型）。这些键由用户决定直接放开（2026-11-24）：任何工作区都不执行前三条样本，与有没有 `Routes:Create`／`Routes:Update` 验证记录无关，审阅页标注“按用户决定直接提交”。它们没有软件写入证据，不属于独立证据范围，提交后照常回读核对。scheduled 的三个键维持原规则；`Routes:Update:FleetIds:Jumpseat`／`Unknown` 仍在规划阶段被阻止。例如，Tags 随创建、scheduled 创建时的 Cost Index、jumpseat 创建时的机队关联没有进入独立证据豁免。新的在线机队仍要求选择一个已批准、未受限的航司参数；既有机队参数改绑不开放。
 
 ## 飞机跨机队移动
 
@@ -58,7 +58,7 @@
 - 只测了一个字段的改写不推广到同类字段：arrival_time 没有 `HH:MM` 规则、end_date 没有“只写日期”规则、start_date 没有“丢弃毫秒”规则；程序本来也不会发出这些形式。
 - **飞机 Internal Remarks（已采用“新建后补一次 PUT”，2026-11-17）。** 新建时随 POST 发送的 `internal_remarks` 不保存：201 应答、单条 GET 和机队下的飞机列表都是 null。补充取证（`artifacts/write-evidence/aircraft-remarks.json`，运行标记 `FODESK-WE 20261118T005911Z`）证明只含 `internal_remarks` 的 PUT 返回 200、两处回读与发送值一致、可多次修改，PUT 空字符串回读为 null。所以在线新建飞机且填写了 Internal Remarks 时，程序先 POST（不带这一列），拿到新飞机 ID 后再对它 PUT 一次只含 `internal_remarks` 的请求，然后回读核对全部值；没填写时只发 POST。PUT 只在 POST 应答给出 ID 之后发出；POST 应答丢失时不发 PUT（找回的记录也不发）。这时查找和核对输入的 ID 只比较 POST 发出的值，找到后绑定记录、保持“结果未知”，用户可以接受服务器的值，草稿里的 Internal Remarks 留作冲突（2026-11-23）；2026-11-17 之前保存的未完成任务仍是一次 POST，回读会不一致，新建已应答的可用“接受服务器的值”处理；PUT 收到 429 或未发出时，“继续”先回读核对 POST 写入的值，再只补发 PUT，不会再次新建；PUT 超时、5xx 或应答丢失时不重发，按回读结果判定。飞机 `internal_remarks` 登记了“空字符串→null”的回读规则。修改已有飞机的 Internal Remarks 同样有证据（两次非空值 PUT 都 200，单条和列表回读一致），自 2026-11-17 起列入上表“修改”范围，不再受首次样本限制；同一条修改里夹带未验证字段（如 SELCAL）时仍按原规则。清空仍按“未验证清空”禁用。
 
-**软删除（G8）。** cargo、charter、training、vfr、repositioning 航线各新建一条后 DELETE 均 204，随后 GET 均 404，与 scheduled、jumpseat 相同。这些类型的删除现在按同一套 204＋404 证据自动核对“API 已核对不可见”，审阅时不再受首次样本限制；它们的新建和修改没有新证据，仍保留样本限制。
+**软删除（G8）。** cargo、charter、training、vfr、repositioning 航线各新建一条后 DELETE 均 204，随后 GET 均 404，与 scheduled、jumpseat 相同。这些类型的删除现在按同一套 204＋404 证据自动核对“API 已核对不可见”，审阅时不再受首次样本限制；它们的新建和修改没有新证据，不属于独立证据范围；按类型分键后由用户决定直接放开（2026-11-24），提交后照常回读核对（见上文）。
 
 **前缀检查（2.1）。** 本次航线都用合法前缀 CCA／CA，没有测被拒情况；cargo、charter、training、vfr 的前缀检查仍是按决定 D11 阻止，尚无服务端证据。
 
