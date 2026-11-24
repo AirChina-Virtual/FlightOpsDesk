@@ -1,5 +1,7 @@
 <Project>
   <PropertyGroup>
+    <!-- Release version of the published package (1.0.0 was the SDK default). The commit is appended to the informational version. -->
+    <Version>1.1.0</Version>
     <Nullable>enable</Nullable>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
