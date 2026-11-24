@@ -130,7 +130,8 @@ public class ConnectedDialogTests
             while (clock.Elapsed < limit)
             {
                 app.Foreground();
-                app.HoverOn(FleetButton(), "the route's fleet cell", away: false);
+                // The Fleet IDs column is the route's eleventh, right of the window at first: the table is scrolled to it.
+                app.HoverOn(app.ScrollIntoTableView(FleetButton, "the route's fleet cell"), "the route's fleet cell", away: false);
                 if (Poll(() => app.OpenToolTip() is { } tip && tip.Contains(Marker, StringComparison.Ordinal) ? tip : null, TimeSpan.FromSeconds(1.5)) is { } shown)
                     return shown;
             }

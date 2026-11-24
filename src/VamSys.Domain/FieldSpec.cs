@@ -158,6 +158,44 @@ public static class FieldSpecs
 
     public static ResourceSpec Get(ResourceKind kind) => All[kind];
 
+    // The data table's order for the known columns of each resource, most used first; the status and key columns come
+    // before these. It is the table's order only: the stored columns, the CSV export and the field table keep theirs.
+    public static readonly FrozenDictionary<ResourceKind, IReadOnlyList<string>> DisplayOrder = new Dictionary<ResourceKind, IReadOnlyList<string>>
+    {
+        [ResourceKind.Airports] = ["Name", "Category", "Container IDs", "Pax LF ID", "Cargo LF ID"],
+        [ResourceKind.Fleets] = ["Name", "Type Code", "Type (pax/cargo/...)", "Max Passengers", "Max Freight", "Container Units",
+            "Hide in Phoenix", "Allowed Prefix IDs", "Parameter IDs"],
+        [ResourceKind.Aircraft] = ["Registration", "Name", "Fleet ID", "Passengers", "Freight", "SELCAL", "Hex Code", "Fin Number", "Internal Remarks"],
+        [ResourceKind.Routings] = [Dep, Arr, "Route String", "Days of Operation", "Tags", "Remarks", "Internal Remarks"],
+        [ResourceKind.Routes] = ["Callsign", "Flight Number", Dep, Arr, "Type", "Departure Time (HH:MM)", "Arrival Time (HH:MM)", "Service Days",
+            "Fleet IDs", "Start Date", "End Date", "Routing", "Is Hidden", "Tags", "Altitude", "Cost Index", "Remarks", "Internal Remarks"]
+    }.ToFrozenDictionary();
+
+    // The given columns in the data table's order: the status and key columns, then the known ones in DisplayOrder, then
+    // the rest (imported columns of the user's own) in the order given. Each column appears once; none is added.
+    public static List<string> TableOrder(ResourceKind kind, IEnumerable<string> columns)
+    {
+        var given = columns.Distinct(StringComparer.Ordinal).ToList();
+        var present = given.ToHashSet(StringComparer.Ordinal);
+        var known = DisplayOrder[kind];
+        var leading = new[] { DeleteMarker.Csv, All[kind].Key }.Where(present.Contains);
+        var ordered = leading.Concat(known.Where(present.Contains)).ToList();
+        var placed = ordered.ToHashSet(StringComparer.Ordinal);
+        ordered.AddRange(given.Where(c => !placed.Contains(c)));
+        return ordered;
+    }
+
+    // Every column the data table shows for a resource whose data has these columns (the schema's when it has none yet):
+    // the status and key always, and for aircraft and routes the fleet column too, so fleets can be assigned in the table
+    // after a CSV without it. In TableOrder.
+    public static List<string> TableColumns(ResourceKind kind, IReadOnlyCollection<string> dataColumns)
+    {
+        IEnumerable<string> always = [DeleteMarker.Csv, All[kind].Key];
+        if (kind is ResourceKind.Aircraft or ResourceKind.Routes)
+            always = always.Append(FleetAssignmentService.Field(kind));
+        return TableOrder(kind, always.Concat(dataColumns.Count == 0 ? Schemas.All[kind].Columns : dataColumns));
+    }
+
     // Column facts by name across all resources: rows may carry columns of any resource, and the same column name
     // has the same type everywhere (locked by FieldSpecTests). The first resource that lists a column wins.
     static readonly FrozenDictionary<string, FieldSpec> Columns = new[] { DeleteMarker }

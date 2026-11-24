@@ -370,14 +370,8 @@ public sealed partial class MainWindow : Window
         Render();
         Status(() => L(undo ? "Text_E5CE954248" : "Text_1F00D27BEE"));
     }
-    // Every column of the resource, in table order: the status, the key, the fleet, then the data's own order.
-    List<string> AllColumns()
-    {
-        var leading = new List<string> { "_delete", Schemas.All[resource].Key };
-        if (resource is ResourceKind.Aircraft or ResourceKind.Routes)
-            leading.Add(FleetAssignmentService.Field(resource));
-        return leading.Concat(Data.Columns.Count == 0 ? Schemas.All[resource].Columns : Data.Columns).Distinct().ToList();
-    }
+    // Every column of the resource, in table order (FieldSpecs.TableColumns): the status, the key, the known columns, then the rest.
+    List<string> AllColumns() => FieldSpecs.TableColumns(resource, Data.Columns);
     // The columns the table shows: all but the ones hidden from the view menu (never the status or the key).
     List<string> DisplayColumns() => HiddenColumns.Shown(resource, AllColumns()).ToList();
     // Rebuilt on every render; the shown one is refreshed when the language changes.

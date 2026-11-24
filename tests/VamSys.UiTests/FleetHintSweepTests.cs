@@ -42,7 +42,9 @@ public class FleetHintSweepTests
             var order = pass % 2 == 0 ? buttons : buttons.Reverse().ToArray();
             for (var i = 0; i < order.Length; i++)
             {
-                app.HoverOn(order[i], $"fleet button {i} (pass {pass})", away: false);
+                // The Fleet IDs column is the route's eleventh, right of the window at first: the table is scrolled to it.
+                var button = order[i];
+                app.HoverOn(app.ScrollIntoTableView(() => button, $"fleet button {i} (pass {pass})"), $"fleet button {i} (pass {pass})", away: false);
                 Thread.Sleep((i + pass) % 2 == 0 ? 700 : 60);
             }
             Assert.True(app.Running, $"The window ended while the pointer swept over the fleet buttons (pass {pass}).");
@@ -57,7 +59,7 @@ public class FleetHintSweepTests
                 app.Foreground();
                 foreach (var button in FleetButtons(name))
                 {
-                    app.HoverOn(button, "a fleet button", away: false);
+                    app.HoverOn(app.ScrollIntoTableView(() => button, "a fleet button"), "a fleet button", away: false);
                     if (Poll(() => app.OpenToolTip() is { } tip && tip.Contains(marker, StringComparison.Ordinal) ? tip : null, TimeSpan.FromSeconds(1.5)) is { } shown)
                         return shown;
                 }

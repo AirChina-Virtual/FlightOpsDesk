@@ -630,6 +630,46 @@ public sealed partial class AppWindow : IDisposable
         MoveTo(x, y);
     }
 
+    /// <summary>
+    /// Scrolls the data table sideways until the element is in view, and returns it: its whole rectangle is inside the
+    /// window and UI Automation does not report it off screen (clipped by the table's scroller). A hit test cannot tell more:
+    /// at any point of the WinUI content it finds only the window's content bridge pane. Columns
+    /// far to the right (a route's Fleet IDs is the eleventh) start out of view. Each try reads the table's offset and moves
+    /// it by the element's distance from the window's centre with the QA command data-scroll, which also brings the first
+    /// row to the top. An element wholly out of view has an empty rectangle: the table then moves on by half the window's
+    /// width per try, and back to its left edge once it can go no further.
+    /// </summary>
+    public AutomationElement ScrollIntoTableView(Func<AutomationElement> find, string what)
+    {
+        var observed = "nothing read yet";
+        var found = Poll(() =>
+        {
+            var element = find();
+            var rect = element.Current.BoundingRectangle;
+            if (!GetWindowRect(Handle, out var bounds))
+            {
+                observed = "the window's bounds cannot be read";
+                return null;
+            }
+            var laidOut = !rect.IsEmpty && double.IsFinite(rect.X) && double.IsFinite(rect.Y) && rect.Width > 0 && rect.Height > 0;
+            if (laidOut && rect.Left >= bounds.Left && rect.Right <= bounds.Right && rect.Top >= bounds.Top && rect.Bottom <= bounds.Bottom
+                && !element.Current.IsOffscreen)
+                return element;
+            var state = Query("data-state");
+            var scale = state["rasterizationScale"]?.GetValue<double>() ?? 1;
+            var current = state["horizontal"]?.GetValue<double>() ?? 0;
+            var offset = laidOut
+                ? Math.Max(0, current + (rect.X + rect.Width / 2 - (bounds.Left + bounds.Right) / 2.0) / scale)
+                : current + (bounds.Right - bounds.Left) / 2.0 / scale;
+            var moved = Query("data-scroll:0," + offset.ToString(System.Globalization.CultureInfo.InvariantCulture))["horizontal"]?.GetValue<double>() ?? 0;
+            if (!laidOut && Math.Abs(moved - current) < 1)
+                moved = Query("data-scroll:0,0")["horizontal"]?.GetValue<double>() ?? 0;
+            observed = $"rectangle {rect} (offscreen {element.Current.IsOffscreen}) in window [{bounds.Left},{bounds.Top} - {bounds.Right},{bounds.Bottom}], table offset {current:0} -> {moved:0}";
+            return null;
+        }, DefaultWait);
+        return found ?? throw new TimeoutException($"Timeout: {what} in view; last seen: {observed}{Describe()}");
+    }
+
     // Moves the pointer there in eight injected absolute moves from where it is, as a hand would: a jump with SetCursorPos
     // (even followed by a one-pixel move) often raised no pointer events in the window.
     static void MoveTo(int x, int y)
