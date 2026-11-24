@@ -14,8 +14,9 @@ public sealed record ServerValueReview(ChangeItem Item, ChangeItem Candidate, Da
 // in the draft as conflicts. An accepted hard delete whose record is still readable keeps the record.
 public sealed class OperationsServerValueResolver(OperationsAdapter api, Workspace workspace)
 {
-    // Soft deletes have their own manual path; a move is read at the target fleet only.
-    public static bool CanAccept(ChangeItem item) => item.State == ItemState.Unknown && (item.WriteAccepted || item.CreateCompleted)
+    // Soft deletes have their own manual path; a move is read at the target fleet only. A create whose POST answer was lost
+    // qualifies once its record has been found and bound (CreateFoundWithoutAnswer): its later steps are never sent.
+    public static bool CanAccept(ChangeItem item) => item.State == ItemState.Unknown && (item.WriteAccepted || item.CreateCompleted || item.CreateFoundWithoutAnswer)
         && !IndependentApiEvidence.IsSoftDelete(item) && !IndependentApiEvidence.IsMove(item) && Id(item) != null;
     static string? Id(ChangeItem item) => item.RemoteId ?? item.Before?.Identity?.RemoteId;
 

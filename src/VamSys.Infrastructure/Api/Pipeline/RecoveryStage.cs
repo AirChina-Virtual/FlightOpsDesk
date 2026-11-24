@@ -6,6 +6,7 @@ namespace VamSys.Infrastructure;
 // What happens to an item that was interrupted (Running, Unknown, a create that was answered, a write that was accepted).
 // It is read-only: the server is asked what became of the write and the item is settled from the answer. An interrupted
 // request is never repeated; the one exception is the later steps of a legacy two-step create whose POST was answered.
+// A two-step create whose POST answer was lost gets its record bound, never its later steps (UnknownResolver.CanBindLostCreate).
 internal sealed class RecoveryStage(JobRun run, WriteStage write)
 {
     public async Task RunAsync(ItemRun r)
@@ -42,6 +43,18 @@ internal sealed class RecoveryStage(JobRun run, WriteStage write)
         }
         else if (item.Kind == ChangeKind.Delete && found == null && r.Id != null && item.Resource is ResourceKind.Fleets or ResourceKind.Aircraft or ResourceKind.Routings)
             await run.Completion.CompleteAsync(item, null);
+        else if (UnknownResolver.CanBindLostCreate(item) && found != null && api.MatchesCreated(item, found))
+        {
+            // The record the POST made, found automatically or by the id the user entered, carries every value the POST
+            // sent. It is bound so the user can accept it as the server holds it; the later steps are never sent for it.
+            item.RemoteId = found.Identity!.RemoteId;
+            item.After = item.After.WithIdentity(found.Identity);
+            item.RecoveryCandidateId = null;
+            item.CreateFoundWithoutAnswer = true;
+            item.State = ItemState.Unknown;
+            api.RecordReadback(item, found);
+            item.SetMessage(Messages.Define("ApiCreateFoundFollowUpsNotSent", ("id", item.RemoteId)));
+        }
         else if (OperationsAdapter.CanResumeCreate(item) && found != null && api.MatchesCreated(item, found))
         {
             await write.ResumeAsync(r, api.ExecutionPlan(item));

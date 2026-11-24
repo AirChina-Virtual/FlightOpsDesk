@@ -146,21 +146,7 @@ public class AircraftInternalRemarksTests
         Assert.True(item.CreateCompleted);
     }
 
-    [Fact]
-    public async Task Without_the_posts_answer_no_put_is_ever_sent()
-    {
-        var w = World();
-        w.Remote.Intercept = r => r.Method == "POST" ? Applied(w, r) : null;
-        await w.RunAsync();
-        var item = w.Job!.Items.Single();
-        Assert.Equal(ItemState.Unknown, item.State);
-        Assert.False(item.CreateCompleted);
-        w.Remote.Intercept = null;
-        await w.ResumeAsync("continue");
-        Assert.Equal(ItemState.Unknown, item.State);
-        Assert.Equal(["POST fleet/4/aircraft"], Writes(w));
-        Assert.Null(w.Remote.Rows[Created]["internal_remarks"]);
-    }
+    // A lost POST answer: AircraftLostPostTests.
 
     [Fact]
     public async Task A_put_the_server_answered_but_did_not_keep_stays_unknown_and_is_not_repeated()

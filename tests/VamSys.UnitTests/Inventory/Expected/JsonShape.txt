@@ -60,6 +60,7 @@ VamSys.Core.ChangeItem.Before => VamSys.Core.DataRow; get/set; ignore=Never
 VamSys.Core.ChangeItem.CanProposeRecoveryId => System.Boolean; ; ignore=Always
 VamSys.Core.ChangeItem.CanProposeRecoveryId => not serialized (JsonIgnore Always)
 VamSys.Core.ChangeItem.CreateCompleted => System.Boolean; get/set; ignore=Never
+VamSys.Core.ChangeItem.CreateFoundWithoutAnswer => System.Boolean; get/set; ignore=WhenWritingDefault
 VamSys.Core.ChangeItem.DeletionVerification => VamSys.Core.ApiDeletionVerification; get/set; ignore=WhenWritingNull
 VamSys.Core.ChangeItem.Dependencies => System.Collections.Generic.List<System.Guid>; get/set; ignore=Never
 VamSys.Core.ChangeItem.Description => VamSys.Core.MessageDescriptor; get/set; ignore=Never

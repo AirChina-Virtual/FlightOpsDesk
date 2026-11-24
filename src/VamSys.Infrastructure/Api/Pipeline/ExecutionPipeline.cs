@@ -33,7 +33,7 @@ internal sealed class ExecutionPipeline(OperationsAdapter api, Workspace workspa
         // saved steps are all still prepared never reached the server. Done before candidates are seeded.
         foreach (var item in job.Items)
             if (item.State is ItemState.Running or ItemState.Unknown && item.ApiSteps.Count > 0 && item.ApiSteps.All(s => s.State == BatchStepState.Prepared)
-                && !item.CreateCompleted && !item.WriteAccepted)
+                && !item.CreateCompleted && !item.WriteAccepted && !item.CreateFoundWithoutAnswer)
                 item.State = ItemState.Pending;
         api.InvalidateParameters();
         api.SeedCandidates(job, run.Queries);
@@ -76,7 +76,7 @@ internal sealed class ExecutionPipeline(OperationsAdapter api, Workspace workspa
             {
                 sink.Active = item;
                 // Recovery is read-only even when dependency checks or the recovery GET fail.
-                var recovering = item.State is ItemState.Running or ItemState.Unknown || item.CreateCompleted || item.WriteAccepted;
+                var recovering = item.State is ItemState.Running or ItemState.Unknown || item.CreateCompleted || item.WriteAccepted || item.CreateFoundWithoutAnswer;
                 if (recovering && item.State is not (ItemState.Succeeded or ItemState.ManuallyConfirmed))
                     item.State = ItemState.Unknown;
                 if (ct.IsCancellationRequested)
@@ -116,7 +116,7 @@ internal sealed class ExecutionPipeline(OperationsAdapter api, Workspace workspa
                     if (collect && item.State == ItemState.Pending && NotProcessed(e, r.Phase) && !ct.IsCancellationRequested)
                         unprocessed.Add(item);
                 }
-                if (item.State is ItemState.Failed or ItemState.Pending && !item.CreateCompleted && !item.WriteAccepted)
+                if (item.State is ItemState.Failed or ItemState.Pending && !item.CreateCompleted && !item.WriteAccepted && !item.CreateFoundWithoutAnswer)
                     run.Queries.Release(item);
                 await sink.SaveAsync();
                 if (ct.IsCancellationRequested)
@@ -179,8 +179,9 @@ internal sealed class ExecutionPipeline(OperationsAdapter api, Workspace workspa
             catch (PersistenceException) { throw; }
             catch (Exception)
             { item.State = ItemState.Unknown; item.ReadbackDetails = readback; }
-            // A search that found several records the create may have made says so instead (E1).
-            if (item.State == ItemState.Unknown && item.Description?.Code != "ApiCreateCandidates")
+            // A search that found several records the create may have made says so instead (E1), as does a create whose
+            // record was found but whose later steps were never sent.
+            if (item.State == ItemState.Unknown && item.Description?.Code is not ("ApiCreateCandidates" or "ApiCreateFoundFollowUpsNotSent"))
             { item.Description = description; item.Message = message; }
             await run.Sink.SaveAsync();
         }

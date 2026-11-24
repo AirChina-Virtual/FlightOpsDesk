@@ -17,14 +17,28 @@ $unit = 'tests/VamSys.UnitTests/VamSys.UnitTests.csproj'
 $integration = 'tests/VamSys.IntegrationTests/VamSys.IntegrationTests.csproj'
 $failureHandler = 'src/VamSys.Infrastructure/Api/Pipeline/FailureHandler.cs'
 $writeSafety = 'VamSys.IntegrationTests.Api.WriteSafetyTableTests'
+$lostPost = 'VamSys.IntegrationTests.Api.AircraftLostPostTests'
+$recoveryStage = 'src/VamSys.Infrastructure/Api/Pipeline/RecoveryStage.cs'
+$finder = 'src/VamSys.Infrastructure/Api/CreatedRecordFinder.cs'
 
 $core = @(
     # Never send twice, and what counts as unknown.
     @{ Name = '500-not-unknown'; File = $failureHandler; From = '|| phase == Phase.Writing && (int)e.Status >= 500 ? ItemState.Unknown'; To = '? ItemState.Unknown'; Project = $integration; Class = $writeSafety }
     @{ Name = 'timeout-to-pending'; File = $failureHandler; From = 'item.State = phase != Phase.Preflight ? ItemState.Unknown : ItemState.Pending;'; To = 'item.State = ItemState.Pending;'; Project = $integration; Class = $writeSafety }
     @{ Name = '429-not-pending'; File = $failureHandler; From = ': throttled || phase == Phase.Preflight && (int)e.Status >= 500 ? ItemState.Pending : ItemState.Failed;'; To = ': phase == Phase.Preflight && (int)e.Status >= 500 ? ItemState.Pending : ItemState.Failed;'; Project = $integration; Class = $writeSafety }
-    @{ Name = 'unknown-not-recovered'; File = 'src/VamSys.Infrastructure/Api/Pipeline/ExecutionPipeline.cs'; From = 'var recovering = item.State is ItemState.Running or ItemState.Unknown || item.CreateCompleted || item.WriteAccepted;'; To = 'var recovering = item.State is ItemState.Running || item.CreateCompleted || item.WriteAccepted;'; Project = $integration; Class = $writeSafety }
+    @{ Name = 'unknown-not-recovered'; File = 'src/VamSys.Infrastructure/Api/Pipeline/ExecutionPipeline.cs'; From = 'var recovering = item.State is ItemState.Running or ItemState.Unknown || item.CreateCompleted || item.WriteAccepted || item.CreateFoundWithoutAnswer;'; To = 'var recovering = item.State is ItemState.Running || item.CreateCompleted || item.WriteAccepted || item.CreateFoundWithoutAnswer;'; Project = $integration; Class = $writeSafety }
     @{ Name = 'discard-after-sending'; File = 'src/VamSys.Domain/ApiEvidence.cs'; From = "`n        && item.ApiSteps.All(s => s.State == BatchStepState.Prepared);"; To = ';'; Project = $integration; Class = 'VamSys.IntegrationTests.Api.DiscardUnsentTests' }
+    # A create whose POST answer was lost and whose later steps never left (an aircraft with internal remarks): its record
+    # is found by the POST's values and bound, never resumed; only accepting the server's value settles it.
+    @{ Name = 'lost-create-all-values'; File = 'src/VamSys.Infrastructure/Api/ReadbackVerifier.cs'; From = "var verdict = UnknownResolver.CanBindLostCreate(item)`n            ? Verify(item, current, item.After, PostValues(item)) : VerifyPlanned(item, current, item.After);"; To = 'var verdict = VerifyPlanned(item, current, item.After);'; Project = $integration; Class = $lostPost }
+    @{ Name = 'lost-create-not-bound'; File = $recoveryStage; From = 'else if (UnknownResolver.CanBindLostCreate(item) && found != null && api.MatchesCreated(item, found))'; To = 'else if (UnknownResolver.CanBindLostCreate(item) && found != null && api.MatchesCreated(item, found) && item.CreateCompleted)'; Project = $integration; Class = $lostPost }
+    @{ Name = 'lost-create-binds-any-record'; File = $recoveryStage; From = 'else if (UnknownResolver.CanBindLostCreate(item) && found != null && api.MatchesCreated(item, found))'; To = 'else if (UnknownResolver.CanBindLostCreate(item) && found != null)'; Project = $integration; Class = $lostPost }
+    @{ Name = 'lost-create-bound-as-answered'; File = $recoveryStage; From = 'item.CreateFoundWithoutAnswer = true;'; To = 'item.CreateFoundWithoutAnswer = true; item.CreateCompleted = true; item.ApiSteps[0].State = BatchStepState.ResponseReceived;'; Project = $integration; Class = $lostPost }
+    @{ Name = 'lost-create-not-acceptable'; File = 'src/VamSys.Infrastructure/OperationsServerValue.cs'; From = '(item.WriteAccepted || item.CreateCompleted || item.CreateFoundWithoutAnswer)'; To = '(item.WriteAccepted || item.CreateCompleted)'; Project = $integration; Class = $lostPost }
+    @{ Name = 'lost-create-message-dropped'; File = 'src/VamSys.Infrastructure/Api/Pipeline/ExecutionPipeline.cs'; From = 'item.Description?.Code is not ("ApiCreateCandidates" or "ApiCreateFoundFollowUpsNotSent")'; To = 'item.Description?.Code != "ApiCreateCandidates"'; Project = $integration; Class = $lostPost }
+    @{ Name = 'lost-create-not-applied-offered'; File = 'src/VamSys.Infrastructure/OperationsUnknownResolution.cs'; From = '&& !item.WriteAccepted && !item.CreateFoundWithoutAnswer'; To = '&& !item.WriteAccepted'; Project = $integration; Class = $lostPost }
+    @{ Name = 'found-create-not-new'; File = $finder; From = 'if (item.PreCreateCandidateIds!.Contains(id) || found.Contains(id)'; To = 'if (found.Contains(id)'; Project = $integration; Class = $lostPost }
+    @{ Name = 'found-create-any-time'; File = $finder; From = 'if (created >= start + shift.Value - margin && created <= end + shift.Value + margin)'; To = 'if (created != default)'; Project = $integration; Class = $lostPost }
     # Checkpoint order.
     @{ Name = 'no-inflight-save'; File = 'src/VamSys.Infrastructure/Api/StepWriter.cs'; From = "            record.FinishedAt = null;`n            await persist();"; To = '            record.FinishedAt = null;'; Project = $integration; Class = $writeSafety }
     @{ Name = 'unsaved-task-kept'; File = 'src/VamSys.Application/TaskSubmission.cs'; From = "if (!isDurable(job))`n                    owner.Jobs.Remove(job);"; To = '// MUTATION: the unsaved job lingers'; Project = $unit; Class = 'VamSys.UnitTests.Application.SubmissionServiceTests' }

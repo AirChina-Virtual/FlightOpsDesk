@@ -61,6 +61,47 @@ public class CreatedRecordRecoveryTests
         Assert.All(w.Remote.Server.Requests.SkipWhile(r => r.Method != "POST").Skip(1), r => Assert.Equal("GET", r.Method));
     }
 
+    // A one-step create of every other kind (the POST sends all its values) is bound and verified as before. The fleet is the
+    // test above; an aircraft with internal remarks is two steps (AircraftLostPostTests).
+    [Theory]
+    [InlineData("aircraft")]
+    [InlineData("aircraft-remarks-dropped")]
+    [InlineData("airport")]
+    [InlineData("route")]
+    public async Task A_one_step_create_of_any_kind_whose_answer_was_lost_is_bound_and_verified_as_before(string kind)
+    {
+        var w = new GoldenWorld();
+        w.Remote.AircraftCreateDropsInternalRemarks = kind == "aircraft-remarks-dropped";
+        if (kind.StartsWith("aircraft", StringComparison.Ordinal))
+            w.New(ResourceKind.Aircraft, ("Name", "Plane Two"), ("Registration", "QA-2"), ("Fleet ID", "4"));
+        else if (kind == "airport")
+            w.New(ResourceKind.Airports, ("ICAO/IATA", "ZZZZ"), ("Name", "New field"));
+        else
+            w.New(ResourceKind.Routes, ("Departure Airport (ICAO/IATA)", "EGLL"), ("Arrival Airport (ICAO/IATA)", "EGKK"), ("Type", "scheduled"),
+                ("Callsign", "CAO900"), ("Flight Number", "CA900"), ("Fleet IDs", "4"));
+        var posted = false;
+        w.Remote.Intercept = r =>
+        {
+            if (r.Method != "POST" || posted)
+                return null;
+            posted = true;
+            w.Remote.Respond(r);
+            w.Remote.Rows[w.Remote.Rows.Keys.Single(k => k.EndsWith("/90", StringComparison.Ordinal))]["created_at"] = DateTimeOffset.UtcNow.ToString("O");
+            throw new TimeoutException("simulated: created, answer lost");
+        };
+
+        await w.RunAsync();
+
+        var item = w.Job!.Items.Single();
+        Assert.Single(item.ApiSteps);
+        Assert.Equal(ItemState.Succeeded, item.State);
+        Assert.Equal("90", item.RemoteId);
+        Assert.True(item.CreateCompleted);
+        Assert.False(item.CreateFoundWithoutAnswer);
+        Assert.Equal(("90", "Automatic"), (item.RecoveryCandidates.Single().RemoteId, item.RecoveryCandidates.Single().Source));
+        Assert.Equal(["POST"], w.Remote.Server.Requests.Where(r => r.Method != "GET").Select(r => r.Method));
+    }
+
     [Fact]
     public async Task Two_records_that_could_be_the_create_are_listed_for_the_user_and_neither_is_bound()
     {

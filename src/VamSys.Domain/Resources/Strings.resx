@@ -1031,6 +1031,7 @@
   <data name="ApiDeleteCheckDone" xml:space="preserve"><value>只读删除核对完成；未确认项保留原状态，没有重新提交删除。</value></data>
   <data name="ApiTaskCounts" xml:space="preserve"><value>API 核对 {success}/{total} · 人工确认 {manual} · 未知 {unknown}</value></data>
   <data name="ApiNotSent" xml:space="preserve"><value>请求尚未发送到服务器（在等待限流、刷新令牌或取消时中断），已放回待执行；继续任务即可重试。</value></data>
+  <data name="ApiCreateFoundFollowUpsNotSent" xml:space="preserve"><value>新建请求的应答丢失，但服务器上已找到这次建好的记录 {id}；Internal Remarks 等需要另行写入的字段没有写入，程序也不会补写。可以在“核对”中选择接受服务器的值，未写入的值会作为冲突留在草稿中。</value></data>
   <data name="ApiResumeCreate" xml:space="preserve"><value>记录已创建，后续步骤尚未被服务器处理。继续任务时会先核对已创建的记录，再补发剩余步骤，不会重复创建。</value></data>
   <data name="ApiVerifyNotApplied" xml:space="preserve"><value>API 核对未生效</value></data>
   <data name="ApiNotAppliedHelp" xml:space="preserve"><value>如认为这次写入没有生效，可用 API 只读核对：新建项须查不到符合判重条件的记录，修改或删除项读回的当前值须仍与修改前一致。核对通过后标为失败，本地草稿保留，可重新审阅提交；不通过则保持原状态。</value></data>

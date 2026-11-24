@@ -208,7 +208,8 @@ public sealed class FakeRemote
         // fleets (fleets: 2026-11-12, route 14217362), nor the remarks sent with it (2026-11-16, route 14327585).
         if (collection == "routes" && body["type"]?.ToString() == "jumpseat")
         { row["callsign"] = null; row["flight_number"] = null; row["fleet_ids"] = null; if (row.ContainsKey("remarks")) row["remarks"] = null; }
-        if (AircraftCreateDropsInternalRemarks && collection.StartsWith("fleet/", StringComparison.Ordinal) && row.ContainsKey("internal_remarks"))
+        // Live (aircraft-remarks.json): the created aircraft always carries "internal_remarks": null, sent or not.
+        if (AircraftCreateDropsInternalRemarks && collection.StartsWith("fleet/", StringComparison.Ordinal))
             row["internal_remarks"] = null;
         row["created_at"] = Stamp;
         row["updated_at"] = Stamp;

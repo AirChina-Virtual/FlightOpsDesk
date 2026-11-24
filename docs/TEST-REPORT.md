@@ -22,6 +22,44 @@
 人工查看（明暗主题、高对比度、100%／150%／200% 缩放、读屏抽查、单元格首次点击）已于 2026-11-16 由用户在正式包上完成，未报告问题；软件真实写入验收不在上表内。云端 CI 于 2026-11-09 首次在私有远端运行：恢复、分析器基线、构建和单元测试通过；集成测试第一次有 1 个进程终止测试读库报 `disk I/O error`，重跑通过，测试已改为等数据库文件释放后再检查（见 [综合优化计划](history/IMPROVEMENT-PLAN-2026-11-08.md) 0.5）。原始结果归档在 `archive/2026-11-03-r8/measurements.zip`。
 
 
+## 新建飞机的 POST 应答丢失后可以接受服务器的值（2026-11-23）
+
+分支 `fix/aircraft-lost-post`，基于 eb92b0a。worktree 里建了指向 `vamsys/.tools` 的目录链接 `.tools`（已在 `.gitignore` 里）。
+
+**问题。** 填了 Internal Remarks 的新建飞机是 POST（不带这一列）加一次 PUT。POST 应答丢失时 PUT 不发（正确），但自动查找和输入 ID 都按全部期望值（含 PUT 的 `internal_remarks`）核对，记录不可能通过；“接受服务器的值”又要求新建已应答或写入已接受。这一项永远停在“结果未知”，挡住刷新和修改连接设置。
+
+**改法。**
+
+- 新增可选字段 `ChangeItem.CreateFoundWithoutAnswer`（只在为真时写出，旧任务读出为假，数据库仍为 v4）。没有复用 `CreateCompleted`：它会让“补发后续步骤”（`CanResumeCreate`）、失败处理和 POST 守卫把这一项当成“新建已应答”，见下面 `lost-create-bound-as-answered`。
+- `UnknownResolver.CanBindLostCreate`：新建、未应答、未接受、多于一步、第一步是仍处于 InFlight 的 POST、后续步骤都未发出。只有这种项改变行为；一步的新建 POST 值就是全部值，不受影响。
+- 自动查找（`ReadbackVerifier.ContentMatches`）对这种项只比较 POST 发出的值；其他条件（提交前不存在、判重规则、创建时间窗、恰好一条）不变。
+- `RecoveryStage`：完整核对不通过时，若记录通过 POST 值核对（`MatchesCreated`），就写入 `RemoteId`、`After` 的身份和 `CreateFoundWithoutAnswer`，清掉候选 ID，保持 Unknown，提示 `ApiCreateFoundFollowUpsNotSent`（中英文）。每轮结束时的核对保留这条提示。
+- `OperationsServerValueResolver.CanAccept` 接受这个字段；“API 核对未生效”（`CanCheck`）不再提供给这种项。执行管线、检查点指纹也认这个字段。
+- 模拟服务器在“新建飞机不保存 internal_remarks”模式下，新建的飞机总是带 `"internal_remarks": null`（与 `aircraft-remarks.json` 中真实应答一致）。原来没发这一列时记录里没有这个键，接受后不会产生冲突。
+
+**测试。**
+
+- `AircraftLostPostTests`（新，7 项，使用真实数据库的 `StoredWorld`）：
+  - `Without_the_posts_answer_no_put_is_ever_sent`（由 `AircraftInternalRemarksTests` 移入并改写，那个类剩 8 项）：本轮结束的核对自动绑定记录 90，仍为 Unknown 并带新提示，磁盘与内存一致；“继续”只有 GET；接受服务器的值后为 ManuallyConfirmed、不登记为已验证操作、不再挡住刷新和清理，快照的 Internal Remarks 为空、草稿保留 `hangar 3` 并列为冲突；之后“继续”和从磁盘重启运行都不写入。全程一次 POST、零次 PUT。
+  - 检查点保存后重启：读出的任务与内存一致，重启后的运行只有 GET，状态不变，并能在重启后的工作区接受服务器的值。
+  - 手动输入正确的 ID（记录创建时间在窗外，程序不会自动绑定）：同样绑定，接受后结果相同，没有写入。
+  - 输入内容不符的 ID：不绑定（`RemoteId`、身份为空，不能接受），提示仍为 `ApiUnknown`，只有 GET。
+  - 提交前已存在、时间窗外、两条候选：都不绑定；两条候选时列出两条并提示 `ApiCreateCandidates`（旧逻辑一条也找不到）。
+- `CreatedRecordRecoveryTests` +4：飞机（不填 Internal Remarks，模拟服务器两种模式）、机场、航线的一步新建在 POST 应答丢失时自动绑定并核对成功，`CreateFoundWithoutAnswer` 为假，只有一次 POST。机队已有测试。
+- 先在旧逻辑上运行（只保留新字段以便编译）：绑定的 3 项和两条候选的 1 项失败；提交前已存在、时间窗外、ID 不符和一步新建的 4 项是守护现有规则的测试，旧逻辑上本应通过，由下面的变异确认它们会发现放宽。
+- `scripts/test-mutations.ps1` 新增 9 个变异（类 `AircraftLostPostTests`），并更新了因本次改动移位的 `unknown-not-recovered` 锚点。逐个运行（`-Only`），10 个全部被发现：
+  - `lost-create-all-values`（查找仍按全部值比较）、`lost-create-not-bound`（不绑定）、`lost-create-not-acceptable`（不能接受）、`lost-create-not-applied-offered`（提供“API 核对未生效”）：各 3 项失败；`lost-create-message-dropped`（本轮结束的核对丢掉新提示）：2 项失败。
+  - `lost-create-binds-any-record`（不核对 POST 值就绑定）：输入内容不符 ID 的 1 项失败。
+  - `lost-create-bound-as-answered`（复用 `CreateCompleted` 并把 POST 标为已应答）：3 项失败，在绑定后的状态断言处就被发现（这种做法下“继续”会通过 `CanResumeCreate` 补发 PUT）。
+  - `found-create-not-new`（不检查提交前已存在）：1 项失败；`found-create-any-time`（不检查创建时间窗）：3 项失败。
+  - `unknown-not-recovered`：`WriteSafetyTableTests` 35 项失败。
+  
+  日志在 worktree 的 `artifacts/scratch/mutation-logs`（不在仓库里）。
+
+**验证。** `pwsh scripts/check-all.ps1 -Mode Full` 全部通过（261 s）：Release 构建 0 错误、没有新增警告；单元测试 Release／Debug 各 1,939 项通过；集成测试 Release／Debug 各 803 项通过、2 项跳过；分析器警告 45 条，基线允许 47 条。单元测试的清单文件只多了新提示键（两种语言各一条、源码引用一条）和新字段 `CreateFoundWithoutAnswer`（`ignore=WhenWritingDefault`）。
+
+**没有验证的。** 没有连接真实服务器，“POST 应答丢失、记录已建好”只在模拟服务器上验证。2026-11-17 之前保存的单次 POST 旧任务在新建应答丢失时仍找不到记录，只能在 Orwell 核对（用户的数据里没有这样的任务，结案）。没有改界面代码和 QA 验证代码（“核对未知结果”和“接受服务器的值”沿用现有对话框，只多了一条提示文字），所以没有重新生成程序包，也没有跑窗口测试；新提示在任务中心的显示没有在窗口里看过。
+
 ## 两个偶发失败的窗口测试改稳（2026-11-23）
 
 分支 `test/flaky-window-tests`，基于 3907798。只改测试和 QA 验证命令（`tests/UiVerification`，只编进 QA 包），没有改产品代码。日志在 worktree 的 `artifacts/scratch`（不在仓库里）。

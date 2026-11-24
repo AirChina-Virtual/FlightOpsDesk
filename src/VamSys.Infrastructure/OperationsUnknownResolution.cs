@@ -41,7 +41,7 @@ public static class OperationsPendingDiscard
 public sealed class OperationsUnknownResolver(OperationsAdapter api, Workspace workspace)
 {
     // Accepted, created or soft-deleted writes cannot be disproved by reading.
-    public static bool CanCheck(ChangeItem item) => item.State == ItemState.Unknown && !item.CreateCompleted && !item.WriteAccepted
+    public static bool CanCheck(ChangeItem item) => item.State == ItemState.Unknown && !item.CreateCompleted && !item.WriteAccepted && !item.CreateFoundWithoutAnswer
         && !IndependentApiEvidence.IsSoftDelete(item);
 
     public async Task<bool> ResolveNotAppliedAsync(BatchJob job, ChangeItem item, IBatchCheckpointWriter writer, CancellationToken ct)

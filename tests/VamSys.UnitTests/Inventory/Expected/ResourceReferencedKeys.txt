@@ -16,6 +16,7 @@ direct:ApiConnectFirst => in resx
 direct:ApiConnected => in resx
 direct:ApiCreateCandidateList => in resx
 direct:ApiCreateCandidates => in resx
+direct:ApiCreateFoundFollowUpsNotSent => in resx
 direct:ApiCredentials => in resx
 direct:ApiCredentialsHelp => in resx
 direct:ApiDeleteCheckDone => in resx

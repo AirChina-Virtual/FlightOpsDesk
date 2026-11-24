@@ -270,7 +270,7 @@ public sealed class ChangeJournal
         {
             Add(item.Id.GetHashCode()); Add((int)item.State); Add((int)item.Kind); Add((int)item.Resource);
             Text(item.RemoteId); Text(item.RecoveryCandidateId); Text(item.Message); Text(item.Diagnostic);
-            Add((item.Rebased ? 1 : 0) | (item.CreateCompleted ? 2 : 0) | (item.WriteAccepted ? 4 : 0) | (item.RequiresAirlineParameter ? 8 : 0));
+            Add((item.Rebased ? 1 : 0) | (item.CreateCompleted ? 2 : 0) | (item.WriteAccepted ? 4 : 0) | (item.RequiresAirlineParameter ? 8 : 0) | (item.CreateFoundWithoutAnswer ? 16 : 0));
             Add(item.RecoveryCandidates.Count); Add(item.Dependencies.Count); Add(item.VerificationDifferences.Count); Add(item.PreCreateCandidateIds?.Count ?? -1); Add(item.FoundCreateCandidates?.Count ?? -1);
             Ref(item.Description); Ref(item.DiagnosticDetails); Ref(item.ReadbackDetails); Ref(item.FirstReadbackDetails); Ref(item.DeletionVerification); Ref(item.ManualResolution); Ref(item.PreflightComparison); Ref(item.ApiExpectedValues);
             Ref(item.After); Ref(item.Before); Add(item.After.Fields.Count); Add(item.After.Identity?.GetHashCode() ?? 0);

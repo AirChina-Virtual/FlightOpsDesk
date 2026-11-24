@@ -200,7 +200,7 @@ public sealed class ChangeItem
     List<RecoveryCandidateAttempt>? recoveryCandidates;
     public List<RecoveryCandidateAttempt> RecoveryCandidates { get => recoveryCandidates ??= []; set => recoveryCandidates = value; }
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool CanProposeRecoveryId => State == ItemState.Unknown && Kind == ChangeKind.Create && !CreateCompleted && After.Identity == null;
+    public bool CanProposeRecoveryId => State == ItemState.Unknown && Kind == ChangeKind.Create && !CreateCompleted && !CreateFoundWithoutAnswer && After.Identity == null;
     [System.Text.Json.Serialization.JsonIgnore]
     public string? EditableRecoveryId => RecoveryCandidateId ?? (CanProposeRecoveryId ? RemoteId : null);
     public void ProposeRecoveryId(string value, string? source = null)
@@ -218,6 +218,12 @@ public sealed class ChangeItem
     }
     public bool Rebased { get; set; }
     public bool CreateCompleted { get; set; }
+    // A create whose POST answer was lost and whose later steps never left (an aircraft's internal remarks, written by a
+    // PUT after the POST): the record the POST made was found by the values the POST sent and is bound in RemoteId, but
+    // the later steps are never sent for it (CreateCompleted stays false). Only "accept the server's value" settles it.
+    // Missing (false) in tasks saved before this field existed.
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    public bool CreateFoundWithoutAnswer { get; set; }
     public bool WriteAccepted { get; set; }
     public string? Diagnostic { get; set; }
     public ApiDiagnostic? DiagnosticDetails { get; set; }

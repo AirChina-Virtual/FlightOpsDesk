@@ -79,13 +79,18 @@ internal sealed class ReadbackVerifier(ApiContext ctx, RequestPlanners planners)
     internal static TimeSpan ServerClockOffset(ApiDiagnostic? response)
         => response?.ServerDate is { } server ? server - response.FinishedAt : TimeSpan.Zero;
 
-    // Whether a record carries every value the create sent, leaving out the checks that say whether it is new and
-    // when it was made (the caller decides those).
+    // Whether a record carries every value the create's POST sent, leaving out the checks that say whether it is new and
+    // when it was made (the caller decides those). For a one-step create these are all its values; for a create whose
+    // later steps never left (UnknownResolver.CanBindLostCreate) only the POST's, since the record cannot hold the rest.
     public bool ContentMatches(ChangeItem item, DataRow current)
     {
         ctx.CheckConnection(current);
-        return VerifyPlanned(item, current, item.After).Differences.All(d => d.Field is "pre_create_candidates" or "request_window" or "created_at");
+        var verdict = UnknownResolver.CanBindLostCreate(item)
+            ? Verify(item, current, item.After, PostValues(item)) : VerifyPlanned(item, current, item.After);
+        return verdict.Differences.All(d => d.Field is "pre_create_candidates" or "request_window" or "created_at");
     }
+
+    static IReadOnlyDictionary<string, JsonElement> PostValues(ChangeItem item) => ApiSteps.ExpectedValues([ApiSteps.ToStep(item.ApiSteps[0])]);
 
     // The values a write is expected to have left: those saved with the item, or what its plan says now.
     ReadbackVerification VerifyPlanned(ChangeItem item, DataRow current, DataRow expected)
@@ -137,7 +142,7 @@ internal sealed class ReadbackVerifier(ApiContext ctx, RequestPlanners planners)
     {
         ctx.CheckConnection(current);
         ctx.CheckConnection(item.After);
-        return Verify(item, current, item.After, ApiSteps.ExpectedValues([ApiSteps.ToStep(item.ApiSteps[0])])).Passed;
+        return Verify(item, current, item.After, PostValues(item)).Passed;
     }
 
     // Saves what the last GET returned and why it passed or failed, on the item, so a failed check explains itself.
